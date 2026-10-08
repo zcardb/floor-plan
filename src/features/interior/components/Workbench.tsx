@@ -1163,6 +1163,7 @@ export function Workbench(p: Props) {
           ) : (
             <PropertyPanel
               splitWall={view === '2d' && tool === 'select' ? openWallSplit : undefined}
+              mergeWall={view === '2d' && tool === 'select' ? id => void cancelWallSplit(id) : undefined}
               transaction={sizeTransaction} showCosts={p.loggedIn}
               design={d}
               selection={selection}

@@ -3,6 +3,7 @@ import { ManagementLoading } from './ManagementLoading';
 import { LoadError } from './LoadError';
 import { Plus, Pencil, Copy, Trash2, LayoutTemplate, RefreshCw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { EditorTooltip } from '@/components/ui/editor-tooltip';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';

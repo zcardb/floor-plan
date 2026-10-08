@@ -14,7 +14,6 @@ import {
   Info,
   LayoutGrid,
   Ruler,
-  Scissors,
 } from "lucide-react";
 import { notify } from "@/lib/notify";
 import { floorMaterialOf, floorMaterialsOf } from "../model/floorMaterials";
