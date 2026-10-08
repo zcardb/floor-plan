@@ -13,7 +13,7 @@ export function AccountCostDialog({group,entryKey,name,groupTitle,unit,design,ch
       <div className="cms-detail-body single">
         <PriceInput key={entryKey+String(price)} value={price} label={name+'账号默认单价'} onApply={v=>change(d=>setPrice(d,group,entryKey,v))}/>
         <p className="footnote">留空并应用即回到「未定价」；内置参考价不受影响。</p>
-        {group==='floorPrices'&&<MaterialProcurementEditor design={design} material={entryKey} change={change}/>}
+        {group==='floorPrices'&&<MaterialProcurementEditor design={{...design,rooms:[]}} material={entryKey} change={change}/>}
       </div>
       <div className="cms-detail-actions"><button className="cms-primary-action" onClick={done}>完成</button></div>
     </DialogContent>

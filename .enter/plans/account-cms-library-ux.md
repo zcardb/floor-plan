@@ -126,7 +126,42 @@ const remove = useCallback(async (catalogId: string) => {
 - 新增：`src/features/interior/components/CmsFilterBar.tsx`、`AccountFurnitureLibrary.tsx`、`AccountFurnitureDialog.tsx`、`AccountCostDialog.tsx`
 - 修改：`src/features/interior/components/AccountCMS.tsx`、`AccountCostManager.tsx`、`src/features/interior/cloud/useFurnitureCatalog.ts`、`src/index.css`
 
-## Implementation checklist
+## Implementation checklist（已完成项）
+
+- [x] `useFurnitureCatalog` 导出 `remove(catalogId)`：按 `owner_id + catalog_id` 删除，后端错误信息原样抛出。
+- [x] `CmsFilterBar` 渲染「全部」与传入 chips，选中项带 `active` 与 `aria-pressed`，`meta` 显示在标签后。
+- [x] `AccountCMS` 家具页渲染 `AccountFurnitureLibrary`，传入 `costs.settings` 作为内置参考价来源。
+- [x] 家具合并列表按 `catalogId` 去重且自定义优先；自定义带 accent 色「自定义」徽标，内置带中性「内置」徽标。
+- [x] 家具「全部」视图按 6 个分类分块，每块显示分类名与款数，自定义条目排在该块最前。
+- [x] 家具选择具体分类只显示该分类条目；搜索时跨分类显示「搜索结果」；结果为空显示「没有匹配的家具」。
+- [x] 家具卡片价格行：自定义显示自身 `price`（含 `0`）或 `未定价`；内置显示 `furniturePrices[catalogId]` 参考价或 `未定价`。
+- [x] 家具副标题显示「内置 78 + 自定义 n」总款数，「加载更多家具」仍调用 `load(true)`。
+- [x] 内置家具点击 → 详情弹窗只读，含「单价请在成本管理中设置」提示且无删除按钮。
+- [x] 自定义家具点击 → 详情弹窗可改单价（`catalog.save` upsert 并即时更新卡片），可在 AlertDialog 确认后删除；取消不删除。
+- [x] `AccountCostManager` 顶部进度行显示「已定价 x / 共 y」并在有未定价项时给出提示文案。
+- [x] 成本筛选条 meta 显示每组「已定价 / 总条数」，切换分类只渲染该组卡片。
+- [x] 成本卡片显示组名、名称、`元 / 单位`、大号价格与来源徽标（账号默认 / 内置参考）。
+- [x] 点击成本卡片 → `AccountCostDialog` 改价经 `setPrice` 写入 `draft`，关闭弹窗后卡片即时显示新价。
+- [x] 地面材料弹窗内嵌 `MaterialProcurementEditor`，应用采购规格后 `draft.procurement` 更新且「保存账号默认」可持久化。
+- [x] 「家具款式」组仍合并自定义 + 内置家具，`catalogId` 重复时自定义优先。
+- [x] 「保存账号默认」按钮、保存中/已保存/错误状态与 `saved` 重置行为与现状一致。
+- [x] 新样式全部使用语义 token（`hsl(var(--...))`），无硬编码颜色、无 emoji 图标（图标均为 lucide-react）。
+- [x] `index.css` 新增 `.cms-filter-bar/.cms-toolbar/.cms-category-block/.cms-progress/.cms-item-grid/.cms-item-card/.cms-item-visual/.cms-item-badge/.cms-detail-dialog`，删除 `.cms-cost-grid/.cms-category-counts`，并在 700px 断点补齐移动端规则。
+- [x] 全仓 `src/**` 中不再有 `cms-cost-grid`、`cms-category-counts`、`cms-furniture-visual` 的引用（grep 无匹配）。
+
+## Verification checklist
+
+- [x] `pnpm lint` 通过。
+- [x] `pnpm exec tsc --noEmit` 通过。
+- [x] `pnpm test`（`vitest run src/features/interior`）33 个用例全部通过（模型层未改动）。
+- [x] `pnpm run build` 成功。
+- [ ] 正常路径（需登录，人工确认）：登录 → 家具管理，「全部」按 6 个分类分块，每块款数 = 内置款数 + 已加载自定义款数；切到「客厅」只显示客厅家具。
+- [ ] 正常路径（需登录，人工确认）：家具搜索「沙发」跨分类命中；清空搜索回到分块视图。
+- [ ] 正常路径（需登录，人工确认）：成本管理点「墙面材料 → 乳胶漆」弹窗改价 → 卡片显示「账号默认」与新区值、进度行「已定价」+1 →「保存账号默认」→ 刷新页面仍为新值。
+- [ ] 默认路径（需登录，人工确认）：新账号家具库不再出现「还没有自定义家具」空状态，而是内置家具分块网格；空搜索/空分类显示新空状态。
+- [ ] 边界（需登录，人工确认）：地面材料弹窗内应用采购规格（800×800、损耗 5%）后单位随 `draft.procurement` 变化；清空单价后卡片显示 `未定价`。
+- [ ] 边界（需登录，人工确认）：自定义家具填价 0 显示 `¥0`（不是 `未定价`）；删除自定义家具时点「取消」不会删除。
+- [ ] 响应式：账号区（家具库/成本页）与详情弹窗在 `desktop_1280` 与 `mobile_390` 下的表现——账号区必须登录，截图工具无登录态，故**未做自动截图验证**，需在预览中人工确认。
 
 - [ ] `useFurnitureCatalog` 导出 `remove(catalogId)`：按 `owner_id + catalog_id` 删除，后端错误信息原样抛出。
 - [ ] `CmsFilterBar` 渲染「全部」与传入 chips，选中项带 `active` 与 `aria-pressed`，`meta` 显示在标签后。

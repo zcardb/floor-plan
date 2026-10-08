@@ -378,6 +378,47 @@ export function useProjects() {
     },
     [persist, save],
   );
+  const saveGuestToCloud = useCallback(async (): Promise<boolean> => {
+    const p = activeRef.current;
+    if (!sessionRef.current || !p || p.cloud) return false;
+    const next: Project = {
+      ...p,
+      id: uid(),
+      name: "修改的第一个版本",
+      revision: 0,
+      updatedAt: new Date().toISOString(),
+      cloud: true,
+    };
+    const { error } = await supabase
+      .from("interior_design_projects")
+      .insert({
+        id: next.id,
+        name: next.name,
+        state: next.state as unknown as Json,
+        schema_version: 2,
+      });
+    if (error) {
+      toast.error("保存到云端失败：" + error.message);
+      return false;
+    }
+    setCloud((c) => [
+      {
+        id: next.id,
+        name: next.name,
+        revision: 0,
+        updatedAt: next.updatedAt,
+        cloud: true,
+      },
+      ...c,
+    ]);
+    epoch.current++;
+    dirty.current = false;
+    activeRef.current = next;
+    setActive(next);
+    setStatus("云端已保存");
+    toast.success("已保存到云端项目「修改的第一个版本」");
+    return true;
+  }, []);
   const remove = useCallback(
     async (p: ProjectSummary) => {
       if (!sessionRef.current) return;
