@@ -36,11 +36,12 @@ export function AccountFurnitureDialog({item,isCustom,referencePrice,onOpenChang
   };
   return <>
     <Dialog open onOpenChange={v=>{if(!closeLocked)onOpenChange(v);}}>
-      <DialogContent className="cms-detail-dialog" onEscapeKeyDown={event=>{if(closeLocked)event.preventDefault();}} onInteractOutside={event=>{if(closeLocked)event.preventDefault();}}>
+      <DialogContent className="cms-detail-dialog flex max-h-[calc(100dvh-2rem)] max-w-[640px] flex-col overflow-hidden" onEscapeKeyDown={event=>{if(closeLocked)event.preventDefault();}} onInteractOutside={event=>{if(closeLocked)event.preventDefault();}}>
         <DialogHeader>
           <DialogTitle>{item.name}</DialogTitle>
           <DialogDescription>{item.category} · {isCustom?'自定义家具':'内置家具'} · 画布按参考几何绘制，不是 3D 建模。</DialogDescription>
         </DialogHeader>
+        <div className="cms-detail-scroll">
         <div className="cms-detail-body">
           <div className="cms-detail-visual">
             {item.imageUrl?<img src={item.imageUrl} crossOrigin="anonymous" alt={item.name}/>:<svg viewBox={`${-item.w/2-100} ${-item.d/2-100} ${item.w+200} ${item.d+200}`}><FurnitureShape f={item}/></svg>}
@@ -59,6 +60,7 @@ export function AccountFurnitureDialog({item,isCustom,referencePrice,onOpenChang
           </div>
         </div>
         {isCustom&&saveGeometry&&<fieldset disabled={busy||commitBusy||!!retryPrice} className="cost-edit-fields"><FurnitureGeometryEditor key={item.type+item.shape+item.w+item.d} item={item} save={saveGeometry} onSaved={onChanged} onWorkChange={setEditorPhase}/></fieldset>}
+        </div>
         {failure&&<div className="cost-save-error" role="alert"><span>{failure}</span>{retryPrice&&<Button variant="outline" disabled={working} onClick={()=>void retry()}>重试保存</Button>}</div>}
         <p className="cost-sync" role="status">{editorPhase==='generating'?'正在生成，原图尚未替换':working?'正在保存…':saved&&!failure?'已保存并生效':isCustom?'价格应用后自动保存；新图片需手动保存':'价格应用后自动保存'}</p>
         <div className="cms-detail-actions">
