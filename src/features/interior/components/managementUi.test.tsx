@@ -67,6 +67,13 @@ describe('管理端精简与加载分支', () => {
     expect(empty).toContain('还没有设计项目');
     expect(empty).not.toContain('cms-loading-placeholder');
   });
+  it('列表读取失败显示错误与重试，而不是“还没有设计项目”', () => {
+    const failed = render(createElement(ProjectManager, { projects: { ...projects(false, []), listError: 'Failed to fetch' } as ReturnType<typeof useProjects>, opened: () => {} }));
+    expect(failed).toContain('role="alert"');
+    expect(failed).toContain('云端项目读取失败');
+    expect(failed).toContain('重试');
+    expect(failed).not.toContain('还没有设计项目');
+  });
   it('成本页账号家具读取使用搜索框原位反馈并保留价格列表', () => {
     const html = render(createElement(AccountCostManager, { settings: {}, save: async () => true, saving: false, error: '', items: [], onDirty: () => {}, onNew: () => {}, hasMore: false, loading: true, catalogError: '', loadMore: () => {}, reload: () => {} }));
     expect(html).toContain('aria-busy="true"');

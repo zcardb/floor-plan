@@ -2,7 +2,7 @@ import { isValidElement, type ReactElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Design, Project } from '../model/types';
 
-const state = vi.hoisted(() => ({ values: [] as unknown[], cursor: 0, effects: [] as (() => unknown)[], design: null as Design | null, change: vi.fn(), commit: vi.fn(), cancel: vi.fn() }));
+const state = vi.hoisted(() => ({ values: [] as unknown[], cursor: 0, effects: [] as (() => unknown)[], design: null as Design | null, change: vi.fn(), commit: vi.fn(), cancel: vi.fn(), confirm: vi.fn() }));
 vi.mock('react', async original => ({
   ...await original<typeof import('react')>(),
   useState: (initial: unknown) => {
@@ -14,7 +14,7 @@ vi.mock('react', async original => ({
   useCallback: (callback: unknown) => callback,
   useRef: (value: unknown) => ({ current: value }),
 }));
-vi.mock('@/components/ui/confirm-dialog', () => ({ useConfirm: () => vi.fn() }));
+vi.mock('@/components/ui/confirm-dialog', () => ({ useConfirm: () => state.confirm }));
 vi.mock('./CustomFurnitureDialog', () => ({ CustomFurnitureDialog: () => null }));
 vi.mock('../model/useDesign', () => ({ useDesign: () => ({
   design: state.design, current: { get current() { return state.design; } }, change: state.change, commit: state.commit, preview: vi.fn(), undo: vi.fn(), redo: vi.fn(),
@@ -56,6 +56,19 @@ function tools(tree: Node[]) {
   return nodes(group);
 }
 beforeEach(() => { state.values = []; state.cursor = 0; state.effects = []; state.design = blankDesign(); state.change.mockReset(); state.commit.mockReset(); state.cancel.mockReset(); });
+describe('合并确认与快照', () => {
+  it('取消无提交，确认仅提交一次并选中原根，过期拒绝', async () => {
+    const original = blankDesign();
+    const { splitWall } = await import('../model/wallSplit');
+    state.design = splitWall(original, 'outer-0', [300]).design;
+    const callback = () => render().find(n => n.type === PropertyPanel)!.props.mergeWall as (id: string) => void;
+    state.confirm.mockResolvedValue(false); callback()('outer-0'); await Promise.resolve(); expect(state.commit).not.toHaveBeenCalled();
+    state.confirm.mockResolvedValue(true); callback()('outer-0'); await Promise.resolve(); expect(state.commit).toHaveBeenCalledOnce();
+    expect(state.values[0]).toEqual({ kind: 'wall', id: 'outer-0' });
+    state.commit.mockClear(); let resolve!: (yes: boolean) => void; state.confirm.mockImplementation(() => new Promise<boolean>(r => { resolve = r; }));
+    callback()('outer-0'); state.design = structuredClone(state.design!); resolve(true); await Promise.resolve(); expect(state.commit).not.toHaveBeenCalled();
+  });
+});
 describe('分割墙段共享入口及快照提交', () => {
   const open = (entry: typeof PropertyPanel | typeof SelectionEditor = PropertyPanel) => {
     const canvas = render().find(n => n.type === PlanCanvas)!;

@@ -9,7 +9,6 @@ const Toaster = ({ ...props }: ToasterProps) => (
     theme="light"
     position="top-center"
     offset={64}
-    closeButton={false}
     gap={8}
     className="toaster group"
     icons={{
@@ -31,13 +30,12 @@ const Toaster = ({ ...props }: ToasterProps) => (
         error: "group-[.toaster]:border-destructive/30 group-[.toaster]:bg-toast-surface",
         warning: "group-[.toaster]:border-warning/30 group-[.toaster]:bg-toast-surface",
         info: "group-[.toaster]:border-border",
-        closeButton:
-          "group-[.toast]:border-border group-[.toast]:bg-popover group-[.toast]:text-muted-foreground hover:group-[.toast]:text-foreground",
         actionButton: "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
         cancelButton: "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
       },
     }}
     {...props}
+    closeButton={false}
   />
 )
 

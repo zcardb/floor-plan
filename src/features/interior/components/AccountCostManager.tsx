@@ -39,9 +39,11 @@ export function AccountCostManager({ settings, save, saving, error, items, floor
     </header>
     <div className="cost-controls">
       <div className="cost-toolbar">
-        <div className="cms-search cost-search" aria-busy={loading}>{loading?<Loader2 className="animate-spin" size={17} aria-label="加载家具"/>:<Search size={17}/>}<input aria-label="搜索材料或家具" placeholder="搜索材料、家具名称…" value={query} onChange={event => setQuery(event.target.value)}/>{query && <button type="button" aria-label="清空搜索" onClick={() => setQuery('')}><X size={16}/></button>}</div>
+        <div className="cms-search cost-search" aria-busy={loading}>{loading?<Loader2 className="animate-spin" size={17} aria-label="加载家具"/>:<Search size={17}/>}<input aria-label="搜索材料或家具" placeholder="搜索材料、家具名称…" value={query} onChange={event => setQuery(event.target.value)}/>{query && <EditorTooltip label="清空搜索" description="清除关键词，显示全部单价项"><button type="button" aria-label="清空搜索" onClick={() => setQuery('')}><X size={16}/></button></EditorTooltip>}</div>
         {(busy || failure || commit.saved) && <span className="cost-sync" role="status">{busy ? <><Loader2 size={14} className="animate-spin"/>正在保存…</> : failure ? '修改尚未保存' : <><Check size={14}/>已保存并生效</>}</span>}
-        <Button className="cost-new" disabled={busy || !!commit.pending} onClick={() => onNew(category)}><Plus size={16}/>新建家具</Button>
+        <EditorTooltip label="新建家具" description="创建自定义家具，并设置它的参考单价" disabled={busy || !!commit.pending}>
+          <Button className="cost-new" disabled={busy || !!commit.pending} onClick={() => onNew(category)}><Plus size={16}/>新建家具</Button>
+        </EditorTooltip>
       </div>
       <div className="cost-group-columns">
         {groups.map(group => <div className={'cost-group cost-group--' + (group.major === '硬装' ? 'hard' : 'soft')} key={group.major}>

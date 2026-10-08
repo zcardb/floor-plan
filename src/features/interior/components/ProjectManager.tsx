@@ -102,7 +102,9 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
         <AlertDialogHeader><AlertDialogTitle>删除「{deleting?.name}」？</AlertDialogTitle><AlertDialogDescription>不可撤销。请先下载需要保留的方案。</AlertDialogDescription></AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={rowAction.pending}>取消</AlertDialogCancel>
-          <Button variant="destructive" loading={!!deleting && isPending('remove', deleting)} onClick={() => { if (deleting) void rowAction.run('remove', deleting); }}>删除项目</Button>
+          <EditorTooltip label="删除项目" description="立即永久删除这个项目，不可恢复" disabled={!deleting || rowAction.pending} side="top">
+            <Button variant="destructive" loading={!!deleting && isPending('remove', deleting)} onClick={() => { if (deleting) void rowAction.run('remove', deleting); }}>删除项目</Button>
+          </EditorTooltip>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
