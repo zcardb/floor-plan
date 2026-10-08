@@ -8,7 +8,10 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Mail, LockKeyhole, Cloud, Loader2 } from "lucide-react";
+const authInput =
+  "h-auto border-0 bg-transparent px-0 py-0 text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 md:text-xs max-[700px]:text-base";
 export function AuthDialog({
   open,
   onOpenChange,
@@ -85,7 +88,8 @@ export function AuthDialog({
             <span>邮箱</span>
             <div>
               <Mail size={17} />
-              <input
+              <Input
+                className={authInput}
                 name="email"
                 type="email"
                 placeholder="you@example.com"
@@ -98,7 +102,8 @@ export function AuthDialog({
             <span>密码</span>
             <div>
               <LockKeyhole size={17} />
-              <input
+              <Input
+                className={authInput}
                 name="password"
                 type="password"
                 placeholder="至少 6 位密码"
