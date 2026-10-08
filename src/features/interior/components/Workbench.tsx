@@ -681,6 +681,19 @@ export function Workbench(p: Props) {
             <Redo2 size={16} />
           </ToolButton>
         </div>
+        <span className="toolbar-divider" />
+        <div className="tool-group danger-actions">
+          <ToolButton label="重置方案" onClick={resetDesign}>
+            <RotateCcw size={16} />
+          </ToolButton>
+          <ToolButton
+            label="清空家具"
+            disabled={!d.furniture.length}
+            onClick={clearFurniture}
+          >
+            <Trash2 size={16} />
+          </ToolButton>
+        </div>
         <div className="header-spacer" />
         <div className="toolbar-right">
           <DropdownMenu>

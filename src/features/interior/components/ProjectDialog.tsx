@@ -7,6 +7,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   FolderOpen,
   Plus,
@@ -130,7 +131,8 @@ export function ProjectDialog(p: Props) {
               </button>
             </div>
             <div className="project-name-entry">
-              <input
+              <Input
+                className="h-8 flex-1 min-w-0 rounded-[5px] text-[11px]"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 maxLength={100}
@@ -239,7 +241,8 @@ export function ProjectDialog(p: Props) {
               setRename(null);
             }}
           >
-            <input
+            <Input
+              className="h-8 flex-1 min-w-0 rounded-[5px] text-[11px]"
               autoFocus
               value={renameText}
               onChange={(e) => setRenameText(e.target.value)}

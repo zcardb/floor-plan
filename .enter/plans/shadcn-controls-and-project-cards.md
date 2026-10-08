@@ -71,27 +71,28 @@
 - 复用现成组件：`@/components/ui/{select,input,label,checkbox,tabs,popover,button,dialog,alert-dialog}`
 
 ## Implementation checklist
-- [ ] `CustomFurnitureDialog.tsx`：分类、参考模型改为 shadcn `Select`，`onValueChange` 仍写入 `category` / `type`。
-- [ ] `CustomFurnitureDialog.tsx`：名称、宽深高、价格改为 `Input` + `Label htmlFor`，校验与 `type="number"`、`maxLength`、`required` 保持不变。
-- [ ] `CustomFurnitureDialog.tsx`：账号库勾选改为 `Checkbox` + `Label`，`accountOnly` 分支不渲染该勾选。
-- [ ] `CustomFurnitureDialog.tsx`：`.project-tabs` 两个按钮改为 `Tabs` 结构，切到账号库仍触发 `catalog.load()`；`accountOnly` 时不渲染 Tabs。
-- [ ] `CustomFurnitureDialog.tsx`：模型颜色改为 `Popover` + 色块色板 + 自定义取色，默认色 `#b7c4b0` 与 `setColor` 行为不变。
-- [ ] `CustomFurnitureDialog.tsx`：`locked = ai.busy||saving||!!pending` 显式传给 Select/Input/Checkbox，`fieldset` 仍保留。
-- [ ] 新增 `src/features/interior/data/palette.ts` 导出 `FURNITURE_COLORS`，`SelectionEditor.tsx` 改为引用它并删除本地 `colors`。
-- [ ] `ProjectManager.tsx`：弹窗内项目名称 `Input`、户型模板 `Select`（blank/reference 两项），提交逻辑不变。
-- [ ] `ProjectManager.tsx`：卡片加 `cms-card-open` 遮罩按钮触发 `projects.open(row)` + `opened()`，删除「打开设计」按钮与「本机」标签。
-- [ ] `ProjectManager.tsx`：重命名/复制（本机为上传到云端）/删除改为 `Button variant="ghost" size="icon"`，`aria-label` 与调用链保留。
-- [ ] `AccountFurnitureDialog.tsx`、`AccountCostDialog.tsx`：主/危险按钮改为 `Button` 并带 `cms-detail-action`。
-- [ ] `AuthDialog.tsx`：邮箱/密码改为 `Input`（无边框覆盖），校验属性保留。
-- [ ] `ProjectDialog.tsx`：创建项目名与重命名输入改为 `Input`。
-- [ ] `src/index.css`：收窄 `.custom-furniture-fields input/select`；删 `.cms-form input/select`；`.project-tabs` active 选择器改用 `[data-state='active']`；新增 `.cms-field`、`.furniture-color-*`、`.cms-card-open` 与 `.cms-card` hover 规则；删除 `.cms-card-tag`、`.cms-card-actions>button:not(:first-child)`；移动端媒体查询改指 `.cms-detail-action`。
+- [x] `CustomFurnitureDialog.tsx`：分类、参考模型改为 shadcn `Select`，`onValueChange` 仍写入 `category` / `type`。
+- [x] `CustomFurnitureDialog.tsx`：名称、宽深高、价格改为 `Input` + `Label htmlFor`，校验与 `type="number"`、`maxLength`、`required` 保持不变。
+- [x] `CustomFurnitureDialog.tsx`：账号库勾选改为 `Checkbox` + `Label`，`accountOnly` 分支不渲染该勾选。
+- [x] `CustomFurnitureDialog.tsx`：`.project-tabs` 两个按钮改为 `Tabs` 结构，切到账号库仍触发 `catalog.load()`；`accountOnly` 时不渲染 Tabs。
+- [x] `CustomFurnitureDialog.tsx`：模型颜色改为 `Popover` + 色块色板 + 自定义取色，默认色 `#b7c4b0` 与 `setColor` 行为不变。
+- [x] `CustomFurnitureDialog.tsx`：`locked = ai.busy||saving||!!pending` 显式传给 Select/Input/Checkbox，`fieldset` 仍保留。
+- [x] 新增 `src/features/interior/data/palette.ts` 导出 `FURNITURE_COLORS`，`SelectionEditor.tsx` 改为引用它并删除本地 `colors`。
+- [x] `ProjectManager.tsx`：弹窗内项目名称 `Input`、户型模板 `Select`（blank/reference 两项），提交逻辑不变。
+- [x] `ProjectManager.tsx`：卡片加 `cms-card-open` 遮罩按钮触发 `projects.open(row)` + `opened()`，删除「打开设计」按钮与「本机」标签。
+- [x] `ProjectManager.tsx`：重命名/复制（本机为上传到云端）/删除改为 `Button variant="ghost" size="icon"`，`aria-label` 与调用链保留。
+- [x] `AccountFurnitureDialog.tsx`、`AccountCostDialog.tsx`：主/危险按钮改为 `Button` 并带 `cms-detail-action`。
+- [x] `AuthDialog.tsx`：邮箱/密码改为 `Input`（无边框覆盖），校验属性保留。
+- [x] `ProjectDialog.tsx`：创建项目名与重命名输入改为 `Input`。
+- [x] `src/index.css`：收窄 `.custom-furniture-fields input/select`；删 `.cms-form input/select`；`.project-tabs` active 选择器改用 `[data-state='active']`；新增 `.cms-field`、`.furniture-color-*`、`.cms-card-open` 与 `.cms-card` hover 规则；删除 `.cms-card-tag`、`.cms-card-actions>button:not(:first-child)`；移动端媒体查询改指 `.cms-detail-action`。
 
 ## Verification checklist
-- [ ] `pnpm lint` 通过（无 unused import，如 `Plus` / `Button` 仍在用）。
-- [ ] `pnpm exec tsc --noEmit` 通过。
-- [ ] `pnpm test` 通过（`src/features/interior` 下模型层测试不受 UI 改动影响，用于确认无回归）。
-- [ ] `pnpm run build` 通过。
-- [ ] 正向：预览首页 → 素材库「新建家具 / 账号库」→ 弹窗内分类、参考模型可展开 shadcn 浮层并选中；宽深高、价格可输入；色板可选色；两个 Tab 可切换且账号库列表能加载。
-- [ ] 负向/边界：名称为空或尺寸超范围时提交仍报「请填写名称、有效尺寸及非负单价」，且不触发 AI 生成；生成中（`ai.busy`）时下拉/输入/勾选为禁用态；`accountOnly` 模式无 Tabs 与账号库勾选。
-- [ ] 卡片：点击卡片空白处或标题进入项目；点击铅笔/复制/删除图标只触发对应弹窗，不会顺带打开项目；「本机」标签与「打开设计」按钮不再出现。
-- [ ] 视觉：`website_screenshot` 打开运行中的应用根路径确认无布局破损（若预览环境已登录，可直接看到项目管理卡片网格；弹窗内部需在预览中点击打开确认，截图工具无法打开弹窗，这一点以代码审查 + 上述手工操作为准）。
+- [x] `pnpm lint` 通过（无 unused import，如 `Plus` / `Button` 仍在用）。
+- [x] `pnpm exec tsc --noEmit` 通过。
+- [x] `pnpm test` 通过（`src/features/interior` 下模型层测试不受 UI 改动影响，用于确认无回归）。
+- [x] `pnpm run build` 通过。
+- [ ] 正向：预览首页 → 素材库「新建家具 / 账号库」→ 弹窗内分类、参考模型可展开 shadcn 浮层并选中；宽深高、价格可输入；色板可选色；两个 Tab 可切换且账号库列表能加载。（需在预览中点击打开弹窗，截图工具无法打开弹窗，尚未人工点验）
+- [ ] 负向/边界：名称为空或尺寸超范围时提交仍报「请填写名称、有效尺寸及非负单价」，且不触发 AI 生成；生成中（`ai.busy`）时下拉/输入/勾选为禁用态；`accountOnly` 模式无 Tabs 与账号库勾选。（同上，需点击验证）
+- [ ] 卡片：点击卡片空白处或标题进入项目；点击铅笔/复制/删除图标只触发对应弹窗，不会顺带打开项目；「本机」标签与「打开设计」按钮不再出现。（项目管理需登录后才可见，预览环境未登录）
+- [x] 视觉：`website_screenshot` 打开运行中的应用根路径确认无布局破损（工作台与左侧素材库渲染正常）；项目卡片与弹窗内部仍待登录后点验。
+
