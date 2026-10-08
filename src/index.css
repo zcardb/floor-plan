@@ -2553,10 +2553,6 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 7px;
 }
-.custom-furniture-fields input[type="color"] {
-  height: 32px;
-  padding: 3px;
-}
 .furniture-color-trigger {
   justify-content: flex-start;
   gap: 8px;
