@@ -111,34 +111,47 @@ function overlapOnBoundary(
     Math.min(L, Math.max(p(c), p(e))) - Math.max(0, Math.min(p(c), p(e))),
   );
 }
+/**
+ * 开口落在该房间边界上的宽度（mm）；不贴墙时返回 0。
+ * 墙面扣减与门窗费用分摊共用同一套几何判定。
+ */
+export function openingRoomOverlap(room: Room, o: Opening, d: Design): number {
+  const w = d.walls.find((w) => w.id === o.wallId);
+  if (!w || d.demolished.includes(w.id)) return 0;
+  const L = length(w);
+  if (!L) return 0;
+  const dx = (w.b[0] - w.a[0]) / L,
+    dy = (w.b[1] - w.a[1]) / L,
+    p: Point = [w.a[0] + dx * o.offset, w.a[1] + dy * o.offset],
+    a: Point = [p[0] - (dx * o.width) / 2, p[1] - (dy * o.width) / 2],
+    b: Point = [p[0] + (dx * o.width) / 2, p[1] + (dy * o.width) / 2];
+  let matched = 0;
+  for (const ring of room.rings)
+    for (let i = 0; i < ring.length; i++)
+      matched = Math.max(
+        matched,
+        overlapOnBoundary(
+          ring[i],
+          ring[(i + 1) % ring.length],
+          a,
+          b,
+          w.thickness / 2 + 2,
+        ),
+      );
+  return Math.min(o.width, matched);
+}
 export function wallSurfaceArea(room: Room, d: Design): number {
   let deduction = 0;
-  for (const o of d.openings) {
-    const w = d.walls.find((w) => w.id === o.wallId);
-    if (!w || d.demolished.includes(w.id)) continue;
-    const L = length(w),
-      dx = (w.b[0] - w.a[0]) / L,
-      dy = (w.b[1] - w.a[1]) / L,
-      p: Point = [w.a[0] + dx * o.offset, w.a[1] + dy * o.offset],
-      a: Point = [p[0] - (dx * o.width) / 2, p[1] - (dy * o.width) / 2],
-      b: Point = [p[0] + (dx * o.width) / 2, p[1] + (dy * o.width) / 2];
-    let matched = 0;
-    for (const ring of room.rings)
-      for (let i = 0; i < ring.length; i++)
-        matched = Math.max(
-          matched,
-          overlapOnBoundary(
-            ring[i],
-            ring[(i + 1) % ring.length],
-            a,
-            b,
-            w.thickness / 2 + 2,
-          ),
-        );
+  for (const o of d.openings)
     deduction +=
-      (Math.min(o.width, matched) * openingDimensions(o, d).height) / 1e6;
-  }
+      (openingRoomOverlap(room, o, d) * openingDimensions(o, d).height) / 1e6;
   return Math.max(0, (perim(room) * d.height) / 1000 - deduction);
+}
+/** 与该开口相邻、需要共同承担其费用的房间 id。 */
+export function openingRoomIds(d: Design, o: Opening): string[] {
+  return d.rooms
+    .filter((r) => openingRoomOverlap(r, o, d) > 1)
+    .map((r) => r.id);
 }
 export function calculateCosts(d: Design, defaults?: AccountCostSettings) {
   if (defaults) d = effectiveCostDesign(d, defaults);
