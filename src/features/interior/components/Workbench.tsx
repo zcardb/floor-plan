@@ -138,6 +138,7 @@ function ToolButton({
   );
 }
 export function Workbench(p: Props) {
+  const confirm = useConfirm();
   const model = useDesign(p.project.state, p.update),
     { design: d, change, commit, preview, undo, redo, counts, sizeTransaction } = model;
   const [selection, setSelection] = useState<Selection>(null),
@@ -384,22 +385,28 @@ export function Workbench(p: Props) {
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
-  const clearFurniture = () => {
-    if (
-      d.furniture.length &&
-      window.confirm("清空所有家具？墙体、材质和测量会保留，可撤销恢复。")
-    ) {
-      change((d) => ({ ...d, furniture: [] }));
-      setSelection(null);
-    }
+  const clearFurniture = async () => {
+    if (!d.furniture.length) return;
+    const ok = await confirm({
+      title: "清空所有家具？",
+      description: "墙体、材质和测量会保留，可撤销恢复。",
+      confirmText: "清空家具",
+      tone: "destructive",
+    });
+    if (!ok) return;
+    change((d) => ({ ...d, furniture: [] }));
+    setSelection(null);
   };
-  const resetDesign = () => {
-    if (window.confirm("重置当前项目为其初始模板？可撤销恢复。")) {
-      change(() =>
-        d.template === "blank" ? blankDesign() : referenceDesign(),
-      );
-      setSelection(null);
-    }
+  const resetDesign = async () => {
+    const ok = await confirm({
+      title: "重置当前项目为其初始模板？",
+      description: "墙体、家具与测量都会恢复到初始模板，可撤销恢复。",
+      confirmText: "重置方案",
+      tone: "destructive",
+    });
+    if (!ok) return;
+    change(() => (d.template === "blank" ? blankDesign() : referenceDesign()));
+    setSelection(null);
   };
   const clearMeasures = () => {
     if (d.measures.length) change((d) => ({ ...d, measures: [] }));
