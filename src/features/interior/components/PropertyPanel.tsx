@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   ArrowUpToLine,
   ArrowDownToLine,
-  RotateCw,
   Copy,
   Trash2,
   ChevronRight,
@@ -29,6 +28,7 @@ import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
 import { editSelection } from "../model/selectionEdits";
 import { useCostDesign } from './CostDefaultsContext';
 import { SizeFields } from './SizeFields';
+import { RotationControls } from './RotationControls';
 import { DimensionSettings } from './DimensionSettings';
 import type { SizeTransaction } from '../model/sizeTransaction';
 import {

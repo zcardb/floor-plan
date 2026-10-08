@@ -258,6 +258,7 @@ export function Workbench(p: Props) {
   );
   const rotate = useCallback(
     (angle = 90) => {
+      sizeTransaction.flush();
       if (selection?.kind === "furniture")
         change((d) => ({
           ...d,

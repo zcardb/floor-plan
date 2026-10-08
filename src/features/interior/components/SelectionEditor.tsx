@@ -9,7 +9,6 @@ import {
 import {
   ChevronDown,
   Copy,
-  RotateCw,
   Trash2,
   X,
   Settings2,
@@ -30,6 +29,7 @@ import { materials } from "../data/catalog";
 import { FURNITURE_COLORS } from "../data/palette";
 import { length } from "../model/geometry";
 import { SizeFields } from './SizeFields';
+import { RotationControls } from './RotationControls';
 import type { SizeTransaction } from '../model/sizeTransaction';
 import {
   furnitureKey,
