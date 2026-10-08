@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { blankDesign } from '../data/templates';
 import type { Design, Opening, Tool } from '../model/types';
 
-const hooks = vi.hoisted(() => ({ refs: [] as { current: unknown }[], svg: {} as object,
+const hooks = vi.hoisted(() => ({ refs: [] as { current: unknown }[], svg: {} as object, states: [] as { initial: unknown; set: ReturnType<typeof import('vitest').vi.fn> }[],
 }));
 vi.mock('react', async importOriginal => {
   const react = await importOriginal<typeof import('react')>();
@@ -13,7 +13,7 @@ vi.mock('react', async importOriginal => {
       hooks.refs.push(ref);
       return ref;
     },
-    useState: (value: unknown) => [value, vi.fn()],
+    useState: (value: unknown) => { const set = vi.fn(); hooks.states.push({ initial: value, set }); return [value, set]; },
     useMemo: (compute: () => unknown) => compute(),
     useEffect: vi.fn(),
     useImperativeHandle: vi.fn(),
@@ -48,6 +48,7 @@ function harness(kind: Opening['kind'] = 'door', tool: Tool = 'select') {
 }
 beforeEach(() => {
   hooks.refs = [];
+  hooks.states = [];
   hooks.svg = { hasPointerCapture: () => true, releasePointerCapture: vi.fn(), setPointerCapture: vi.fn(), getScreenCTM: () => ({ inverse: () => ({}) }),
     createSVGPoint: () => ({ x: 0, y: 0, matrixTransform() { return { x: this.x, y: this.y }; } }) };
 });
@@ -135,6 +136,26 @@ describe('PlanCanvas 墙端点连接事件链', () => {
     h.handlers.onPointerCancel!(event(1950, 40));
     expect(h.preview).toHaveBeenLastCalledWith(h.design);
     expect(h.commit).not.toHaveBeenCalled();
+  });
+});
+describe('PlanCanvas 家具对齐线', () => {
+  it('拖动靠近其他家具时吸附并显示对齐线，松手后清除', () => {
+    const h = harness();
+    const furn = (id: string, cx: number, cy: number) => ({ id, type: 'sofa', name: id, cx, cy, w: 1000, d: 600, rot: 0, color: '#ccc' });
+    h.design.openings = [];
+    h.design.furniture = [furn('a', 2000, 2000), furn('m', 4000, 4000)];
+    hooks.refs = []; hooks.states = [];
+    h.handlers = h.component.render(h.props, null).props;
+    const setGuides = hooks.states.find(s => Array.isArray(s.initial))!.set;
+    const guides = (call: number) => (setGuides.mock.calls[call][0] as (p: unknown[]) => unknown[])([{ axis: 'y', at: 0, from: 0, to: 0 }]);
+    h.handlers.onPointerDown!(event(4000, 4000, 1, 'data-fid', 'm'));
+    h.handlers.onPointerMove!(event(2050, 4013, 1, 'data-fid', 'm'));
+    const moved = h.preview.mock.calls[0][0].furniture.find((f: { id: string }) => f.id === 'm');
+    expect([moved.cx, moved.cy]).toEqual([2000, 4000]);
+    expect(guides(setGuides.mock.calls.length - 1)).toContainEqual(expect.objectContaining({ axis: 'x', at: 2000 }));
+    h.handlers.onPointerUp!(event(2050, 4013, 1, 'data-fid', 'm'));
+    expect(guides(setGuides.mock.calls.length - 1)).toEqual([]);
+    expect(h.commit).toHaveBeenCalledOnce();
   });
 });
 describe('PlanCanvas 门窗事件链', () => {
