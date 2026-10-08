@@ -6,7 +6,7 @@ import { meterDraft, sizeDraftToModel } from '../model/lengthUnits';
 import type { Design,Selection } from '../model/types';
 import type { SizeTransaction } from '../model/sizeTransaction';
 function sizeFields(d:Design,s:Selection):[string,string,number][] {
-  if(s?.kind==='furniture'){const f=d.furniture.find(f=>f.id===s.id);return f?[['w','宽 / m',f.w],['d','深 / m',f.d],['cx','中心 X / m',f.cx],['cy','中心 Y / m',f.cy],['rot','旋转 / °',f.rot]]:[];}
+  if(s?.kind==='furniture'){const f=d.furniture.find(f=>f.id===s.id);return f?[['w','宽 / m',f.w],['d',f.type==='stairs'?'长 / m':'深 / m',f.d],['cx','中心 X / m',f.cx],['cy','中心 Y / m',f.cy],['rot','旋转 / °',f.rot]]:[];}
   if(s?.kind==='wall'){const w=d.walls.find(w=>w.id===s.id);return w?[['length','长度 / m',length(w)],['thickness','墙厚 / m',w.thickness]]:[];}
   if(s?.kind==='opening'){const o=d.openings.find(o=>o.id===s.id);return o?[['width','宽度 / m',o.width],['offset','沿墙位置 / m',o.offset],['height','高度 / m',o.height??(o.kind==='door'?2100:1600)],...(o.kind==='window'?[['sill','窗台高 / m',o.sill??800] as [string,string,number]]:[])]:[];}
   return [];

@@ -54,6 +54,12 @@ export function validateDesign(value: unknown): Design {
   ] as const)
     if (!Array.isArray(v[k]) || v[k].length > 2000) return fail();
   if (!v.rooms.length || !v.walls.length) return fail();
+  if (v.dimensionSettings !== undefined) {
+    const settings = v.dimensionSettings;
+    if (!settings || typeof settings !== 'object' || Array.isArray(settings) ||
+      (settings.visible !== undefined && typeof settings.visible !== 'boolean') ||
+      (['top', 'bottom', 'left', 'right'] as const).some(key => settings[key] !== undefined && !finite(settings[key], 0, 10000))) return fail();
+  }
   const ids = new Set<string>();
   const id = (s: string) => {
     if (typeof s !== "string" || !s.length || s.length > 100 || ids.has(s))

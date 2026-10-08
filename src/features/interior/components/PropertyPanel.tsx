@@ -207,7 +207,7 @@ export function PropertyPanel({
               input(
                 [
                   "宽度 / m",
-                  "深度 / m",
+                  f.type === 'stairs' ? "长度 / m" : "深度 / m",
                   "中心 X / m",
                   "中心 Y / m",
                   "旋转 / °",
