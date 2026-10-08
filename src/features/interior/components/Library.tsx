@@ -20,14 +20,18 @@ export function Library({
   add,
   setTool,
   blank,
+  customItems = [],
+  onNew,
 }: {
   add: (i: LibraryItem) => void;
   setTool: (t: Tool) => void;
   blank: boolean;
+  customItems?: LibraryItem[];
+  onNew: () => void;
 }) {
   const [category, setCategory] = useState("客厅"),
     [query, setQuery] = useState("");
-  const items = library.filter((i) =>
+  const items = [...customItems, ...library].filter((i) =>
     query ? i.name.includes(query) : i.category === category,
   );
   return (
@@ -36,6 +40,10 @@ export function Library({
         <span>构件与家具</span>
         <span className="mini-label">素材库</span>
       </div>
+      <button className="new-furniture-button" onClick={onNew}>
+        <Plus size={15} />
+        新建家具 / 账号库
+      </button>
       <div className="library-search">
         <Search size={15} />
         <input
@@ -98,11 +106,15 @@ export function Library({
             aria-label={"添加" + it.name}
           >
             <span className="library-visual">
-              <svg
-                viewBox={`${-it.w / 2 - 100} ${-it.d / 2 - 100} ${it.w + 200} ${it.d + 200}`}
-              >
-                <FurnitureShape f={it} />
-              </svg>
+              {it.imageUrl ? (
+                <img src={it.imageUrl} crossOrigin="anonymous" alt={it.name} />
+              ) : (
+                <svg
+                  viewBox={`${-it.w / 2 - 100} ${-it.d / 2 - 100} ${it.w + 200} ${it.d + 200}`}
+                >
+                  <FurnitureShape f={it} />
+                </svg>
+              )}
               <span className="item-add">
                 <Plus size={12} />
               </span>

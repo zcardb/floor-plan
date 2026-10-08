@@ -13,8 +13,15 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { materials } from "../data/catalog";
-import { calculateCosts, furnitureKey, priceOf, setPrice } from "../model/costs";
-import { PriceInput } from './PriceInput';
+import {
+  calculateCosts,
+  furnitureKey,
+  priceOf,
+  setPrice,
+} from "../model/costs";
+import { PriceInput } from "./PriceInput";
+import { projectProcurement } from "../model/materialProcurement";
+import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
 import { editSelection } from "../model/selectionEdits";
 import {
   area,
@@ -52,7 +59,13 @@ export function PropertyPanel({
     r = s?.kind === "room" ? d.rooms.find((r) => r.id === s.id) : null,
     w = s?.kind === "wall" ? d.walls.find((w) => w.id === s.id) : null,
     o = s?.kind === "opening" ? d.openings.find((o) => o.id === s.id) : null;
-  const applyEdit = (values:Record<string,number>)=>{try{change(d=>editSelection(d,s,values));}catch(e){toast.error(e instanceof Error?e.message:'尺寸无效');}};
+  const applyEdit = (values: Record<string, number>) => {
+    try {
+      change((d) => editSelection(d, s, values));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "尺寸无效");
+    }
+  };
   const input = (
     label: string,
     value: number,
@@ -108,7 +121,10 @@ export function PropertyPanel({
           <span className="material-swatch" style={{ background: m.color }} />
           <span>
             {m.name}
-            <small>¥{priceOf(d, "floorPrices", key) ?? "未定价"} / m²</small>
+            <small>
+              ¥{priceOf(d, "floorPrices", key) ?? "未定价"} /{" "}
+              {d.costSettings?.procurement?.[key]?.unit || "m²"}
+            </small>
           </span>
         </button>
       ))}
@@ -124,11 +140,9 @@ export function PropertyPanel({
   const total = d.rooms
       .filter((r) => r.counted !== false)
       .reduce((a, r) => a + area(r), 0),
-    cost = d.rooms.reduce(
-      (sum, r) =>
-        sum + area(r) * (priceOf(d, "floorPrices", r.mat) ?? 0) * 1.05,
-      0,
-    );
+    cost = costs.hard
+      .filter((r) => r.group === "floorPrices")
+      .reduce((sum, r) => sum + r.subtotal, 0);
   if (f)
     return (
       <>
@@ -149,6 +163,14 @@ export function PropertyPanel({
               </small>
             </div>
           </div>
+          {f.imageUrl && (
+            <img
+              className="furniture-exterior-preview"
+              src={f.imageUrl}
+              crossOrigin="anonymous"
+              alt={f.name + "外观预览"}
+            />
+          )}
           <div className="property-form">
             {rename(f.name, (v) =>
               change((d) => ({
@@ -168,7 +190,7 @@ export function PropertyPanel({
                   "旋转 / °",
                 ][i],
                 f[key],
-                (v) => applyEdit({[key]:v}),
+                (v) => applyEdit({ [key]: v }),
                 key === "w" || key === "d" ? 50 : -100000,
                 key === "w" || key === "d" ? 20000 : 100000,
               ),
@@ -189,7 +211,26 @@ export function PropertyPanel({
               />
             </label>
           </div>
-          <div className="furniture-price-field"><h3 className="section-title">家具单价 <small>元 / 件 · 同款联动</small></h3><PriceInput key={furnitureKey(f)+priceOf(d,'furniturePrices',furnitureKey(f))} value={priceOf(d,'furniturePrices',furnitureKey(f))} label={f.name+'单价'} onApply={v=>change(d=>setPrice(d,'furniturePrices',furnitureKey(f),v))}/><p className="footnote">修改仅影响当前项目的同款家具，自动计入软装总成本。</p></div>
+          <div className="furniture-price-field">
+            <h3 className="section-title">
+              家具单价 <small>元 / 件 · 同款联动</small>
+            </h3>
+            <PriceInput
+              key={
+                furnitureKey(f) + priceOf(d, "furniturePrices", furnitureKey(f))
+              }
+              value={priceOf(d, "furniturePrices", furnitureKey(f))}
+              label={f.name + "单价"}
+              onApply={(v) =>
+                change((d) =>
+                  setPrice(d, "furniturePrices", furnitureKey(f), v),
+                )
+              }
+            />
+            <p className="footnote">
+              修改仅影响当前项目的同款家具，自动计入软装总成本。
+            </p>
+          </div>
           <div className="property-actions">
             <Button size="sm" variant="outline" onClick={rotate}>
               <RotateCw />
@@ -303,14 +344,22 @@ export function PropertyPanel({
             })),
           )}
           <div className="estimate-line">
-            <span>含 5% 损耗</span>
+            <span>本项目同材质采购合计</span>
             <b>
               ¥
               {Math.round(
-                area(r) * (priceOf(d, "floorPrices", r.mat) ?? 0) * 1.05,
+                costs.hard.find(
+                  (g) => g.group === "floorPrices" && g.key === r.mat,
+                )?.subtotal || 0,
               ).toLocaleString()}
             </b>
           </div>
+          <MaterialProcurementEditor
+            key={r.mat}
+            design={d}
+            material={r.mat}
+            change={change}
+          />
         </section>
         <section>
           <h3 className="section-title">
@@ -356,14 +405,14 @@ export function PropertyPanel({
             {input(
               "长度 / mm",
               length(w),
-              (v) => applyEdit({length:v}),
+              (v) => applyEdit({ length: v }),
               100,
               50000,
             )}
             {input(
               "墙厚 / mm",
               w.thickness,
-              (v) => applyEdit({thickness:v}),
+              (v) => applyEdit({ thickness: v }),
               50,
               1000,
             )}
@@ -388,7 +437,7 @@ export function PropertyPanel({
     );
   }
   if (o) {
-    const upd = (key: 'offset'|'width',v:number)=>applyEdit({[key]:v});
+    const upd = (key: "offset" | "width", v: number) => applyEdit({ [key]: v });
     return (
       <>
         <div className="panel-heading">
@@ -531,7 +580,28 @@ export function PropertyPanel({
       ) : (
         <>
           <section>
-            <div className="cost-summary"><small>整体成本 · 已录入费用</small><strong>¥{costs.total.toLocaleString('zh-CN',{maximumFractionDigits:2})}</strong><div><span>软装 ¥{Math.round(costs.softTotal).toLocaleString()}</span><span>硬装 ¥{Math.round(costs.hardTotal).toLocaleString()}</span></div></div>{costs.unpriced>0&&<p className="cost-warning">{costs.unpriced} 类费用未定价，可在成本管理中填写。</p>}
+            <div className="cost-summary">
+              <small>整体成本 · 已录入费用</small>
+              <strong>
+                ¥
+                {costs.total.toLocaleString("zh-CN", {
+                  maximumFractionDigits: 2,
+                })}
+              </strong>
+              <div>
+                <span>
+                  软装 ¥{Math.round(costs.softTotal).toLocaleString()}
+                </span>
+                <span>
+                  硬装 ¥{Math.round(costs.hardTotal).toLocaleString()}
+                </span>
+              </div>
+            </div>
+            {costs.unpriced > 0 && (
+              <p className="cost-warning">
+                {costs.unpriced} 类费用未定价，可在成本管理中填写。
+              </p>
+            )}
             <div className="overview-top">
               <span>空间，恰到好处。</span>
               <LayoutGrid size={17} />
@@ -583,7 +653,7 @@ export function PropertyPanel({
           </section>
           <section>
             <h3 className="section-title">
-              地面材料估算<span className="soft-badge">含 5% 损耗</span>
+              地面采购估算<span className="soft-badge">含损耗 / 取整</span>
             </h3>
             <div className="cost-list">
               {Object.entries(materials).map(([key, m]) => {
@@ -601,7 +671,9 @@ export function PropertyPanel({
                       <b>
                         ¥
                         {Math.round(
-                          a * (priceOf(d, "floorPrices", key) ?? 0) * 1.05,
+                          costs.hard.find(
+                            (r) => r.group === "floorPrices" && r.key === key,
+                          )?.subtotal || 0,
                         ).toLocaleString()}
                       </b>
                     </div>

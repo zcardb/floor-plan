@@ -497,6 +497,12 @@ export function buildFurniture(f: Furniture): THREE.Group {
     default:
       box(g, w, 0.7, d, c);
   }
+  if (f.height) {
+    g.updateMatrixWorld(true);
+    const bounds = new THREE.Box3().setFromObject(g),
+      modelHeight = bounds.max.y - bounds.min.y;
+    if (modelHeight > 0) g.scale.y = f.height / 1000 / modelHeight;
+  }
   g.position.set(f.cx / 1000, 0, f.cy / 1000);
   g.rotation.y = (-f.rot * Math.PI) / 180;
   g.userData.fid = f.id;

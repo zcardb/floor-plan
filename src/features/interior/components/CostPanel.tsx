@@ -8,6 +8,7 @@ import {
 } from "../model/costs";
 import { uid, type Design } from "../model/types";
 import { PriceInput } from "./PriceInput";
+import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
 export function CostPanel({
   design,
   change,
@@ -40,6 +41,13 @@ export function CostPanel({
           label={r.name + "单价"}
           onApply={(v) => change((d) => setPrice(d, r.group, r.key, v))}
         />
+        {r.group === "floorPrices" && (
+          <MaterialProcurementEditor
+            design={design}
+            material={r.key}
+            change={change}
+          />
+        )}
       </div>
     ));
   return (
@@ -70,8 +78,7 @@ export function CostPanel({
           </p>
         )}
         <p className="footnote">
-          单价修改仅影响当前项目所有同款家具／同材质空间。地面含 5%
-          损耗；墙面扣除对应门窗面积。
+          单价修改仅影响当前项目所有同款家具／同材质空间。地面按设定损耗与采购取整计算；墙面扣除对应门窗面积。
         </p>
       </section>
       <section>

@@ -1,5 +1,5 @@
 import { library } from "./catalog";
-import { normalizeFurniture } from '../model/costs';
+import { normalizeFurniture } from "../model/costs";
 import { outerWalls, rect } from "../model/geometry";
 import {
   uid,

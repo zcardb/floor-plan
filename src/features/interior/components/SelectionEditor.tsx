@@ -1,4 +1,10 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import {
   ChevronDown,
   Copy,
@@ -30,6 +36,7 @@ import {
 import { placeEditor, type ScreenRect } from "../model/selectionAnchor";
 import type { Design, Selection } from "../model/types";
 import { PriceInput } from "./PriceInput";
+import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
 export interface SelectionEditorHandle {
   update: (r: ScreenRect | null) => void;
 }
@@ -96,8 +103,16 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
       if (pos) node.style.transform = `translate3d(${pos.x}px,${pos.y}px,0)`;
     };
     useImperativeHandle(ref, () => ({ update: position }));
-    useEffect(()=>{const node=el.current,stage=p.stage.current;if(!node||!stage)return;const observer=new ResizeObserver(()=>position(anchor.current));observer.observe(node);observer.observe(stage);return ()=>observer.disconnect();},[p.stage,p.selection?.id]);
-    useEffect(()=>position(anchor.current),[p.hidden]);
+    useEffect(() => {
+      const node = el.current,
+        stage = p.stage.current;
+      if (!node || !stage) return;
+      const observer = new ResizeObserver(() => position(anchor.current));
+      observer.observe(node);
+      observer.observe(stage);
+      return () => observer.disconnect();
+    }, [p.stage, p.selection?.id]);
+    useEffect(() => position(anchor.current), [p.hidden]);
     const f =
         p.selection?.kind === "furniture"
           ? p.design.furniture.find((f) => f.id === p.selection!.id)
@@ -191,7 +206,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         group: "floorPrices",
         key: r.mat,
         name: materials[r.mat].name,
-        unit: "m²",
+        unit: p.design.costSettings?.procurement?.[r.mat]?.unit || "m²",
       };
     else if (o)
       price = {
@@ -216,7 +231,6 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         aria-label="选中对象编辑工具条"
         onPointerDown={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
-
       >
         <span className="visual-object-name">
           {f?.name ||
@@ -423,6 +437,13 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
                   }
                 }}
               />
+              {price.group === "floorPrices" && (
+                <MaterialProcurementEditor
+                  design={p.design}
+                  material={price.key}
+                  change={p.change}
+                />
+              )}
               <button className="visual-cost-link" onClick={p.costs}>
                 查看软装 / 硬装成本
               </button>

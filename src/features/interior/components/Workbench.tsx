@@ -78,6 +78,8 @@ import { validateDesign } from "../model/validation";
 import { Library } from "./Library";
 import { PropertyPanel } from "./PropertyPanel";
 import { CostPanel } from "./CostPanel";
+import { CustomFurnitureDialog } from "./CustomFurnitureDialog";
+import { setPrice } from "../model/costs";
 import { SelectionEditor, type SelectionEditorHandle } from "./SelectionEditor";
 import { furnitureKey } from "../model/costs";
 import type { ScreenRect } from "../model/selectionAnchor";
@@ -165,7 +167,24 @@ export function Workbench(p: Props) {
       hour: 10,
       mode: "orbit",
     });
-  const [costOpen, setCostOpen] = useState(false);
+  const [costOpen, setCostOpen] = useState(false),
+    [customOpen, setCustomOpen] = useState(false);
+  const saveCustom = (item: LibraryItem) => {
+    change((d) => {
+      if (d.customCatalog?.some((i) => i.catalogId === item.catalogId))
+        return d;
+      const next = { ...d, customCatalog: [...(d.customCatalog || []), item] };
+      return d.costSettings?.furniturePrices?.[item.catalogId!] !== undefined
+        ? next
+        : setPrice(
+            next,
+            "furniturePrices",
+            item.catalogId!,
+            item.price ?? null,
+          );
+    });
+    toast.success("家具已加入当前项目目录");
+  };
   const stage = useRef<HTMLElement>(null),
     editor = useRef<SelectionEditorHandle>(null);
   const onAnchor = useCallback(
@@ -724,6 +743,8 @@ export function Workbench(p: Props) {
             setDrawer(null);
           }}
           blank={d.template === "blank"}
+          customItems={d.customCatalog || []}
+          onNew={() => setCustomOpen(true)}
         />
       </aside>
       <main className="stage" ref={stage}>
@@ -978,6 +999,15 @@ export function Workbench(p: Props) {
             toast.error(e instanceof Error ? e.message : "文件格式不正确");
           }
         }}
+      />
+      <CustomFurnitureDialog
+        open={customOpen}
+        onOpenChange={setCustomOpen}
+        loggedIn={p.loggedIn}
+        login={p.login}
+        ownerKey={p.email || "guest"}
+        onCreate={saveCustom}
+        onImport={saveCustom}
       />
       <Dialog open={help} onOpenChange={setHelp}>
         <DialogContent>

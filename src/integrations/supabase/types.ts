@@ -3393,6 +3393,75 @@ export type Database = {
         }
         Relationships: []
       }
+      interior_furniture_catalog: {
+        Row: {
+          catalog_id: string
+          category: string
+          color: string
+          created_at: string
+          depth: number
+          height: number
+          id: string
+          image_url: string | null
+          name: string
+          owner_id: string
+          price: number | null
+          type: string
+          width: number
+        }
+        Insert: {
+          catalog_id: string
+          category: string
+          color: string
+          created_at?: string
+          depth: number
+          height: number
+          id?: string
+          image_url?: string | null
+          name: string
+          owner_id?: string
+          price?: number | null
+          type: string
+          width: number
+        }
+        Update: {
+          catalog_id?: string
+          category?: string
+          color?: string
+          created_at?: string
+          depth?: number
+          height?: number
+          id?: string
+          image_url?: string | null
+          name?: string
+          owner_id?: string
+          price?: number | null
+          type?: string
+          width?: number
+        }
+        Relationships: []
+      }
+      interior_furniture_image_tasks: {
+        Row: {
+          created_at: string
+          owner_id: string
+          status: string
+          task_id: string
+        }
+        Insert: {
+          created_at?: string
+          owner_id?: string
+          status?: string
+          task_id: string
+        }
+        Update: {
+          created_at?: string
+          owner_id?: string
+          status?: string
+          task_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

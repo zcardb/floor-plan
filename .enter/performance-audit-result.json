@@ -17,9 +17,9 @@
   "warnings": [
     {
       "code": "INITIAL_DYNAMIC_IMPORT",
-      "message": "Declared initial dynamic dependency \"_browser-ponyfill-DzRvWcJS.js\"; desired initial dynamic dependency count is zero",
+      "message": "Declared initial dynamic dependency \"_browser-ponyfill-B5YaLySi.js\"; desired initial dynamic dependency count is zero",
       "route": "/",
-      "key": "_browser-ponyfill-DzRvWcJS.js"
+      "key": "_browser-ponyfill-B5YaLySi.js"
     },
     {
       "code": "UNVERIFIED_ASSET",
@@ -28,62 +28,62 @@
     },
     {
       "code": "BUDGET_EXCEEDED",
-      "message": "initialJsBrotli: 236156 > 153600",
+      "message": "initialJsBrotli: 245746 > 153600",
       "route": "/",
       "budget": "initialJsBrotli",
-      "actual": 236156,
+      "actual": 245746,
       "limit": 153600
     },
     {
       "code": "BUDGET_EXCEEDED",
-      "message": "initialJsRaw: 903454 > 512000",
+      "message": "initialJsRaw: 943093 > 512000",
       "route": "/",
       "budget": "initialJsRaw",
-      "actual": 903454,
+      "actual": 943093,
       "limit": 512000
     }
   ],
   "entries": [
     {
       "key": "index.html",
-      "file": "assets/index-DF0duG1e.js",
+      "file": "assets/index-DgdRDIWy.js",
       "size": {
-        "raw": 892427,
-        "gzip": 275987,
-        "brotli": 232748
+        "raw": 932066,
+        "gzip": 289013,
+        "brotli": 242333
       },
       "reachableKeys": [
-        "_browser-ponyfill-DzRvWcJS.js",
+        "_browser-ponyfill-B5YaLySi.js",
         "index.html",
         "src/features/interior/scene/Scene3D.tsx"
       ],
       "staticImports": [],
       "staticJs": {
-        "raw": 892427,
-        "gzip": 275987,
-        "brotli": 232748,
+        "raw": 932066,
+        "gzip": 289013,
+        "brotli": 242333,
         "files": [
           {
-            "file": "assets/index-DF0duG1e.js",
+            "file": "assets/index-DgdRDIWy.js",
             "size": {
-              "raw": 892427,
-              "gzip": 275987,
-              "brotli": 232748
+              "raw": 932066,
+              "gzip": 289013,
+              "brotli": 242333
             }
           }
         ]
       },
       "staticCss": {
-        "raw": 87861,
-        "gzip": 16094,
-        "brotli": 13705,
+        "raw": 96418,
+        "gzip": 17466,
+        "brotli": 14806,
         "files": [
           {
-            "file": "assets/index-Bx-CS2gj.css",
+            "file": "assets/index-kCzL05IB.css",
             "size": {
-              "raw": 87861,
-              "gzip": 16094,
-              "brotli": 13705
+              "raw": 96418,
+              "gzip": 17466,
+              "brotli": 14806
             }
           }
         ]
@@ -92,8 +92,8 @@
       "hasDynamicCycle": true,
       "potentialDynamicImports": [
         {
-          "key": "_browser-ponyfill-DzRvWcJS.js",
-          "file": "assets/browser-ponyfill-DzRvWcJS.js",
+          "key": "_browser-ponyfill-B5YaLySi.js",
+          "file": "assets/browser-ponyfill-B5YaLySi.js",
           "potentialDynamicDepth": 1,
           "importedBy": [
             "index.html"
@@ -101,7 +101,7 @@
         },
         {
           "key": "src/features/interior/scene/Scene3D.tsx",
-          "file": "assets/Scene3D-BYTJ5h4H.js",
+          "file": "assets/Scene3D-D2gRwa9E.js",
           "potentialDynamicDepth": 1,
           "importedBy": [
             "index.html"
@@ -132,7 +132,7 @@
         "index.html"
       ],
       "reachableKeys": [
-        "_browser-ponyfill-DzRvWcJS.js",
+        "_browser-ponyfill-B5YaLySi.js",
         "index.html",
         "src/features/interior/scene/Scene3D.tsx"
       ],
@@ -140,8 +140,8 @@
       "hasDynamicCycle": true,
       "potentialDynamicImports": [
         {
-          "key": "_browser-ponyfill-DzRvWcJS.js",
-          "file": "assets/browser-ponyfill-DzRvWcJS.js",
+          "key": "_browser-ponyfill-B5YaLySi.js",
+          "file": "assets/browser-ponyfill-B5YaLySi.js",
           "potentialDynamicDepth": 1,
           "importedBy": [
             "index.html"
@@ -150,7 +150,7 @@
         },
         {
           "key": "src/features/interior/scene/Scene3D.tsx",
-          "file": "assets/Scene3D-BYTJ5h4H.js",
+          "file": "assets/Scene3D-D2gRwa9E.js",
           "potentialDynamicDepth": 1,
           "importedBy": [
             "index.html"
@@ -163,39 +163,39 @@
       "initialDepth": 1,
       "initialDepthBasis": "maximum potential graph depth of declared initial dynamic modules; not measured",
       "initialJs": {
-        "raw": 903454,
-        "gzip": 279830,
-        "brotli": 236156,
+        "raw": 943093,
+        "gzip": 292857,
+        "brotli": 245746,
         "files": [
           {
-            "file": "assets/browser-ponyfill-DzRvWcJS.js",
+            "file": "assets/browser-ponyfill-B5YaLySi.js",
             "size": {
               "raw": 11027,
-              "gzip": 3843,
-              "brotli": 3408
+              "gzip": 3844,
+              "brotli": 3413
             }
           },
           {
-            "file": "assets/index-DF0duG1e.js",
+            "file": "assets/index-DgdRDIWy.js",
             "size": {
-              "raw": 892427,
-              "gzip": 275987,
-              "brotli": 232748
+              "raw": 932066,
+              "gzip": 289013,
+              "brotli": 242333
             }
           }
         ]
       },
       "initialCss": {
-        "raw": 87861,
-        "gzip": 16094,
-        "brotli": 13705,
+        "raw": 96418,
+        "gzip": 17466,
+        "brotli": 14806,
         "files": [
           {
-            "file": "assets/index-Bx-CS2gj.css",
+            "file": "assets/index-kCzL05IB.css",
             "size": {
-              "raw": 87861,
-              "gzip": 16094,
-              "brotli": 13705
+              "raw": 96418,
+              "gzip": 17466,
+              "brotli": 14806
             }
           }
         ]
@@ -215,28 +215,28 @@
       },
       "assetReferences": [
         {
-          "url": "/assets/index-DF0duG1e.js",
+          "url": "/assets/index-DgdRDIWy.js",
           "source": "script[src]",
           "category": "script",
           "module": true,
-          "file": "assets/index-DF0duG1e.js",
+          "file": "assets/index-DgdRDIWy.js",
           "status": "local",
           "size": {
-            "raw": 892427,
-            "gzip": 275987,
-            "brotli": 232748
+            "raw": 932066,
+            "gzip": 289013,
+            "brotli": 242333
           }
         },
         {
-          "url": "/assets/index-Bx-CS2gj.css",
+          "url": "/assets/index-kCzL05IB.css",
           "source": "link[href]",
           "category": "css",
-          "file": "assets/index-Bx-CS2gj.css",
+          "file": "assets/index-kCzL05IB.css",
           "status": "local",
           "size": {
-            "raw": 87861,
-            "gzip": 16094,
-            "brotli": 13705
+            "raw": 96418,
+            "gzip": 17466,
+            "brotli": 14806
           }
         },
         {
@@ -260,8 +260,8 @@
         "file": "index.html",
         "size": {
           "raw": 2181,
-          "gzip": 1099,
-          "brotli": 784
+          "gzip": 1100,
+          "brotli": 785
         },
         "status": "mapped",
         "routes": [

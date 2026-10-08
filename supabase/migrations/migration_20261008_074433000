@@ -1,0 +1,1 @@
+DROP POLICY interior_image_tasks_own ON public.interior_furniture_image_tasks; CREATE POLICY interior_image_tasks_read ON public.interior_furniture_image_tasks FOR SELECT TO authenticated USING(auth.uid()=owner_id);

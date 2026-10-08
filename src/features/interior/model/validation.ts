@@ -1,6 +1,7 @@
 import { materials, library } from "../data/catalog";
 import { referenceDesign } from "../data/templates";
 import { length } from "./geometry";
+import { validateProcurement } from "./materialProcurement";
 import { normalizeFurniture, validPrice, wallMaterials } from "./costs";
 import type { Design } from "./types";
 const fail = () => {
@@ -87,6 +88,32 @@ export function validateDesign(value: unknown): Design {
     )
       fail();
   }
+  if (v.customCatalog !== undefined) {
+    if (!Array.isArray(v.customCatalog) || v.customCatalog.length > 500) fail();
+    const catalogIds = new Set<string>();
+    for (const item of v.customCatalog) {
+      if (
+        !item ||
+        typeof item.catalogId !== "string" ||
+        catalogIds.has(item.catalogId) ||
+        item.catalogId.length > 250 ||
+        typeof item.name !== "string" ||
+        item.name.length > 100 ||
+        typeof item.category !== "string" ||
+        !library.some((l) => l.type === item.type) ||
+        !finite(item.w, 50, 20000) ||
+        !finite(item.d, 50, 20000) ||
+        !finite(item.height, 50, 8000) ||
+        !/^#[0-9a-f]{6}$/i.test(item.color) ||
+        (item.price !== undefined &&
+          item.price !== null &&
+          !validPrice(item.price)) ||
+        (item.imageUrl !== undefined && !/^https:\/\//.test(item.imageUrl))
+      )
+        fail();
+      catalogIds.add(item.catalogId);
+    }
+  }
   for (const f of v.furniture) {
     id(f.id);
     if (
@@ -156,7 +183,24 @@ export function validateDesign(value: unknown): Design {
       (typeof f.catalogId !== "string" || f.catalogId.length > 250)
     )
       fail();
+  for (const f of v.furniture)
+    if (
+      (f.height !== undefined && !finite(f.height, 50, 8000)) ||
+      (f.imageUrl !== undefined && !/^https:\/\//.test(f.imageUrl))
+    )
+      fail();
   if (v.costSettings) {
+    if (v.costSettings.procurement) {
+      if (
+        typeof v.costSettings.procurement !== "object" ||
+        Array.isArray(v.costSettings.procurement)
+      )
+        fail();
+      for (const [key, config] of Object.entries(v.costSettings.procurement)) {
+        if (!materials[key]) fail();
+        validateProcurement(config);
+      }
+    }
     if (typeof v.costSettings !== "object" || Array.isArray(v.costSettings))
       fail();
     for (const group of [

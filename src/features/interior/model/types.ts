@@ -37,9 +37,19 @@ export interface Furniture {
   rot: number;
   color: string;
   catalogId?: string;
+  height?: number;
+  imageUrl?: string;
+}
+export interface MaterialProcurement {
+  length?: number;
+  width?: number;
+  waste: number;
+  perBox?: number;
+  unit: "m²" | "张" | "箱";
 }
 export interface CostSettings {
   floorPrices?: Record<string, number | null>;
+  procurement?: Record<string, MaterialProcurement>;
   wallPrices?: Record<string, number | null>;
   furniturePrices?: Record<string, number | null>;
   openingPrices?: Partial<Record<"door" | "window", number | null>>;
@@ -65,6 +75,7 @@ export interface Design {
   demolished: string[];
   measures: Measure[];
   costSettings?: CostSettings;
+  customCatalog?: LibraryItem[];
 }
 export interface Project {
   id: string;
@@ -101,5 +112,8 @@ export interface LibraryItem {
   d: number;
   color: string;
   category: string;
+  height?: number;
+  imageUrl?: string;
+  price?: number | null;
 }
 export const uid = () => crypto.randomUUID();

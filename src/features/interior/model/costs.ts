@@ -1,5 +1,6 @@
 import { library, materials } from "../data/catalog";
 import { area, length, perim } from "./geometry";
+import { projectProcurement } from "./materialProcurement";
 import type {
   CostSettings,
   Design,
@@ -24,7 +25,7 @@ export interface CostRow {
   name: string;
   group: PriceGroup;
   quantity: number;
-  unit: "m²" | "件";
+  unit: "m²" | "件" | "张" | "箱";
   price: number | null;
   subtotal: number;
   reference?: boolean;
@@ -56,6 +57,8 @@ export function priceOf(
   )?.[key];
   if (override !== undefined) return override;
   if (group === "floorPrices") return materials[key]?.price ?? null;
+  if (group === "furniturePrices")
+    return d.customCatalog?.find((i) => i.catalogId === key)?.price ?? null;
   return null;
 }
 export function setPrice(
@@ -165,7 +168,9 @@ export function calculateCosts(d: Design) {
       soft,
       "furniturePrices",
       furnitureKey(f),
-      library.find((l) => l.catalogId === furnitureKey(f))?.name || f.name,
+      [...(d.customCatalog || []), ...library].find(
+        (l) => l.catalogId === furnitureKey(f),
+      )?.name || f.name,
       1,
       "件",
     );
@@ -221,6 +226,12 @@ export function calculateCosts(d: Design) {
         (length(w) * d.height) / 1e6,
         "m²",
       );
+  }
+  for (const row of hard.filter((r) => r.group === "floorPrices")) {
+    const purchase = projectProcurement(d, row.key);
+    row.quantity = purchase.quantity;
+    row.unit = purchase.unit;
+    row.subtotal = purchase.quantity * (row.price ?? 0);
   }
   const labor = d.costSettings?.labor || [],
     softTotal = soft.reduce((s, r) => s + r.subtotal, 0),
