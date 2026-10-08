@@ -9,6 +9,7 @@ import {
 import {
   ChevronDown,
   Copy,
+  RotateCw,
   Trash2,
   X,
   Settings2,
@@ -29,7 +30,7 @@ import { materials } from "../data/catalog";
 import { FURNITURE_COLORS } from "../data/palette";
 import { length } from "../model/geometry";
 import { SizeFields } from './SizeFields';
-import { RotationControls } from './RotationControls';
+
 import type { SizeTransaction } from '../model/sizeTransaction';
 import {
   furnitureKey,
@@ -367,7 +368,9 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         )}
         {f && (
           <>
-            <RotationControls key={f.id} id={f.id} value={f.rot} transaction={p.transaction} compact />
+            <button type="button" aria-label="旋转 90°" title="旋转" onClick={p.rotate}>
+              <RotateCw size={15} />
+            </button>
             <button aria-label="复制对象" onClick={p.duplicate}>
               <Copy size={15} />
             </button>

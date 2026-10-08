@@ -6,6 +6,8 @@ import { library } from '../data/catalog';
 import { createDrawingDocument } from './drawingDocument';
 import { serializeDrawing, downloadDrawing } from './drawingExport';
 import { furnitureDrawing } from './furnitureDrawing';
+import { perimeterDimensions } from './perimeterDimensions';
+import { editDimensionWalls } from './dimensionWallEdit';
 import type { Layers } from './types';
 const layers:Layers={grid:true,dims:true,labels:true,furn:true,bearing:true,snap:true};
 function fixture(){
@@ -16,6 +18,16 @@ function fixture(){
   d.measures.push({id:'measure',a:[0,0],b:[1000,0]});return d;
 }
 describe('工程交换图',()=>{
+  it('尺寸驱动后DXF/SVG和JSON保留真实新净距，而非文字覆盖', () => {
+    const d = fixture();
+    const binding = perimeterDimensions(d)!.chains.flatMap(c => c.segments).find(s => s.binding?.startWalls.includes('partition') && s.binding.endWalls.includes('outer-1'))!.binding!;
+    const next = editDimensionWalls(d, binding, 2200, 'end');
+    const svg = serializeDrawing(next, layers, 'svg'); expect(svg).toContain('2.20 m');
+    const dxf = new DxfParser().parseSync(serializeDrawing(next, layers, 'dxf'))!;
+    expect(dxf.entities.some(e => e.type === 'DIMENSION' && 'actualMeasurement' in e && e.actualMeasurement === 2200)).toBe(true);
+    expect(serializeDrawing(JSON.parse(JSON.stringify(next)), layers, 'svg')).toBe(svg);
+    expect(svg).not.toContain('dimension-selected');
+  });
   it('独立解析器回读毫米单位、真实原生尺寸与关联显示块及中文文本',()=>{
     const d=fixture(),document=createDrawingDocument(d,layers),text=serializeDrawing(d,layers,'dxf');
     const parsed=new DxfParser().parseSync(text)!;
