@@ -884,7 +884,7 @@ function MeasureLine({ a, b, scale }: { a: Point; b: Point; scale: number }) {
         fill="var(--plan-selection)"
         fontSize={12 / scale}
       >
-        {Math.round(Math.hypot(a[0] - b[0], a[1] - b[1]))} mm
+        {formatMeters(Math.hypot(a[0] - b[0], a[1] - b[1]))} m
       </text>
     </g>
   );
@@ -917,7 +917,7 @@ function Dimensions({ design: d }: { design: Design }) {
                     fontSize={v < 400 ? 125 : 180}
                     className="dimension-text"
                   >
-                    {v}
+                    {formatMeters(v)} m
                   </text>
                 </>
               ) : (
@@ -934,7 +934,7 @@ function Dimensions({ design: d }: { design: Design }) {
                     fontSize={180}
                     className="dimension-text"
                   >
-                    {v}
+                    {formatMeters(v)} m
                   </text>
                 </>
               )}

@@ -860,11 +860,11 @@ export function Workbench(p: Props) {
             正在加载 3D 场景…
           </div>
         )}
-        {tool !== "select" && (
+        {tool !== "select" && tool !== "wall" && (
           <div className="mode-hint">
             {tip}
             <button onClick={() => setTool("select")}>
-              {tool==='wall'?'完成绘墙':<X size={13} />}
+              <X size={13} />
             </button>
           </div>
         )}
@@ -1024,7 +1024,8 @@ export function Workbench(p: Props) {
         <span className="status-coordinates" ref={coordLabel}>
           X 0 / Y 0 mm
         </span>
-        <span className="status-tip">{tip}</span>
+        <span className="status-tip" title={tip}>{tip}</span>
+        {tool === 'wall' && <button className="status-finish-wall" onClick={() => setTool('select')}>完成绘墙</button>}
         {p.loggedIn && <span className={'workspace-save-status' + (p.status.includes('失败') || p.status.includes('冲突') ? ' is-error' : '')} role="status" title={p.status}><span className={p.status.includes('失败') || p.status.includes('冲突') ? 'error-dot' : 'status-dot'} />{p.status}</span>}
         <span className="status-safe">
           <ShieldCheck size={13} />

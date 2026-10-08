@@ -1010,6 +1010,23 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  .status-finish-wall {
+    flex-shrink: 0;
+    padding: 3px 8px;
+    border: 1px solid hsl(var(--primary) / 0.25);
+    border-radius: 4px;
+    background: hsl(var(--primary) / 0.08);
+    color: hsl(var(--primary));
+    font-size: inherit;
+    cursor: pointer;
+  }
+  .status-finish-wall:hover {
+    background: hsl(var(--primary) / 0.16);
+  }
+  .status-finish-wall:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
   .status-safe {
     font-size: 8px;
   }

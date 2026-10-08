@@ -121,7 +121,7 @@ export function PropertyPanel({
   const rename = (value: string, update: (v: string) => void) => (
     <label className="property-field full">
       名称
-      <input
+      <Input className="editor-control"
         key={value}
         defaultValue={value}
         maxLength={100}
@@ -180,7 +180,7 @@ export function PropertyPanel({
             <div>
               <h3>{f.name}</h3>
               <small>
-                {f.w} × {f.d} mm
+                {formatMeters(f.w)} × {formatMeters(f.d)} m
               </small>
             </div>
           </div>
@@ -204,16 +204,17 @@ export function PropertyPanel({
             {(["w", "d", "cx", "cy", "rot"] as const).map((key, i) =>
               input(
                 [
-                  "宽度 / mm",
-                  "深度 / mm",
-                  "中心 X / mm",
-                  "中心 Y / mm",
+                  "宽度 / m",
+                  "深度 / m",
+                  "中心 X / m",
+                  "中心 Y / m",
                   "旋转 / °",
                 ][i],
                 f[key],
                 (v) => applyEdit({ [key]: v }),
                 key === "w" || key === "d" ? 50 : -100000,
                 key === "w" || key === "d" ? 20000 : 100000,
+                key !== 'rot',
               ),
             )}
             <label className="property-field">
@@ -343,15 +344,15 @@ export function PropertyPanel({
             <div>
               <small>开间</small>
               <b>
-                {Math.round(b.x2 - b.x)}
-                <em>mm</em>
+                {formatMeters(b.x2 - b.x)}
+                <em>m</em>
               </b>
             </div>
             <div>
               <small>进深</small>
               <b>
-                {Math.round(b.y2 - b.y)}
-                <em>mm</em>
+                {formatMeters(b.y2 - b.y)}
+                <em>m</em>
               </b>
             </div>
           </div>
@@ -489,7 +490,7 @@ export function PropertyPanel({
             </p>
             <div className="property-form">
               {input(
-                "净宽 / mm",
+                "净宽 / m",
                 d.width,
                 async (v) => {
                   if (d.template !== "blank") return false;
@@ -516,7 +517,7 @@ export function PropertyPanel({
                 50000,
               )}
               {input(
-                "净深 / mm",
+                "净深 / m",
                 d.depth,
                 async (v) => {
                   if (d.template !== "blank") return false;
@@ -543,7 +544,7 @@ export function PropertyPanel({
                 50000,
               )}
               {input(
-                "外围墙厚 / mm",
+                "外围墙厚 / m",
                 d.thickness,
                 (v) => {
                   if (d.template === "blank")
@@ -553,7 +554,7 @@ export function PropertyPanel({
                 1000,
               )}
               {input(
-                "层高 / mm",
+                "层高 / m",
                 d.height,
                 (v) => change((d) => ({ ...d, height: v })),
                 1000,
@@ -626,7 +627,7 @@ export function PropertyPanel({
                 家具 <b>{d.furniture.length} 件</b>
               </span>
               <span>
-                层高 <b>{(d.height / 1000).toFixed(1)} m</b>
+                层高 <b>{formatMeters(d.height)} m</b>
               </span>
             </div>
           </section>
