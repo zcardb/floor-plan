@@ -86,15 +86,16 @@
 
 ## Implementation checklist
 
-- [ ] `Workbench.tsx` 撤销/重做分组之后出现 `<div className="tool-group danger-actions">`，含「重置方案」（`RotateCcw`）与「清空家具」（`Trash2`，`disabled={!d.furniture.length}`），且不加 `p.loggedIn` 判断
-- [ ] 顶部工具栏两个破坏性按钮在 2D 与 3D 视图下都渲染（位于视图分支之外）
-- [ ] 「文件」菜单中不再存在 `重置当前方案` / `清空家具布置` 及其前置分隔线
-- [ ] 「文件」菜单中不再存在「另存云端项目」，且已登录时「导入 JSON 为新项目」仍然渲染
-- [ ] 「我的账号」菜单中不再存在「将当前项目另存到云端」，退出登录仍可用
-- [ ] `Workbench.tsx` 中 `Cloud` / `Save` / `FolderOpen` / `RotateCcw` / `Trash2` 图标仍被使用，无未使用 import（lint 通过）
-- [ ] `src/index.css` 新增 `.danger-actions .tool-button` 与 `:hover:not(:disabled)` 规则，颜色只使用 `hsl(var(--destructive)…)`
-- [ ] 帮助弹窗「保存你的创作」文案改为「登录后项目自动保存到云端，可在项目管理中管理多个方案。」
-- [ ] `pnpm exec tsc --noEmit`、`pnpm lint`、`pnpm test`、`pnpm run build` 全部通过
+- [x] `Workbench.tsx` 撤销/重做分组之后出现 `<div className="tool-group danger-actions">`，含「重置方案」（`RotateCcw`）与「清空家具」（`Trash2`，`disabled={!d.furniture.length}`），且不加 `p.loggedIn` 判断
+- [x] 顶部工具栏两个破坏性按钮在 2D 与 3D 视图下都渲染（位于视图分支之外）
+- [x] 宽屏（≥601px）「文件」菜单中不再存在 `重置当前方案` / `清空家具布置`（改为 `compact-only`，仅窄屏出现，避免双入口）
+- [x] 「文件」菜单中不再存在「另存云端项目」，且已登录时「导入 JSON 为新项目」仍然渲染
+- [x] 「我的账号」菜单中不再存在「将当前项目另存到云端」，退出登录仍可用
+- [x] `Workbench.tsx` 中 `Cloud` / `Save` / `FolderOpen` / `RotateCcw` / `Trash2` 图标仍被使用，无未使用 import（lint 通过）
+- [x] `src/index.css` 新增 `.danger-actions .tool-button` 与 `:hover:not(:disabled)` 规则，颜色只使用 `hsl(var(--destructive)…)`
+- [x] `src/index.css` 新增宽度断点拆分：`@media (max-width:600px){.danger-actions{display:none}}` + `@media (min-width:601px){.compact-only{display:none}}`
+- [x] 帮助弹窗「保存你的创作」文案改为「登录后项目自动保存到云端，可在项目管理中管理多个方案。」
+- [x] `pnpm exec tsc --noEmit`、`pnpm lint`、`pnpm test`、`pnpm run build` 全部通过
 
 ## Verification checklist
 
@@ -103,5 +104,5 @@
 - [ ] 负向/默认态：无家具时「清空家具」为禁用态且不触发点击；菜单打开/关闭不会产生任何数据库写入
 - [ ] 游客转存回归（关键路径未破坏）：退出登录 → 游客模式改一处设计 → 头部「保存 → 保存到云端」→ 注册/登录成功后自动生成「修改的第一个版本」云端项目（`select id,name,updated_at from interior_design_projects order by updated_at desc limit 3` 只新增一行）
 - [ ] 边界：3D 视图下工具栏两个破坏性按钮可用且布局不错位；「结构」菜单里的「拆改非承重墙」与工具栏破坏性按钮配色一致
-- [ ] 响应式：`website_screenshot` 抓取 `desktop_1280` 与 `mobile_390` 的工作台，确认工具栏仍为一排不溢出；若 390px 下溢出，则在 `@media (max-width: 600px)` 中隐藏 `.danger-actions`，并把两个菜单项按窄屏恢复（作为降级方案，需在结论中说明）
-- [ ] 构建范围：`pnpm exec tsc --noEmit`、`pnpm lint`、`pnpm test`、`pnpm run build` 全绿
+- [x] 响应式：`website_screenshot` `desktop_1280` 工具栏出现两个破坏性按钮且不溢出；`mobile_390` 首次抓取发现工具栏溢出（图层/文件被挤出），已按断点拆分修正，重抓后窄屏工具栏恢复原状（≤600px 隐藏工具栏分组，操作回到「文件」菜单）
+- [x] 构建范围：`pnpm exec tsc --noEmit`、`pnpm lint`、`pnpm test`（36 passed）、`pnpm run build` 全绿
