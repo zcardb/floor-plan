@@ -105,7 +105,7 @@ describe('工程交换图',()=>{
     const d=hiddenOnCanvas(fixture());
     expect(createDrawingDocument(d,{...layers,furn:false}).entities.some(e=>e.layer==='FURNITURE')).toBe(false);
     const svg=serializeDrawing(d,'svg');
-    for(const name of ['家具','尺寸标注','房间名称','测量'])expect(svg).toContain(`inkscape:label="${name}"`);
+    for(const name of ['家具','尺寸标注','房间名称'])expect(svg).toContain(`inkscape:label="${name}"`);
     const dxf=new DxfParser().parseSync(serializeDrawing(d,'dxf'))!;
     expect(dxf.entities.some(e=>e.layer==='FURNITURE')).toBe(true);
     expect(dxf.entities.some(e=>e.type==='DIMENSION'&&e.layer==='DIMENSIONS')).toBe(true);

@@ -42,13 +42,15 @@ describe('共享连续取点状态机（绘墙）', () => {
     d.down([1000, 50], 1, [0, 0]); d.up([1000, 2050], 1, [30, 0]);
     expect(h.commit).toHaveBeenCalledTimes(1);
   });
-  it('无吸附取点和闭合结束，无重复提交', () => {
+  it('无吸附取点保留原始坐标，闭合回起点后结束且无重复提交', () => {
     const h = harness(false), d = h.render();
-    d.down([1000, 50], 1, [0, 0]); d.up([2000, 50], 1, [10, 0]);
+    d.down([1000, 50], 1, [0, 0]); d.up([1000, 2000], 1, [10, 0]);
     expect(h.design.current.walls[1].a).toEqual([1000, 50]);
-    d.down([1000, 50], 1, [0, 0]); d.up([1000, 50], 1, [0, 0]);
+    d.down([1000, 2000], 1, [20, 20]); d.up([3000, 2000], 1, [30, 20]);
+    d.down([3000, 2000], 1, [40, 20]); d.up([1000, 50], 1, [50, 20]);
+    expect(h.commit).toHaveBeenCalledTimes(3);
     expect(h.done).toHaveBeenCalledOnce(); expect(h.render().draft).toBeNull();
-    d.up([1000, 50], 1, [0, 0]); expect(h.commit).toHaveBeenCalledTimes(2);
+    d.up([1000, 50], 1, [50, 20]); expect(h.commit).toHaveBeenCalledTimes(3);
   });
   it.each(['Enter', 'Escape'])('%s 清理草稿并退出，保留已提交段', key => {
     const listener = vi.fn(); vi.stubGlobal('window', { addEventListener: listener, removeEventListener: vi.fn() });

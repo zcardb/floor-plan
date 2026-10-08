@@ -165,7 +165,7 @@ describe('2D 常用工具与顶部工具栏', () => {
     expect(text(tree.map(node => node.props.children as ReactNode))).not.toContain('拆改非承重墙');
     const more = tools(render()).find(node => node.props['aria-label'] === '更多')!;
     expect(more.props.className).toContain('compact-only');
-    const items = nodes(more).filter(node => typeof node.props.onSelect === 'function');
+    const items = tools(render()).filter(node => typeof node.props.onSelect === 'function');
     expect(items.map(item => text(item.props.children as ReactNode))).toEqual(['重置方案', '清空家具']);
   });
   it('V、Esc 保留工具切换，M、X 不再切换工具', () => {
