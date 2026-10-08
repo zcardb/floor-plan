@@ -1,5 +1,4 @@
 import { normalizeFurniture } from "../model/costs";
-import { length } from "../model/geometry";
 import { library } from "./catalog";
 import {
   uid,
@@ -12,128 +11,195 @@ import {
   type WallKind,
 } from "../model/types";
 
-/** 墙：按矩形给定，长边即走向、短边即墙厚（外围墙与参考户型同一套约定）。 */
-export interface FloorplanWall {
+/** 矩形：[x1, y1, x2, y2]，单位 mm，原点在户型内净轮廓的左上角，y 向下（下方为南）。 */
+export type Box = [number, number, number, number];
+
+/** 内墙：沿轴线给定。horizontal 时 at 为 y、from/to 为 x；vertical 时相反。 */
+export interface WallSpec {
   /** 便于开口引用的名字，同一份方案内唯一。 */
   key: string;
-  rect: [number, number, number, number];
+  dir: "h" | "v";
+  at: number;
+  from: number;
+  to: number;
+  thickness?: number;
   kind?: WallKind;
 }
 
-/** 墙上的开口：offset 为沿墙起点量起的洞口中心距离，可留出墙垛。 */
-export interface FloorplanOpening {
+export type Side = "up" | "down" | "left" | "right";
+
+/** 墙上的开口：at 为洞口中心沿墙方向的世界坐标（横墙给 x，竖墙给 y）。 */
+export interface OpeningSpec {
   /** 目标墙：外围墙用 top / right / bottom / left，内墙用墙的 key。 */
   wall: string;
-  offset: number;
-  width: number;
   kind: "door" | "window";
+  at: number;
+  width: number;
+  /** 门扇开向哪一侧；合页在坐标较小的一端（start）还是较大的一端（end）。 */
+  into?: Side;
   hinge?: "start" | "end";
-  swingSide?: -1 | 1;
 }
 
-export interface FloorplanRoom {
+export interface RoomSpec {
   id: string;
   name: string;
-  rect: [number, number, number, number];
   mat: string;
+  /** 净空矩形，或任意多边形（L 形客餐厅等）。 */
+  box?: Box;
+  poly?: Point[];
   counted?: boolean;
 }
 
-export interface FloorplanSpec {
+/**
+ * 家具简写：背靠哪面墙 + 沿墙位置 + 离墙距离。
+ * 坐标相对所在分区 zone 的左上角，尺寸与颜色默认取自素材库。
+ */
+export interface FurnitureSpec {
+  type: string;
+  /** 素材库里的名字，用于精确取尺寸与颜色；只给 type 时取该类型的第一件。 */
+  name?: string;
+  /** 显示名（与素材库不同时使用，例如把「橱柜台面」叫作「吊柜」）。 */
+  label?: string;
+  w?: number;
+  d?: number;
+  back: Side;
+  /** 家具中心沿背后那面墙方向的位置（横墙量 x，竖墙量 y）；缺省居中。 */
+  along?: number;
+  /** 背面离墙的净距，缺省贴墙。 */
+  gap?: number;
+  color?: string;
+}
+
+export interface FurnitureZone {
+  /** 摆放分区：通常就是房间净空矩形。 */
+  zone: Box;
+  items: FurnitureSpec[];
+}
+
+export interface PlanSpec {
+  id: string;
   width: number;
   depth: number;
-  thickness: number;
+  thickness?: number;
   height?: number;
-  /** 内部隔墙与承重段；外围四面墙自动生成，索引 0–3 依次为上、右、下、左。 */
-  walls: FloorplanWall[];
-  openings: FloorplanOpening[];
-  rooms: FloorplanRoom[];
+  walls: WallSpec[];
+  openings: OpeningSpec[];
+  rooms: RoomSpec[];
+  furniture: FurnitureZone[];
 }
 
-export interface BuiltFloorplan {
-  walls: Wall[];
-  openings: Opening[];
-  rooms: Room[];
+export const INNER_WALL = 120;
+const OUTER_WALL = 240;
+/** 短于该长度的墙垛没有意义，直接并入洞口旁的缺口。 */
+const MIN_PIER = 60;
+
+/** 把四边各向内收半个内墙厚：sides 里写哪条边（t/b/l/r）就收哪条边。 */
+export function net(x1: number, y1: number, x2: number, y2: number, sides = ""): Box {
+  const h = INNER_WALL / 2;
+  return [
+    x1 + (sides.includes("l") ? h : 0),
+    y1 + (sides.includes("t") ? h : 0),
+    x2 - (sides.includes("r") ? h : 0),
+    y2 - (sides.includes("b") ? h : 0),
+  ];
 }
 
-/** 外围四面墙：与 geometry.outerWalls 一致——墙体落在室内净尺寸之外，内表面贴着 0 / width / depth。 */
-const outline = (width: number, depth: number, t: number): FloorplanWall[] => [
-  { key: "top", rect: [-t, -t, width + t, 0] },
-  { key: "right", rect: [width, -t, width + t, depth + t] },
-  { key: "bottom", rect: [-t, depth, width + t, depth + t] },
-  { key: "left", rect: [-t, -t, 0, depth + t] },
+const boxPoly = ([x1, y1, x2, y2]: Box): Point[] => [
+  [x1, y1],
+  [x2, y1],
+  [x2, y2],
+  [x1, y2],
 ];
 
-/** 矩形 → 墙：长边为走向，短边为厚度。 */
-export function wallFromRect(
-  id: string,
-  rect: [number, number, number, number],
-  kind: WallKind,
-): Wall {
-  const [x, y, x2, y2] = rect;
-  const horizontal = x2 - x >= y2 - y;
+interface Axis {
+  key: string;
+  dir: "h" | "v";
+  /** 垂直于走向的中心线坐标。 */
+  at: number;
+  from: number;
+  to: number;
+  thickness: number;
+  kind: WallKind;
+}
+
+/** 外围四面墙：与 geometry.outerWalls 一致——墙体在室内净尺寸之外，内表面贴着 0 / width / depth。 */
+function outline(width: number, depth: number, t: number): Axis[] {
+  const base = { thickness: t, kind: "exterior" as WallKind };
+  return [
+    { ...base, key: "top", dir: "h", at: -t / 2, from: -t, to: width + t },
+    { ...base, key: "right", dir: "v", at: width + t / 2, from: -t, to: depth + t },
+    { ...base, key: "bottom", dir: "h", at: depth + t / 2, from: -t, to: width + t },
+    { ...base, key: "left", dir: "v", at: -t / 2, from: -t, to: depth + t },
+  ];
+}
+
+/** 内墙两端各伸出半个墙厚，补上转角与丁字接头处的缺口；顶到外墙内表面的一端不伸。 */
+function innerAxis(w: WallSpec, width: number, depth: number): Axis {
+  const thickness = w.thickness ?? INNER_WALL;
+  const limit = w.dir === "h" ? width : depth;
   return {
-    id,
-    kind,
-    a: horizontal ? [x, (y + y2) / 2] : [(x + x2) / 2, y],
-    b: horizontal ? [x2, (y + y2) / 2] : [(x + x2) / 2, y2],
-    thickness: horizontal ? y2 - y : x2 - x,
+    key: w.key,
+    dir: w.dir,
+    at: w.at,
+    from: w.from <= 0 ? 0 : w.from - thickness / 2,
+    to: w.to >= limit ? limit : w.to + thickness / 2,
+    thickness,
+    kind: w.kind ?? "partition",
   };
 }
 
-const rectOf = (x: number, y: number, w: number, h: number): Point[] => [
-  [x, y],
-  [x + w, y],
-  [x + w, y + h],
-  [x, y + h],
-];
-
-/** 短于 60mm 的墙垛没有意义（校验也会拒绝），直接并进相邻墙段。 */
-const MIN_PIER = 60;
+const point = (axis: Axis, along: number): Point =>
+  axis.dir === "h" ? [along, axis.at] : [axis.at, along];
 
 /**
- * 由「墙 + 墙上的开口 + 房间矩形」装配一份可用的 Design。
- * 与参考户型一致：每段实墙与每个洞口各自是一段墙，洞口段的 offset = 墙长 / 2、width = 墙长，
- * 因此 2D 平面与 3D 场景无需额外约定即可把洞口正确显形。
+ * 门扇开向 → swingSide。墙的起点恒为坐标较小的一端，
+ * 此时横墙 -1 朝上、+1 朝下，竖墙 -1 朝右、+1 朝左（见 model/doorOrientation.ts）。
  */
-export function buildFloorplan(spec: FloorplanSpec): BuiltFloorplan {
-  const all = [...outline(spec.width, spec.depth, spec.thickness), ...spec.walls];
+function swingSideOf(axis: Axis, into: Side): -1 | 1 {
+  const ok = axis.dir === "h" ? into === "up" || into === "down" : into === "left" || into === "right";
+  if (!ok) throw new Error(`墙 ${axis.key} 上的门不能朝 ${into} 开`);
+  return into === "up" || into === "right" ? -1 : 1;
+}
+
+/**
+ * 由「墙 + 开口」生成墙段与门窗。与参考户型同一约定：每段实墙与每个洞口各自是一段墙，
+ * 洞口段的 offset = 墙长 / 2、width = 墙长，2D 平面与 3D 场景无需额外约定就能把洞口显形。
+ */
+export function buildStructure(spec: PlanSpec): { walls: Wall[]; openings: Opening[] } {
+  const t = spec.thickness ?? OUTER_WALL;
+  const axes = [
+    ...outline(spec.width, spec.depth, t),
+    ...spec.walls.map((w) => innerAxis(w, spec.width, spec.depth)),
+  ];
+  const keys = new Set<string>();
+  for (const axis of axes) {
+    if (keys.has(axis.key)) throw new Error(`户型模板 ${spec.id} 里墙名重复：${axis.key}`);
+    keys.add(axis.key);
+  }
+  for (const o of spec.openings)
+    if (!keys.has(o.wall)) throw new Error(`户型模板 ${spec.id} 的开口指向了不存在的墙：${o.wall}`);
   const walls: Wall[] = [];
   const openings: Opening[] = [];
-  const keys = new Set<string>();
-  all.forEach((item, index) => {
-    if (keys.has(item.key)) throw new Error(`户型模板里墙名重复：${item.key}`);
-    keys.add(item.key);
-  });
-  all.forEach((item, index) => {
-    const base = wallFromRect(
-      "w" + index,
-      item.rect,
-      item.kind ?? (index < 4 ? "exterior" : "partition"),
-    );
+  for (const axis of axes) {
+    const segment = (id: string, from: number, to: number): Wall => ({
+      id,
+      kind: axis.kind,
+      a: point(axis, from),
+      b: point(axis, to),
+      thickness: axis.thickness,
+    });
     const cuts = spec.openings
-      .filter((o) => o.wall === item.key)
-      .sort((a, b) => a.offset - b.offset);
-    if (!cuts.length) {
-      walls.push(base);
-      return;
-    }
-    const total = length(base);
-    const at = (distance: number): Point => {
-      const k = distance / total;
-      return [
-        base.a[0] + (base.b[0] - base.a[0]) * k,
-        base.a[1] + (base.b[1] - base.a[1]) * k,
-      ];
-    };
-    let cursor = 0;
+      .filter((o) => o.wall === axis.key)
+      .sort((a, b) => a.at - b.at);
+    let cursor = axis.from;
     cuts.forEach((cut, i) => {
-      const start = cut.offset - cut.width / 2;
-      const end = cut.offset + cut.width / 2;
-      if (start - cursor >= MIN_PIER)
-        walls.push({ ...base, id: `${base.id}-s${i}`, a: at(cursor), b: at(start) });
-      const id = `${cut.kind === "door" ? "door" : "win"}-${item.key}-${i}`;
-      walls.push({ ...base, id, a: at(start), b: at(end) });
+      const start = cut.at - cut.width / 2;
+      const end = cut.at + cut.width / 2;
+      if (start < cursor || end > axis.to)
+        throw new Error(`户型模板 ${spec.id}：墙 ${axis.key} 上的开口越界或互相重叠`);
+      if (start - cursor >= MIN_PIER) walls.push(segment(`${axis.key}-${i}`, cursor, start));
+      const id = `${cut.kind}-${axis.key}-${i}`;
+      walls.push(segment(id, start, end));
       openings.push({
         id,
         wallId: id,
@@ -141,129 +207,86 @@ export function buildFloorplan(spec: FloorplanSpec): BuiltFloorplan {
         offset: cut.width / 2,
         width: cut.width,
         open: true,
-        ...(cut.hinge ? { hinge: cut.hinge } : {}),
-        ...(cut.swingSide ? { swingSide: cut.swingSide } : {}),
+        ...(cut.kind === "door" && cut.into
+          ? { hinge: cut.hinge ?? "start", swingSide: swingSideOf(axis, cut.into) }
+          : {}),
       });
       cursor = end;
     });
-    if (total - cursor >= MIN_PIER)
-      walls.push({ ...base, id: `${base.id}-e`, a: at(cursor), b: at(total) });
-  });
-  const rooms: Room[] = spec.rooms.map((r) => ({
-    id: r.id,
-    name: r.name,
-    rings: [rectOf(r.rect[0], r.rect[1], r.rect[2], r.rect[3])],
-    mat: r.mat,
-    ...(r.counted === undefined ? {} : { counted: r.counted }),
-  }));
-  return { walls, openings, rooms };
+    if (axis.to - cursor >= MIN_PIER)
+      walls.push(segment(cuts.length ? `${axis.key}-end` : axis.key, cursor, axis.to));
+  }
+  return { walls, openings };
 }
 
-/**
- * 家具简写：默认按「贴哪面墙 + 沿墙位置」描述，需要自由摆放时用 at 直接给中心点。
- * wall 指明靠背方向；rot 直接给角度时优先级最高。
- */
-export interface FurnitureSpec {
-  type: string;
-  /** 库里的中文名，用于精确取尺寸与颜色；只给 type 时取该类目第一件。 */
-  name?: string;
-  w?: number;
-  d?: number;
-  wall?: "back-left" | "back-right" | "back-top" | "back-bottom" | "center";
-  /** 沿墙方向的中心距离（从该墙起点量起）；缺省居中。 */
-  along?: number;
-  /** 离背后那面墙的净距，缺省贴墙。 */
-  gap?: number;
-  /** 自由摆放时的中心点（房间坐标）。 */
-  at?: [number, number];
-  rot?: number;
-  color?: string;
-}
-
-/** 尺寸与颜色默认取自素材库，保证与「点击添加」出来的家具完全一致。 */
 const catalogOf = (type: string, name?: string) =>
   (name ? library.find((i) => i.type === type && i.name === name) : undefined) ??
   library.find((i) => i.type === type);
 
-const ROT_OF_WALL = {
-  "back-top": 0,
-  "back-right": 90,
-  "back-bottom": 180,
-  "back-left": 270,
-  center: 0,
-} as const;
+/** 背靠方向 → 旋转角，与参考户型一致：0 靠上、90 靠右、180 靠下、270 靠左。 */
+const ROT: Record<Side, number> = { up: 0, right: 90, down: 180, left: 270 };
 
 /** 把家具简写解析成实际坐标。 */
-export function placeFurniture(
-  room: [number, number, number, number],
-  specs: FurnitureSpec[],
-): Furniture[] {
-  const [x, y, w, h] = room;
-  return specs.map((s) => {
+export function placeFurniture({ zone, items }: FurnitureZone): Furniture[] {
+  const [x1, y1, x2, y2] = zone;
+  return items.map((s) => {
     const item = catalogOf(s.type, s.name);
     if (!item) throw new Error(`素材库里没有 ${s.type}${s.name ? " / " + s.name : ""}`);
-    const fw = s.w ?? item.w;
-    const fd = s.d ?? item.d;
-    const wall = s.wall ?? "center";
-    const rot = s.rot ?? ROT_OF_WALL[wall];
-    const alongSpan = rot % 180 === 0 ? fw : fd;
-    const depthSpan = rot % 180 === 0 ? fd : fw;
+    const w = s.w ?? item.w;
+    const d = s.d ?? item.d;
     const gap = s.gap ?? 0;
-    let cx: number;
-    let cy: number;
-    if (s.at) {
-      [cx, cy] = s.at;
-    } else {
-      cx = x + w / 2;
-      cy = y + h / 2;
-      if (wall === "back-top") cy = y + gap + depthSpan / 2;
-      else if (wall === "back-bottom") cy = y + h - gap - depthSpan / 2;
-      else if (wall === "back-left") cx = x + gap + depthSpan / 2;
-      else if (wall === "back-right") cx = x + w - gap - depthSpan / 2;
-      if (s.along !== undefined) {
-        if (rot % 180 === 0) cx = x + s.along;
-        else cy = y + s.along;
-      }
-    }
+    const horizontal = s.back === "up" || s.back === "down";
+    const along = s.along ?? (horizontal ? x2 - x1 : y2 - y1) / 2;
+    const cx = horizontal
+      ? x1 + along
+      : s.back === "left"
+        ? x1 + gap + d / 2
+        : x2 - gap - d / 2;
+    const cy = !horizontal
+      ? y1 + along
+      : s.back === "up"
+        ? y1 + gap + d / 2
+        : y2 - gap - d / 2;
     return normalizeFurniture({
       id: uid(),
       type: item.type,
-      name: item.name,
+      name: s.label ?? item.name,
       cx,
       cy,
-      w: fw,
-      d: fd,
-      rot,
+      w,
+      d,
+      rot: ROT[s.back],
       color: s.color || item.color,
     });
   });
 }
 
-/** 房间矩形的中心，便于在房间内居中摆放。 */
-export const roomCenter = (r: [number, number, number, number]): Point => [
-  r[0] + r[2] / 2,
-  r[1] + r[3] / 2,
-];
-
-/** 由构件装配成完整方案。 */
-export function assemblePlan(
-  meta: { id: string; width: number; depth: number; thickness: number; height?: number },
-  spec: FloorplanSpec,
-  furniture: Furniture[],
-): Design {
-  const built = buildFloorplan(spec);
+/** 由一份户型描述装配出完整方案。 */
+export function buildPlan(spec: PlanSpec): Design {
+  const { walls, openings } = buildStructure(spec);
+  const rooms: Room[] = spec.rooms.map((r) => {
+    const ring = r.poly ?? (r.box ? boxPoly(r.box) : null);
+    if (!ring) throw new Error(`户型模板 ${spec.id} 的房间 ${r.id} 缺少轮廓`);
+    return {
+      id: r.id,
+      name: r.name,
+      rings: [ring],
+      mat: r.mat,
+      ...(r.counted === undefined ? {} : { counted: r.counted }),
+    };
+  });
   return {
     version: 2,
     template: "reference",
-    templateId: meta.id,
-    width: meta.width,
-    depth: meta.depth,
-    thickness: meta.thickness,
-    height: meta.height ?? 2800,
-    walls: built.walls,
-    openings: built.openings,
-    rooms: built.rooms,
-    furniture,
+    templateId: spec.id,
+    width: spec.width,
+    depth: spec.depth,
+    thickness: spec.thickness ?? OUTER_WALL,
+    height: spec.height ?? 2800,
+    walls,
+    openings,
+    rooms,
+    furniture: spec.furniture.flatMap(placeFurniture),
     demolished: [],
   };
 }

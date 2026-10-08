@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DXF_UNITS, type DxfSource, type DxfUnit } from '../model/externalDxf/dxfSource';
 import { guessRoles, LAYER_ROLES, recognizeDxf, type LayerRole, type Recognition } from '../model/externalDxf/recognize';
+import { layerLabel } from '../model/externalDxf/layerNames';
 import type { Design } from '../model/types';
 import { DxfImportPreview } from './DxfImportPreview';
 
@@ -49,9 +50,12 @@ export function DxfImportDialog({ source, defaultName, pending, onImport, onClos
           <div className="cms-field">
             <span className="dxf-import-label">图层（{source.layers.length}）</span>
             <ul className="dxf-import-layers">{source.layers.map((layer, i) => <li key={layer.name}>
-              <span className="dxf-import-layer-name" title={layer.name}>{layer.name}<small>{layer.count} 条线</small></span>
+              <span className="dxf-import-layer-name" title={layer.name}>
+                {layerLabel(layer.name) || layer.name}
+                <small>{layerLabel(layer.name) ? layer.name + ' · ' : ''}{layer.count} 条线</small>
+              </span>
               <Select value={roles[layer.name]} onValueChange={v => setRoles(r => ({ ...r, [layer.name]: v as LayerRole }))} disabled={pending}>
-                <SelectTrigger aria-label={'图层 ' + layer.name + ' 的用途'} id={'dxf-import-layer-' + i}><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-label={'图层「' + (layerLabel(layer.name) || layer.name) + '」的用途'} id={'dxf-import-layer-' + i}><SelectValue /></SelectTrigger>
                 <SelectContent>{LAYER_ROLES.map(r => <SelectItem key={r.id} value={r.id}>{r.label}</SelectItem>)}</SelectContent>
               </Select>
             </li>)}</ul>
