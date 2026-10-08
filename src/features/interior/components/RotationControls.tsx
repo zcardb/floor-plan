@@ -17,7 +17,7 @@ export function RotationControls({ id, value, transaction, compact = false, clos
   const [draft, setDraft] = useState<string | null>(null);
   const [error, setError] = useState('');
   const edit = useRef<{ token: symbol; before: number; text: string; invalid: boolean } | null>(null);
-  const active = edit.current && transaction.isActive(edit.current.token);
+  const active = !!edit.current && transaction.isActive(edit.current.token);
   const displayed = active && draft !== null ? draft : String(value);
   const settle = () => {
     const current = edit.current;
@@ -52,6 +52,7 @@ export function RotationControls({ id, value, transaction, compact = false, clos
       ? current.invalid ? current.before : norm(Number(current.text))
       : value;
     settle();
+    transaction.flush();
     const token = transaction.begin({ kind: 'furniture', id });
     transaction.update(token, { rot: String(norm(base + 90)) });
     transaction.apply(token);

@@ -64,7 +64,6 @@ export function PropertyPanel({
   change,
   duplicate,
   remove,
-  rotate,
 }: Props) {
   const d = useCostDesign(design);
   const confirm = useConfirm();
@@ -204,22 +203,22 @@ export function PropertyPanel({
                 ),
               })),
             )}
-            {(["w", "d", "cx", "cy", "rot"] as const).map((key, i) =>
+            {(["w", "d", "cx", "cy"] as const).map((key, i) =>
               input(
                 [
                   "宽度 / m",
                   f.type === 'stairs' ? "长度 / m" : "深度 / m",
                   "中心 X / m",
                   "中心 Y / m",
-                  "旋转 / °",
                 ][i],
                 f[key],
                 (v) => applyEdit({ [key]: v }),
                 key === "w" || key === "d" ? 50 : -100000,
                 key === "w" || key === "d" ? 20000 : 100000,
-                key !== 'rot',
+                true,
               ),
             )}
+            <RotationControls key={f.id} id={f.id} value={f.rot} transaction={transaction} />
             <label className="property-field">
               家具颜色
               <input
@@ -257,10 +256,6 @@ export function PropertyPanel({
             </p>
           </div>}
           <div className="property-actions">
-            <Button size="sm" variant="outline" onClick={rotate}>
-              <RotateCw />
-              旋转
-            </Button>
             <Button size="sm" variant="outline" onClick={duplicate}>
               <Copy />
               复制

@@ -1,5 +1,46 @@
 ## Context
+
+### 本次执行结果
+- 已实现共享取点/结束状态机、测量墙端双距离、门窗净距覆盖层和完成测量按钮。
+- 功能回归：通过，37 个文件、206 项测试；包含相同取点、连续段、闭合、Enter/Esc、最小长度、拖动阈值、门窗方向/贴端/碰撞与选中覆盖层接线。
+- check、开发及生产构建：通过；保留既有 PlanCanvas `fit` effect 依赖警告。
+- 构建审计：已运行 strict app 审计，保留现有预算/动态分类/外部字体告警，未宣称性能验收通过。
+- 浏览器性能、实际拖动标注的 390/1280 布局及部署 HTTP：未验证。没有浏览器交互工具，未用无选中截图替代所需证据；这些验收项保持未勾选。
 新增需求：门、窗沿所属墙移动时，在画布上实时展示开口两侧到该墙两端的距离。下方「门窗两侧距离」为本次待实施内容；工具栏功能已实现，保留原验证记录。
+
+## 测量与绘墙一致：推荐方案
+- 将 `components/useWallDrawing.ts` 的连续取点状态机抽为共享的 `useSegmentDrawing.ts`，保留 `useWallDrawing` 包装入口以兼容现有调用与测试；测量也使用同一状态机，差别仅是提交测量线而非墙体、以及草稿 UI。
+- 共享 `resolveWallPoint`、`resolveWallHover`：相同的起点/端点优先吸附、墙面投影、容差、吸附开关和连续起点方向锁定。不再保留测量独立的两点点击状态及 Shift 专属方向规则。
+- 相同手势：首点点击开启草稿；后续点击逐段提交并以前段终点继续；首段拖动超过现有 5 px 阈值可提交；回到首点闭合后自动结束。双击、右键、Enter 结束，Esc 取消未提交草稿并退出；已提交段保留。切工具、指针取消和双指缩放按绘墙规则清理。
+- 共享状态机允许工具专用段校验：绘墙继续使用 `validateWallSegment`、`rebuildRooms`；测量沿用绘墙 100 mm 最小段长，但不应用墙体重叠或门窗穿越校验，因为测量墙长、穿过开口不应改变或受到结构编辑限制。测量只追加 `design.measures`，不增删墙或重建房间。
+- 测量工具在墙面悬停/沿墙移动时显示当前投影点到该墙起端、末端的两项距离（`offset` 与 `length(wall)-offset`）；不再只显示距近端。展示点与实际取点分别使用共享 hover/candidate，保持与绘墙相同的吸附和方向锁定语义。
+- 复用/扩展 `WallHoverOverlay` 支持测量 UI：墙高亮、当前点及两端数值，不显示「点击连接」；保持绘墙现有 UI 不变。测量草稿只显示 `MeasureLine`，不显示墙体多边形。
+- `Workbench.tsx` 同步测量模式提示和帮助；测量时提供「完成测量」按钮，走与「完成绘墙」一致的结束/清理路径，不产生末尾多余段。
+
+### 测量关键文件
+- `src/features/interior/components/useSegmentDrawing.ts`（新增）：共享连续取点、手势、完成/取消状态机。
+- `src/features/interior/components/useWallDrawing.ts`：保留包装入口，将墙体校验与提交传给共享状态机。
+- `src/features/interior/components/PlanCanvas.tsx`：测量接入共享状态机，移除 `measureStart` 及旧测量 drag/draft 分支，保持其他对象拖动不变。
+- `src/features/interior/components/WallHoverOverlay.tsx`：测量变体展示点到两端距离。
+- `src/features/interior/components/Workbench.tsx`：测量提示、帮助和完成按钮。
+- `src/features/interior/components/useSegmentDrawing.test.ts`（新增）、`PlanCanvas.test.tsx`、`WallHoverOverlay.test.tsx`、`Workbench.test.tsx`：状态机、入口及数值回归。
+
+## Implementation checklist
+- [x] 抽出共享连续绘制状态机，绘墙包装保留原有取点、校验、提交及闭合行为。
+- [x] 测量 pointer down/move/up 使用共享状态机，替换旧两点取点路径且提交仅修改 measures。
+- [x] 双击、右键、Enter、Esc、切工具、指针取消与双指缩放走共同清理路径，不提交未确认末段。
+- [x] 测量沿墙 hover 展示投影点到两端的距离，草稿保持测量线 UI 而非墙体 UI。
+- [x] 添加完成测量按钮并更新提示，复用绘墙结束规则。
+- [x] 新增共享状态机与测量回归测试，证明绘墙原路径未退化。
+
+## Verification checklist
+- [ ] 正向：相同 pointer 输入在测量和绘墙中得到相同起点、方向锁定、吸附端点及连续段端点；测量不修改 walls、rooms、openings。
+- [ ] 正向：6000 mm 墙上投影 offset=2000 时显示 2.00 m/4.00 m，移动到 3000 时显示 3.00 m/3.00 m；适用于水平、垂直、斜墙与反向墙。
+- [ ] 默认/负向：没有墙命中时不显示墙端距离；吸附关闭时取点规则仍与绘墙一致；测量沿墙及穿过门窗不会触发结构重叠限制。
+- [ ] 边界：100 mm 最小段长、5 px 首段拖动阈值、贴端零距离、回首点闭合、每种结束手势及重复结束均无末尾多余段。
+- [ ] 已提交测量段在结束后保留；Esc 只取消草稿；清除测量、撤销重做、切工具和 3D 工具不退化。
+- [ ] 执行 `pnpm exec vitest run src/features/interior/components/useSegmentDrawing.test.ts src/features/interior/components/PlanCanvas.test.tsx src/features/interior/components/WallHoverOverlay.test.tsx src/features/interior/components/Workbench.test.tsx src/features/interior/model/wallDrawing.test.ts`，随后 `pnpm test`、`pnpm run check`、`pnpm run build`、`pnpm run build:prod`。
+- [ ] 同一路由 mobile_390、desktop_1280 验证测量 hover、连续取点和结束 UI；若无法交互，记录相关布局/浏览器行为未验证。
 
 ## 门窗两侧距离：推荐方案
 - 在 2D 中选中门或窗即显示两侧距离，拖动时随既有 `preview(next)` 的设计状态实时更新，松开后保留，取消选中后隐藏。
@@ -16,11 +57,11 @@
 - 复用 `model/geometry.ts` 的 `length`、`model/lengthUnits.ts` 的 `formatMeters`；参考 `WallHoverOverlay.tsx` 的缩放补偿与 `openingDrag.test.ts` 的拖动夹取/碰撞测试。
 
 ## Implementation checklist
-- [ ] 新增 OpeningDistances，只从选中开口的 offset、width 与所属墙端点计算两侧净距。
-- [ ] 两侧标注支持任意墙方向，并对短距离、零距离安排不重叠的文字位置。
-- [ ] PlanCanvas 在选中门窗时挂载标注，使用预览 design 实时更新，取消选中后隐藏。
-- [ ] 标注不拦截指针、不进入图片导出、不受外围尺寸开关控制，且不修改设计数据或拖动规则。
-- [ ] 添加距离组件与画布选中/预览集成回归测试。
+- [x] 新增 OpeningDistances，只从选中开口的 offset、width 与所属墙端点计算两侧净距。
+- [x] 两侧标注支持任意墙方向，并对短距离、零距离安排错行文字位置（实际视觉效果未验证）。
+- [x] PlanCanvas 在选中门窗时挂载标注，使用预览 design 实时更新，取消选中后隐藏。
+- [x] 标注不拦截指针、不进入图片导出、不受外围尺寸开关控制，且不修改设计数据或拖动规则。
+- [x] 添加距离组件与画布选中/预览集成回归测试。
 
 ## Verification checklist
 - [ ] 正向：6000 mm 墙、1000 mm 开口、offset=2000 时两侧显示 1.50 m 和 3.50 m；移动到 offset=3000 时更新为 2.50 m 和 2.50 m，门窗均适用。

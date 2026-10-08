@@ -30,6 +30,7 @@ export function SizeFields({design,selection,transaction,close}:{design:Design;s
   settleRef.current=settle;
   useEffect(()=>()=>settleRef.current(true),[]);
   const cancel=()=>{const t=token.current;token.current=null;if(t)transaction.cancel(t);setError('');setDraft(draftFromDesign());close?.();};
+  const furniture=selection?.kind==='furniture'?design.furniture.find(f=>f.id===selection.id):null;
   const wall=selection?.kind==='wall'?design.walls.find(w=>w.id===selection.id):null;
   const locked=wall&&(design.template!=='blank'||wall.kind!=='partition');
   if(locked)return <p className="visual-locked">原始建筑结构已锁定，不能修改尺寸。</p>;
@@ -37,5 +38,5 @@ export function SizeFields({design,selection,transaction,close}:{design:Design;s
     if(!token.current||!transaction.isActive(token.current))token.current=transaction.begin(selection);
     const next={...draft,[key]:e.target.value};setDraft(next);
     try{transaction.update(token.current,sizeDraftToModel(next));setError('');}catch(err){setError(err instanceof Error?err.message:'尺寸无效');}
-  }} onBlur={()=>settle()} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();e.currentTarget.blur();}}}/></Label>)}</div>{error&&<p className="form-error" role="alert">{error}</p>}<p className="muted-note">改动即时生效</p></div>;
+  }} onBlur={()=>settle()} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();e.currentTarget.blur();}}}/></Label>)}{furniture&&<RotationControls key={furniture.id} id={furniture.id} value={furniture.rot} transaction={transaction} close={close}/>}</div>{error&&<p className="form-error" role="alert">{error}</p>}<p className="muted-note">改动即时生效</p></div>;
 }

@@ -19,8 +19,10 @@ vi.mock('react', async importOriginal => {
   };
 });
 vi.mock('./useWallDrawing', () => ({ useWallDrawing: () => ({ clear: vi.fn(), clearHover: vi.fn(), down: vi.fn(), move: vi.fn(), up: vi.fn() }) }));
+vi.mock('./useSegmentDrawing', () => ({ useSegmentDrawing: () => ({ clear: vi.fn(), clearHover: vi.fn(), down: vi.fn(), move: vi.fn(), up: vi.fn() }) }));
 import { PlanCanvas } from './PlanCanvas';
 import { PerimeterDimensions } from './PerimeterDimensions';
+import { OpeningDistances } from './OpeningDistances';
 import { Children, isValidElement } from 'react';
 
 type CanvasProps = React.ComponentProps<typeof PlanCanvas>;
@@ -96,6 +98,18 @@ describe('PlanCanvas 墙端点连接事件链', () => {
   });
 });
 describe('PlanCanvas 门窗事件链', () => {
+  it('选中门窗时距离层接收实时设计，关闭外围尺寸仍显示，取消选中隐藏', () => {
+    const h = harness();
+    const overlay = (design: Design, selected: boolean) => {
+      hooks.refs = [];
+      const tree = h.component.render({ ...h.props, design, selection: selected ? { kind: 'opening', id: 'opening' } : null }, null);
+      return Children.toArray((tree.props as React.SVGProps<SVGSVGElement>).children).filter(c => isValidElement(c) && c.type === OpeningDistances) as ReactElement<{ design: Design }>[];
+    };
+    expect(overlay(h.design, true)[0].props.design.openings[0].offset).toBe(2000);
+    const moved = { ...h.design, openings: [{ ...h.design.openings[0], offset: 3000 }] };
+    expect(overlay(moved, true)[0].props.design).toBe(moved);
+    expect(overlay(h.design, false)).toHaveLength(0);
+  });
   it.each(['door', 'window'] as const)('%s 选中、预览、释放只提交一次原始快照', kind => {
     const h = harness(kind);
     h.handlers.onPointerDown!(event(1700, -300));

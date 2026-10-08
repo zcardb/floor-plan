@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatMeters } from '../model/lengthUnits';
+import { DrawingExportItems } from './DrawingExportItems';
+import type { DrawingFormat } from '../model/drawingExport';
 import {
   Armchair,
   ArrowDownToLine,
@@ -267,7 +269,7 @@ export function Workbench(p: Props) {
           ),
         }));
     },
-    [selection, change],
+    [selection, change, sizeTransaction],
   );
   const duplicate = useCallback(() => {
     if (selection?.kind !== "furniture") return;
@@ -378,6 +380,16 @@ export function Workbench(p: Props) {
     if (view === "2d") canvas.current?.exportImage();
     else scene.current?.shot();
   };
+  const exportDrawing = async (format: DrawingFormat) => {
+    sizeTransaction.cancel();
+    const snapshot = structuredClone(model.current.current);
+    try {
+      const { downloadDrawing } = await import('../model/drawingExport');
+      downloadDrawing(snapshot, layers, format, p.project.name);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '工程图导出失败');
+    }
+  };
   const exportJson = () => {
     sizeTransaction.cancel();
     const blob = new Blob(
@@ -421,7 +433,7 @@ export function Workbench(p: Props) {
     tool === "wall"
       ? "点击起点与转角连续绘墙 · 可拖动起段 · 双击 / 右键 / Enter 完成 · Esc 取消草稿"
       : tool === "measure"
-        ? "点击两点或拖动测量 · Shift 锁定方向 · 双击 / 右键 / Esc 结束 · 测量线可在顶部「更多」菜单中清除"
+        ? "点击起点与转角连续测量 · 可拖动起段 · 双击 / 右键 / Enter 完成 · Esc 取消草稿 · 在「更多」菜单清除测量线"
         : tool === "demolish"
           ? "点击非承重墙标记拆除，再次点击恢复"
           : tool === "door" || tool === "window"
@@ -437,7 +449,7 @@ export function Workbench(p: Props) {
         (hidePanel ? "hide-properties" : "")
       }
     >
-      {p.loggedIn ? <WorkbenchHeader {...p.projectNavigation} project={p.project} email={p.email} view={view} onBack={()=>{sizeTransaction.cancel();p.projects();}} onOpen={async row=>{sizeTransaction.cancel();return p.projectNavigation.onOpen(row);}} onLogout={p.logout} onDownload={exportImage} /> : <header className="main-header">
+      {p.loggedIn ? <WorkbenchHeader {...p.projectNavigation} project={p.project} email={p.email} view={view} onBack={()=>{sizeTransaction.cancel();p.projects();}} onOpen={async row=>{sizeTransaction.cancel();return p.projectNavigation.onOpen(row);}} onLogout={p.logout} onDownload={exportImage} onExportDrawing={format => void exportDrawing(format)} /> : <header className="main-header">
         <div className="brand-mark">
           <LayoutTemplate size={23} />
         </div>
@@ -478,6 +490,7 @@ export function Workbench(p: Props) {
               <Download />
               保存到本地
             </DropdownMenuItem>
+            <DrawingExportItems disabled={view !== '2d'} onExport={format => void exportDrawing(format)} />
             <DropdownMenuItem onClick={p.cloudSave}>
               <Cloud />
               保存到云端
@@ -707,6 +720,7 @@ export function Workbench(p: Props) {
                 <Download />
                 {view === "2d" ? "下载 2D 图片" : "下载当前 3D 视角"}
               </DropdownMenuItem>
+              <DrawingExportItems disabled={view !== '2d'} onExport={format => void exportDrawing(format)} />
               <DropdownMenuItem onClick={()=>{sizeTransaction.cancel();p.save();}}>
                 <Save />
                 立即保存当前项目
@@ -1019,7 +1033,7 @@ export function Workbench(p: Props) {
           X 0 / Y 0 m
         </span>
         <span className="status-tip" title={tip}>{tip}</span>
-        {tool === 'wall' && <button className="status-finish-wall" onClick={() => setTool('select')}>完成绘墙</button>}
+        {(tool === 'wall' || tool === 'measure') && <button className="status-finish-wall" onClick={() => setTool('select')}>{tool === 'wall' ? '完成绘墙' : '完成测量'}</button>}
         {p.loggedIn && <span className={'workspace-save-status' + (p.status.includes('失败') || p.status.includes('冲突') ? ' is-error' : '')} role="status" title={p.status}><span className={p.status.includes('失败') || p.status.includes('冲突') ? 'error-dot' : 'status-dot'} />{p.status}</span>}
         <span className="status-safe">
           <ShieldCheck size={13} />
@@ -1080,7 +1094,7 @@ export function Workbench(p: Props) {
               <div>
                 <strong>布置空间</strong>
                 <p>
-                  点击或拖入家具，选中后调整尺寸与材质。测量线可在顶部「更多」菜单中一键清除。点击
+                  点击或拖入家具，选中后调整尺寸与材质。测量与绘墙一样连续取点，双击、右键或 Enter 完成，Esc 取消草稿；测量线可在顶部「更多」菜单中一键清除。点击
                   3D 预览，走进你的设计。
                 </p>
               </div>

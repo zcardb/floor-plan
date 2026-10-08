@@ -367,9 +367,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         )}
         {f && (
           <>
-            <button aria-label="旋转 90°" onClick={p.rotate}>
-              <RotateCw size={15} />
-            </button>
+            <RotationControls key={f.id} id={f.id} value={f.rot} transaction={p.transaction} compact />
             <button aria-label="复制对象" onClick={p.duplicate}>
               <Copy size={15} />
             </button>
