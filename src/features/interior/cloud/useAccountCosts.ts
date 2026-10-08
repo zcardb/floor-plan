@@ -26,13 +26,19 @@ export function useAccountCosts(owner?: string) {
     busy.current = true; setSaving(true); setError('');
     const run = epoch.current, rev = revision.current;
     const payload = { settings: next as unknown as Json, revision: (rev ?? -1) + 1, updated_at: new Date().toISOString() };
-    const result = rev === null
-      ? await supabase.from('interior_account_cost_defaults').insert({...payload, owner_id: owner}).select('revision').maybeSingle()
-      : await supabase.from('interior_account_cost_defaults').update(payload).eq('owner_id',owner).eq('revision',rev).select('revision').maybeSingle();
-    if (run !== epoch.current) return false;
-    busy.current = false; setSaving(false);
-    if (result.error || !result.data) { setError(result.error?.message || '版本已变化，请刷新后重试；草稿已保留'); return false; }
-    revision.current = result.data.revision; setSettings(next); return true;
+    try {
+      const result = rev === null
+        ? await supabase.from('interior_account_cost_defaults').insert({...payload, owner_id: owner}).select('revision').maybeSingle()
+        : await supabase.from('interior_account_cost_defaults').update(payload).eq('owner_id',owner).eq('revision',rev).select('revision').maybeSingle();
+      if (run !== epoch.current) return false;
+      if (result.error || !result.data) { setError(result.error?.message || '版本已变化，请刷新后重试；草稿已保留'); return false; }
+      revision.current = result.data.revision; setSettings(next); return true;
+    } catch (cause) {
+      if (run === epoch.current) setError(cause instanceof Error ? cause.message : '保存失败，请重试；修改已保留');
+      return false;
+    } finally {
+      if (run === epoch.current) { busy.current = false; setSaving(false); }
+    }
   }, [owner, loading]);
   return { settings, loading, saving, error, save };
 }

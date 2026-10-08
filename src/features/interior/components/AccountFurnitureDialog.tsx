@@ -6,11 +6,11 @@ import { AlertDialog,AlertDialogContent,AlertDialogHeader,AlertDialogTitle,Alert
 import type { LibraryItem } from '../model/types';
 import { PriceInput } from './PriceInput';
 import { FurnitureShape } from './FurnitureShape';
-export function AccountFurnitureDialog({item,isCustom,referencePrice,onOpenChange,onChanged,save,remove}:{item:LibraryItem;isCustom:boolean;referencePrice:number|null;onOpenChange:(v:boolean)=>void;onChanged:(next:LibraryItem|null)=>void;save:(i:LibraryItem)=>Promise<boolean>;remove:(catalogId:string)=>Promise<boolean>}){
+export function AccountFurnitureDialog({item,isCustom,referencePrice,onOpenChange,onChanged,applyDefaultPrice,remove}:{applyDefaultPrice:(price:number|null)=>Promise<boolean>;item:LibraryItem;isCustom:boolean;referencePrice:number|null;onOpenChange:(v:boolean)=>void;onChanged:(next:LibraryItem|null)=>void;remove:(catalogId:string)=>Promise<boolean>}){
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[confirming,setConfirming]=useState(false);
   const applyPrice=async(price:number|null)=>{
     if(busy)return;setBusy(true);setError('');
-    try { if(await save({...item,price}))onChanged({...item,price}); }
+    try { if(await applyDefaultPrice(price))onChanged({...item,price}); else setError('未能保存，本次修改已保留，请重试。'); }
     catch(e){setError(e instanceof Error?e.message:'保存失败，请重试');}
     finally {setBusy(false);}
   };
@@ -39,12 +39,12 @@ export function AccountFurnitureDialog({item,isCustom,referencePrice,onOpenChang
             </dl>
             {isCustom?<div className="cms-detail-price">
               <span className="cms-detail-label">账号默认单价 · 元 / 件</span>
-              <PriceInput key={String(item.price)} value={item.price??null} label={item.name+'账号默认单价'} onApply={v=>void applyPrice(v)}/>
+              <PriceInput key={String(item.price)} value={item.price??null} disabled={busy} label={item.name+'账号默认单价'} onApply={v=>void applyPrice(v)}/>
               <small>仅影响未单独调价的项目；项目内改价仍以项目为准。</small>
             </div>:<div className="cms-detail-price">
-              <span className="cms-detail-label">内置参考价</span>
+              <span className="cms-detail-label">当前账号单价</span>
               <strong>{referencePrice===null?'未定价':`¥${referencePrice}`}</strong>
-              <small className="cms-detail-hint"><Info size={13}/>内置家具的单价请在「成本管理 · 家具款式」中设置。</small>
+              <small className="cms-detail-hint"><Info size={13}/>内置家具的单价请在「成本管理」对应家具分类中设置。</small>
             </div>}
           </div>
         </div>

@@ -41,14 +41,13 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { AccountAvatar } from "./AccountAvatar";
+import { WorkbenchHeader, type WorkbenchHeaderProps } from "./WorkbenchHeader";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -91,6 +90,7 @@ import type { Scene3D, SceneHandle, SceneOptions } from "../scene/Scene3D";
 type SceneComponent = typeof Scene3D;
 interface Props {
   project: Project;
+  projectNavigation: Pick<WorkbenchHeaderProps, 'projectList' | 'hasMore' | 'listLoading' | 'onOpen' | 'onLoadMore'>;
   update: (d: Design) => void;
   status: string;
   loggedIn: boolean;
@@ -434,7 +434,7 @@ export function Workbench(p: Props) {
         (hidePanel ? "hide-properties" : "")
       }
     >
-      <header className="main-header">
+      {p.loggedIn ? <WorkbenchHeader {...p.projectNavigation} project={p.project} email={p.email} view={view} onBack={()=>{sizeTransaction.cancel();p.projects();}} onOpen={async row=>{sizeTransaction.cancel();return p.projectNavigation.onOpen(row);}} onLogout={p.logout} onDownload={exportImage} /> : <header className="main-header">
         <div className="brand-mark">
           <LayoutTemplate size={23} />
         </div>
@@ -445,9 +445,7 @@ export function Workbench(p: Props) {
           <small>把想象，变成家的模样</small>
         </div>
         <span className="header-divider" />
-        {p.loggedIn ? <button className="project-title" onClick={()=>{sizeTransaction.cancel();p.projects();}}>
-          <span>{p.project.name}</span><ChevronDown size={14} />
-        </button> : <span className="project-title">参考户型</span>}
+        <span className="project-title">参考户型</span>
         <span className="save-indicator">
           <span
             className={
@@ -459,38 +457,7 @@ export function Workbench(p: Props) {
           {p.status}
         </span>
         <div className="header-spacer" />
-        {p.loggedIn ? <><button className="header-plain" onClick={()=>{sizeTransaction.cancel();p.projects();}}>
-          <FolderOpen size={16} />
-          <span>返回管理</span>
-        </button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="header-plain">
-              <AccountAvatar email={p.email} size={20} />
-              <span>{p.loggedIn ? "我的账号" : "游客模式"}</span>
-              <ChevronDown size={12} />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel className="account-menu-head">
-              <AccountAvatar email={p.email} size={34} />
-              <span>
-                <b>{p.email || "游客模式"}</b>
-                <small>{p.email ? "已登录 · 云端同步" : "无需登录即可编辑与下载"}</small>
-              </span>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {p.loggedIn ? (
-              <DropdownMenuItem onClick={p.logout}>退出登录</DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem onClick={p.login}>登录 / 注册</DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <Button size="sm" className="download-button" onClick={exportImage}>
-          <Download />
-          <span>下载{view === "2d" ? "设计图" : "当前视角"}</span>
-        </Button></> : <>
+        <>
         <Button size="sm" className="login-button" onClick={p.login}>
           <UserRound />
           <span>登录</span>
@@ -513,8 +480,8 @@ export function Workbench(p: Props) {
               保存到云端
             </DropdownMenuItem>
           </DropdownMenuContent>
-        </DropdownMenu></>}
-      </header>
+        </DropdownMenu></>
+      </header>}
       <div className="main-toolbar">
         <div className="view-switch">
           <button
@@ -1058,6 +1025,7 @@ export function Workbench(p: Props) {
           X 0 / Y 0 mm
         </span>
         <span className="status-tip">{tip}</span>
+        {p.loggedIn && <span className={'workspace-save-status' + (p.status.includes('失败') || p.status.includes('冲突') ? ' is-error' : '')} role="status" title={p.status}><span className={p.status.includes('失败') || p.status.includes('冲突') ? 'error-dot' : 'status-dot'} />{p.status}</span>}
         <span className="status-safe">
           <ShieldCheck size={13} />
           设计示意 · 拆改须专业确认
