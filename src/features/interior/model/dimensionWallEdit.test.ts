@@ -11,6 +11,15 @@ function binding(d:Design,startId:string,endId:string,axis:0|1=0):DimensionBindi
   expect(result,`${startId}/${endId}`).toBeDefined();return result!.binding!;
 }
 describe('净距驱动真实墙体',()=>{
+  it('用户承重标记固定目标和连接端点，普通另一侧仍可移动',()=>{
+    const d=fixture();d.walls.find(w=>w.id==='partition')!.loadBearing=true;
+    expect(dimensionEditPolicy(d,binding(d,'partition','outer-1')).reason).toBeTruthy();
+    d.walls.push(wall('second',[5000,0],[5000,d.depth]));
+    const b=binding(d,'partition','second');expect(dimensionEditPolicy(d,b).fixed).toBe('start');
+    const next=editDimensionWalls(d,b,1500,'start');expect(next.walls.find(w=>w.id==='partition')).toEqual(d.walls.find(w=>w.id==='partition'));
+    const connected=fixture();connected.walls.push({...wall('locked',[1000,2000],[3000,2000]),loadBearing:true});
+    expect(()=>editDimensionWalls(connected,binding(connected,'partition','outer-1'),1500,'end')).toThrow('承重');
+  });
   it('外墙固定，隔墙移动到指定墙面净距，不改变厚度、家具或测量',()=>{
     const d=fixture(),b=binding(d,'partition','outer-1'),before=JSON.stringify(d);
     expect(dimensionEditPolicy(d,b)).toEqual({fixed:'end',chooseSide:false});

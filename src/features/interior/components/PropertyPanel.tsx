@@ -15,7 +15,7 @@ import {
   Ruler,
 } from "lucide-react";
 import { toast } from "sonner";
-import { materials } from "../data/catalog";
+import { floorMaterialOf, floorMaterialsOf } from "../model/floorMaterials";
 import {
   calculateCosts,
   furnitureKey,
@@ -28,6 +28,8 @@ import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
 import { editSelection } from "../model/selectionEdits";
 import { useCostDesign } from './CostDefaultsContext';
 import { SizeFields } from './SizeFields';
+import { WallBearingControls } from './WallBearingControls';
+import { canEditWall, openingIsLocked, wallKindName } from '../model/wallPolicy';
 import { RotationControls } from './RotationControls';
 import { DimensionSettings } from './DimensionSettings';
 import type { SizeTransaction } from '../model/sizeTransaction';
@@ -98,17 +100,21 @@ export function PropertyPanel({
         defaultValue={isLength ? meterDraft(value) : String(value)}
         min={isLength ? toMeters(min) : min}
         max={isLength ? toMeters(max) : max}
-        step={isLength ? 0.001 : 1}
+        step={isLength ? 0.01 : 1}
         onBlur={(e) => {
           const target = e.target;
+          if (target.value === (isLength ? meterDraft(value) : String(value))) return;
           const v = isLength ? parseMeterDraft(target.value) : Number(target.value);
           const restore = () => { target.value = isLength ? meterDraft(value) : String(value); };
           if (target.value && Number.isFinite(v) && v >= min && v <= max) {
-            const result = update(v);
-            if (result instanceof Promise)
-              void result.then((applied) => {
-                if (!applied) restore();
+            try {
+              const result = update(v);
+              if (result instanceof Promise) void result.then(applied => { if (!applied) restore(); }).catch(error => {
+                restore(); toast.error(error instanceof Error ? error.message : '户型调整失败');
               });
+            } catch (error) {
+              restore(); toast.error(error instanceof Error ? error.message : '户型调整失败');
+            }
           } else {
             restore();
             toast.error("请输入允许范围内的有效数值");
@@ -135,7 +141,7 @@ export function PropertyPanel({
   );
   const matGrid = (value: string, update: (v: string) => void) => (
     <div className="material-grid">
-      {Object.entries(materials).map(([key, m]) => (
+      {Object.entries(floorMaterialsOf(d)).map(([key, m]) => (
         <button
           key={key}
           className={"material-card " + (key === value ? "active" : "")}
@@ -403,24 +409,21 @@ export function PropertyPanel({
     );
   }
   if (w) {
-    const editable = d.template === "blank" && w.kind === "partition";
+    const editable = canEditWall(design, w);
     return (
       <>
         <div className="panel-heading">
           <span>墙体属性</span>
           <span className="mini-label">
-            {w.kind === "bearing"
-              ? "承重墙"
-              : w.kind === "exterior"
-                ? "外围墙"
-                : "隔墙"}
+            {wallKindName(w)}
           </span>
         </div>
         <section>
           {back}
           <h3 className="section-title">
-            {editable ? "可编辑内部墙体" : "原始建筑墙体"}
+            {editable ? "可编辑内部墙体" : "受保护墙体"}
           </h3>
+          <WallBearingControls design={design} wall={w} change={change} />
           <SizeFields key={w.id} design={design} selection={s} transaction={transaction}/>
           {editable && (
             <Button variant="outline" size="sm" onClick={remove}>
@@ -451,7 +454,7 @@ export function PropertyPanel({
           {back}
           <SizeFields key={o.id} design={design} selection={s} transaction={transaction}/>
           {o.kind === 'door' && <DoorOrientationControls door={o} onChange={patch => change(d => changeDoorOrientation(d, o.id, patch))} />}
-          <Button variant="outline" size="sm" onClick={remove}>
+          <Button variant="outline" size="sm" disabled={openingIsLocked(design, o.wallId)} onClick={remove}>
             <Trash2 />
             删除开口
           </Button>
@@ -643,7 +646,7 @@ export function PropertyPanel({
                   onClick={() => select({ kind: "room", id: r.id })}
                 >
                   <span>
-                    <i style={{ background: materials[r.mat].color }} />
+                    <i style={{ background: floorMaterialOf(d, r.mat).color }} />
                     {r.name}
                     {r.counted === false ? " *" : ""}
                   </span>
@@ -662,7 +665,7 @@ export function PropertyPanel({
               地面采购估算<span className="soft-badge">含损耗 / 取整</span>
             </h3>
             <div className="cost-list">
-              {Object.entries(materials).map(([key, m]) => {
+              {Object.entries(floorMaterialsOf(d)).map(([key, m]) => {
                 const a = d.rooms
                   .filter((r) => r.mat === key)
                   .reduce((s, r) => s + area(r), 0);

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatMeters } from '../model/lengthUnits';
+import { canEditWall, openingIsLocked } from '../model/wallPolicy';
 import { DrawingExportItems } from './DrawingExportItems';
 import type { DrawingFormat } from '../model/drawingExport';
 import { DimensionEditDialog } from './DimensionEditDialog';
@@ -75,6 +76,7 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { center, norm, pushOut, rebuildRooms } from "../model/geometry";
 import {
   uid,
+  type CustomFloor,
   type Design,
   type Layers,
   type LibraryItem,
@@ -202,6 +204,12 @@ export function Workbench(p: Props) {
       ? d : { ...d, customCatalog: [...(d.customCatalog || []), item] });
     toast.success("家具已加入当前项目目录");
   };
+  const saveCustomFloor = (floor: CustomFloor) => {
+    if (!p.loggedIn) return;
+    change((d) => d.customFloors?.some((f) => f.key === floor.key)
+      ? d : { ...d, customFloors: [...(d.customFloors || []), floor] });
+    toast.success("地面已加入当前项目，可在房间材质中选择");
+  };
   const stage = useRef<HTMLElement>(null),
     editor = useRef<SelectionEditorHandle>(null);
   const onAnchor = useCallback(
@@ -309,14 +317,14 @@ export function Workbench(p: Props) {
         ...d,
         furniture: d.furniture.filter((f) => f.id !== s.id),
       }));
-    else if (s.kind === "opening")
-      change((d) => ({
-        ...d,
-        openings: d.openings.filter((o) => o.id !== s.id),
-      }));
+    else if (s.kind === "opening") {
+      const opening = d.openings.find(o => o.id === s.id);
+      if (opening && openingIsLocked(d, opening.wallId)) return toast.error('承重墙上的门窗洞口不可删除');
+      change((d) => ({ ...d, openings: d.openings.filter((o) => o.id !== s.id) }));
+    }
     else if (s.kind === "wall") {
       const w = d.walls.find((w) => w.id === s.id);
-      if (d.template !== "blank" || w?.kind !== "partition")
+      if (!w || !canEditWall(d, w))
         return toast.error("此墙体不可删除");
       change((d) =>
         rebuildRooms({
@@ -1096,6 +1104,7 @@ export function Workbench(p: Props) {
         ownerKey={p.email || "guest"}
         onCreate={saveCustom}
         onImport={saveCustom}
+        onCreateFloor={saveCustomFloor}
       />}
       <Dialog open={help} onOpenChange={setHelp}>
         <DialogContent>

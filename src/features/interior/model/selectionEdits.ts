@@ -1,4 +1,5 @@
 import { length, norm, rebuildRooms } from "./geometry";
+import { canEditWall, openingIsLocked } from './wallPolicy';
 import type { Design, Selection } from "./types";
 export function editSelection(
   d: Design,
@@ -47,7 +48,7 @@ export function editSelection(
     };
   if (s.kind === "wall") {
     const w = d.walls.find((w) => w.id === s.id);
-    if (!w || d.template !== "blank" || w.kind !== "partition")
+    if (!w || !canEditWall(d, w))
       throw new Error("此墙体的结构尺寸已锁定");
     const L = length(w),
       next = {
@@ -76,6 +77,7 @@ export function editSelection(
     const o = d.openings.find((o) => o.id === s.id),
       w = d.walls.find((w) => w.id === o?.wallId);
     if (!o || !w) return d;
+    if (openingIsLocked(d, w.id)) throw new Error('承重墙上的门窗洞口已锁定');
     const n = { ...o, ...values };
     if (
       n.offset - n.width / 2 < 0 ||

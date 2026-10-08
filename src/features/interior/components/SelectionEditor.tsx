@@ -26,8 +26,10 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover";
-import { materials } from "../data/catalog";
+import { floorMaterialOf, floorMaterialsOf } from "../model/floorMaterials";
 import { FURNITURE_COLORS } from "../data/palette";
+import { WallBearingControls } from './WallBearingControls';
+import { canEditWall, openingIsLocked, wallKindName } from '../model/wallPolicy';
 import { length } from "../model/geometry";
 import { SizeFields } from './SizeFields';
 
@@ -139,7 +141,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           ? p.design.openings.find((o) => o.id === p.selection!.id)
           : null;
     const editableWall =
-      w && p.design.template === "blank" && w.kind === "partition";
+      w && canEditWall(p.design, w);
     const fields = f
       ? [
           ["w", "宽 / m", f.w],
@@ -204,7 +206,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
       price = {
         group: "floorPrices",
         key: r.mat,
-        name: materials[r.mat].name,
+        name: floorMaterialOf(p.design, r.mat).name,
         unit: costDesign.costSettings?.procurement?.[r.mat]?.unit || "m²",
       };
     else if (o)
@@ -235,7 +237,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         <span className="visual-object-name">
           {f?.name ||
             r?.name ||
-            (w ? "墙体" : o?.kind === "door" ? "门" : "窗")}
+            (w ? wallKindName(w) : o?.kind === "door" ? "门" : "窗")}
         </span>
         {fields.length > 0 && (
           <Popover
@@ -265,7 +267,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
               {w && !editableWall ? (
                 <p className="visual-locked">
                   <LockKeyhole size={15} />
-                  原始建筑结构已锁定，不能修改尺寸。
+                  建筑结构已锁定，不能修改尺寸。
                 </p>
               ) : (
                 <SizeFields design={p.design} selection={p.selection} transaction={p.transaction} close={()=>setOpen(null)}/>
@@ -273,6 +275,10 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </PopoverContent>
           </Popover>
         )}
+        {w && <Popover open={open === 'bearing'} onOpenChange={value => setPanel(value, 'bearing')}>
+          <PopoverTrigger asChild><Button type="button" variant="ghost" size="sm" aria-label="墙体承重属性">承重<ChevronDown size={12} /></Button></PopoverTrigger>
+          <PopoverContent className="visual-editor-popover"><h3>墙体承重属性</h3><WallBearingControls design={p.design} wall={w} change={p.change} /></PopoverContent>
+        </Popover>}
         {(f || w) && (
           <div className="visual-colors" aria-label="常用颜色">
             {colors.map((c) => (
@@ -310,7 +316,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             <PopoverContent className="visual-editor-popover">
               <h3>房间材质</h3>
               <EditorSelect label="地面" value={r.mat}
-                options={Object.entries(materials).map(([value, m]) => ({ value, label: m.name }))}
+                options={Object.entries(floorMaterialsOf(p.design)).map(([value, m]) => ({ value, label: m.name }))}
                 onChange={value => p.change(d => ({ ...d, rooms: d.rooms.map(g => g.id === r.id ? { ...g, mat: value } : g) }))} />
               <EditorSelect label="墙面" value={r.wallMat || 'paint'}
                 options={Object.entries(wallMaterials).map(([value, m]) => ({ value, label: m.name }))}
@@ -376,7 +382,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </button>
           </>
         )}
-        {(f || o || editableWall) && (
+        {(f || (o && !openingIsLocked(p.design, o.wallId)) || editableWall) && (
           <button aria-label="删除对象" onClick={p.remove}>
             <Trash2 size={15} />
           </button>

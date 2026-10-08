@@ -1,4 +1,5 @@
-import { library, materials } from "../data/catalog";
+import { library } from "../data/catalog";
+import { floorMaterialOf, isFloorKey } from "./floorMaterials";
 import { area, length, perim } from "./geometry";
 import { projectProcurement } from "./materialProcurement";
 import { effectiveCostDesign, type AccountCostSettings } from './costDefaults';
@@ -59,7 +60,7 @@ export function priceOf(
     d.costSettings?.[group] as Record<string, number | null> | undefined
   )?.[key];
   if (override !== undefined) return override;
-  if (group === "floorPrices") return materials[key]?.price ?? null;
+  if (group === "floorPrices") return isFloorKey(d, key) ? floorMaterialOf(d, key).price : null;
   if (group === "furniturePrices")
     return d.customCatalog?.find((i) => i.catalogId === key)?.price ?? null;
   return null;
@@ -185,7 +186,7 @@ export function calculateCosts(d: Design, defaults?: AccountCostSettings) {
       hard,
       "floorPrices",
       r.mat,
-      materials[r.mat].name,
+      floorMaterialOf(d, r.mat).name,
       area(r) * 1.05,
       "m²",
       d.costSettings?.floorPrices?.[r.mat] === undefined,

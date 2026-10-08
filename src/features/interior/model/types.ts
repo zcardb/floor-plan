@@ -7,6 +7,7 @@ export interface Wall {
   b: Point;
   thickness: number;
   kind: WallKind;
+  loadBearing?: boolean;
   color?: string;
 }
 export interface Opening {
@@ -81,6 +82,17 @@ export interface Design {
   dimensionSettings?: { visible?: boolean; top?: number; bottom?: number; left?: number; right?: number };
   costSettings?: CostSettings;
   customCatalog?: LibraryItem[];
+  customFloors?: CustomFloor[];
+}
+export type FloorPattern = "plank" | "tile" | "seamless";
+export interface CustomFloor {
+  key: string;
+  name: string;
+  pattern: FloorPattern;
+  length?: number;
+  width?: number;
+  color: string;
+  price: number | null;
 }
 export interface Project {
   id: string;

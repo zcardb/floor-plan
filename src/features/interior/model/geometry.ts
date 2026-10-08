@@ -1,4 +1,5 @@
 import polygonClipping from "polygon-clipping";
+import { isBearingWall } from './wallPolicy';
 import { connectedWallPoly } from './wallConnections';
 import {
   uid,
@@ -194,16 +195,15 @@ export function resizeBlank(
   depth: number,
   thickness: number,
 ): Design {
-  return rebuildRooms({
-    ...d,
-    width,
-    depth,
-    thickness,
-    walls: [
-      ...outerWalls(width, depth, thickness),
-      ...d.walls.filter((w) => w.kind !== "exterior"),
-    ],
+  const exterior = outerWalls(width, depth, thickness).map(w => {
+    const previous = d.walls.find(old => old.id === w.id && old.kind === 'exterior');
+    if (previous && isBearingWall(previous) && (JSON.stringify(previous.a) !== JSON.stringify(w.a) || JSON.stringify(previous.b) !== JSON.stringify(w.b) || previous.thickness !== w.thickness))
+      throw new Error('户型调整会改变已标记承重的外围墙，请先核实结构');
+    return previous ? { ...previous, ...w } : w;
   });
+  if (d.walls.some(w => w.kind !== 'exterior' && isBearingWall(w) && [w.a, w.b].some(p => p[0] < 0 || p[1] < 0 || p[0] > width || p[1] > depth)))
+    throw new Error('缩小户型会使承重墙超出边界');
+  return rebuildRooms({ ...d, width, depth, thickness, walls: [...exterior, ...d.walls.filter(w => w.kind !== 'exterior')] });
 }
 export const norm = (a: number) => ((Math.round(a) % 360) + 360) % 360;
 export function aabb(f: Furniture) {

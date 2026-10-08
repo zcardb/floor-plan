@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatMeters, meterDraft, parseMeterDraft, sizeDraftToModel, toMeters, toMillimeters } from './lengthUnits';
+import { formatMeters, meterDraft, parseMeterDraft, resolveMeterDraft, sizeDraftToModel, toMeters, toMillimeters } from './lengthUnits';
 import { createSizeTransaction } from './sizeTransaction';
 import { createProject } from '../data/templates';
 
@@ -10,12 +10,21 @@ describe('米制 UI / 毫米模型边界', () => {
     expect(formatMeters(1)).toBe('0.00');
     expect(formatMeters(1251)).toBe('1.25');
     expect(formatMeters(1256)).toBe('1.26');
-    expect(meterDraft(1234.567)).toBe('1.234567');
+    expect(meterDraft(1234.567)).toBe('1.23');
+    expect(meterDraft(2594.82568359375)).toBe('2.59');
+    expect(meterDraft(50)).toBe('0.05');
     expect(toMeters(50)).toBe(0.05);
     expect(toMillimeters(2.4)).toBe(2400);
-    expect(parseMeterDraft('-0.001')).toBe(-1);
+    expect(parseMeterDraft('1.235')).toBe(1240);
+    expect(parseMeterDraft('1.234')).toBe(1230);
+    expect(parseMeterDraft('-0.01')).toBe(-10);
+    expect(parseMeterDraft('-0.004')).toBe(0);
     expect(parseMeterDraft('')).toBeNaN();
     expect(parseMeterDraft('bad')).toBeNaN();
+  });
+  it('未改动的两位草稿保留模型原值', () => {
+    expect(resolveMeterDraft('2.59', 2594.8)).toBe(2594.8);
+    expect(resolveMeterDraft('2.60', 2594.8)).toBe(2600);
   });
   it('往返编辑不重复换算，不换算旋转', () => {
     const values=sizeDraftToModel({w:'1.8',d:'0.8',cx:'-0.5',rot:'90'});

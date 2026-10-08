@@ -57,30 +57,30 @@
 
 ## Implementation checklist
 
-- [ ] `lengthUnits.ts`：`meterDraft` 返回两位小数字符串
-- [ ] `lengthUnits.ts`：`parseMeterDraft` 把输入取整到两位小数，空串与非数字仍为 `NaN`
-- [ ] `SizeFields.tsx`：只向事务提交用户改过的字段，结算与取消时清空记录
-- [ ] `PropertyPanel.tsx`：`input()` 失焦时文本未变则不调用 `update`
-- [ ] `DimensionSettings.tsx`：失焦时文本未变则不写入
-- [ ] `DimensionEditDialog.tsx`：数值未变时「应用距离」只关闭弹窗
-- [ ] `FurnitureGeometryEditor.tsx`：宽/深未改时保存沿用原始毫米值
-- [ ] `MaterialProcurementEditor.tsx`：长/宽改用字符串草稿，可正常输入和删除
-- [ ] `RotationControls.tsx`：静态显示角度最多两位小数
-- [ ] 六个文件的长度输入框 `step` 改为 `0.01`
-- [ ] `lengthUnits.test.ts`：把 `meterDraft(1234.567)` 的期望改为 `'1.23'`，`parseMeterDraft('-0.001')` 的期望按取整规则更新，并补充 `parseMeterDraft('1.235')` 的用例
-- [ ] 更新因 `meterDraft` / `step` 变化而失败的其它组件测试
+- [x] `lengthUnits.ts`：`meterDraft` 返回两位小数字符串
+- [x] `lengthUnits.ts`：`parseMeterDraft` 把输入取整到两位小数，空串与非数字仍为 `NaN`
+- [x] `SizeFields.tsx`：只向事务提交用户改过的字段，结算与取消时清空记录
+- [x] `PropertyPanel.tsx`：`input()` 失焦时文本未变则不调用 `update`
+- [x] `DimensionSettings.tsx`：失焦时文本未变则不写入
+- [x] `DimensionEditDialog.tsx`：数值未变时「应用距离」只关闭弹窗
+- [x] `FurnitureGeometryEditor.tsx`：宽/深未改时保存沿用原始毫米值
+- [x] `MaterialProcurementEditor.tsx`：长/宽改用字符串草稿，可正常输入和删除
+- [x] `RotationControls.tsx`：静态显示角度最多两位小数
+- [x] 六个文件的长度输入框 `step` 改为 `0.01`
+- [x] `lengthUnits.test.ts`：把 `meterDraft(1234.567)` 的期望改为 `'1.23'`，`parseMeterDraft('-0.001')` 的期望按取整规则更新，并补充 `parseMeterDraft('1.235')` 的用例
+- [x] 更新因 `meterDraft` / `step` 变化而失败的其它组件测试
 
 ## Verification checklist
 
-- [ ] 正向：净距为 2594.83 mm 时，弹窗输入框显示 `2.59`
-- [ ] 正向：`SizeFields`、属性面板、外围标注距离、家具参考几何、材料规格各输入框初始值均为两位小数
-- [ ] 正向：输入 `1.235` 后模型值为整厘米，重新打开显示两位
-- [ ] 默认：非整厘米的值（如 `cx = 1234.567`）在只改另一个字段后保持原值不变
-- [ ] 默认：属性面板输入框聚焦后不改动直接失焦，模型值不变，撤销栈不新增记录
-- [ ] 默认：净距弹窗不改数值点「应用距离」，墙体位置不变
-- [ ] 边界：`1800` 显示 `1.80`，`50` 显示 `0.05`，空输入仍提示尺寸无效
-- [ ] 边界：材料规格长/宽可以逐字删除并重新输入
-- [ ] 边界：角度 `37.48291` 显示 `37.48`，`90` 显示 `90`
-- [ ] `pnpm run lint`
-- [ ] `pnpm exec vitest run`（全量，重点 `lengthUnits`、`DimensionEditDialog`、`Workbench`、`RotationControls`、`stairs`）
-- [ ] `pnpm run build`
+- [x] 正向：净距为 2594.83 mm 时，弹窗输入框显示 `2.59`
+- [x] 正向：`SizeFields`、属性面板、外围标注距离、家具参考几何、材料规格各输入框初始值均为两位小数
+- [x] 正向：输入 `1.235` 后模型值为整厘米，重新打开显示两位
+- [x] 默认：非整厘米的值（如 `cx = 1234.567`）在只改另一个字段后保持原值不变
+- [x] 默认：属性面板输入框聚焦后不改动直接失焦，模型值不变，撤销栈不新增记录
+- [x] 默认：净距弹窗不改数值点「应用距离」，墙体位置不变
+- [x] 边界：`1800` 显示 `1.80`，`50` 显示 `0.05`，空输入仍提示尺寸无效
+- [x] 边界：材料规格长/宽可以逐字删除并重新输入
+- [x] 边界：角度 `37.48291` 显示 `37.48`，`90` 显示 `90`
+- [x] `pnpm run lint`
+- [x] `pnpm exec vitest run`（全量，重点 `lengthUnits`、`DimensionEditDialog`、`Workbench`、`RotationControls`、`stairs`）
+- [x] `pnpm run build`

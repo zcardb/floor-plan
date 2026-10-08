@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import { toast } from "sonner";
+import { canEditWall, canDemolishWall, isBearingWall, openingIsLocked } from '../model/wallPolicy';
 import {
   area,
   center,
@@ -284,7 +285,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
   const wallToggle = (id: string) => {
     const d = current.current,
       w = d.walls.find((w) => w.id === id)!;
-    if (["bearing", "exterior"].includes(w.kind))
+    if (!canDemolishWall(w))
       return toast.error("承重墙和建筑外墙不可拆除");
     commit(
       rebuildRooms({
@@ -405,7 +406,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         }
         if ((tool === "door" || tool === "window") && wid) {
           const wall = design.walls.find((w) => w.id === wid)!;
-          if (wall.kind === "bearing") {
+          if (isBearingWall(wall)) {
             toast.error("承重墙不可新增开口");
             return;
           }
@@ -442,6 +443,9 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           finishTool();
           return;
         } else if (handle && selection) {
+          const selectedWall = selection.kind === 'wall' ? design.walls.find(w => w.id === selection.id) : null;
+          const selectedOpening = selection.kind === 'opening' ? design.openings.find(o => o.id === selection.id) : null;
+          if ((selectedWall && !canEditWall(design, selectedWall)) || (selectedOpening && openingIsLocked(design, selectedOpening.wallId))) return;
           base.kind = handle === "a" || handle === "b" ? "endpoint" : handle;
           base.id = selection.id;
           base.room = handle;
@@ -454,13 +458,15 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         } else if (oid) {
           select({ kind: "opening", id: oid });
           if (tool === 'door' || tool === 'window') finishTool();
+          const opening = design.openings.find(o => o.id === oid);
+          if (opening && openingIsLocked(design, opening.wallId)) return;
           base.kind = 'openingmove';
           base.id = oid;
         } else if (wid && tool === "select") {
           const w = design.walls.find((w) => w.id === wid)!;
           wallClick.current={id:wid,fraction:nearestOnWall(p,w).offset/length(w)};
           select({ kind: "wall", id: wid });
-          if (design.template === "blank" && w.kind === "partition") {
+          if (canEditWall(design, w)) {
             base.kind = "wallmove";
             base.id = wid;
           } else return;
@@ -606,7 +612,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         finish(true);
       }}
     >
-      <MaterialDefs />
+      <MaterialDefs design={design} />
       <rect
         x={-100000}
         y={-100000}
@@ -666,7 +672,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           fill={
             design.demolished.includes(w.id)
               ? "var(--plan-demolished)"
-              : w.kind === "bearing"
+              : isBearingWall(w)
                 ? layers.bearing
                   ? "var(--plan-bearing)"
                   : w.color || "var(--plan-ink)"
@@ -860,8 +866,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
                     stroke="var(--plan-selection)"
                     strokeWidth={2 / view.s}
                   />
-                  {design.template === "blank" &&
-                    w.kind === "partition" &&
+                  {canEditWall(design, w) &&
                     selection.kind === "wall" &&
                     (["a", "b"] as const).map((k) => (
                       <circle

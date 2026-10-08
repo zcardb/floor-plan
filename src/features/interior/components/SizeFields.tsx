@@ -1,5 +1,6 @@
 import { useEffect,useRef,useState } from 'react';
 import { length } from '../model/geometry';
+import { canEditWall, openingIsLocked } from '../model/wallPolicy';
 import { RotationControls } from './RotationControls';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,13 +16,14 @@ function sizeFields(d:Design,s:Selection):[string,string,number][] {
 export function SizeFields({design,selection,transaction,close}:{design:Design;selection:Selection;transaction:SizeTransaction;close?:()=>void}){
   const fields=useRef(sizeFields(design,selection));
   const [draft,setDraft]=useState(()=>Object.fromEntries(fields.current.map(([key,,value])=>[key,key==='rot'?String(value):meterDraft(value)]))),[error,setError]=useState('');
-  const token=useRef<symbol|null>(null),invalid=useRef(false);
+  const token=useRef<symbol|null>(null),invalid=useRef(false),edited=useRef(new Set<string>());
   invalid.current=!!error;
   const draftFromDesign=()=>Object.fromEntries(sizeFields(design,selection).map(([key,,value])=>[key,key==='rot'?String(value):meterDraft(value)]));
   // 输入即生效：失焦或弹窗关闭时把预览合并成一步撤销；非法输入则放弃本次预览。
   const settle=(silent=false)=>{
     const t=token.current;
     token.current=null;
+    edited.current.clear();
     if(!t)return;
     if(invalid.current)transaction.cancel(t);
     else if(!transaction.apply(t)&&!silent&&transaction.isActive(t))setError('尺寸编辑已结束，请重新打开');
@@ -29,14 +31,18 @@ export function SizeFields({design,selection,transaction,close}:{design:Design;s
   const settleRef=useRef(settle);
   settleRef.current=settle;
   useEffect(()=>()=>settleRef.current(true),[]);
-  const cancel=()=>{const t=token.current;token.current=null;if(t)transaction.cancel(t);setError('');setDraft(draftFromDesign());close?.();};
+  const cancel=()=>{const t=token.current;token.current=null;edited.current.clear();if(t)transaction.cancel(t);setError('');setDraft(draftFromDesign());close?.();};
   const furniture=selection?.kind==='furniture'?design.furniture.find(f=>f.id===selection.id):null;
   const wall=selection?.kind==='wall'?design.walls.find(w=>w.id===selection.id):null;
-  const locked=wall&&(design.template!=='blank'||wall.kind!=='partition');
-  if(locked)return <p className="visual-locked">原始建筑结构已锁定，不能修改尺寸。</p>;
-  return <div onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cancel();}}}><div className="visual-size-fields">{fields.current.map(([key,label])=><Label key={key}>{label}<Input className="editor-control" aria-label={label} type="number" step={key==='rot'?1:0.001} value={draft[key]??''} onChange={e=>{
-    if(!token.current||!transaction.isActive(token.current))token.current=transaction.begin(selection);
+  const opening=selection?.kind==='opening'?design.openings.find(o=>o.id===selection.id):null;
+  const locked=(wall&&!canEditWall(design,wall))||(opening&&openingIsLocked(design,opening.wallId));
+  if(locked)return <p className="visual-locked">建筑结构或承重洞口已锁定，不能修改尺寸。</p>;
+  return <div onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cancel();}}}><div className="visual-size-fields">{fields.current.map(([key,label])=><Label key={key}>{label}<Input className="editor-control" aria-label={label} type="number" step={key==='rot'?1:0.01} value={draft[key]??''} onChange={e=>{
+    if(!token.current||!transaction.isActive(token.current)){token.current=transaction.begin(selection);edited.current.clear();}
+    edited.current.add(key);
     const next={...draft,[key]:e.target.value};setDraft(next);
-    try{transaction.update(token.current,sizeDraftToModel(next));setError('');}catch(err){setError(err instanceof Error?err.message:'尺寸无效');}
+    // 只提交改过的字段：未改动的两位草稿不得把模型原值取整写回。
+    const changed=Object.fromEntries(Object.entries(next).filter(([name])=>edited.current.has(name)));
+    try{transaction.update(token.current,sizeDraftToModel(changed));setError('');}catch(err){setError(err instanceof Error?err.message:'尺寸无效');}
   }} onBlur={()=>settle()} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();e.currentTarget.blur();}}}/></Label>)}{furniture&&<RotationControls key={furniture.id} id={furniture.id} value={furniture.rot} transaction={transaction} close={close}/>}</div>{error&&<p className="form-error" role="alert">{error}</p>}<p className="muted-note">改动即时生效</p></div>;
 }

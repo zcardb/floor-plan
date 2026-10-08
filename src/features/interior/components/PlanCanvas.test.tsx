@@ -54,6 +54,19 @@ beforeEach(() => {
   hooks.svg = { hasPointerCapture: () => true, releasePointerCapture: vi.fn(), setPointerCapture: vi.fn(), getScreenCTM: () => ({ inverse: () => ({}) }),
     createSVGPoint: () => ({ x: 0, y: 0, matrixTransform() { return { x: this.x, y: this.y }; } }) };
 });
+describe('PlanCanvas 承重保护', () => {
+  it.each(['select', 'demolish', 'door', 'window'] as Tool[])('%s 不修改用户标记承重墙', tool => {
+    const h = harness('door', tool); h.design.walls[0].loadBearing = true;
+    h.handlers.onPointerDown!(event(2000, 0, 1, 'data-wall', 'wall'));
+    h.handlers.onPointerMove!(event(3000)); h.handlers.onPointerUp!(event(3000));
+    expect(h.commit).not.toHaveBeenCalled(); expect(h.preview).not.toHaveBeenCalled();
+  });
+  it('已有开口仍可选中但不能拖动', () => {
+    const h = harness(); h.design.walls[0].loadBearing = true;
+    h.handlers.onPointerDown!(event(2000)); h.handlers.onPointerMove!(event(3000)); h.handlers.onPointerUp!(event(3000));
+    expect(h.select).toHaveBeenCalledWith({ kind: 'opening', id: 'opening' }); expect(h.commit).not.toHaveBeenCalled(); expect(h.preview).not.toHaveBeenCalled();
+  });
+});
 describe('PlanCanvas 测量完成事件链', () => {
   it('测量手势调用共享 down/move/up，不走旧测量提交路径', () => {
     const h = harness('door', 'measure');

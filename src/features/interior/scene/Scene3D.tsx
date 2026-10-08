@@ -13,7 +13,8 @@ import {
   CSS2DObject,
 } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import { toast } from "sonner";
-import { materials } from "../data/catalog";
+import { floorMaterialOf } from "../model/floorMaterials";
+import { floorTexture } from "./floorTexture";
 import { doorOrientation } from '../model/doorOrientation';
 import {
   area,
@@ -705,32 +706,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
           );
         const geo = new THREE.ShapeGeometry(shape);
         geo.rotateX(-Math.PI / 2);
-        const cv = document.createElement("canvas");
-        cv.width = cv.height = 256;
-        const ctx = cv.getContext("2d")!,
-          m = materials[room.mat];
-        ctx.fillStyle = m.color;
-        ctx.fillRect(0, 0, 256, 256);
-        ctx.strokeStyle = "#a79d8960";
-        ctx.lineWidth = 2;
-        if (room.mat === "wood" || room.mat === "walnut") {
-          for (let y = 0; y < 256; y += 32) {
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(256, y);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(y % 64 ? 80 : 160, y);
-            ctx.lineTo(y % 64 ? 80 : 160, y + 32);
-            ctx.stroke();
-          }
-        } else ctx.strokeRect(0, 0, 256, 256);
-        const texture = new THREE.CanvasTexture(cv);
-        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-        texture.repeat.set(
-          room.mat === "wood" || room.mat === "walnut" ? 1 / 1.8 : 1 / 0.8,
-          room.mat === "wood" || room.mat === "walnut" ? 1 / 0.36 : 1 / 0.8,
-        );
+        const texture = floorTexture(floorMaterialOf(d, room.mat));
         texture.colorSpace = THREE.SRGBColorSpace;
         r.textures.push(texture);
         const floor = new THREE.Mesh(

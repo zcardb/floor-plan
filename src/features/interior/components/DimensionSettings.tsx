@@ -16,8 +16,9 @@ export function DimensionSettings({ design, change }: { design: Design; change: 
       {(['top', 'bottom', 'left', 'right'] as const).map((key, i) => <label className="property-field" key={key}>
         {['上侧距离 / m', '下侧距离 / m', '左侧距离 / m', '右侧距离 / m'][i]}
         <Input className="editor-control" aria-label={['上侧距离 / m', '下侧距离 / m', '左侧距离 / m', '右侧距离 / m'][i]}
-          key={settings[key]} type="number" defaultValue={meterDraft(settings[key])} min={0} max={10} step={0.001}
+          key={settings[key]} type="number" defaultValue={meterDraft(settings[key])} min={0} max={10} step={0.01}
           onBlur={e => {
+            if (e.currentTarget.value === meterDraft(settings[key])) return;
             const value = parseMeterDraft(e.currentTarget.value);
             try {
               changeDimensionSetting(design, key, value);

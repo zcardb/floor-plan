@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { uid, type LibraryItem } from '../model/types';
 import { furnitureTypes, resolvedFurnitureType, appearanceDimensions, type FurnitureOutline } from '../model/furnitureAppearance';
 import { FurnitureShape } from './FurnitureShape';
-import { meterDraft, parseMeterDraft } from '../model/lengthUnits';
+import { meterDraft, resolveMeterDraft } from '../model/lengthUnits';
 import { useFurnitureImage } from '../cloud/useFurnitureImage';
 
 export function FurnitureGeometryEditor({item,save,onSaved,onWorkChange}:{item:LibraryItem;save:(item:LibraryItem)=>Promise<boolean>;onSaved:(item:LibraryItem)=>void;onWorkChange?:(phase:'idle'|'generating'|'saving')=>void}) {
@@ -17,7 +17,7 @@ export function FurnitureGeometryEditor({item,save,onSaved,onWorkChange}:{item:L
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
   const busy=saving||ai.busy;
   useEffect(()=>{onWorkChange?.(saving?'saving':ai.busy?'generating':'idle');return()=>onWorkChange?.('idle');},[saving,ai.busy,onWorkChange]);
-  const widthMm=parseMeterDraft(width),depthMm=shape==='circle'?widthMm:parseMeterDraft(depth);
+  const widthMm=resolveMeterDraft(width,item.w),depthMm=shape==='circle'?widthMm:resolveMeterDraft(depth,item.d);
   const validDimensions=[widthMm,depthMm].every(value=>Number.isFinite(value)&&value>=50&&value<=20000);
   const preview={...item,type:resolvedFurnitureType(item.name,type),shape,...appearanceDimensions(shape,validDimensions?widthMm:item.w,validDimensions?depthMm:item.d)};
   const invalidate=()=>{ai.cancel();request.current=undefined;setError('');};
@@ -41,8 +41,8 @@ export function FurnitureGeometryEditor({item,save,onSaved,onWorkChange}:{item:L
   return <details className="furniture-geometry-editor"><summary>调整参考类型与外形</summary><div className="furniture-geometry-fields">
     <Label>参考类型<Select value={type} onValueChange={value=>{invalidate();setType(value);}} disabled={busy}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="auto">按名称匹配</SelectItem>{furnitureTypes.map(option=><SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></Label>
     <Label>外形<Select value={shape} onValueChange={value=>{invalidate();setShape(value as FurnitureOutline);}} disabled={busy}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="reference">参考原形</SelectItem><SelectItem value="rectangle">方形</SelectItem><SelectItem value="circle">圆形</SelectItem></SelectContent></Select></Label>
-    <Label>{shape==='circle'?'直径 m':'宽 m'}<Input type="number" min={0.05} max={20} step={0.001} value={width} onChange={e=>{invalidate();setWidth(e.target.value);}} disabled={busy}/></Label>
-    {shape!=='circle'&&<Label>深 m<Input type="number" min={0.05} max={20} step={0.001} value={depth} onChange={e=>{invalidate();setDepth(e.target.value);}} disabled={busy}/></Label>}
+    <Label>{shape==='circle'?'直径 m':'宽 m'}<Input type="number" min={0.05} max={20} step={0.01} value={width} onChange={e=>{invalidate();setWidth(e.target.value);}} disabled={busy}/></Label>
+    {shape!=='circle'&&<Label>深 m<Input type="number" min={0.05} max={20} step={0.01} value={depth} onChange={e=>{invalidate();setDepth(e.target.value);}} disabled={busy}/></Label>}
     <div className="cms-item-visual"><svg viewBox={`${-preview.w/2-100} ${-preview.d/2-100} ${preview.w+200} ${preview.d+200}`}><FurnitureShape f={preview}/></svg></div>
     <small>仅保存参考几何不会替换原图；已放置到项目中的家具始终不变。</small>
     <Button type="button" disabled={busy||!validDimensions} onClick={()=>void apply()}>{saving?'正在保存…':'保存参考几何'}</Button>

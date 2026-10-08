@@ -53,6 +53,17 @@ function tools(tree: Node[]) {
   return nodes(group);
 }
 beforeEach(() => { state.values = []; state.cursor = 0; state.effects = []; state.design = blankDesign(); state.change.mockReset(); state.commit.mockReset(); state.cancel.mockReset(); });
+describe('承重墙删除保护', () => {
+  it('选中用户标记墙或其洞口后删除均不提交', () => {
+    const d = blankDesign(); d.walls.push({ id: 'bearing', kind: 'partition', a: [3000, 0], b: [3000, 6000], thickness: 240, loadBearing: true });
+    d.openings.push({ id: 'door', wallId: 'bearing', kind: 'door', offset: 2000, width: 900 }); state.design = d;
+    for (const selection of [{ kind: 'wall', id: 'bearing' }, { kind: 'opening', id: 'door' }]) {
+      const canvas = render().find(n => n.type === PlanCanvas)!; (canvas.props.select as (s: unknown) => void)(selection);
+      const editor = render().find(n => n.props.remove && n.props.selection)!; (editor.props.remove as () => void)();
+      expect(state.change).not.toHaveBeenCalled();
+    }
+  });
+});
 describe('尺寸驱动墙体提交链', () => {
   const open = () => {
     const d = blankDesign(); d.walls.push({ id: 'partition', a: [3000, 0], b: [3000, d.depth], thickness: 240, kind: 'partition' });

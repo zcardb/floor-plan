@@ -1,6 +1,11 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.wall-bearing-controls { display: grid; gap: 0.6rem; }
+.wall-bearing-status { display: flex; align-items: center; gap: 0.5rem; color: hsl(var(--foreground)); font-size: 0.85rem; font-weight: 600; }
+.wall-bearing-controls .muted-note { margin: 0; }
+
 @layer base {
   :root {
     --background: 40 50% 98%;
@@ -2784,6 +2789,44 @@
   height: 100%;
   object-fit: contain;
   border-radius: 8px;
+}
+.custom-floor-preview svg {
+  width: 150px;
+  height: 150px;
+  border-radius: 6px;
+  border: 1px solid hsl(var(--border));
+}
+.account-floor-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.account-floor-list button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  font-size: 12px;
+  text-align: left;
+}
+.account-floor-list button:hover {
+  border-color: hsl(var(--primary));
+}
+.account-floor-list svg {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 4px;
+}
+.account-floor-list small {
+  display: block;
+  color: hsl(var(--muted-foreground));
+  font-size: 10px;
 }
 .custom-image-panel textarea {
   width: 100%;

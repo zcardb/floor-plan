@@ -16,6 +16,7 @@ vi.mock('react', async importOriginal => ({
 }));
 vi.mock('./useAccountCostCommit', () => ({ useAccountCostCommit: () => ({ settings: {}, busy: false, pending: null, error: '', saved: false }) }));
 vi.mock('../cloud/useFurnitureImage', () => ({ useFurnitureImage: () => ({ cancel: () => {}, generate: harness.generate, busy: false }) }));
+vi.mock('../cloud/useFloorCatalog', () => ({ useFloorCatalog: () => ({ items: [], loading: false, error: '', load: vi.fn(), save: vi.fn() }) }));
 vi.mock('../cloud/useFurnitureCatalog', () => ({ useFurnitureCatalog: () => ({ items: [], count: 0, counts: {}, reset: () => {}, save: harness.save }) }));
 import { newFurnitureCategory } from '../model/newFurnitureCategory';
 import { AccountFurnitureLibrary } from './AccountFurnitureLibrary';

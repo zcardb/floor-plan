@@ -24,7 +24,17 @@ describe('净距对话框',()=>{
   });
   it('取消不应用，结构校验错误保留对话框并显示',()=>{
     const h=harness();let all=h.render();(all.find(e=>e.props.children==='取消')!.props.onClick as ()=>void)();expect(h.onClose).toHaveBeenCalledOnce();expect(h.onApply).not.toHaveBeenCalled();
-    h.onApply.mockImplementation(()=>{throw new Error('无法容纳门窗');});(all.find(e=>e.props.children==='应用距离')!.props.onClick as ()=>void)();
+    h.onApply.mockImplementation(()=>{throw new Error('无法容纳门窗');});
+    (all.find(e=>e.props.id==='dimension-gap')!.props.onChange as (e:unknown)=>void)({target:{value:'0.5'}});all=h.render();
+    (all.find(e=>e.props.children==='应用距离')!.props.onClick as ()=>void)();
     all=h.render();expect(all.some(e=>e.props.role==='alert'&&e.props.children==='无法容纳门窗')).toBe(true);
+  });
+  it('输入框显示两位小数，未改动时应用只关闭不移动墙体',()=>{
+    const f=fixture();const binding={...f.binding,end:f.binding.start+2594.82568359375};
+    const props={design:f.design,binding,onApply:vi.fn(),onClose:vi.fn()};
+    const all=nodes(DimensionEditDialog(props));
+    expect(all.find(e=>e.props.id==='dimension-gap')!.props.value).toBe('2.59');
+    (all.find(e=>e.props.children==='应用距离')!.props.onClick as ()=>void)();
+    expect(props.onApply).not.toHaveBeenCalled();expect(props.onClose).toHaveBeenCalledOnce();
   });
 });

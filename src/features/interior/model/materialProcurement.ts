@@ -1,6 +1,12 @@
 import type { Design, MaterialProcurement } from "./types";
 import { area } from "./geometry";
-export const defaultProcurement = (key: string): MaterialProcurement => ({
+export const defaultProcurement = (key: string, d?: Pick<Design, "customFloors">): MaterialProcurement => {
+  const custom = d?.customFloors?.find((f) => f.key === key);
+  return custom?.length && custom.width
+    ? { unit: "m²", waste: 5, length: custom.length, width: custom.width }
+    : builtinProcurement(key);
+};
+const builtinProcurement = (key: string): MaterialProcurement => ({
   unit: "m²",
   waste: 5,
   ...(key === "tile800"

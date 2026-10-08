@@ -1,4 +1,5 @@
-import { materials } from "../data/catalog";
+import { isFloorKey, validCustomFloor } from "./floorMaterials";
+import { isBearingWall } from './wallPolicy';
 import { validFurnitureType, validFurnitureOutline } from './furnitureAppearance';
 import { referenceDesign } from "../data/templates";
 import { length } from "./geometry";
@@ -72,17 +73,27 @@ export function validateDesign(value: unknown): Design {
       !point(w.a) ||
       !point(w.b) ||
       !finite(w.thickness, 50, 1000) ||
+      (w.loadBearing !== undefined && typeof w.loadBearing !== 'boolean') ||
       length(w) < 50 ||
       !["bearing", "exterior", "partition", "low"].includes(w.kind)
     )
       fail();
+  }
+  if (v.customFloors !== undefined) {
+    if (!Array.isArray(v.customFloors) || v.customFloors.length > 500) fail();
+    const keys = new Set<string>();
+    for (const floor of v.customFloors) {
+      if (!validCustomFloor(floor) || keys.has(floor.key)) fail();
+      keys.add(floor.key);
+    }
   }
   for (const r of v.rooms) {
     id(r.id);
     if (
       typeof r.name !== "string" ||
       r.name.length > 100 ||
-      !materials[r.mat] ||
+      typeof r.mat !== "string" ||
+      !isFloorKey(v, r.mat) ||
       !Array.isArray(r.rings) ||
       !r.rings.length ||
       r.rings.some(
@@ -172,7 +183,7 @@ export function validateDesign(value: unknown): Design {
   }
   for (const s of v.demolished) {
     const w = v.walls.find((w) => w.id === s);
-    if (!w || !["partition", "low"].includes(w.kind)) fail();
+    if (!w || isBearingWall(w) || !["partition", "low"].includes(w.kind)) fail();
   }
   for (const w of v.walls)
     if (w.color !== undefined && !/^#[0-9a-f]{6}$/i.test(w.color)) fail();
@@ -208,7 +219,7 @@ export function validateDesign(value: unknown): Design {
       )
         fail();
       for (const [key, config] of Object.entries(v.costSettings.procurement)) {
-        if (!materials[key]) fail();
+        if (!isFloorKey(v, key)) fail();
         validateProcurement(config);
       }
     }

@@ -4,7 +4,7 @@ import {
   projectProcurement,
   validateProcurement,
 } from "../model/materialProcurement";
-import { materials } from "../data/catalog";
+import { floorMaterialOf } from "../model/floorMaterials";
 import { priceOf, validPrice } from "../model/costs";
 import type { Design, MaterialProcurement } from "../model/types";
 import { useCostDesign } from './CostDefaultsContext';
@@ -25,34 +25,45 @@ export function MaterialProcurementEditor({
   const saved = effective.costSettings?.procurement?.[material],
     [expanded, setExpanded] = useState(false),
     [draft, setDraft] = useState<MaterialProcurement>(
-      saved || defaultProcurement(material),
+      saved || defaultProcurement(material, design),
     ),
     [price, setPrice] = useState(
       String(priceOf(effective, "floorPrices", material) ?? ""),
     ),
     [error, setError] = useState("");
+  const sizeDrafts = (value: MaterialProcurement) => ({
+    length: value.length === undefined ? "" : meterDraft(value.length),
+    width: value.width === undefined ? "" : meterDraft(value.width),
+  });
+  // 长宽以文本草稿编辑，避免两位格式化打断输入；未改动的字段保留原值。
+  const [sizes, setSizes] = useState(() => sizeDrafts(draft));
   const p = projectProcurement(effective, material);
   const field = (
     key: "length" | "width" | "waste" | "perBox",
     label: string,
-  ) => (
+  ) => {
+    const isSize = key === "length" || key === "width";
+    return (
     <label key={key}>
       {label}
       <Input
         className="editor-control"
-        aria-label={materials[material].name + label}
+        aria-label={floorMaterialOf(design, material).name + label}
         type="number"
-        step={key==='length'||key==='width'?0.001:'any'}
-        value={draft[key] === undefined ? '' : key==='length'||key==='width' ? meterDraft(draft[key]) : draft[key]}
-        onChange={(e) =>
+        step={isSize ? 0.01 : 'any'}
+        value={isSize ? sizes[key] : draft[key] ?? ''}
+        onChange={(e) => {
+          const text = e.target.value;
+          if (isSize) setSizes((s) => ({ ...s, [key]: text }));
           setDraft((d) => ({
             ...d,
-            [key]: e.target.value === "" ? undefined : key==='length'||key==='width' ? parseMeterDraft(e.target.value) : Number(e.target.value),
-          }))
-        }
+            [key]: text === "" ? undefined : isSize ? parseMeterDraft(text) : Number(text),
+          }));
+        }}
       />
     </label>
-  );
+    );
+  };
   return (
     <div className="procurement-editor">
       <div className="procurement-result">
@@ -76,7 +87,8 @@ export function MaterialProcurementEditor({
         className="editor-procurement-toggle"
         onClick={() => {
           setExpanded(!expanded);
-          setDraft(saved || defaultProcurement(material));
+          setDraft(saved || defaultProcurement(material, design));
+          setSizes(sizeDrafts(saved || defaultProcurement(material, design)));
           setPrice(String(priceOf(effective, "floorPrices", material) ?? ""));
         }}
       >

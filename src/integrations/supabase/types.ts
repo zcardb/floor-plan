@@ -3414,6 +3414,45 @@ export type Database = {
         }
         Relationships: []
       }
+      interior_floor_catalog: {
+        Row: {
+          color: string
+          created_at: string
+          floor_key: string
+          id: string
+          length: number | null
+          name: string
+          owner_id: string
+          pattern: string
+          price: number | null
+          width: number | null
+        }
+        Insert: {
+          color: string
+          created_at?: string
+          floor_key: string
+          id?: string
+          length?: number | null
+          name: string
+          owner_id?: string
+          pattern: string
+          price?: number | null
+          width?: number | null
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          floor_key?: string
+          id?: string
+          length?: number | null
+          name?: string
+          owner_id?: string
+          pattern?: string
+          price?: number | null
+          width?: number | null
+        }
+        Relationships: []
+      }
       interior_furniture_catalog: {
         Row: {
           catalog_id: string

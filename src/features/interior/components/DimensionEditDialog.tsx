@@ -11,11 +11,13 @@ export function DimensionEditDialog({ design, binding, onApply, onClose }: {
   design: Design; binding: DimensionBinding; onApply: (millimeters: number, fixed: FixedDimensionSide) => void; onClose: () => void;
 }) {
   const policy = dimensionEditPolicy(design, binding);
-  const [draft, setDraft] = useState(meterDraft(binding.end - binding.start));
+  const initialDraft = meterDraft(binding.end - binding.start);
+  const [draft, setDraft] = useState(initialDraft);
   const [fixed, setFixed] = useState<FixedDimensionSide | ''>(policy.fixed || '');
   const [error, setError] = useState('');
   const horizontal = binding.axis === 0;
   const apply = () => {
+    if (draft.trim() === initialDraft) { onClose(); return; }
     try {
       if (!fixed) throw new Error('请选择固定侧');
       onApply(parseMeterDraft(draft), fixed);

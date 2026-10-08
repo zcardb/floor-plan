@@ -18,7 +18,7 @@ export function RotationControls({ id, value, transaction, compact = false, clos
   const [error, setError] = useState('');
   const edit = useRef<{ token: symbol; before: number; text: string; invalid: boolean } | null>(null);
   const active = !!edit.current && transaction.isActive(edit.current.token);
-  const displayed = active && draft !== null ? draft : String(value);
+  const displayed = active && draft !== null ? draft : String(Number(value.toFixed(2)));
   const settle = () => {
     const current = edit.current;
     edit.current = null;
