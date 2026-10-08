@@ -2,6 +2,7 @@ import { useMemo,useState } from 'react';
 import { Armchair,Plus,Search,Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { categories,library } from '../data/catalog';
+import { formatMeters } from '../model/lengthUnits';
 import type { LibraryItem } from '../model/types';
 import type { useFurnitureCatalog } from '../cloud/useFurnitureCatalog';
 import type { AccountCostSettings } from '../model/costDefaults';
@@ -37,7 +38,7 @@ export function AccountFurnitureLibrary({catalog,defaults,saveDefaults,onDirty,o
         <span className={'cms-item-badge'+(custom?' custom':'')}>{custom?'自定义':'内置'}</span>
       </span>
       <b>{it.name}</b>
-      <small>{it.category} · {it.w} × {it.d} mm</small>
+      <small>{it.category} · {formatMeters(it.w)} × {formatMeters(it.d)} m</small>
       <span className="cms-item-price">{price===null?<em>未定价</em>:<>{overridden?'账号默认 ':custom?'':'参考价 '}¥{price}</>}</span>
     </button>;
   };

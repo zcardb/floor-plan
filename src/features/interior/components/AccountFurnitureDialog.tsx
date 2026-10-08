@@ -7,6 +7,7 @@ import type { LibraryItem } from '../model/types';
 import { PriceInput } from './PriceInput';
 import { FurnitureShape } from './FurnitureShape';
 import { FurnitureGeometryEditor } from './FurnitureGeometryEditor';
+import { formatMeters } from '../model/lengthUnits';
 export function AccountFurnitureDialog({item,isCustom,referencePrice,onOpenChange,onChanged,applyDefaultPrice,remove,saveGeometry,commitBusy=false,commitError='',retryPrice,saved=false}:{commitBusy?:boolean;commitError?:string;retryPrice?:()=>Promise<boolean>;saved?:boolean;saveGeometry?:(item:LibraryItem)=>Promise<boolean>;applyDefaultPrice:(price:number|null)=>Promise<boolean>;item:LibraryItem;isCustom:boolean;referencePrice:number|null;onOpenChange:(v:boolean)=>void;onChanged:(next:LibraryItem|null)=>void;remove:(catalogId:string)=>Promise<boolean>}){
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[confirming,setConfirming]=useState(false);
   const working=busy||commitBusy;
@@ -44,7 +45,7 @@ export function AccountFurnitureDialog({item,isCustom,referencePrice,onOpenChang
           <div className="cms-detail-fields">
             <dl>
               <div><dt>分类</dt><dd>{item.category}</dd></div>
-              <div><dt>参考尺寸</dt><dd>{item.w} × {item.d}{item.height?` × ${item.height}`:''} mm</dd></div>
+              <div><dt>参考尺寸</dt><dd>{formatMeters(item.w)} × {formatMeters(item.d)}{item.height?` × ${formatMeters(item.height)}`:''} m</dd></div>
               <div><dt>来源</dt><dd>{isCustom?'自定义':'内置'}</dd></div>
             </dl>
             {isCustom?<div className="cms-detail-price">

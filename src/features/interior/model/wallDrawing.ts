@@ -23,7 +23,7 @@ export function resolveWallPoint(raw:Point,d:Design,scale:number,snap:boolean,st
 }
 export function validateWallSegment(d:Design,a:Point,b:Point,exclude?:string){
   const candidate={a,b},L=length(candidate as Design['walls'][number]);
-  if(L<100)throw new Error('墙段长度至少为100 mm');
+  if(L<100)throw new Error('墙段长度至少为0.1 m');
   const dx=(b[0]-a[0])/L,dy=(b[1]-a[1])/L;
   for(const w of d.walls){if(w.id===exclude||d.demolished.includes(w.id))continue;
     const cross=(p:Point)=>Math.abs((p[0]-a[0])*dy-(p[1]-a[1])*dx),along=(p:Point)=>(p[0]-a[0])*dx+(p[1]-a[1])*dy;

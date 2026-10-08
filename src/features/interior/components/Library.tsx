@@ -13,6 +13,7 @@ import {
   SquareDashed,
 } from "lucide-react";
 import { categories, library } from "../data/catalog";
+import { formatMeters } from '../model/lengthUnits';
 import { FurnitureShape } from "./FurnitureShape";
 import type { LibraryItem, Tool } from "../model/types";
 const icons = [BedDouble, Armchair, UtensilsCrossed, Bath, Monitor, BookOpen];
@@ -121,7 +122,7 @@ export function Library({
             </span>
             <b>{it.name}</b>
             <small>
-              {it.w} × {it.d} mm
+              {formatMeters(it.w)} × {formatMeters(it.d)} m
             </small>
           </button>
         ))}

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Armchair, Check, Layers, Loader2, Plus, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { categories } from '../data/catalog';
+import { formatMeters } from '../model/lengthUnits';
 import { priceOf } from '../model/costs';
 import type { AccountCostSettings } from '../model/costDefaults';
 import { accountCostEntries, accountCostSource, filterCostEntries, materialCostCategories, type CostEntry, type CostMajor } from '../model/accountCostEntries';
@@ -55,7 +56,7 @@ export function AccountCostManager({ settings, save, saving, error, items, onDir
         const price = priceOf(design, entry.group, entry.key), source = accountCostSource(design, entry);
         return <button type="button" className="cms-item-card cms-item-card--cost" key={entry.group + ':' + entry.key} aria-label={'编辑' + entry.name + '单价'} disabled={busy || !!commit.pending} onClick={() => setEditing(entry)}>
           <span className="cms-item-visual"><CostItemVisual entry={entry}/><span className="cms-item-badge">{source}</span></span>
-          <b>{entry.name}</b><small>{entry.category}{entry.furniture?` · ${entry.furniture.w} × ${entry.furniture.d} mm`:''}</small>
+          <b>{entry.name}</b><small>{entry.category}{entry.furniture?` · ${formatMeters(entry.furniture.w)} × ${formatMeters(entry.furniture.d)} m`:''}</small>
           <span className="cms-item-price">{price === null ? '未定价' : `¥${price.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`}<small> / {entry.unit}</small></span>
         </button>;
       })}</div>

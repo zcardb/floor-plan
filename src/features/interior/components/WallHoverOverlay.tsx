@@ -1,4 +1,5 @@
 import { length, nearestOnWall, wallPoly } from '../model/geometry';
+import { formatMeters } from '../model/lengthUnits';
 import type { Wall } from '../model/types';
 import type { WallSnap } from '../model/wallDrawing';
 
@@ -13,7 +14,7 @@ export function WallHoverOverlay({ walls, candidate, scale }: Props) {
   if (!wall || !candidate) return null;
   const [x, y] = candidate.point;
   const offset = nearestOnWall(candidate.point, wall).offset;
-  const meters = Number((Math.min(offset, length(wall) - offset) / 1000).toFixed(3));
+  const meters = formatMeters(Math.min(offset, length(wall) - offset));
   return (
     <g data-export-hide="true" pointerEvents="none">
       <polygon points={wallPoly(wall).map(p => p.join(',')).join(' ')} fill="var(--plan-selection-soft)" stroke="var(--plan-selection)" strokeWidth={2 / scale} />

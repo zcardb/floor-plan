@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { formatMeters } from '../model/lengthUnits';
 import {
   Armchair,
   ArrowDownToLine,
@@ -158,7 +159,7 @@ export function Workbench(p: Props) {
   const coordLabel = useRef<HTMLSpanElement>(null);
   const onCoord = useCallback((p: Point) => {
     if (coordLabel.current)
-      coordLabel.current.textContent = `X ${Math.round(p[0])}  /  Y ${Math.round(p[1])} mm`;
+      coordLabel.current.textContent = `X ${formatMeters(p[0])}  /  Y ${formatMeters(p[1])} m`;
   }, []);
   const [layers, setLayers] = useState<Layers>({
       grid: false,
@@ -1022,7 +1023,7 @@ export function Workbench(p: Props) {
           </b>
         </span>
         <span className="status-coordinates" ref={coordLabel}>
-          X 0 / Y 0 mm
+          X 0 / Y 0 m
         </span>
         <span className="status-tip" title={tip}>{tip}</span>
         {tool === 'wall' && <button className="status-finish-wall" onClick={() => setTool('select')}>完成绘墙</button>}
