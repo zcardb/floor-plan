@@ -2,6 +2,13 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('../cloud/useFurnitureImage',()=>({useFurnitureImage:()=>({image:'',busy:false,error:'',generate:vi.fn(),cancel:vi.fn()})}));
+// 识别确认弹窗走 Portal，服务端渲染不出内容：换成一个标记，并让导入流程的状态可由用例指定。
+const importState = vi.hoisted(() => ({ drawing: null as null | { source: unknown; name: string } }));
+vi.mock('./DxfImportDialog', () => ({ DxfImportDialog: ({ defaultName }: { defaultName: string }) => createElement('div', { 'data-dxf-import': defaultName }) }));
+vi.mock('./useProjectImport', async original => {
+  const actual = await original<typeof import('./useProjectImport')>();
+  return { useProjectImport: (...args: Parameters<typeof actual.useProjectImport>) => ({ ...actual.useProjectImport(...args), ...(importState.drawing ? { drawing: importState.drawing } : {}) }) };
+});
 import { ManagementLoading } from './ManagementLoading';
 import { ProjectManager } from './ProjectManager';
 import { AccountFurnitureLibrary } from './AccountFurnitureLibrary';
@@ -28,6 +35,13 @@ describe('管理端精简与加载分支', () => {
     expect(html).not.toContain('<button');
   });
   const projects = (loading: boolean, cloud = [project]) => ({ guests: [], cloud, loading, hasMore: false, reload: () => {}, open: async () => true }) as unknown as ReturnType<typeof useProjects>;
+  it('选了外部 DXF 后显示识别确认弹窗；没有待识别图纸时不显示', () => {
+    expect(render(createElement(ProjectManager, { projects: projects(false), opened: () => {} }))).not.toContain('data-dxf-import');
+    importState.drawing = { source: {}, name: '户型图' };
+    try {
+      expect(render(createElement(ProjectManager, { projects: projects(false), opened: () => {} }))).toContain('data-dxf-import="户型图"');
+    } finally { importState.drawing = null; }
+  });
   it('刷新在新建左侧，后台刷新保留项目，列表底部没有重复刷新', () => {
     const html = render(createElement(ProjectManager, { projects: projects(true), opened: () => {} }));
     expect(html).toContain('aria-haspopup="menu"');

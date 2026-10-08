@@ -56,16 +56,13 @@ export interface BuiltFloorplan {
   rooms: Room[];
 }
 
-/** 外围四面墙：与 geometry.outerWalls 同一结果。 */
-const outline = (width: number, depth: number, t: number): FloorplanWall[] => {
-  const h = t / 2;
-  return [
-    { key: "top", rect: [-h, -h, width + h, h] },
-    { key: "right", rect: [width - h, -h, width + h, depth + h] },
-    { key: "bottom", rect: [-h, depth - h, width + h, depth + h] },
-    { key: "left", rect: [-h, -h, h, depth + h] },
-  ];
-};
+/** 外围四面墙：与 geometry.outerWalls 一致——墙体落在室内净尺寸之外，内表面贴着 0 / width / depth。 */
+const outline = (width: number, depth: number, t: number): FloorplanWall[] => [
+  { key: "top", rect: [-t, -t, width + t, 0] },
+  { key: "right", rect: [width, -t, width + t, depth + t] },
+  { key: "bottom", rect: [-t, depth, width + t, depth + t] },
+  { key: "left", rect: [-t, -t, 0, depth + t] },
+];
 
 /** 矩形 → 墙：长边为走向，短边为厚度。 */
 export function wallFromRect(

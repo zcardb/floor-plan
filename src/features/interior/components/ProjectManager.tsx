@@ -14,10 +14,9 @@ import { ProjectRowActions } from './ProjectRowActions';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { notify } from '@/lib/notify';
 import { createProject } from '../data/templates';
-import { IMPORT_ACCEPT, parseDesignFile } from '../model/designImport';
-import type { DxfSource } from '../model/externalDxf/dxfSource';
-import type { Design } from '../model/types';
+import { IMPORT_ACCEPT } from '../model/designImport';
 import { DxfImportDialog } from './DxfImportDialog';
+import { useProjectImport } from './useProjectImport';
 import { SoftwareSoonItem } from './SoftwareSoonItem';
 import type { useProjects, ProjectSummary } from '../cloud/useProjects';
 
@@ -45,29 +44,9 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
     if (await projects.create(project, true)) { setCreating(false); notify.success('已创建项目「' + project.name + '」'); opened(); }
   });
   const file = useRef<HTMLInputElement>(null);
-  // 外部 CAD 图纸先进识别确认弹窗；本应用导出的 DXF 自带方案数据，直接还原。
-  const [drawing, setDrawing] = useState<{ source: DxfSource; name: string } | null>(null);
-  const importDesign = async (design: Design, importedName: string) => {
-    const project = { ...createProject(design.template, importedName), state: design };
-    if (!(await projects.create(project, true))) return false;
-    notify.success('已导入方案「' + project.name + '」');
-    opened();
-    return true;
-  };
-  const importFile = useAsyncAction(async (selected: File) => {
-    try {
-      const imported = await parseDesignFile(selected);
-      if (imported.kind === 'dxf') setDrawing({ source: imported.source, name: imported.name });
-      else await importDesign(imported.design, imported.name);
-    } catch (error) {
-      notify.fail('导入失败：' + (error instanceof Error ? error.message : '文件无法读取'));
-    }
-  });
-  const importDrawing = useAsyncAction(async (design: Design, importedName: string) => {
-    if (await importDesign(design, importedName)) setDrawing(null);
-  });
+  const imports = useProjectImport(projects, opened);
   const pickFile = () => file.current?.click();
-  const createBusy = rowAction.pending || importFile.pending || importDrawing.pending;
+  const createBusy = rowAction.pending || imports.reading || imports.saving;
   const busyRow = rowAction.pendingKey?.split(':')[1] ?? null;
   const isPending = (kind: string, row: ProjectSummary) => rowAction.pendingKey === kind + ':' + row.id;
   const refreshing = projects.loading && !rowAction.pending;
@@ -79,8 +58,8 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
         <Button variant="outline" className="cms-refresh-button" disabled={projects.loading} aria-busy={refreshing} onClick={() => void projects.reload()}><RefreshCw className={refreshing ? 'animate-spin' : ''} />刷新</Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button className="cms-create-button" disabled={createBusy} aria-busy={importFile.pending}>
-              {importFile.pending ? <Loader2 className="animate-spin" /> : <Plus />}新建项目<ChevronDown />
+            <Button className="cms-create-button" disabled={createBusy} aria-busy={imports.reading}>
+              {imports.reading ? <Loader2 className="animate-spin" /> : <Plus />}新建项目<ChevronDown />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="create-menu">
@@ -93,7 +72,7 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
         <input ref={file} type="file" accept={IMPORT_ACCEPT} hidden aria-hidden="true" tabIndex={-1} onChange={event => {
           const selected = event.target.files?.[0];
           event.target.value = '';
-          if (selected && !importFile.pending) void importFile.run(selected);
+          if (selected) imports.importFile(selected);
         }} />
       </div>
     </div>
@@ -129,6 +108,9 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
         </form>
       </DialogContent>
     </Dialog>
+
+    {imports.drawing && <DxfImportDialog source={imports.drawing.source} defaultName={imports.drawing.name} pending={imports.saving}
+      onImport={imports.confirmDrawing} onClose={imports.closeDrawing} />}
 
     <ProjectRenameDialog project={rename} onClose={() => setRename(null)} onSubmit={projects.rename} />
     <ProjectDeleteDialog project={deleting} onClose={() => setDeleting(null)} onConfirm={row => rowAction.run('remove', row)} />
