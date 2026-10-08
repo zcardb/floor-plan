@@ -36,7 +36,7 @@ export function accountInitial(email?: string) { /* 本地部分首个字母 →
 export function AccountAvatar({ email, size = 40, className }: { email?: string; size?: number; className?: string })
 ```
 - 已登录（有 `email`）：根节点 `data-tone={accountTone(email)}`，`AvatarFallback` 显示 `accountInitial(email)`。
-- 游客（无 `email`）：`data-tone="guest"`，fallback 渲染 lucide `UserRound`（不用 emoji）。
+- 无 `email` 时 `accountInitial` 回退为 `'?'`，仍带品牌色底，不额外做游客样式（顶部下拉只在已登录时渲染，游客分支会是不可达代码，故执行时未保留 `data-tone="guest"`）。
 - 尺寸走内联 `width/height`（radix root 需要显式尺寸覆盖 `h-10 w-10`），字号 `Math.round(size*0.42)`。
 - 根节点 `aria-hidden="true"`：头像纯装饰，邮箱文本始终在旁边，避免读屏重复播报。
 
@@ -74,8 +74,7 @@ export function AccountAvatar({ email, size = 40, className }: { email?: string;
 - `@layer components` 追加：
   - `.account-avatar`：`border-radius:50%; overflow:hidden; display:flex; box-shadow:var(--shadow-float)`。
   - `.account-avatar[data-tone="0"…"5"]`：`linear-gradient(140deg, hsl(var(--avatar-N-from)), hsl(var(--avatar-N-to)))`。
-  - `.account-avatar[data-tone="guest"]`：`background:hsl(var(--secondary)); color:hsl(var(--muted-foreground))`。
-  - `.account-avatar-fallback`：`background:transparent; color:hsl(var(--avatar-ink)); font-weight:650; letter-spacing:.4px`。
+  - `.account-avatar-fallback`：`background:transparent !important; color:hsl(var(--avatar-ink)) !important; font-weight:650; letter-spacing:.4px`（`!important` 用于压过 `AvatarFallback` 自带的 `bg-muted` 工具类）。
   - `.cms-account { align-content:start; gap:14px; }`、`.cms-account-id { display:flex; align-items:center; gap:12px; min-width:0; }`、`.cms-account-id b { font-size:12.5px; font-weight:600; overflow-wrap:anywhere; }`、`.cms-account-id small { font-size:11px; }`。
   - `.account-menu-head { display:flex; align-items:center; gap:10px; padding:8px 10px; }`（`b` 13px 前景色、`small` 11px 弱化色，覆盖 shadcn label 的 12px/600 默认）。
 - `@media(max-width:700px)`：在现有 `.cms-account` 规则里补 `.cms-account .account-avatar { width:32px; height:32px; } .cms-account-id small { display:none; }`，保持「头像 + 邮箱 | 退出登录」一行不换行。
