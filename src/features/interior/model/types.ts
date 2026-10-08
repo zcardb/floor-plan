@@ -76,6 +76,8 @@ export interface CostSettings {
 export interface Design {
   version: 2;
   template: "reference" | "blank";
+  /** 内置户型模板 id（见 data/templatePresets.ts）；空白户型与旧数据没有该字段。 */
+  templateId?: string;
   width: number;
   depth: number;
   thickness: number;
@@ -129,6 +131,12 @@ export interface Project {
   updatedAt: string;
   revision: number;
   cloud?: boolean;
+  /** 系统自带的本机默认方案：不可重命名、不可删除，只能复制。 */
+  system?: boolean;
+  /** 内置户型模板：只读预览，不可编辑、重命名、复制或删除。 */
+  builtin?: boolean;
+  /** 内置模板对应的预设 id（builtin 为真时有值）。 */
+  templateId?: string;
 }
 export type Selection = {
   kind: "furniture" | "room" | "wall" | "opening";

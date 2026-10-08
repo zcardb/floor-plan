@@ -5,6 +5,7 @@ import type { Json } from "@/integrations/supabase/types";
 import { errorMessage, notify } from "@/lib/notify";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { validateDesign } from "../model/validation";
+import { nextGuestEditCount } from "../model/templateState";
 import { uid, type Design, type Project } from "../model/types";
 import { GUEST_DEFAULT_KEY, purgeRecoveryCopies, readGuestDefault, readGuests, writeGuests } from "./guestStore";
 export type SaveStatusKind = "saved" | "saving" | "dirty" | "error" | "conflict";
@@ -43,6 +44,8 @@ export interface ProjectSummary {
   updatedAt: string;
   revision: number;
   cloud?: boolean;
+  /** 系统自带的本机默认方案：不可重命名、不可删除，只能复制。 */
+  system?: boolean;
 }
 export function useProjects() {
   const confirm = useConfirm();
@@ -56,7 +59,9 @@ export function useProjects() {
     [signingOut, setSigningOut] = useState(false),
     [loading, setLoading] = useState(false),
     [listReady, setListReady] = useState(false),
-    [hasMore, setHasMore] = useState(false);
+    [hasMore, setHasMore] = useState(false),
+    /** 游客模式下对当前方案的编辑次数：0 表示还没改动过模版，顶部提示条据此出现。 */
+    [guestEdits, setGuestEdits] = useState(0);
   const sessionRef = useRef(session),
     activeRef = useRef(active),
     guestsRef = useRef(guests),
@@ -72,7 +77,7 @@ export function useProjects() {
   const persist = useCallback((ps: Project[]) => {
     // 先写存储，成功了才更新界面状态：否则会出现「界面删了、刷新又回来」。
     const result = writeGuests(ps);
-    if (!result.ok) {
+    if ("cause" in result) {
       setStatus(STATUS.localFailed);
       notify.error("本机存储空间不足，请导出 JSON 保留方案", result.cause);
       return false;
@@ -140,6 +145,7 @@ export function useProjects() {
         setLoading(false);
         const guest = readGuestDefault(); activeRef.current = guest; setActive(guest);
         setStatus(STATUS.local);
+        setGuestEdits(0);
       }
       sessionRef.current = s;
       setSession(s);
@@ -260,6 +266,8 @@ export function useProjects() {
         if (timer.current) clearTimeout(timer.current);
         timer.current = setTimeout(() => void save(), 1000);
       } else if (!sessionRef.current) {
+        // 回到初始模版（重置方案、一路撤销回起点）计数归零，顶部提示条随之消失。
+        setGuestEdits((n) => nextGuestEditCount(n, design));
         try { localStorage.setItem(GUEST_DEFAULT_KEY, JSON.stringify(next)); setStatus(STATUS.local); } catch { setStatus(STATUS.localFailed); }
       } else persist(guestsRef.current.map((r) => (r.id === p.id ? next : r)));
     },
@@ -339,6 +347,8 @@ export function useProjects() {
         revision: 0,
         updatedAt: new Date().toISOString(),
         cloud: toCloud,
+        // 复制/新建/导入出来的项目都属于「用户新建」：必须三操作齐全，不能继承来源的系统标记。
+        system: false,
       };
       if (toCloud) {
         if (!sessionRef.current) {
@@ -388,6 +398,7 @@ export function useProjects() {
       revision: 0,
       updatedAt: new Date().toISOString(),
       cloud: true,
+      system: false,
     };
     const { error } = await attempt(supabase
       .from("interior_design_projects")
@@ -557,6 +568,7 @@ export function useProjects() {
     listReady,
     listError,
     hasMore,
+    guestEdits,
     update,
     save,
     open,

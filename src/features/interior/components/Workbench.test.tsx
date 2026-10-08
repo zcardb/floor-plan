@@ -34,6 +34,7 @@ import { WallSplitDialog } from './WallSplitDialog';
 import { PropertyPanel } from './PropertyPanel';
 import { SelectionEditor } from './SelectionEditor';
 import { ProjectMenu } from './ProjectMenu';
+import { Button } from '@/components/ui/button';
 import { ExportMenu } from './ExportMenu';
 import { AccountMenu } from './AccountMenu';
 import { perimeterDimensions } from '../model/perimeterDimensions';
@@ -57,7 +58,7 @@ function render(overrides: Partial<Parameters<typeof Workbench>[0]> = {}) {
     project: { id: 'test', name: '测试', state: state.design } as Project,
     projectNavigation: { projectList: [], hasMore: false, listLoading: false, onOpen: noop, onLoadMore: noop },
     update: noop, status: { kind: 'saved' as const, label: '' }, loggedIn: false, projects: noop, login: noop, logout: noop,
-    cloudSave: noop,
+    cloudSave: noop, guestEdits: 0,
     ...overrides,
   }));
 }
@@ -256,5 +257,24 @@ describe('单行顶部工具栏', () => {
   it('小屏的重置方案 / 清空家具在 2D「更多」菜单的 compact-only 项里', () => {
     const more = tools(render()).filter(n => typeof n.props.className === 'string' && (n.props.className as string).includes('compact-only') && n.props.onSelect);
     expect(more.map(n => text(n.props.children as ReactNode))).toEqual(['重置方案', '清空家具']);
+  });
+});
+
+describe('游客改模版后的顶部提示条', () => {
+  const banner = (tree: Node[]) => tree.find(n => n.props.className === 'guest-cloud-banner');
+  it('只有游客改过方案才出现', () => {
+    expect(banner(render({ guestEdits: 1 }))).toBeDefined();
+    expect(banner(render())).toBeUndefined();
+    expect(banner(render({ guestEdits: 1, loggedIn: true }))).toBeUndefined();
+  });
+  it('主按钮触发登录保存，「暂不保存」只关掉当前版本', async () => {
+    const cloudSave = vi.fn(async () => true);
+    const buttons = nodes(banner(render({ guestEdits: 2, cloudSave }))!).filter(n => n.type === Button);
+    (buttons[0].props.onClick as () => void)();
+    await Promise.resolve();
+    expect(cloudSave).toHaveBeenCalledOnce();
+    (buttons[1].props.onClick as () => void)();
+    expect(banner(render({ guestEdits: 2, cloudSave }))).toBeUndefined();
+    expect(banner(render({ guestEdits: 3, cloudSave }))).toBeDefined();
   });
 });

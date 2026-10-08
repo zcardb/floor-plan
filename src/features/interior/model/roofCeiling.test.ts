@@ -72,6 +72,15 @@ describe('屋面与吊顶（按房间计入硬装）', () => {
     expect(accountCostSource(d, { group: 'roofPrices', key: tile.key })).toBe('账号屋面库');
     expect(accountCostSource(d, { group: 'ceilingPrices', key: board.key })).toBe('账号吊顶库');
   });
+  it('没有屋面就没有吊顶：不能单独设吊顶，清除屋面一并清除吊顶，不计吊顶费用', () => {
+    const d = blankDesign(), id = d.rooms[0].id;
+    expect(() => applyRoomCeiling(d, id, 'gypsum', [])).toThrow('请先设置屋面');
+    const full = withSurfaces(), cleared = applyRoomRoof(full, full.rooms[0].id, null, []);
+    expect(cleared.rooms[0].ceilingMat).toBeUndefined();
+    const orphan = { ...d, rooms: d.rooms.map(r => ({ ...r, ceilingMat: 'gypsum' })) };
+    expect(calculateCosts(orphan).hard.some(x => x.group === 'ceilingPrices')).toBe(false);
+    expect(validateDesign(orphan).rooms[0].ceilingMat).toBeUndefined();
+  });
   it('平面图纸不含屋面 / 吊顶内容', () => {
     const doc = JSON.stringify(createDrawingDocument(withSurfaces(), layers));
     expect(doc).not.toContain('仿古琉璃瓦');

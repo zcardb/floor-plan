@@ -1331,6 +1331,13 @@
     border-radius: 3px;
     flex: none;
   }
+  .material-swatch-empty {
+    border: 1px dashed hsl(var(--border));
+    background: hsl(var(--muted) / 0.4);
+  }
+  .room-roof-slope {
+    margin-top: 10px;
+  }
   .material-card small {
     display: block;
     color: hsl(var(--muted-foreground));
@@ -3357,4 +3364,24 @@ button.room-cost-row:hover {
   .export-button>span,.export-button .export-button-caret { display:none; }
   .toolbar-right>.export-button { margin:0 2px; }
   .toolbar-fullscreen { display:none; }
+}
+
+/* 游客改过模版后的顶部提示条：放在工作台栅格之外，避免打乱 .workbench 的三行布局 */
+.workbench-shell { display:flex; flex-direction:column; height:100dvh; background:hsl(var(--card)); }
+.workbench-shell > .workbench { flex:1 1 auto; height:auto; min-height:0; }
+.guest-cloud-banner { display:flex; align-items:center; gap:10px; margin:10px 16px 0; padding:6px 8px 6px 10px; border:1px solid hsl(var(--primary) / 0.45); border-radius:10px; background:linear-gradient(90deg,hsl(var(--primary) / 0.22),hsl(var(--primary) / 0.07)); box-shadow:0 10px 22px -16px hsl(var(--primary) / 0.7); color:hsl(var(--foreground)); font-size:12px; }
+.guest-cloud-banner-badge { display:grid; place-items:center; flex:none; width:22px; height:22px; border-radius:7px; background:hsl(var(--primary)); color:hsl(var(--primary-foreground)); }
+.guest-cloud-banner-copy { display:flex; align-items:baseline; gap:8px; flex:1 1 auto; min-width:0; }
+.guest-cloud-banner-copy > b { font-size:12px; font-weight:600; white-space:nowrap; }
+.guest-cloud-banner-copy > span { color:hsl(var(--muted-foreground)); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.guest-cloud-banner .guest-cloud-banner-save,.guest-cloud-banner .guest-cloud-banner-dismiss { flex:none; height:28px; padding:0 10px; gap:6px; font-size:12px; }
+.guest-cloud-banner .guest-cloud-banner-save { box-shadow:0 4px 12px -6px hsl(var(--primary) / 0.6); }
+.guest-cloud-banner .guest-cloud-banner-dismiss { padding:0 8px; color:hsl(var(--muted-foreground)); }
+.guest-cloud-banner .guest-cloud-banner-dismiss:hover:not(:disabled) { color:hsl(var(--foreground)); }
+@media (max-width: 600px) {
+  .guest-cloud-banner { margin:8px 8px 0; padding:5px 6px 5px 8px; gap:8px; }
+  .guest-cloud-banner-copy > span { display:none; }
+  .guest-cloud-banner .guest-cloud-banner-save,.guest-cloud-banner .guest-cloud-banner-dismiss { height:32px; }
+  .guest-cloud-banner .guest-cloud-banner-dismiss { padding:0 6px; }
+  .guest-cloud-banner .guest-cloud-banner-dismiss > span { display:none; }
 }

@@ -85,6 +85,26 @@
   转存失败时保持停在项目管理页（`saveGuestToCloud` 内部已有 `notify.error`）。
 - `<Workbench>` 增加 `guestEdits={projects.guestEdits}`。
 
+## 追加一轮（用户反馈）
+
+### 1. 回到初始态时提示条消失 —— `model/templateState.ts`（新增）+ `cloud/useProjects.ts`
+
+原来 `guestEdits` 只做单调累加，所以「重置方案」后提示条还挂着。改为按「方案内容是否等于系统初始模版」判定：
+
+- 新增 `model/templateState.ts`：`fingerprint(design)` 只比较方案内容（墙体、门窗、房间、材质、家具与位置、拆改标记），剔除每次都变的 `uid()`（家具 id、空白户型的房间 id），并忽略与内容无关的 `structureUnlocked`（解锁标记）与 `dimensionSettings`（尺寸标注显示）；
+- `isPristineDesign(design)`：与 `referenceDesign()` / `blankDesign()` 的指纹比较，模版指纹按 template 缓存一次；
+- `nextGuestEditCount(current, design)`：回到初始模版返回 0，否则 +1；
+- `useProjects.update()` 的游客分支改用 `nextGuestEditCount(n, design)`，于是**重置方案、一路撤销回起点都会让提示条消失**，之后再次编辑又会重新出现。
+
+### 2. 提示条视觉 —— `components/Workbench.tsx` + `src/index.css`
+
+按用户反馈「颜色醒目一点、宽度窄一些、操作按钮小一点、和页面设计统一」重做：
+
+- 不再通栏：`margin:10px 16px 0` + `border-radius:10px`，成为一条比工具栏窄的浮起提示条；
+- 醒目：primary 前景渐变底（0.22 → 0.07）+ `1px` primary 边框 + 柔和投影，左侧加 primary 实底圆角图标徽标（Visual Anchor / Von Restorff）；
+- 按钮变小：CTA 与关闭都收到 28px 高、12px 字号（≤600px 提到 32px 保证可点，Fitts's Law），并保持「一个主按钮 + 一个次要出口」两级层次（Hick's Law、Reactance：不阻断编辑，随时可「暂不保存」）；
+- 文案同步收短：`登录并保存` / `暂不保存`，副文案改为「登录后即可保存到云端，换设备也能继续编辑」；移动端隐藏副文案，关闭按钮只留图标。
+
 ## 不做
 
 - 不改数据库表结构、RLS 与任何云端数据（不新增字段、不做迁移）。
@@ -95,28 +115,36 @@
 
 ## Implementation checklist
 
-- [ ] `model/types.ts` 的 `Project` 增加 `system?: boolean`，注释写明「本机系统默认方案：不可重命名/删除，可复制」。
-- [ ] `guestStore.ts` 导出 `systemProject()` 并在三处兜底播种时带上 `system: true`。
-- [ ] `guestStore.ts` 新增 `withSystemMarker()`：已有标记则原样返回；否则标记更新时间最早的一条；空列表返回空数组（不重播种）。
-- [ ] `readGuests()` 返回值经 `withSystemMarker()`；`readGuestDefault()` 与 `writeGuests()` 行为不变。
-- [ ] `useProjects.ts` 的 `ProjectSummary` 增加 `system?: boolean`；`create()` 与 `saveGuestToCloud()` 产出的项目 `system: false`。
-- [ ] `useProjects.ts` 新增 `guestEdits` 计数：`update()` 在游客分支 +1；登录/登出时复位为 0；随 hook 返回值导出。
-- [ ] `ProjectManager.tsx` 列表映射带上 `system`；`rowActions` 三按钮：复制对全部卡片可用，重命名/删除在 `row.system` 时禁用并给出「系统默认方案不可…」提示。
-- [ ] `ProjectMenu.tsx` 游客分支不再渲染「保存到云端」；`onCloudSave` / `cloudSaving` props 与 `Cloud` import 一并移除，下拉保留当前方案一行。
-- [ ] `Workbench.tsx` 移除 `ProjectMenu` 的云保存传参，最外层包 `.workbench-shell`，按 `guestEdits` / `dismissed` / `p.loggedIn` 渲染 banner，主按钮走 `cloudSave.run()`，关闭按钮置 `dismissed = p.guestEdits`。
-- [ ] `src/index.css` 新增 `.workbench-shell`、`.workbench-shell > .workbench` 与 `.guest-cloud-banner`（含 ≤600px 规则），颜色全部用语义 token。
-- [ ] `Index.tsx` 的 `cloudSave` 只保留游客意图分支；`useEffect([owner])` 转存成功后 `setEditingOwner(owner)`；`<Workbench>` 传入 `guestEdits`。
-- [ ] `managementUi.test.tsx` 更新本机/云端操作断言并新增「系统默认方案：复制可用、重命名/删除禁用」用例。
-- [ ] `guestStore.test.ts` 增补：播种带 `system` 标记；缺失标记时标记最早一条；空列表不重播种。
-- [ ] `Workbench.test.tsx` 与 `toolbarMenus.test.tsx` 适配新 props，并断言游客有编辑时出现 banner、已登录或无编辑时不出现、游客下拉里不再有「保存到云端」。
+- [x] `model/types.ts` 的 `Project` 增加 `system?: boolean`，注释写明「本机系统默认方案：不可重命名/删除，可复制」。
+- [x] `guestStore.ts` 导出 `systemProject()` 并在三处兜底播种时带上 `system: true`。
+- [x] `guestStore.ts` 新增 `withSystemMarker()`：已有标记则原样返回；否则标记更新时间最早的一条；空列表返回空数组（不重播种）。
+- [x] `readGuests()` 返回值经 `withSystemMarker()`；`readGuestDefault()` 与 `writeGuests()` 行为不变。
+- [x] `useProjects.ts` 的 `ProjectSummary` 增加 `system?: boolean`；`create()` 与 `saveGuestToCloud()` 产出的项目 `system: false`。
+- [x] `useProjects.ts` 新增 `guestEdits` 计数：`update()` 在游客分支 +1；登录/登出时复位为 0；随 hook 返回值导出。
+- [x] `model/templateState.ts` 提供 `isPristineDesign` / `nextGuestEditCount`，剔除 `uid()` 波动字段、忽略解锁标记与尺寸标注显示，模版指纹按 template 缓存。
+- [x] `useProjects.update()` 游客分支改用 `nextGuestEditCount(n, design)`：重置方案 / 撤销回初始模版计数归零。
+- [x] 提示条改为窄幅浮起样式（16px 边距、圆角、primary 渐变底 + 边框 + 徽标），按钮 28px / 12px，≤600px 32px 且隐藏副文案与关闭按钮文字。
+- [x] `ProjectManager.tsx` 列表映射带上 `system`；`rowActions` 三按钮：复制对全部卡片可用，重命名/删除在 `row.system` 时禁用并给出「系统默认方案不可…」提示。
+- [x] `ProjectMenu.tsx` 游客分支不再渲染「保存到云端」；`onCloudSave` / `cloudSaving` props 与 `Cloud` import 一并移除，下拉保留当前方案一行。
+- [x] `Workbench.tsx` 移除 `ProjectMenu` 的云保存传参，最外层包 `.workbench-shell`，按 `guestEdits` / `dismissed` / `p.loggedIn` 渲染 banner，主按钮走 `cloudSave.run()`，关闭按钮置 `dismissed = p.guestEdits`。
+- [x] `src/index.css` 新增 `.workbench-shell`、`.workbench-shell > .workbench` 与 `.guest-cloud-banner`（含 ≤600px 规则），颜色全部用语义 token。
+- [x] `Index.tsx` 的 `cloudSave` 只保留游客意图分支；`useEffect([owner])` 转存成功后 `setEditingOwner(owner)`；`<Workbench>` 传入 `guestEdits`。
+- [x] `managementUi.test.tsx` 更新本机/云端操作断言并新增「系统默认方案：复制可用、重命名/删除禁用」用例。
+- [x] `guestStore.test.ts` 增补：播种带 `system` 标记；缺失标记时标记最早一条；空列表不重播种。
+- [x] `Workbench.test.tsx` 与 `toolbarMenus.test.tsx` 适配新 props，并断言游客有编辑时出现 banner、已登录或无编辑时不出现、游客下拉里不再有「保存到云端」。
 
 ## Verification checklist
 
-- 正向（游客转存 + 进入项目）：退出登录 → 游客模式改一处设计 → 顶部出现 banner → 点「登录并保存到云端」→ 邮箱密码登录 → 登录后自动转存并**直接进入该项目**（工作台左上显示项目名、状态为云端已保存），项目列表里多出该云端项目且三个操作全开。
-- 数据校验：`select id,name,updated_at from public.interior_design_projects order by updated_at desc limit 3` —— 只新增一行「修改的第一个版本」，无重复行；刷新页面后不会因为 effect 重跑再插一行。
-- 负向/默认态：游客未做任何修改 → 无 banner；已登录 → 无 banner；点「暂不保存」→ banner 消失且不弹登录框、云端无新行；再次编辑 → banner 重新出现。
-- 负向：游客与已登录状态下，左上「参考户型 ▾」下拉里都不再出现「保存到云端」，下拉仍可展开并显示当前方案一行。
-- 列表规则：本机默认方案「三室两厅两卫 · 原木之家」卡片重命名/删除置灰（悬浮提示为不可操作原因），复制可用 → 副本是可自由重命名/删除/复制的用户项目；云端「Home」等项目三个操作不变。
-- 边界：清空本机列表后重进 → 列表为空、不重新播种默认方案；旧数据（本机项目没有 `system` 标记）→ 最早一条被识别为系统默认；用户在本机复制出的副本不会被标记。
-- 响应式：`website_screenshot` 在 `desktop_1280` 与 `mobile_390` 分别检查游客工作台（banner 不遮挡工具栏、不撑出滚动条）与项目管理卡片（三个图标不被挤出卡片）。
-- 构建范围：`pnpm test src/features/interior`、`pnpm check`（eslint + tsc）、`pnpm run build` 全绿。
+- [x] 卡片规则（`managementUi.test.tsx`）：系统默认方案重命名/删除渲染为 `disabled`，复制可用；用户新建的本机与云端项目三个操作都可用。
+- [x] 默认态（`Workbench.test.tsx`）：`guestEdits = 0` 无 banner；已登录时即使 `guestEdits > 0` 也不出现 banner。
+- [x] 「暂不保存」（`Workbench.test.tsx`）：点击后 banner 消失，同一 `guestEdits` 不再出现；`guestEdits` 增加到下一版时重新出现。
+- [x] 主按钮（`Workbench.test.tsx`）：点击后调用传入的 `cloudSave`（未被禁用/防重复逻辑吞掉）。
+- [x] 下拉入口（`toolbarMenus.test.tsx`）：游客与已登录的「项目 ▾」菜单都不再包含「保存到云端」，游客只剩当前方案一行。
+- [x] 边界（`guestStore.test.ts`）：播种的默认方案带 `system` 标记；已有标记的列表不被重新指派；旧列表无标记时最早一条被标记；清空后读到空列表且不重新播种。
+- [x] 初始态判定（`model/templateState.test.ts`）：刚生成的模版 / 带解锁标记 / 重新生成 id 都算初始态；移动家具、删家具、拆墙标记、改房间材质都算改过；尺寸标注显示不算；`nextGuestEditCount` 回初始态归零。
+- [x] 计数链路（`cloud/useProjects.test.ts`，hook 替身不连后端）：游客未改动为 0 → `update(改动后方案)` 变 1、再改变 2 → `update(重置方案产出的初始模版)` 归零。
+- [x] 视觉实测：临时强制显示提示条后 `website_screenshot` 抓 `desktop_1280` 与 `mobile_390`，确认窄幅、配色醒目、按钮变小、移动端不换行不溢出；随后已还原强制标记（`git` 中该行为原判定条件）。
+- [x] 构建范围：`pnpm test`（63 文件 / 436 条全绿）、`pnpm check`（eslint 0 error、tsc 干净）、`pnpm run build` 通过。
+- [ ] 正向（游客转存 + 进入项目，需真实登录）：退出登录 → 游客改一处设计 → 顶部 banner → 「登录并保存到云端」→ 登录后自动转存并直接进入该项目（工作台左上显示项目名、状态为云端已保存）。本次会话无法代替用户登录，未在浏览器里走完。
+- [ ] 数据校验：`select id,name,updated_at from public.interior_design_projects order by updated_at desc limit 3` —— 转存后只新增一行「修改的第一个版本」，刷新后不重复插入（同因未登录未执行）。
+- [x] 响应式（提示条本体）：`desktop_1280` 与 `mobile_390` 都实拍过提示条（临时强制显示），移动端单行不溢出、关闭按钮收起文字；无提示条时的 `desktop_1280` / `mobile_390` 工作台布局也已确认完好。

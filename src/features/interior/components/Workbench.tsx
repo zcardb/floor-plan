@@ -18,6 +18,7 @@ import {
   Armchair,
   Check,
   ChevronDown,
+  Cloud,
   Copy,
   DoorOpen,
   Expand,
@@ -44,6 +45,7 @@ import {
   SquareDashed,
   Sun,
   Trash2,
+  TriangleAlert,
   Undo2,
   UserRound,
   X,
@@ -106,6 +108,8 @@ interface Props {
   logout: () => void;
   loggingOut?: boolean;
   cloudSave: () => Promise<boolean>;
+  /** 游客模式下对当前方案的编辑次数：>0 表示模版已被改动，顶部出现「登录并保存到云端」提示条。 */
+  guestEdits: number;
 }
 function ToolButton({
   label,
@@ -457,6 +461,9 @@ export function Workbench(p: Props) {
     else setHidePanel((v) => !v);
   };
   const cloudSave = useAsyncAction(p.cloudSave);
+  // 游客改过模版才提示登录保存；「暂不保存」只关掉当前这一版，再改一次会重新出现。
+  const [bannerClosed, setBannerClosed] = useState(0);
+  const showGuestBanner = !p.loggedIn && p.guestEdits > 0 && p.guestEdits !== bannerClosed;
   const exportAction = useAsyncAction(async (format: ExportFormat) => {
     if (format === "png") {
       if (view === "2d") canvas.current?.exportImage();
@@ -515,6 +522,35 @@ export function Workbench(p: Props) {
           ? "拖动旋转 · 滚轮缩放 · 选中家具可移动 · 点击门开关"
           : "拖入家具，开始规划你的理想空间";
   return (
+    <div className="workbench-shell">
+      {showGuestBanner && (
+        <div className="guest-cloud-banner" role="status" aria-label="模版已更改">
+          <span className="guest-cloud-banner-badge"><TriangleAlert size={14} /></span>
+          <span className="guest-cloud-banner-copy">
+            <b>模版已经更改</b>
+            <span>登录后即可保存到云端，换设备也能继续编辑</span>
+          </span>
+          <Button
+            size="sm"
+            className="guest-cloud-banner-save"
+            loading={cloudSave.pending}
+            onClick={() => { sizeTransaction.cancel(); void cloudSave.run(); }}
+          >
+            <Cloud size={14} />
+            <span>登录并保存</span>
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="guest-cloud-banner-dismiss"
+            disabled={cloudSave.pending}
+            onClick={() => setBannerClosed(p.guestEdits)}
+          >
+            <X size={14} />
+            <span>暂不保存</span>
+          </Button>
+        </div>
+      )}
     <div
       className={
         "workbench " +
@@ -529,8 +565,6 @@ export function Workbench(p: Props) {
           loggedIn={p.loggedIn}
           onBack={() => { sizeTransaction.cancel(); p.projects(); }}
           onOpen={async (row) => { sizeTransaction.cancel(); return p.projectNavigation.onOpen(row); }}
-          onCloudSave={() => { sizeTransaction.cancel(); void cloudSave.run(); }}
-          cloudSaving={cloudSave.pending}
         />
         <span className="toolbar-divider" />
         <div className="toolbar-scroll">
@@ -1018,6 +1052,7 @@ export function Workbench(p: Props) {
               removeWall={view === '2d' && tool === 'select' ? removeWall : undefined}
               transaction={sizeTransaction} showCosts={p.loggedIn}
               accountFloors={accountFloors} accountWalls={accountWalls} accountOpenings={accountOpenings}
+              accountRoofs={accountRoofs} accountCeilings={accountCeilings}
               design={d}
               selection={selection}
               select={select}
@@ -1071,6 +1106,7 @@ export function Workbench(p: Props) {
         onCreateWall={saveCustomWall}
         onCreateOpening={saveCustomOpening}
       />}
+    </div>
     </div>
   );
 }
