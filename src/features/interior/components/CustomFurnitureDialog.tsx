@@ -14,9 +14,10 @@ import { uid,type CustomFloor,type CustomOpening,type CustomWall,type LibraryIte
 import { FLOOR_CATEGORY,customFloorMaterial,floorPatterns } from '../model/floorMaterials';
 import { useFloorCatalog } from '../cloud/useFloorCatalog';
 import { useWallCatalog } from '../cloud/useWallCatalog';
+import { useCeilingCatalog, useRoofCatalog } from '../cloud/useSurfaceCatalogs';
 import { useOpeningCatalog } from '../cloud/useOpeningCatalog';
-import { HARD_CATEGORIES,OPENING_CATEGORY,WALL_CATEGORY } from '../model/hardMaterials';
-import { CustomWallForm } from './CustomWallForm';
+import { HARD_CATEGORIES,OPENING_CATEGORY,surfaceCategory,surfaceKindOfCategory,type SurfaceKind } from '../model/hardMaterials';
+import { CustomColorMaterialForm } from './CustomColorMaterialForm';
 import { CustomOpeningForm } from './CustomOpeningForm';
 import { AccountMaterialList } from './AccountMaterialList';
 import { ColorPickerField } from './ColorPickerField';
@@ -29,15 +30,16 @@ import { useFurnitureCatalog } from '../cloud/useFurnitureCatalog';
 import { FurnitureShape } from './FurnitureShape';
 import { furnitureTypes, resolvedFurnitureType, appearanceDimensions, needsParameterOnly, type FurnitureOutline } from '../model/furnitureAppearance';
 import { notify } from '@/lib/notify';
-type Props = { open:boolean; onOpenChange:(v:boolean)=>void; loggedIn:boolean; login:()=>void; onCreate:(i:LibraryItem)=>void; onImport:(i:LibraryItem)=>void; onCreateFloor?:(f:CustomFloor)=>void; onCreateWall?:(w:CustomWall)=>void; onCreateOpening?:(o:CustomOpening)=>void; ownerKey:string; accountOnly?:boolean; initialCategory?:string };
+type Props = { open:boolean; onOpenChange:(v:boolean)=>void; loggedIn:boolean; login:()=>void; onCreate:(i:LibraryItem)=>void; onImport:(i:LibraryItem)=>void; onCreateFloor?:(f:CustomFloor)=>void; onCreateWall?:(w:CustomWall)=>void; onCreateOpening?:(o:CustomOpening)=>void; onCreateRoof?:(r:CustomWall)=>void; onCreateCeiling?:(c:CustomWall)=>void; ownerKey:string; accountOnly?:boolean; initialCategory?:string };
 const tabTrigger = 'gap-[5px] rounded px-2.5 py-1.5 text-[11px] max-[700px]:px-[7px] max-[700px]:text-[10px]';
-export function CustomFurnitureDialog({open,onOpenChange,loggedIn,login,onCreate,onImport,onCreateFloor,onCreateWall,onCreateOpening,ownerKey,accountOnly=false,initialCategory='客厅'}:Props){
+const surfaceDescription:Record<SurfaceKind,string>={wall:'设置墙面颜色与单价，可在房间材质中选用。',roof:'设置屋面颜色与单价，可在房间材质中选用并设置坡度。',ceiling:'设置吊顶颜色与单价，可在房间材质中选用。'};
+export function CustomFurnitureDialog({open,onOpenChange,loggedIn,login,onCreate,onImport,onCreateFloor,onCreateWall,onCreateOpening,onCreateRoof,onCreateCeiling,ownerKey,accountOnly=false,initialCategory='客厅'}:Props){
   const [name,setName]=useState(''),[category,setCategory]=useState(()=>newFurnitureCategory(initialCategory)),[w,setW]=useState('1.8'),[d,setD]=useState('0.8'),[h,setH]=useState('0.8'),[price,setPrice]=useState(''),[color,setColor]=useState('#b7c4b0'),[account,setAccount]=useState(accountOnly),[error,setError]=useState(''),[saving,setSaving]=useState(false),[tab,setTab]=useState('create'),[pending,setPending]=useState<LibraryItem|null>(null);
-  const ai=useFurnitureImage(),catalog=useFurnitureCatalog(),floors=useFloorCatalog(),walls=useWallCatalog(),openings=useOpeningCatalog(),cancel=ai.cancel,reset=catalog.reset;
+  const ai=useFurnitureImage(),catalog=useFurnitureCatalog(),floors=useFloorCatalog(),walls=useWallCatalog(),openings=useOpeningCatalog(),roofs=useRoofCatalog(),ceilings=useCeilingCatalog(),cancel=ai.cancel,reset=catalog.reset;
   const epoch=useRef(0),lock=useRef(false),id=useRef(uid()),pendingRef=useRef<LibraryItem|null>(null),latest=useRef({open,ownerKey}); latest.current={open,ownerKey};
   useEffect(()=>{const generation=epoch;epoch.current++;lock.current=false;pendingRef.current=null;setPending(null);setSaving(false);setError('');cancel();reset();id.current=uid();return()=>{generation.current++;};},[open,ownerKey,cancel,reset]);
-  const loadCatalog=catalog.load,loadFloors=floors.load,loadWalls=walls.load,loadOpenings=openings.load,hasFloors=!!onCreateFloor,hasWalls=!!onCreateWall,hasOpenings=!!onCreateOpening;
-  useEffect(()=>{if(open&&!accountOnly&&tab==='account'){void loadCatalog();if(hasFloors)void loadFloors();if(hasWalls)void loadWalls();if(hasOpenings)void loadOpenings();}},[open,accountOnly,tab,loadCatalog,loadFloors,loadWalls,loadOpenings,hasFloors,hasWalls,hasOpenings]);
+  const loadCatalog=catalog.load,loadFloors=floors.load,loadWalls=walls.load,loadOpenings=openings.load,loadRoofs=roofs.load,loadCeilings=ceilings.load,hasFloors=!!onCreateFloor,hasWalls=!!onCreateWall,hasOpenings=!!onCreateOpening,hasRoofs=!!onCreateRoof,hasCeilings=!!onCreateCeiling;
+  useEffect(()=>{if(open&&!accountOnly&&tab==='account'){void loadCatalog();if(hasFloors)void loadFloors();if(hasWalls)void loadWalls();if(hasOpenings)void loadOpenings();if(hasRoofs)void loadRoofs();if(hasCeilings)void loadCeilings();}},[open,accountOnly,tab,loadCatalog,loadFloors,loadWalls,loadOpenings,loadRoofs,loadCeilings,hasFloors,hasWalls,hasOpenings,hasRoofs,hasCeilings]);
   const [typeChoice,setTypeChoice]=useState('auto'),[shape,setShape]=useState<FurnitureOutline>('reference');
   const type=resolvedFurnitureType(name,typeChoice);
   const parametersRequired=needsParameterOnly({type,shape});
@@ -69,11 +71,12 @@ export function CustomFurnitureDialog({open,onOpenChange,loggedIn,login,onCreate
     onCreateFloor?.(floor);onOpenChange(false);
     if(accountOnly)notify.success('已保存到账号地面库「'+floor.name+'」');
   };
-  const saveWall=async(wall:CustomWall,toAccount:boolean)=>{
+  const surfaceStores={wall:{catalog:walls,create:onCreateWall},roof:{catalog:roofs,create:onCreateRoof},ceiling:{catalog:ceilings,create:onCreateCeiling}};
+  const saveSurface=(kind:SurfaceKind)=>async(item:CustomWall,toAccount:boolean)=>{
     if(!loggedIn){login();return;}
-    if(toAccount)await walls.save(wall);
-    onCreateWall?.(wall);onOpenChange(false);
-    if(accountOnly)notify.success('已保存到账号墙面库「'+wall.name+'」');
+    if(toAccount)await surfaceStores[kind].catalog.save(item);
+    surfaceStores[kind].create?.(item);onOpenChange(false);
+    if(accountOnly)notify.success('已保存到账号'+surfaceCategory(kind)+'库「'+item.name+'」');
   };
   const saveOpening=async(opening:CustomOpening,toAccount:boolean)=>{
     if(!loggedIn){login();return;}
@@ -85,7 +88,7 @@ export function CustomFurnitureDialog({open,onOpenChange,loggedIn,login,onCreate
   const accountPanel=<>
     {onCreateFloor&&floors.items.length>0&&<><p className="muted-note">{floors.items.length} 款 · 账号地面</p><div className="account-floor-list">{floors.items.map(f=><button key={f.key} type="button" onClick={()=>{if(!loggedIn)return;onCreateFloor(f);onOpenChange(false);}}><FloorSwatch material={customFloorMaterial(f)}/><span>{f.name}<small>{floorPatterns.find(p=>p.value===f.pattern)?.label} · {f.price===null?'未定价':`¥${f.price}/m²`}</small></span><Plus size={14}/></button>)}</div></>}
     {floors.error&&<p className="form-error">{floors.error}</p>}
-    {onCreateWall&&<AccountMaterialList title="账号墙面" items={walls.items.map(w=>({key:w.key,name:w.name,color:w.color,meta:w.price===null?'未定价':`¥${w.price}/m²`,pick:()=>pickMaterial(()=>onCreateWall(w))}))} error={walls.error}/>}
+    {(['wall','roof','ceiling'] as const).map(kind=>{const store=surfaceStores[kind],create=store.create;return create&&<AccountMaterialList key={kind} title={'账号'+surfaceCategory(kind)} items={store.catalog.items.map(w=>({key:w.key,name:w.name,color:w.color,meta:w.price===null?'未定价':`¥${w.price}/m²`,pick:()=>pickMaterial(()=>create(w))}))} error={store.catalog.error}/>;})}
     {onCreateOpening&&<AccountMaterialList title="账号门窗" items={openings.items.map(o=>({key:o.key,name:o.name,kind:o.kind,meta:`${o.kind==='door'?'门':'窗'} · ${o.price===null?'未定价':`¥${o.price}/m²`}`,pick:()=>pickMaterial(()=>onCreateOpening(o))}))} error={openings.error}/>}
     <p className="muted-note">{catalog.count} 款 · 账号目录款式数</p>
     {catalog.error&&<LoadError title="账号家具读取失败" message={catalog.error} retrying={catalog.loading} onRetry={()=>void loadCatalog()}/>}
@@ -93,7 +96,7 @@ export function CustomFurnitureDialog({open,onOpenChange,loggedIn,login,onCreate
     {catalog.hasMore&&<Button loading={catalog.loading} onClick={()=>void catalog.load(true)}>加载更多</Button>}
     {!catalog.loading&&!catalog.error&&!catalog.items.length&&<p>账号库暂无家具。</p>}
   </>;
-  const hardAvailable:Record<string,boolean>={[FLOOR_CATEGORY]:hasFloors,[WALL_CATEGORY]:hasWalls,[OPENING_CATEGORY]:hasOpenings};
+  const hardAvailable:Record<string,boolean>={[FLOOR_CATEGORY]:hasFloors,[surfaceCategory('wall')]:hasWalls,[OPENING_CATEGORY]:hasOpenings,[surfaceCategory('roof')]:hasRoofs,[surfaceCategory('ceiling')]:hasCeilings};
   const hardChoices=HARD_CATEGORIES.filter(c=>accountOnly||hardAvailable[c]);
   const categoryField=<div className="custom-field">
     <Label htmlFor="furniture-category">分类</Label>
@@ -135,9 +138,10 @@ export function CustomFurnitureDialog({open,onOpenChange,loggedIn,login,onCreate
     <div className="visual-form-actions"><Button type="button" variant="ghost" onClick={()=>onOpenChange(false)}>取消</Button><Button type="submit" disabled={ai.busy||saving}><Plus/>{saving?'正在保存…':pending?.imageUrl?'重试保存（不重新生成）':pending?'重试保存':parametersRequired?'仅保存家具参数':'创建家具'}</Button></div>
   </form>;
   const formProps={categoryField,accountOnly,onCancel:()=>onOpenChange(false)};
-  const createForm=category===FLOOR_CATEGORY?<CustomFloorForm {...formProps} onSave={saveFloor}/>:category===WALL_CATEGORY?<CustomWallForm {...formProps} onSave={saveWall}/>:category===OPENING_CATEGORY?<CustomOpeningForm {...formProps} onSave={saveOpening}/>:furnitureForm;
+  const surfaceKind=surfaceKindOfCategory(category);
+  const createForm=category===FLOOR_CATEGORY?<CustomFloorForm {...formProps} onSave={saveFloor}/>:surfaceKind?<CustomColorMaterialForm key={surfaceKind} kind={surfaceKind} {...formProps} onSave={saveSurface(surfaceKind)}/>:category===OPENING_CATEGORY?<CustomOpeningForm {...formProps} onSave={saveOpening}/>:furnitureForm;
   const title=HARD_CATEGORIES.includes(category)?'新建'+category:'新建你的家具';
-  const description=category===FLOOR_CATEGORY?'按铺贴样式与尺寸绘制纹理，可在房间材质中选用。':category===WALL_CATEGORY?'设置墙面颜色与单价，可在房间材质中选用。':category===OPENING_CATEGORY?'设置门窗尺寸与单价，选中画布中的门窗即可切换款式。':'参考类型可按名称匹配或手动选择；画布按参考几何绘制，生成图不代表精确3D建模。';
+  const description=category===FLOOR_CATEGORY?'按铺贴样式与尺寸绘制纹理，可在房间材质中选用。':surfaceKind?surfaceDescription[surfaceKind]:category===OPENING_CATEGORY?'设置门窗尺寸与单价，选中画布中的门窗即可切换款式。':'参考类型可按名称匹配或手动选择；画布按参考几何绘制，生成图不代表精确3D建模。';
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="custom-furniture-dialog"><DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>{accountOnly?'保存到账号家具库，可在各项目中使用。':'默认保存当前项目，可选同时加入账号库。'}{description}</DialogDescription></DialogHeader>
   {accountOnly?createForm:<Tabs value={tab} onValueChange={setTab}><TabsList className="project-tabs"><TabsTrigger value="create" className={tabTrigger}><Plus size={14}/>新建家具</TabsTrigger><TabsTrigger value="account" className={tabTrigger}><Cloud size={14}/>账号家具库</TabsTrigger></TabsList><TabsContent value="create">{createForm}</TabsContent><TabsContent value="account">{accountPanel}</TabsContent></Tabs>}
   </DialogContent></Dialog>;

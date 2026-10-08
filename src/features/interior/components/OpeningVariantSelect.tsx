@@ -10,6 +10,8 @@ export function OpeningVariantSelect({ design, opening, accountOpenings = [], ch
   design: Design; opening: Opening; accountOpenings?: CustomOpening[]; change: (fn: (d: Design) => Design) => void; disabled?: boolean;
 }) {
   const choices = pickableOpenings(design, accountOpenings, opening.kind);
+  // 只有标准款时无可切换项，不显示款式选择。
+  if (!choices.length && !opening.variant) return null;
   const standard = opening.kind === 'door' ? '标准门' : '标准窗';
   const select = (value: string) => {
     let kept = false;

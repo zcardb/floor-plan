@@ -46,6 +46,7 @@ import {
 import type { CustomFloor, CustomOpening, CustomWall, Design, Selection } from "../model/types";
 import { openingName } from "../model/hardMaterials";
 import { OpeningVariantSelect } from "./OpeningVariantSelect";
+import { RoomSurfacePanel } from "./RoomSurfacePanel";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 interface Props {
@@ -63,6 +64,9 @@ interface Props {
   accountOpenings?: CustomOpening[];
   /** 墙面在房间材质工具条中选择，这里只接收以保持与工具条一致的属性。 */
   accountWalls?: CustomWall[];
+  /** 账号屋面库、吊顶库；选用后自动加入项目。 */
+  accountRoofs?: CustomWall[];
+  accountCeilings?: CustomWall[];
   splitWall?: (wallId: string) => void;
   mergeWall?: (wallId: string) => void;
   /** 删除墙体（由外观层复用同一实现，见 WallOptionsMenu）。 */
@@ -85,6 +89,8 @@ export function PropertyPanel({
   openCosts,
   accountFloors = [],
   accountOpenings = [],
+  accountRoofs = [],
+  accountCeilings = [],
 }: Props) {
   const d = useCostDesign(design);
   const confirm = useConfirm();
@@ -342,7 +348,7 @@ export function PropertyPanel({
       <>
         <div className="panel-heading">
           <span>房间属性</span>
-          <span className="mini-label">地面与尺寸</span>
+          <span className="mini-label">材质与尺寸</span>
         </div>
         <section>
           {back}
@@ -397,7 +403,10 @@ export function PropertyPanel({
               notify.fail(e instanceof Error ? e.message : "地面材质设置失败");
             }
           })}
-          {showCosts && (
+        </section>
+        <RoomSurfacePanel design={d} room={r} change={change} accountRoofs={accountRoofs} accountCeilings={accountCeilings} showCosts={showCosts} />
+        {showCosts && (
+          <section>
             <EditorTooltip label="本间成本">
               <button className="room-cost-link" onClick={openCosts}>
                 <span>本间成本</span>
@@ -409,8 +418,8 @@ export function PropertyPanel({
                 <ChevronRight size={13} />
               </button>
             </EditorTooltip>
-          )}
-        </section>
+          </section>
+        )}
         <section>
           <h3 className="section-title">
             房间内家具 <small>{inside.length} 件</small>

@@ -9,6 +9,24 @@ const RECOVERY_PREFIX = "interior-recovery-";
 
 export type WriteResult = { ok: true } | { ok: false; cause: unknown };
 
+/** 系统自带的本机默认方案（＝自动播种的那份参考户型）。 */
+export const systemProject = (): Project => ({
+  ...createProject("reference"),
+  system: true,
+});
+
+/**
+ * 旧数据兜底：列表里一条系统标记都没有时，把更新时间最早的一条认作系统默认方案。
+ * 播种的那份从未被就地编辑，用户后来自己建的本机副本一定更新，所以「最早」是可靠的兜底。
+ */
+function withSystemMarker(list: Project[]): Project[] {
+  if (!list.length || list.some((p) => p.system === true)) return list;
+  const oldest = list.reduce((a, b) =>
+    (a.updatedAt || "") <= (b.updatedAt || "") ? a : b,
+  );
+  return list.map((p) => (p === oldest ? { ...p, system: true } : p));
+}
+
 /**
  * 读取本机方案列表。存储不可用时返回空列表：不凭空造出一份刷新后又出现、删不掉的项目。
  * 只有「首次运行（没有这个 key）」才播种一份参考户型方案。
@@ -21,14 +39,16 @@ export function readGuests(): Project[] {
     notify.error("本机存储不可用，本机方案列表无法读取", cause);
     return [];
   }
-  if (!raw) return [createProject("reference")];
+  if (!raw) return [systemProject()];
   try {
     const items = JSON.parse(raw) as Project[];
-    if (!Array.isArray(items)) return [createProject("reference")];
-    return items.map((p) => ({ ...p, state: validateDesign(p.state), cloud: false }));
+    if (!Array.isArray(items)) return [systemProject()];
+    return withSystemMarker(
+      items.map((p) => ({ ...p, state: validateDesign(p.state), cloud: false })),
+    );
   } catch (cause) {
     notify.error("本机项目读取失败，可通过 JSON 文件恢复", cause);
-    return [createProject("reference")];
+    return [systemProject()];
   }
 }
 

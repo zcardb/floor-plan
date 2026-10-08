@@ -35,6 +35,26 @@ describe('本机方案存储', () => {
     expect(readGuests()).toHaveLength(1);
   });
 
+  it('播种的默认方案带系统标记，用户新建的本机项目不带', () => {
+    use(fakeStorage());
+    expect(readGuests()[0].system).toBe(true);
+    const mine = createProject('blank');
+    writeGuests([mine, readGuests()[0]]);
+    const list = readGuests();
+    expect(list.find(p => p.id === mine.id)!.system).toBeUndefined();
+    expect(list.filter(p => p.system === true)).toHaveLength(1);
+  });
+
+  it('旧数据没有系统标记时，把更新时间最早的一条认作系统默认方案', () => {
+    use(fakeStorage());
+    const seeded = { ...createProject('reference'), updatedAt: '2026-01-01T00:00:00.000Z' };
+    const newer = { ...createProject('blank'), updatedAt: '2026-02-01T00:00:00.000Z' };
+    writeGuests([newer, seeded]);
+    const list = readGuests();
+    expect(list.find(p => p.id === seeded.id)!.system).toBe(true);
+    expect(list.find(p => p.id === newer.id)!.system).toBeUndefined();
+  });
+
   it('写进去的列表读得回来', () => {
     use(fakeStorage());
     const p = createProject('blank');

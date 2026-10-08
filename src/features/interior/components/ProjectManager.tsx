@@ -26,7 +26,7 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
   const [creating, setCreating] = useState(false), [name, setName] = useState(''), [template, setTemplate] = useState<'blank' | 'reference'>('blank');
   const [rename, setRename] = useState<ProjectSummary | null>(null), [deleting, setDeleting] = useState<ProjectSummary | null>(null);
   const list: ProjectSummary[] = [
-    ...projects.guests.map(g => ({ id: g.id, name: g.name, updatedAt: g.updatedAt, revision: g.revision, cloud: false })),
+    ...projects.guests.map(g => ({ id: g.id, name: g.name, updatedAt: g.updatedAt, revision: g.revision, cloud: false, system: g.system === true })),
     ...projects.cloud,
   ].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
@@ -64,15 +64,22 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
   const isPending = (kind: string, row: ProjectSummary) => rowAction.pendingKey === kind + ':' + row.id;
   const refreshing = projects.loading && !rowAction.pending;
 
-  const rowActions = (row: ProjectSummary) => <>
-    <EditorTooltip label="重命名项目" disabled={rowAction.pending}>
-      <Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'重命名' + row.name} disabled={rowAction.pending} onClick={() => { setRename(row); setName(row.name); }}><Pencil size={16} /></Button>
-    </EditorTooltip>
-    {row.cloud && <EditorTooltip label="复制项目" disabled={rowAction.pending}><Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'复制' + row.name} disabled={rowAction.pending} aria-busy={isPending('duplicate', row)} onClick={() => void rowAction.run('duplicate', row)}>{isPending('duplicate', row) ? <Loader2 className="animate-spin" size={16} /> : <Copy size={16} />}</Button></EditorTooltip>}
-    <EditorTooltip label="删除项目" disabled={rowAction.pending}>
-      <Button type="button" variant="ghost" size="icon" className={dangerIconAction} aria-label={'删除' + row.name} disabled={rowAction.pending} onClick={() => setDeleting(row)}><Trash2 size={16} /></Button>
-    </EditorTooltip>
-  </>;
+  // 三种来源共用同一套图标：用户新建（云端）、游客转存（云端）三个操作全开；
+  // 系统自带的本机默认方案只允许复制，重命名与删除禁用。
+  const rowActions = (row: ProjectSummary) => {
+    const locked = !!row.system;
+    return <>
+      <EditorTooltip label={locked ? '系统默认方案不可重命名' : '重命名项目'} disabled={rowAction.pending || locked}>
+        <Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'重命名' + row.name} disabled={rowAction.pending || locked} onClick={() => { setRename(row); setName(row.name); }}><Pencil size={16} /></Button>
+      </EditorTooltip>
+      <EditorTooltip label="复制项目" disabled={rowAction.pending}>
+        <Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'复制' + row.name} disabled={rowAction.pending} aria-busy={isPending('duplicate', row)} onClick={() => void rowAction.run('duplicate', row)}>{isPending('duplicate', row) ? <Loader2 className="animate-spin" size={16} /> : <Copy size={16} />}</Button>
+      </EditorTooltip>
+      <EditorTooltip label={locked ? '系统默认方案不可删除' : '删除项目'} disabled={rowAction.pending || locked}>
+        <Button type="button" variant="ghost" size="icon" className={dangerIconAction} aria-label={'删除' + row.name} disabled={rowAction.pending || locked} onClick={() => setDeleting(row)}><Trash2 size={16} /></Button>
+      </EditorTooltip>
+    </>;
+  };
 
   return <>
     <div className="cms-heading">

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Check, ChevronDown, Cloud, Loader2 } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, Loader2 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -16,8 +16,6 @@ interface Props extends ProjectNavigation {
   project: ProjectSummary;
   loggedIn: boolean;
   onBack: () => void;
-  onCloudSave: () => void;
-  cloudSaving: boolean;
 }
 
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
@@ -56,10 +54,10 @@ export function ProjectMenu(p: Props) {
       </button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="start" className="project-menu">
-      {p.loggedIn
-        ? <DropdownMenuItem disabled={!!pending} onSelect={p.onBack}><ArrowLeft />返回项目管理</DropdownMenuItem>
-        : <DropdownMenuItem disabled={p.cloudSaving} onSelect={p.onCloudSave}>{p.cloudSaving ? <Loader2 className="animate-spin" /> : <Cloud />}保存到云端</DropdownMenuItem>}
-      <DropdownMenuSeparator />
+      {p.loggedIn && <>
+        <DropdownMenuItem disabled={!!pending} onSelect={p.onBack}><ArrowLeft />返回项目管理</DropdownMenuItem>
+        <DropdownMenuSeparator />
+      </>}
       <div className="project-menu-list" role="group" aria-label="项目列表">
         {rows.map(row => {
           const current = row.id === p.project.id;

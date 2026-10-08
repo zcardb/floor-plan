@@ -39,7 +39,7 @@ describe('管理端精简与加载分支', () => {
     expect(html).not.toContain('cms-loading-placeholder');
     expect(html).not.toContain('project-list-footer');
   });
-  it('本地项目仅保留打开、重命名和删除，云端项目保留普通复制', () => {
+  it('用户新建的本机与云端项目都提供打开、重命名、复制和删除', () => {
     const guest = { ...project, id: 'local', name: '本地项目', cloud: false };
     const localProjects = { ...projects(false, []), guests: [guest] } as unknown as ReturnType<typeof useProjects>;
     const local = render(createElement(ProjectManager, { projects: localProjects, opened: () => {} }));
@@ -49,15 +49,26 @@ describe('管理端精简与加载分支', () => {
     for (const html of [local, mixed]) {
       expect(html).toContain('aria-label="打开项目 本地项目"');
       expect(html).toContain('aria-label="重命名本地项目"');
+      expect(html).toContain('aria-label="复制本地项目"');
       expect(html).toContain('aria-label="删除本地项目"');
-      expect(html).not.toContain('aria-label="复制本地项目"');
-    }
+      expect(html).not.toContain('disabled="" aria-label="重命名本地项目"');    }
     for (const html of [cloud, mixed]) {
       expect(html).toContain('aria-label="打开项目 我的项目"');
       expect(html).toContain('aria-label="重命名我的项目"');
       expect(html).toContain('aria-label="复制我的项目"');
       expect(html).toContain('aria-label="删除我的项目"');
     }
+  });
+  it('系统默认方案只能复制：重命名与删除禁用并给出原因', () => {
+    const system = { ...project, id: 'system', name: '三室两厅两卫 · 原木之家', cloud: false, system: true };
+    const html = render(createElement(ProjectManager, { projects: { ...projects(false, []), guests: [system] } as unknown as ReturnType<typeof useProjects>, opened: () => {} }));
+    const tag = (label: string) => {
+      const at = html.indexOf(`aria-label="${label}"`);
+      return html.slice(html.lastIndexOf('<button', at), html.indexOf('>', at) + 1);
+    };
+    expect(tag('重命名三室两厅两卫 · 原木之家')).toContain('disabled=""');
+    expect(tag('删除三室两厅两卫 · 原木之家')).toContain('disabled=""');
+    expect(tag('复制三室两厅两卫 · 原木之家')).not.toContain('disabled=""');
   });
   it('删除图标常驻危险色，重命名与复制保持中性', () => {
     const guest = { ...project, id: 'local', name: '本地项目', cloud: false };
@@ -67,7 +78,7 @@ describe('管理端精简与加载分支', () => {
       return html.slice(html.lastIndexOf('<button', at), html.indexOf('>', at) + 1);
     };
     for (const label of ['删除本地项目', '删除我的项目']) expect(tag(label)).toContain('text-destructive');
-    for (const label of ['重命名本地项目', '重命名我的项目', '复制我的项目']) expect(tag(label)).not.toContain('text-destructive');
+    for (const label of ['重命名本地项目', '重命名我的项目', '复制我的项目', '复制本地项目']) expect(tag(label)).not.toContain('text-destructive');
   });
   it('首次无数据加载和真实空态明确区分', () => {
     const loading = render(createElement(ProjectManager, { projects: projects(true, []), opened: () => {} }));

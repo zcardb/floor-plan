@@ -32,6 +32,12 @@ export interface Room {
   mat: string;
   counted?: boolean;
   wallMat?: string;
+  /** 屋面材料 key；为空表示无屋面，不计费。 */
+  roofMat?: string;
+  /** 屋面坡度（°，0–60），0 为平顶。 */
+  roofSlope?: number;
+  /** 吊顶材料 key；为空表示原顶，不计费。 */
+  ceilingMat?: string;
 }
 export interface Furniture {
   id: string;
@@ -62,12 +68,16 @@ export interface CostSettings {
   furniturePrices?: Record<string, number | null>;
   /** key 为 door / window 或自定义门窗款式 key。 */
   openingPrices?: Record<string, number | null>;
+  roofPrices?: Record<string, number | null>;
+  ceilingPrices?: Record<string, number | null>;
   constructionPrices?: Partial<Record<"build" | "demolish", number | null>>;
   labor?: { id: string; name: string; amount: number }[];
 }
 export interface Design {
   version: 2;
   template: "reference" | "blank";
+  /** 内置户型模板 id（见 data/templatePresets.ts）；空白户型与旧数据没有该字段。 */
+  templateId?: string;
   width: number;
   depth: number;
   thickness: number;
@@ -85,8 +95,10 @@ export interface Design {
   customFloors?: CustomFloor[];
   customWalls?: CustomWall[];
   customOpenings?: CustomOpening[];
+  customRoofs?: CustomWall[];
+  customCeilings?: CustomWall[];
 }
-/** 自定义墙面材料，单价按 m²。 */
+/** 自定义墙面 / 屋面 / 吊顶材料（名称 + 颜色），单价按 m²。 */
 export interface CustomWall {
   key: string;
   name: string;
@@ -119,6 +131,12 @@ export interface Project {
   updatedAt: string;
   revision: number;
   cloud?: boolean;
+  /** 系统自带的本机默认方案：不可重命名、不可删除，只能复制。 */
+  system?: boolean;
+  /** 内置户型模板：只读预览，不可编辑、重命名、复制或删除。 */
+  builtin?: boolean;
+  /** 内置模板对应的预设 id（builtin 为真时有值）。 */
+  templateId?: string;
 }
 export type Selection = {
   kind: "furniture" | "room" | "wall" | "opening";

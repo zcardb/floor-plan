@@ -8,7 +8,7 @@ import {
   type PriceGroup,
 } from "./costs";
 import { floorMaterialOf } from "./floorMaterials";
-import { openingName, openingPriceKey, wallMaterialOf } from "./hardMaterials";
+import { openingName, openingPriceKey, roofSurfaceArea, surfaceMaterialOf, wallMaterialOf } from "./hardMaterials";
 import { area, inRoom } from "./geometry";
 import type { Design, Opening, Selection } from "./types";
 
@@ -125,6 +125,18 @@ export function costBreakdown(d: Design): CostBreakdown {
       price,
       subtotal: fix(surface * (price ?? 0)),
     });
+  }
+  // 屋面 / 吊顶：和地面一样归属本间；屋面按坡度换算斜面面积。
+  for (const r of d.rooms) {
+    const items: [PriceGroup, string | undefined, string, number, string | undefined][] = [
+      ["roofPrices", r.roofMat, surfaceMaterialOf(d, "roof", r.roofMat || "")?.name || "屋面", roofSurfaceArea(r), r.roofSlope ? `坡度 ${r.roofSlope}° 换算` : "平顶"],
+      ["ceilingPrices", r.roofMat && r.ceilingMat, surfaceMaterialOf(d, "ceiling", r.ceilingMat || "")?.name || "吊顶", area(r), "按房间面积"],
+    ];
+    for (const [group, key, label, quantity, note] of items) {
+      if (!key) continue;
+      const price = priceOf(d, group, key);
+      byId.get(r.id)?.hard.push({ group, key, label, note, quantity: fix(quantity), unit: "m²", price, subtotal: fix(quantity * (price ?? 0)) });
+    }
   }
   // 门窗：贴到几间房就在几间之间平分；贴不到房间的留在公共项。
   for (const o of d.openings) {

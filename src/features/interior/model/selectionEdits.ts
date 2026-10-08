@@ -79,10 +79,14 @@ export function editSelection(
       w = d.walls.find((w) => w.id === o?.wallId);
     if (!o || !w) return d;
     if (openingIsLocked(d, w.id)) throw new Error('承重墙上的门窗洞口已锁定');
-    const n = { ...o, ...values };
+    const n = { ...o, ...values }, L = length(w);
+    if (n.width > L) throw new Error("门窗宽度超过所在墙段长度");
+    // 只改宽度时以中心为基准；碰到墙端则整体平移，保证宽度改动立即生效。
+    if (values.width !== undefined && values.offset === undefined)
+      n.offset = Math.min(Math.max(n.offset, n.width / 2), L - n.width / 2);
+    if (n.offset - n.width / 2 < 0 || n.offset + n.width / 2 > L)
+      throw new Error("开口超出墙段范围");
     if (
-      n.offset - n.width / 2 < 0 ||
-      n.offset + n.width / 2 > length(w) ||
       d.openings.some(
         (g) =>
           g.id !== n.id &&
@@ -90,7 +94,7 @@ export function editSelection(
           Math.abs(g.offset - n.offset) < (g.width + n.width) / 2,
       )
     )
-      throw new Error("开口超出墙段或与其它门窗重叠");
+      throw new Error("开口与同墙其它门窗重叠");
     if (
       (n.height ?? (n.kind === "door" ? 2100 : 1600)) +
         (n.kind === "window" ? (n.sill ?? 800) : 0) >

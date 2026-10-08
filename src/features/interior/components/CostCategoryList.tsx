@@ -12,6 +12,8 @@ const categories: { id: PriceGroup | "labor"; label: string; hint: string }[] = 
   { id: "floorPrices", label: "地面", hint: "含损耗 / 采购取整" },
   { id: "wallPrices", label: "墙面", hint: "周长 × 层高，扣除门窗" },
   { id: "openingPrices", label: "门窗", hint: "按开口面积 m²" },
+  { id: "roofPrices", label: "屋面", hint: "房间面积 ÷ cos 坡度" },
+  { id: "ceilingPrices", label: "吊顶", hint: "按房间面积" },
   { id: "constructionPrices", label: "拆改与新建", hint: "长度 × 层高" },
   { id: "labor", label: "人工", hint: "独立总价条目" },
   { id: "furniturePrices", label: "软装", hint: "同款家具单价联动" },

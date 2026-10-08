@@ -2,7 +2,7 @@ import { isValidElement, type ReactNode, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LibraryItem } from '../model/types';
 
-const harness = vi.hoisted(() => ({ slots: [] as unknown[], cursor: 0, category: '全部', generate: vi.fn(), save: vi.fn(), loadFloors: vi.fn(), loadWalls: vi.fn(), loadOpenings: vi.fn(), loadCatalog: vi.fn() }));
+const harness = vi.hoisted(() => ({ slots: [] as unknown[], cursor: 0, category: '全部', generate: vi.fn(), save: vi.fn(), loadFloors: vi.fn(), loadWalls: vi.fn(), loadOpenings: vi.fn(), loadRoofs: vi.fn(), loadCeilings: vi.fn(), loadCatalog: vi.fn() }));
 vi.mock('react', async importOriginal => ({
   ...await importOriginal<typeof import('react')>(),
   useState(initial: unknown) {
@@ -20,10 +20,11 @@ vi.mock('../cloud/useFurnitureImage', () => ({ useFurnitureImage: () => ({ cance
 vi.mock('../cloud/useFloorCatalog', () => ({ useFloorCatalog: () => ({ items: [], loading: false, error: '', load: harness.loadFloors, save: vi.fn() }) }));
 vi.mock('../cloud/useWallCatalog', () => ({ useWallCatalog: () => ({ items: [], loading: false, error: '', load: harness.loadWalls, save: vi.fn() }) }));
 vi.mock('../cloud/useOpeningCatalog', () => ({ useOpeningCatalog: () => ({ items: [], loading: false, error: '', load: harness.loadOpenings, save: vi.fn() }) }));
+vi.mock('../cloud/useSurfaceCatalogs', () => ({ useRoofCatalog: () => ({ items: [], loading: false, error: '', load: harness.loadRoofs, save: vi.fn() }), useCeilingCatalog: () => ({ items: [], loading: false, error: '', load: harness.loadCeilings, save: vi.fn() }) }));
 vi.mock('../cloud/useFurnitureCatalog', () => ({ useFurnitureCatalog: () => ({ items: [], count: 0, counts: {}, reset: () => {}, load: harness.loadCatalog, save: harness.save }) }));
 import { newFurnitureCategory } from '../model/newFurnitureCategory';
 import { AccountFurnitureLibrary } from './AccountFurnitureLibrary';
-import { CustomWallForm } from './CustomWallForm';
+import { CustomColorMaterialForm } from './CustomColorMaterialForm';
 import { CustomOpeningForm } from './CustomOpeningForm';
 import { CustomFurnitureDialog } from './CustomFurnitureDialog';
 import { CustomFloorForm } from './CustomFloorForm';
@@ -44,7 +45,7 @@ beforeEach(() => { fresh(); harness.category = '全部'; harness.generate.mockRe
 const catalog = { items: [], count: 0, counts: {}, loading: false, hasMore: false } as unknown as ReturnType<typeof useFurnitureCatalog>;
 describe('新建家具默认分类', () => {
   it.each(['卧室', '客厅', '餐厨', '卫浴', '家电', '书房'])('有效分类 %s 原样保留', category => { expect(newFurnitureCategory(category)).toBe(category); });
-  it.each(['地面', '墙面', '门窗'])('硬装分类 %s 原样保留', category => { expect(newFurnitureCategory(category)).toBe(category); });
+  it.each(['地面', '墙面', '门窗', '屋面', '吊顶'])('硬装分类 %s 原样保留', category => { expect(newFurnitureCategory(category)).toBe(category); });
   it.each([undefined, '', '全部', '自定义'])('非分类 %s 默认客厅', category => { expect(newFurnitureCategory(category)).toBe('客厅'); });
   it.each(['卧室', '餐厨', '全部', '地面', '墙面'])('家具管理点击新建传入当前筛选 %s', category => {
     harness.category = category;
@@ -97,12 +98,16 @@ describe('新建家具默认分类', () => {
     form = nodes(render(() => CustomFloorForm(formProps)));
     expect(form.some(node => node.props.id === 'floor-length')).toBe(false);
   });
-  it('选择“墙面”“门窗”分类时切换为对应表单', () => {
+  it('选择“墙面”“门窗”“屋面”“吊顶”分类时切换为对应表单', () => {
     const props = { open: true, onOpenChange: vi.fn(), loggedIn: true, login: vi.fn(), onCreate: vi.fn(), onImport: vi.fn(), ownerKey: 'owner', accountOnly: true };
     const pick = (value: string) => { const tree = nodes(render(() => CustomFurnitureDialog(props))); (tree.find(node => node.props.id === undefined && typeof node.props.onValueChange === 'function' && node.props.value !== undefined)!.props.onValueChange as (v: string) => void)(value); return nodes(render(() => CustomFurnitureDialog(props))); };
-    expect(pick('墙面').some(node => node.type === CustomWallForm)).toBe(true);
+    expect(pick('墙面').find(node => node.type === CustomColorMaterialForm)?.props.kind).toBe('wall');
     fresh();
     expect(pick('门窗').some(node => node.type === CustomOpeningForm)).toBe(true);
+    fresh();
+    expect(pick('屋面').find(node => node.type === CustomColorMaterialForm)?.props.kind).toBe('roof');
+    fresh();
+    expect(pick('吊顶').find(node => node.type === CustomColorMaterialForm)?.props.kind).toBe('ceiling');
   });
   it('账号页导航只保留项目管理与家具管理', () => {
     const projects = { session: { user: { id: 'owner', email: 'test@example.com' } } } as ReturnType<typeof useProjects>;

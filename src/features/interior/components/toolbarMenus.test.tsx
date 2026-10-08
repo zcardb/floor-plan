@@ -39,7 +39,7 @@ function menu(overrides: Partial<Parameters<typeof ProjectMenu>[0]> = {}) {
   state.cursor = 0;
   const props = {
     project: current, loggedIn: true, projectList: [current, other], hasMore: false, listLoading: false,
-    onOpen: vi.fn(async () => true), onLoadMore: vi.fn(), onBack: vi.fn(), onCloudSave: vi.fn(), cloudSaving: false, ...overrides,
+    onOpen: vi.fn(async () => true), onLoadMore: vi.fn(), onBack: vi.fn(), ...overrides,
   };
   return { props, tree: nodes(ProjectMenu(props)) };
 }
@@ -81,14 +81,14 @@ describe('ProjectMenu', () => {
     expect(sentinel.props.onVisible).toBe(props.onLoadMore);
     expect(menu({ hasMore: true, listLoading: true }).tree.some(n => n.props.className === 'project-menu-loading')).toBe(true);
   });
-  it('访客显示“参考户型”，顶部为保存到云端，无返回项目管理', () => {
-    const { props, tree } = menu({ loggedIn: false });
+  it('访客显示“参考户型”，下拉只剩当前方案一行，没有云保存与返回项目管理', () => {
+    const { tree } = menu({ loggedIn: false });
     expect(text(tree.find(n => n.props.className === 'project-menu-trigger')!.props.children as ReactNode)).toBe('参考户型');
     const labels = items(tree).map(n => text(n.props.children as ReactNode));
-    expect(labels[0]).toBe('保存到云端');
+    expect(labels).toHaveLength(1);
+    expect(labels[0]).toContain('参考户型');
+    expect(labels).not.toContain('保存到云端');
     expect(labels).not.toContain('返回项目管理');
-    (items(tree)[0].props.onSelect as () => void)();
-    expect(props.onCloudSave).toHaveBeenCalledOnce();
   });
 });
 

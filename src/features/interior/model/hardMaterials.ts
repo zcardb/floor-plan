@@ -1,10 +1,12 @@
-import { length } from "./geometry";
-import type { CustomOpening, CustomWall, Design, Opening } from "./types";
+import { area, length } from "./geometry";
+import type { CustomOpening, CustomWall, Design, Opening, Room } from "./types";
 
-/** 硬装分类，顺序即管理页与新建弹窗中的展示顺序。 */
-export const HARD_CATEGORIES = ["地面", "墙面", "门窗"];
 export const WALL_CATEGORY = "墙面";
 export const OPENING_CATEGORY = "门窗";
+export const ROOF_CATEGORY = "屋面";
+export const CEILING_CATEGORY = "吊顶";
+/** 硬装分类，顺序即管理页与新建弹窗中的展示顺序。 */
+export const HARD_CATEGORIES = ["地面", WALL_CATEGORY, OPENING_CATEGORY, ROOF_CATEGORY, CEILING_CATEGORY];
 
 export interface WallMaterial {
   name: string;
@@ -17,6 +19,38 @@ export const wallMaterials: Record<string, WallMaterial> = {
   wallpaper: { name: "墙纸", color: "#e1d4be" },
   walltile: { name: "墙砖", color: "#c7d0cc" },
 };
+/** 内置屋面材料：自建房、别墅常见做法，仅作参考，不带默认单价。 */
+export const roofMaterials: Record<string, WallMaterial> = {
+  glazedTile: { name: "琉璃瓦", color: "#3f6b8c" },
+  cementTile: { name: "水泥瓦", color: "#8b9096" },
+  asphaltShingle: { name: "沥青瓦", color: "#5a4a43" },
+  resinTile: { name: "树脂瓦", color: "#a3412f" },
+  slateTile: { name: "石板瓦", color: "#4a535c" },
+  concreteFlat: { name: "现浇混凝土平屋面（含防水保温）", color: "#b8b4aa" },
+  steelSheet: { name: "彩钢瓦", color: "#3d6f9e" },
+  polycarbonate: { name: "阳光板", color: "#cfe2e8" },
+};
+/** 内置吊顶材料，仅作参考，不带默认单价。 */
+export const ceilingMaterials: Record<string, WallMaterial> = {
+  gypsum: { name: "石膏板吊顶", color: "#f3f1ec" },
+  aluminum: { name: "铝扣板吊顶", color: "#e4e7ea" },
+  integrated: { name: "集成吊顶", color: "#ebe9e3" },
+};
+
+/** 墙面 / 屋面 / 吊顶共用「名称 + 颜色 + 单价/m²」结构，差异集中在这里。 */
+const surfaces = {
+  wall: { field: "customWalls", builtin: wallMaterials, category: WALL_CATEGORY },
+  roof: { field: "customRoofs", builtin: roofMaterials, category: ROOF_CATEGORY },
+  ceiling: { field: "customCeilings", builtin: ceilingMaterials, category: CEILING_CATEGORY },
+} as const;
+export type SurfaceKind = keyof typeof surfaces;
+type SurfaceDesign = Pick<Design, "customWalls" | "customRoofs" | "customCeilings">;
+export const surfaceCategory = (kind: SurfaceKind) => surfaces[kind].category;
+export const surfaceKindOfCategory = (category: string): SurfaceKind | undefined =>
+  (Object.keys(surfaces) as SurfaceKind[]).find((kind) => surfaces[kind].category === category);
+export const ROOF_SLOPE_MAX = 60;
+/** 屋面斜面面积：同坡度的平/单坡/双坡/四坡都等于投影面积 ÷ cos(坡度)。 */
+export const roofSurfaceArea = (room: Room) => area(room) / Math.cos(((room.roofSlope ?? 0) * Math.PI) / 180);
 export const openingKinds: { value: Opening["kind"]; label: string }[] = [
   { value: "door", label: "门" },
   { value: "window", label: "窗" },
@@ -46,15 +80,19 @@ export function validCustomOpening(o: unknown): o is CustomOpening {
 }
 
 export const customWallMaterial = (w: CustomWall): WallMaterial => ({ name: w.name, color: w.color, price: w.price, custom: true });
+export function surfaceMaterialOf(d: SurfaceDesign, kind: SurfaceKind, key: string): WallMaterial | undefined {
+  const custom = d[surfaces[kind].field]?.find((w) => w.key === key);
+  return custom ? customWallMaterial(custom) : surfaces[kind].builtin[key];
+}
+export const isSurfaceKey = (d: SurfaceDesign, kind: SurfaceKind, key: string) =>
+  Object.prototype.hasOwnProperty.call(surfaces[kind].builtin, key) || !!d[surfaces[kind].field]?.some((w) => w.key === key);
 export function wallMaterialsOf(d: Pick<Design, "customWalls">): Record<string, WallMaterial> {
   return { ...wallMaterials, ...Object.fromEntries((d.customWalls || []).map((w) => [w.key, customWallMaterial(w)])) };
 }
 export function wallMaterialOf(d: Pick<Design, "customWalls">, key: string): WallMaterial {
-  const custom = d.customWalls?.find((w) => w.key === key);
-  return custom ? customWallMaterial(custom) : wallMaterials[key] || { name: "墙面材料", color: wallMaterials.paint.color };
+  return surfaceMaterialOf(d, "wall", key) || { name: "墙面材料", color: wallMaterials.paint.color };
 }
-export const isWallKey = (d: Pick<Design, "customWalls">, key: string) =>
-  Object.prototype.hasOwnProperty.call(wallMaterials, key) || !!d.customWalls?.some((w) => w.key === key);
+export const isWallKey = (d: Pick<Design, "customWalls">, key: string) => isSurfaceKey(d, "wall", key);
 
 export const openingPriceKey = (o: Pick<Opening, "kind" | "variant">) => o.variant ?? o.kind;
 export function openingName(d: Pick<Design, "customOpenings">, o: Pick<Opening, "kind" | "variant">): string {
@@ -70,22 +108,43 @@ function pickable<T extends { key: string }>(own: T[], account: T[]): Pickable<T
     ...account.filter((i) => !seen.has(i.key) && !!seen.add(i.key)).map((item) => ({ key: item.key, item, fromAccount: true })),
   ];
 }
-/** 房间可选墙面：内置 + 项目自定义在前，账号库中尚未加入项目的追加在后。 */
-export function pickableWalls(d: Pick<Design, "customWalls">, account: CustomWall[]) {
+/** 房间可选墙面 / 屋面 / 吊顶：内置 + 项目自定义在前，账号库中尚未加入项目的追加在后。 */
+export function pickableSurfaces(d: SurfaceDesign, kind: SurfaceKind, account: CustomWall[]) {
   return [
-    ...Object.entries(wallMaterials).map(([key, m]) => ({ key, name: m.name, fromAccount: false })),
-    ...pickable(d.customWalls || [], account).map(({ key, item, fromAccount }) => ({ key, name: item.name, fromAccount })),
+    ...Object.entries(surfaces[kind].builtin).map(([key, material]) => ({ key, name: material.name, material, fromAccount: false })),
+    ...pickable(d[surfaces[kind].field] || [], account).map(({ key, item, fromAccount }) => ({ key, name: item.name, material: customWallMaterial(item), fromAccount })),
   ];
 }
-/** 给房间设置墙面；账号库墙面首次使用时一并写入项目，保证一次撤销即可还原。 */
+export const pickableWalls = (d: Pick<Design, "customWalls">, account: CustomWall[]) => pickableSurfaces(d, "wall", account);
+/** 账号库材料首次使用时一并写入项目，保证一次撤销即可还原。 */
+function withSurface(d: Design, kind: SurfaceKind, key: string, account: CustomWall[]): Design {
+  if (isSurfaceKey(d, kind, key)) return d;
+  const item = account.find((w) => w.key === key);
+  if (!item) throw new Error(surfaces[kind].category + "材料不存在，请刷新后重试");
+  const field = surfaces[kind].field;
+  return { ...d, [field]: [...(d[field] || []), item] };
+}
+const patchRoom = (d: Design, roomId: string, patch: (r: Room) => Room): Design =>
+  ({ ...d, rooms: d.rooms.map((r) => (r.id === roomId ? patch(r) : r)) });
+const omit = (r: Room, ...keys: (keyof Room)[]): Room => { const next = { ...r }; for (const k of keys) delete next[k]; return next; };
+/** 给房间设置墙面。 */
 export function applyRoomWall(d: Design, roomId: string, key: string, account: CustomWall[]): Design {
-  let next = d;
-  if (!isWallKey(d, key)) {
-    const wall = account.find((w) => w.key === key);
-    if (!wall) throw new Error("墙面材料不存在，请刷新后重试");
-    next = { ...d, customWalls: [...(d.customWalls || []), wall] };
-  }
-  return { ...next, rooms: next.rooms.map((r) => (r.id === roomId ? { ...r, wallMat: key } : r)) };
+  return patchRoom(withSurface(d, "wall", key, account), roomId, (r) => ({ ...r, wallMat: key }));
+}
+/** 给房间设置屋面；key 为 null 表示无屋面（同时清除坡度与吊顶：没有屋面就没有吊顶）。 */
+export function applyRoomRoof(d: Design, roomId: string, key: string | null, account: CustomWall[]): Design {
+  if (key === null) return patchRoom(d, roomId, (r) => omit(r, "roofMat", "roofSlope", "ceilingMat"));
+  return patchRoom(withSurface(d, "roof", key, account), roomId, (r) => ({ ...r, roofMat: key }));
+}
+export function setRoomRoofSlope(d: Design, roomId: string, slope: number): Design {
+  if (!Number.isFinite(slope) || slope < 0 || slope > ROOF_SLOPE_MAX) throw new Error(`坡度需在 0～${ROOF_SLOPE_MAX}° 之间`);
+  return patchRoom(d, roomId, (r) => ({ ...r, roofSlope: slope }));
+}
+/** 给房间设置吊顶；key 为 null 表示原顶。吊顶依附屋面，房间没有屋面时不能设置。 */
+export function applyRoomCeiling(d: Design, roomId: string, key: string | null, account: CustomWall[]): Design {
+  if (key === null) return patchRoom(d, roomId, (r) => omit(r, "ceilingMat"));
+  if (!d.rooms.find((r) => r.id === roomId)?.roofMat) throw new Error("请先设置屋面，再选择吊顶");
+  return patchRoom(withSurface(d, "ceiling", key, account), roomId, (r) => ({ ...r, ceilingMat: key }));
 }
 /** 某类门窗可选款式（不含标准门/窗）。 */
 export function pickableOpenings(d: Pick<Design, "customOpenings">, account: CustomOpening[], kind: Opening["kind"]) {
