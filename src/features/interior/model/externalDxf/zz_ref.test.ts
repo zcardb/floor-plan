@@ -1,0 +1,24 @@
+import { it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { referenceDesign } from '../../data/templates';
+import { createExportDocument } from '../drawingDocument';
+import { serializeDxf } from '../dxfExport';
+import { area } from '../geometry';
+import { readDxfSource } from './dxfSource';
+import { guessRoles, recognizeDxf, toPlan } from './recognize';
+import { connectedWallPoly } from '../wallConnections';
+it('ref', () => {
+  const d = referenceDesign();
+  const s = readDxfSource(serializeDxf(createExportDocument(d)));
+  const roles = guessRoles(s.layers.map(l => l.name));
+  const t0 = performance.now();
+  const r = recognizeDxf(s.segments, { unit: s.unit, roles });
+  console.log('ms', Math.round(performance.now() - t0), r.stats, r.warnings, r.design.rooms.map(x => area(x).toFixed(1)).join(' '), '| orig', d.rooms.map(x => area(x).toFixed(1)).join(' '), d.openings.length);
+  const wl = s.segments.filter(x => roles[x.layer] !== 'ignore').map(x => ({ a: toPlan(x.a, 1), b: toPlan(x.b, 1) }));
+  const path = (ls: {a:number[],b:number[]}[]) => ls.map(l => `M${l.a[0]} ${l.a[1]}L${l.b[0]} ${l.b[1]}`).join('');
+  const off = r.offset, pt = (p: number[]) => (p[0]-off[0])+','+(p[1]-off[1]);
+  const walls = r.design.walls.map(w => `<polygon points="${connectedWallPoly(w, r.design.walls).map(pt).join(' ')}" fill="${w.kind==='exterior'?'#335':'#753'}" fill-opacity="0.6"/>`).join('');
+  const rooms = r.design.rooms.map((rm, i) => `<polygon points="${rm.rings[0].map(pt).join(' ')}" fill="hsl(${i*47},60%,70%)" fill-opacity="0.6"/>`).join('');
+  const ops = r.design.openings.map(o => { const w = r.design.walls.find(x => x.id === o.wallId)!; const L = Math.hypot(w.b[0]-w.a[0], w.b[1]-w.a[1]); const u = [(w.b[0]-w.a[0])/L, (w.b[1]-w.a[1])/L]; const p1 = [w.a[0]+u[0]*(o.offset-o.width/2), w.a[1]+u[1]*(o.offset-o.width/2)], p2 = [w.a[0]+u[0]*(o.offset+o.width/2), w.a[1]+u[1]*(o.offset+o.width/2)]; return `<path d="M${pt(p1)}L${pt(p2)}" stroke="${o.kind==='door'?'orange':'cyan'}" stroke-width="80"/>`; }).join('');
+  writeFileSync('/tmp/ref.svg', `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1000 -1000 14000 14000" width="1400" height="1400"><rect x="-1000" y="-1000" width="14000" height="14000" fill="white"/>${rooms}${walls}${ops}<path d="${path(wl)}" stroke="black" stroke-width="6" fill="none"/></svg>`);
+});

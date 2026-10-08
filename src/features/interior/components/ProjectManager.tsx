@@ -1,25 +1,26 @@
 import { useRef, useState } from 'react';
 import { ManagementLoading } from './ManagementLoading';
 import { LoadError } from './LoadError';
-import { Plus, Pencil, Copy, Trash2, LayoutTemplate, RefreshCw, Loader2, ChevronDown, FilePlus2, FileUp } from 'lucide-react';
+import { Plus, LayoutTemplate, RefreshCw, Loader2, ChevronDown, FilePlus2, FileUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EditorTooltip } from '@/components/ui/editor-tooltip';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ProjectRenameDialog, ProjectDeleteDialog } from './ProjectDialogs';
+import { ProjectRowActions } from './ProjectRowActions';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { notify } from '@/lib/notify';
 import { createProject } from '../data/templates';
-import { IMPORT_FORMATS, parseDesignFile } from '../model/designImport';
+import { IMPORT_ACCEPT, parseDesignFile } from '../model/designImport';
+import type { DxfSource } from '../model/externalDxf/dxfSource';
+import type { Design } from '../model/types';
+import { DxfImportDialog } from './DxfImportDialog';
 import { SoftwareSoonItem } from './SoftwareSoonItem';
 import type { useProjects, ProjectSummary } from '../cloud/useProjects';
 
-const iconAction = 'h-8 w-8 text-muted-foreground hover:text-foreground';
-// 删除不可撤销，图标常驻危险色，和重命名/复制一眼区分。
-const dangerIconAction = 'h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive';
 type Projects = ReturnType<typeof useProjects>;
 
 export function ProjectManager({ projects, opened }: { projects: Projects; opened: () => void }) {
@@ -44,41 +45,32 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
     if (await projects.create(project, true)) { setCreating(false); notify.success('已创建项目「' + project.name + '」'); opened(); }
   });
   const file = useRef<HTMLInputElement>(null);
+  // 外部 CAD 图纸先进识别确认弹窗；本应用导出的 DXF 自带方案数据，直接还原。
+  const [drawing, setDrawing] = useState<{ source: DxfSource; name: string } | null>(null);
+  const importDesign = async (design: Design, importedName: string) => {
+    const project = { ...createProject(design.template, importedName), state: design };
+    if (!(await projects.create(project, true))) return false;
+    notify.success('已导入方案「' + project.name + '」');
+    opened();
+    return true;
+  };
   const importFile = useAsyncAction(async (selected: File) => {
     try {
-      const { design, name: importedName } = await parseDesignFile(selected);
-      const project = { ...createProject(design.template, importedName), state: design };
-      if (await projects.create(project, true)) { notify.success('已导入方案「' + project.name + '」'); opened(); }
+      const imported = await parseDesignFile(selected);
+      if (imported.kind === 'dxf') setDrawing({ source: imported.source, name: imported.name });
+      else await importDesign(imported.design, imported.name);
     } catch (error) {
       notify.fail('导入失败：' + (error instanceof Error ? error.message : '文件无法读取'));
     }
   });
-  const pickFile = (accept: string) => {
-    if (!file.current) return;
-    file.current.accept = accept;
-    file.current.click();
-  };
-  const createBusy = rowAction.pending || importFile.pending;
+  const importDrawing = useAsyncAction(async (design: Design, importedName: string) => {
+    if (await importDesign(design, importedName)) setDrawing(null);
+  });
+  const pickFile = () => file.current?.click();
+  const createBusy = rowAction.pending || importFile.pending || importDrawing.pending;
   const busyRow = rowAction.pendingKey?.split(':')[1] ?? null;
   const isPending = (kind: string, row: ProjectSummary) => rowAction.pendingKey === kind + ':' + row.id;
   const refreshing = projects.loading && !rowAction.pending;
-
-  // 三种来源共用同一套图标：用户新建（云端）、游客转存（云端）三个操作全开；
-  // 系统自带的本机默认方案只允许复制，重命名与删除禁用。
-  const rowActions = (row: ProjectSummary) => {
-    const locked = !!row.system;
-    return <>
-      <EditorTooltip label={locked ? '系统默认方案不可重命名' : '重命名项目'} disabled={rowAction.pending || locked}>
-        <Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'重命名' + row.name} disabled={rowAction.pending || locked} onClick={() => setRename(row)}><Pencil size={16} /></Button>
-      </EditorTooltip>
-      <EditorTooltip label="复制项目" disabled={rowAction.pending}>
-        <Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'复制' + row.name} disabled={rowAction.pending} aria-busy={isPending('duplicate', row)} onClick={() => void rowAction.run('duplicate', row)}>{isPending('duplicate', row) ? <Loader2 className="animate-spin" size={16} /> : <Copy size={16} />}</Button>
-      </EditorTooltip>
-      <EditorTooltip label={locked ? '系统默认方案不可删除' : '删除项目'} disabled={rowAction.pending || locked}>
-        <Button type="button" variant="ghost" size="icon" className={dangerIconAction} aria-label={'删除' + row.name} disabled={rowAction.pending || locked} onClick={() => setDeleting(row)}><Trash2 size={16} /></Button>
-      </EditorTooltip>
-    </>;
-  };
 
   return <>
     <div className="cms-heading">
@@ -92,22 +84,13 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="create-menu">
-            <DropdownMenuItem onSelect={() => { setName(''); setCreating(true); }}><FilePlus2 />新建项目…</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => { setName(''); setCreating(true); }}><FilePlus2 />新建项目</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger className="gap-2"><FileUp size={16} />按格式导入</DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="create-menu">
-                {IMPORT_FORMATS.map(format => (
-                  <DropdownMenuItem key={format.id} onSelect={() => pickFile(format.extension)}>
-                    {format.extension.slice(1).toUpperCase()} {format.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+            <DropdownMenuItem onSelect={pickFile}><FileUp />导入 DXF 图纸…</DropdownMenuItem>
             <SoftwareSoonItem label="从其他软件导入" />
           </DropdownMenuContent>
         </DropdownMenu>
-        <input ref={file} type="file" hidden aria-hidden="true" tabIndex={-1} onChange={event => {
+        <input ref={file} type="file" accept={IMPORT_ACCEPT} hidden aria-hidden="true" tabIndex={-1} onChange={event => {
           const selected = event.target.files?.[0];
           event.target.value = '';
           if (selected && !importFile.pending) void importFile.run(selected);
@@ -126,7 +109,10 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
         {working ? <Loader2 className="animate-spin" size={30} /> : <LayoutTemplate size={30} />}
         <h2>{row.name}</h2>
         <p>{isPending('remove', row) ? '正在删除…' : isPending('duplicate', row) ? '正在复制…' : new Date(row.updatedAt).toLocaleDateString('zh-CN')}</p>
-        <div className="cms-card-actions">{rowActions(row)}</div>
+        <div className="cms-card-actions">
+          <ProjectRowActions row={row} disabled={rowAction.pending} onRename={() => setRename(row)} onDelete={() => setDeleting(row)}
+            onDuplicate={() => void rowAction.run('duplicate', row)} duplicating={isPending('duplicate', row)} />
+        </div>
       </article>;
     })}</div>
     {projects.hasMore && <div className="project-list-footer"><Button variant="ghost" loading={projects.loading && !!list.length} disabled={projects.loading} onClick={() => void projects.loadMore()}>加载更多</Button></div>}

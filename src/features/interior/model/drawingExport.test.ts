@@ -11,7 +11,7 @@ import { serializeDrawing, downloadDrawing, serializeProjectJson } from './drawi
 import { serializeDxf } from './dxfExport';
 import { serializePdf } from './pdfExport';
 import { drawingScale, drawingSheet } from './drawingScale';
-import { FOREIGN_DRAWING_ERROR, parseDesignFile } from './designImport';
+import { DWG_ERROR, FOREIGN_SVG_ERROR, parseDesignFile } from './designImport';
 import { furnitureDrawing } from './furnitureDrawing';
 import { perimeterDimensions } from './perimeterDimensions';
 import { editDimensionWalls } from './dimensionWallEdit';
@@ -127,12 +127,19 @@ describe('工程交换图',()=>{
     const d=fixture(),expected=validateDesign(d);
     for(const [ext,text] of [['svg',serializeDrawing(d,'svg','我的家')],['dxf',serializeDrawing(d,'dxf','我的家')],['json',serializeProjectJson(d,'我的家')]] as const){
       const result=await parseDesignFile(file(`导出.${ext}`,text));
-      expect(result.name,ext).toBe('我的家');expect(result.design,ext).toEqual(expected);
+      expect(result.name,ext).toBe('我的家');expect(result.kind==='design'&&result.design,ext).toEqual(expected);
     }
   });
-  it('负向：外部图纸、损坏JSON、超过5MB、未知格式都报错',async()=>{
-    await expect(parseDesignFile(file('a.svg','<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>'))).rejects.toThrow(FOREIGN_DRAWING_ERROR);
-    await expect(parseDesignFile(file('a.dxf',serializeDxf(createExportDocument(fixture()))))).rejects.toThrow(FOREIGN_DRAWING_ERROR);
+  it('外部DXF（无嵌入方案数据）交给识别流程，带图层与毫米单位',async()=>{
+    const result=await parseDesignFile(file('户型.dxf',serializeDxf(createExportDocument(fixture()))));
+    expect(result.kind).toBe('dxf');expect(result.name).toBe('户型');
+    if(result.kind!=='dxf')return;
+    expect(result.source.unit).toBe('mm');expect(result.source.layers.map(l=>l.name)).toEqual(expect.arrayContaining(['WALLS','OPENINGS']));
+  });
+  it('负向：外部SVG、DWG、无线条DXF、损坏JSON、超过5MB、未知格式都报错',async()=>{
+    await expect(parseDesignFile(file('a.svg','<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>'))).rejects.toThrow(FOREIGN_SVG_ERROR);
+    await expect(parseDesignFile(file('a.dwg','AC1027'))).rejects.toThrow(DWG_ERROR);
+    await expect(parseDesignFile(file('a.dxf','0\nSECTION\n2\nENTITIES\n0\nENDSEC\n0\nEOF'))).rejects.toThrow('没有可识别的线条');
     await expect(parseDesignFile(file('a.json','{broken'))).rejects.toThrow('格式不正确');
     await expect(parseDesignFile(file('a.json','{"version":2}'))).rejects.toThrow();
     await expect(parseDesignFile(file('big.json','{}',6*1024*1024))).rejects.toThrow('5 MB');

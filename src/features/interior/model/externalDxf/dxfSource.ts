@@ -1,5 +1,6 @@
 import DxfParser from 'dxf-parser';
 import type { Point } from '../types';
+import { boundsOf } from './vector';
 
 export type DxfUnit = 'mm' | 'cm' | 'm' | 'in' | 'ft';
 export const DXF_UNITS: { id: DxfUnit; label: string; mm: number }[] = [
@@ -40,8 +41,8 @@ interface RawBlock { entities?: RawEntity[]; position?: XY }
 /** 没写单位时按图纸范围猜：住宅一般 5–50 m。 */
 function guessUnit(segments: DxfSegment[]): DxfUnit {
   if (!segments.length) return 'mm';
-  const xs = segments.flatMap(s => [s.a[0], s.b[0]]), ys = segments.flatMap(s => [s.a[1], s.b[1]]);
-  const extent = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  const box = boundsOf(segments.flatMap(s => [s.a, s.b]));
+  const extent = Math.max(box.x2 - box.x, box.y2 - box.y);
   return extent < 200 ? 'm' : extent < 5000 ? 'cm' : 'mm';
 }
 

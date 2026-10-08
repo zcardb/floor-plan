@@ -1,16 +1,17 @@
 import { PAYLOAD_MARKER, decodePayload } from './designPayload';
 import { validateDesign } from './validation';
+import { readDxfSource, type DxfSource } from './externalDxf/dxfSource';
 import type { Design } from './types';
 
-export const IMPORT_FORMATS = [
-  { id: 'json', label: '方案文件', extension: '.json' },
-  { id: 'dxf', label: 'CAD 图纸', extension: '.dxf' },
-  { id: 'svg', label: 'SVG 矢量图', extension: '.svg' },
-] as const;
-export type ImportFormat = (typeof IMPORT_FORMATS)[number]['id'];
+/** 导入入口只开放 DXF；JSON / SVG 的解析保留给本应用导出文件的回读。 */
+export const IMPORT_ACCEPT = '.dxf,.dwg';
 export const IMPORT_MAX_BYTES = 5 * 1024 * 1024;
-export const FOREIGN_DRAWING_ERROR = '暂不支持识别外部图纸，请导入本应用导出的文件';
-export interface ImportedDesign { design: Design; name: string }
+export const FOREIGN_SVG_ERROR = '暂不支持识别外部 SVG，请从 CAD 导出 DXF 后导入';
+export const DWG_ERROR = 'DWG 是 AutoCAD 私有格式，请在 CAD 中另存为 DXF 后导入';
+/** design：本应用导出的文件，直接还原；dxf：外部 CAD 图纸，需要经过识别确认。 */
+export type ImportedFile =
+  | { kind: 'design'; design: Design; name: string }
+  | { kind: 'dxf'; source: DxfSource; name: string };
 type ImportFile = Pick<File, 'name' | 'size' | 'text'>;
 
 /** Base64 payload from SVG `<metadata>`. */
@@ -30,28 +31,39 @@ function dxfPayload(text: string) {
   return Number.isInteger(count) && count > 0 && chunks.length === count ? chunks.join('') : undefined;
 }
 
-function embedded(payload: string | undefined, fallbackName: string): ImportedDesign {
-  if (!payload) throw new Error(FOREIGN_DRAWING_ERROR);
+function embedded(payload: string, fallbackName: string): ImportedFile {
   let data: { name?: unknown; design?: unknown };
   try { data = decodePayload(payload) as typeof data; } catch { throw new Error('文件中的方案数据已损坏'); }
-  return { design: validateDesign(data?.design), name: typeof data?.name === 'string' && data.name.trim() ? data.name : fallbackName };
+  return { kind: 'design', design: validateDesign(data?.design), name: typeof data?.name === 'string' && data.name.trim() ? data.name : fallbackName };
 }
 
-/** Reads a JSON / DXF / SVG file into a validated design. Only files exported by this app carry a design. */
-export async function parseDesignFile(file: ImportFile): Promise<ImportedDesign> {
+/**
+ * Reads a JSON / DXF / SVG file. Files exported by this app carry the design itself;
+ * a DXF without one is an external CAD drawing and is returned as line work for recognition.
+ */
+export async function parseDesignFile(file: ImportFile): Promise<ImportedFile> {
   if (file.size > IMPORT_MAX_BYTES) throw new Error('文件超过 5 MB，无法导入');
   const extension = file.name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
   const fallbackName = file.name.replace(/\.[^.]+$/, '') || '导入的方案';
+  if (extension === 'dwg') throw new Error(DWG_ERROR);
+  if (extension !== 'svg' && extension !== 'dxf' && extension !== 'json') throw new Error('只支持 DXF 图纸');
   const text = await file.text();
-  if (extension === 'svg') return embedded(svgPayload(text), fallbackName);
-  if (extension === 'dxf') return embedded(dxfPayload(text), fallbackName);
-  if (extension !== 'json') throw new Error('只支持 JSON、DXF、SVG 文件');
+  if (extension === 'svg') {
+    const payload = svgPayload(text);
+    if (!payload) throw new Error(FOREIGN_SVG_ERROR);
+    return embedded(payload, fallbackName);
+  }
+  if (extension === 'dxf') {
+    const payload = dxfPayload(text);
+    return payload ? embedded(payload, fallbackName) : { kind: 'dxf', source: readDxfSource(text), name: fallbackName };
+  }
   let raw: { name?: unknown; state?: unknown };
   try { raw = JSON.parse(text); } catch { throw new Error('方案文件格式不正确'); }
   if (!raw || typeof raw !== 'object') throw new Error('方案文件格式不正确');
   // Exported JSON is `{ name, ...design }`; project rows are `{ name, state }`.
   const { name, state, ...design } = raw;
   return {
+    kind: 'design',
     design: validateDesign(state || design),
     name: typeof name === 'string' && name.trim() ? name : fallbackName,
   };

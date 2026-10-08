@@ -96,6 +96,7 @@ import { PlanCanvas, type CanvasHandle } from "./PlanCanvas";
 import type { Scene3D, SceneHandle, SceneOptions } from "../scene/Scene3D";
 import { isSaveProblem, type SaveStatus } from "../cloud/useProjects";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { DXF_TEMPLATE_ID } from "../model/externalDxf/recognize";
 type SceneComponent = typeof Scene3D;
 /** 3D 模块只下载一次：空闲时预加载，点击时复用同一个 promise。 */
 let scenePromise: Promise<typeof import("../scene/Scene3D")> | null = null;
@@ -533,6 +534,11 @@ export function Workbench(p: Props) {
     notify.success(`已清空 ${count} 件家具，可撤销恢复`);
   };
   const resetDesign = async () => {
+    // CAD 导入的户型没有内置的初始模板，重置会把它换成参考户型。
+    if (d.templateId === DXF_TEMPLATE_ID) {
+      notify.fail("CAD 导入的户型没有初始模板，请用撤销逐步恢复");
+      return;
+    }
     const ok = await confirm({
       title: "重置当前项目为其初始模板？",
       description: "墙体与家具都会恢复到初始模板，可撤销恢复。",
@@ -844,7 +850,7 @@ export function Workbench(p: Props) {
             <span className="context-dot" />
             {view === "2d" ? "平面布置图" : "立体空间预览"}
             <span>
-              /{d.template === "blank" ? " 自定义户型" : " 三室两厅两卫"}
+              /{d.template === "blank" ? " 自定义户型" : d.templateId === DXF_TEMPLATE_ID ? " CAD 导入户型" : " 三室两厅两卫"}
             </span>
           </div>
           <div className="stage-pane-buttons">

@@ -14,6 +14,7 @@ vi.mock('react', async original => ({
 }));
 import { ProjectMenu, LoadMoreSentinel } from './ProjectMenu';
 import { ProjectDeleteDialog, ProjectRenameDialog } from './ProjectDialogs';
+import { ProjectRowActions } from './ProjectRowActions';
 import { AccountMenu } from './AccountMenu';
 import { AccountAvatar } from './AccountAvatar';
 import { ExportMenu } from './ExportMenu';
@@ -45,8 +46,8 @@ function menu(overrides: Partial<Parameters<typeof ProjectMenu>[0]> = {}) {
   };
   return { props, tree: nodes(ProjectMenu(props)) };
 }
-const items = (tree: Node[]) => tree.filter(n => n.type === DropdownMenuItem && n.props.className !== 'project-menu-action' && n.props.className !== 'project-menu-action is-danger');
-const actions = (tree: Node[]) => tree.filter(n => n.type === DropdownMenuItem && String(n.props.className).startsWith('project-menu-action'));
+const items = (tree: Node[]) => tree.filter(n => n.type === DropdownMenuItem);
+const actions = (tree: Node[]) => tree.filter(n => n.type === ProjectRowActions);
 beforeEach(() => { state.values = []; state.cursor = 0; state.refs = []; state.effects = []; });
 
 describe('ProjectMenu', () => {
@@ -94,19 +95,27 @@ describe('ProjectMenu', () => {
     expect(labels).not.toContain('返回项目管理');
     expect(actions(tree)).toHaveLength(0);
   });
-  it('每行提供重命名与删除，系统默认方案不提供；点击后打开对应弹窗', () => {
-    const { tree } = menu({ projectList: [current, other, row('s', '默认方案', true)] });
-    const labels = actions(tree).map(n => n.props['aria-label']);
-    expect(labels).toEqual(['重命名三室两厅两卫', '删除三室两厅两卫', '重命名Home', '删除Home']);
-    expect(actions(tree)[1].props.className).toContain('is-danger');
-    (actions(tree)[2].props.onSelect as () => void)();
+  it('每行复用项目管理的操作按钮（不含复制），点击后收起下拉并打开对应弹窗', () => {
+    const system = row('s', '默认方案', true);
+    const { tree } = menu({ projectList: [current, other, system] });
+    const rows = actions(tree);
+    expect(rows.map(n => n.props.row)).toEqual([current, other, system]);
+    expect(rows.every(n => n.props.onDuplicate === undefined)).toBe(true);
+    state.values[3] = true;
+    (rows[1].props.onRename as () => void)();
     expect(state.values[1]).toBe(other);
-    (actions(tree)[1].props.onSelect as () => void)();
+    expect(state.values[3]).toBe(false);
+    (rows[0].props.onDelete as () => void)();
     expect(state.values[2]).toBe(current);
     const after = menu().tree;
     expect(after.find(n => n.type === ProjectRenameDialog)!.props.project).toBe(other);
-    const del = after.find(n => n.type === ProjectDeleteDialog)!;
-    expect(del.props).toMatchObject({ project: current, current: true });
+    expect(after.find(n => n.type === ProjectDeleteDialog)!.props).toMatchObject({ project: current, current: true });
+  });
+  it('系统默认方案在共享按钮里禁用重命名与删除，复制仅在传入时显示', () => {
+    const buttons = (r: ProjectSummary, onDuplicate?: () => void) =>
+      nodes(ProjectRowActions({ row: r, disabled: false, onRename: vi.fn(), onDelete: vi.fn(), onDuplicate })).filter(n => n.type === Button);
+    expect(buttons(row('s', '默认方案', true)).map(n => n.props.disabled)).toEqual([true, true]);
+    expect(buttons(other, vi.fn()).map(n => n.props['aria-label'])).toEqual(['重命名Home', '复制Home', '删除Home']);
   });
   it('切换项目进行中时行内操作禁用', () => {
     state.values[0] = 'b';
