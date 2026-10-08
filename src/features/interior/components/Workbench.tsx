@@ -9,6 +9,7 @@ import {
   Copy,
   DoorOpen,
   Download,
+  Eraser,
   Expand,
   Eye,
   FolderOpen,
@@ -417,7 +418,7 @@ export function Workbench(p: Props) {
     tool === "wall"
       ? "点击起点与转角连续绘墙 · 可拖动起段 · Enter 完成 / Esc 取消草稿"
       : tool === "measure"
-        ? "点击两点或拖动测量 · Shift 锁定方向 · 测量线可在右侧面板底部清除"
+        ? "点击两点或拖动测量 · Shift 锁定方向 · Esc 结束测量 · 测量线可在顶部「测量」菜单中清除"
         : tool === "demolish"
           ? "点击非承重墙标记拆除，再次点击恢复"
           : tool === "door" || tool === "window"
@@ -488,16 +489,34 @@ export function Workbench(p: Props) {
               将当前项目另存到云端
             </DropdownMenuItem>
           </DropdownMenuContent>
-        </DropdownMenu></> : <><button className="header-plain guest-login" onClick={p.login}><UserRound size={16} />登录</button>
-        <Button size="sm" className="cloud-save-button" onClick={p.cloudSave}>
-          <Cloud size={15} />
-          <span className="wide-only">保存到云端</span>
-          <span className="compact-only">存云端</span>
-        </Button></>}
+        </DropdownMenu>
         <Button size="sm" className="download-button" onClick={exportImage}>
           <Download />
           <span>下载{view === "2d" ? "设计图" : "当前视角"}</span>
+        </Button></> : <>
+        <Button size="sm" className="login-button" onClick={p.login}>
+          <UserRound />
+          <span>登录</span>
         </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="save-button">
+              <Save />
+              <span>保存</span>
+              <ChevronDown size={12} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={exportImage}>
+              <Download />
+              保存到本地
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={p.cloudSave}>
+              <Cloud />
+              保存到云端
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu></>}
       </header>
       <div className="main-toolbar">
         <div className="view-switch">
@@ -541,14 +560,46 @@ export function Workbench(p: Props) {
                 <SquareDashed size={16} />
               </ToolButton>
             )}
-            <ToolButton
-              label="测量"
-              shortcut="M"
-              active={tool === "measure"}
-              onClick={() => setTool("measure")}
-            >
-              <Ruler size={16} />
-            </ToolButton>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={
+                    "tool-button " + (tool === "measure" ? "active" : "")
+                  }
+                  aria-label="测量"
+                >
+                  <Ruler size={16} />
+                  <span>测量</span>
+                  {d.measures.length > 0 && (
+                    <span className="tool-count">{d.measures.length}</span>
+                  )}
+                  <ChevronDown size={12} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onSelect={() => setTool("measure")}>
+                  <Ruler />
+                  测量距离
+                  {tool === "measure" ? (
+                    <Check size={13} className="menu-mark" />
+                  ) : (
+                    <kbd className="menu-kbd">M</kbd>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="danger-item"
+                  disabled={!d.measures.length}
+                  onSelect={clearMeasures}
+                >
+                  <Eraser />
+                  清除测量线
+                  {d.measures.length > 0 && (
+                    <span className="menu-count">{d.measures.length}</span>
+                  )}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="tool-button">
@@ -570,7 +621,10 @@ export function Workbench(p: Props) {
                     </DropdownMenuItem>
                   </>
                 )}
-                <DropdownMenuItem onClick={() => setTool("demolish")}>
+                <DropdownMenuItem
+                  className="danger-item"
+                  onClick={() => setTool("demolish")}
+                >
                   <Trash2 />
                   拆改非承重墙
                 </DropdownMenuItem>
@@ -625,19 +679,6 @@ export function Workbench(p: Props) {
             disabled={!counts.redo}
           >
             <Redo2 size={16} />
-          </ToolButton>
-        </div>
-        <span className="toolbar-divider wide-only" />
-        <div className="tool-group danger-actions wide-only">
-          <ToolButton label="重置方案" onClick={resetDesign}>
-            <RotateCcw size={16} />
-          </ToolButton>
-          <ToolButton
-            label="清空家具"
-            onClick={clearFurniture}
-            disabled={!d.furniture.length}
-          >
-            <Trash2 size={16} />
           </ToolButton>
         </div>
         <div className="header-spacer" />
@@ -725,13 +766,13 @@ export function Workbench(p: Props) {
                 <Cloud />
                 另存云端项目
               </DropdownMenuItem></>}
-              <DropdownMenuSeparator className="compact-only" />
-              <DropdownMenuItem className="compact-only" onClick={resetDesign}>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="danger-item" onClick={resetDesign}>
                 <RotateCcw />
                 重置当前方案
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="compact-only"
+                className="danger-item"
                 onClick={clearFurniture}
               >
                 <Trash2 />
@@ -981,19 +1022,6 @@ export function Workbench(p: Props) {
             </>
           )}
         </div>
-        <div className="panel-footer">
-          <button
-            className="panel-action"
-            onClick={clearMeasures}
-            disabled={!d.measures.length}
-          >
-            <Ruler size={15} />
-            <span>清除测量线</span>
-            {d.measures.length > 0 && (
-              <span className="count">{d.measures.length}</span>
-            )}
-          </button>
-        </div>
       </aside>
       {drawer && (
         <button
@@ -1078,7 +1106,7 @@ export function Workbench(p: Props) {
               <div>
                 <strong>布置空间</strong>
                 <p>
-                  点击或拖入家具，选中后调整尺寸与材质。测量线可在右侧面板底部一键清除。点击
+                  点击或拖入家具，选中后调整尺寸与材质。测量线可在顶部「测量」菜单中一键清除。点击
                   3D 预览，走进你的设计。
                 </p>
               </div>

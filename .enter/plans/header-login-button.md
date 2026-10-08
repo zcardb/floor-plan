@@ -141,22 +141,22 @@
 
 ## Implementation checklist
 
-- [ ] 将「下载设计图」`Button` 移入 `p.loggedIn` 为真的分支，已登录态渲染顺序与类名保持不变
-- [ ] 游客分支用 `<Button size="sm" className="login-button" onClick={p.login}>` 替换原 `header-plain guest-login` 按钮，含 `UserRound` + 「登录」文字
-- [ ] 游客分支新增「保存▾」`DropdownMenu`：触发器为 `<Button variant="outline" size="sm" className="save-button">`（`Save` + 「保存」+ `ChevronDown`）
-- [ ] 「保存」下拉含两项：`保存到本地` → `exportImage`，`保存到云端` → `p.cloudSave`，`DropdownMenuContent` 用 `align="end"`
-- [ ] 游客态不再渲染独立的 `.download-button`；`guest-login` 与 `cloud-save-button` 类名引用从 Workbench.tsx 中消失
-- [ ] `index.css` 新增 `.login-button`、`.save-button`（含 `:hover`、`:focus-visible`），尺寸与 `.download-button` 一致（height 34px、radius 6px）
-- [ ] `index.css` 删除 `.main-header > .guest-login` 与 `.main-header > .cloud-save-button` 规则
-- [ ] `index.css` 的 `max-width:600px` 分支为 `.main-header > .login-button` / `.main-header > .save-button` 补上 44px 触控高度规则
+- [x] 将「下载设计图」`Button` 移入 `p.loggedIn` 为真的分支，已登录态渲染顺序与类名保持不变
+- [x] 游客分支用 `<Button size="sm" className="login-button" onClick={p.login}>` 替换原 `header-plain guest-login` 按钮，含 `UserRound` + 「登录」文字
+- [x] 游客分支新增「保存▾」`DropdownMenu`：触发器为 `<Button variant="outline" size="sm" className="save-button">`（`Save` + 「保存」+ `ChevronDown`）
+- [x] 「保存」下拉含两项：`保存到本地` → `exportImage`，`保存到云端` → `p.cloudSave`，`DropdownMenuContent` 用 `align="end"`
+- [x] 游客态不再渲染独立的 `.download-button`；`guest-login` 与 `cloud-save-button` 类名引用从 Workbench.tsx 中消失
+- [x] `index.css` 新增 `.login-button`、`.save-button`（含 `:hover`、`:focus-visible`），尺寸与 `.download-button` 一致（height 34px、radius 6px）
+- [x] `index.css` 删除 `.main-header > .guest-login` 与 `.main-header > .cloud-save-button` 规则
+- [x] `index.css` 的 `max-width:600px` 分支为 `.main-header > .login-button` / `.main-header > .save-button` 补上 44px 触控高度规则
 
 ## Verification checklist
 
-- [ ] 游客态 1280px：顶栏右侧只有两个按钮，顺序为「登录（实心主色）| 保存▾（描边）」，二者不重叠、不溢出
-- [ ] 点击「登录」→ 打开 `AuthDialog`（与改动前 `p.login` 行为一致）
-- [ ] 打开「保存▾」→ 菜单出现「保存到本地」「保存到云端」两项；点「保存到本地」触发下载（2D 导出设计图 / 3D 导出当前视角），点「保存到云端」拉起 `AuthDialog` 的 cloud intent（负向/默认路径检查）
-- [ ] 悬停「保存▾」背景变浅橙、文字保持橙色；Tab 聚焦出现 `focus-visible` 描边（正向交互检查）
-- [ ] `website_screenshot` @ `mobile_390` 复核：两个按钮文字完整显示、触控高度充足，顶栏与「参考户型」标题均未溢出或裁切
-- [ ] `website_screenshot` @ `desktop_1280` 复核游客态外观；浅色与深色模式各看一次，确认描边按钮边框/文字在两种模式下都清晰可读
-- [ ] 已登录态截图确认顶栏（返回管理 / 我的账号 / 下载设计图）与改动前一致（边界检查）
-- [ ] 运行 `pnpm run lint` 与 `pnpm run build`，均无新增报错
+- [x] 游客态 1280px：顶栏右侧只有两个按钮，顺序为「登录（实心主色）| 保存▾（描边）」，二者不重叠、不溢出（`desktop_1280` 截图已确认）
+- [x] `website_screenshot` @ `mobile_390` 复核：两个按钮文字（登录 / 保存 + 折叠箭头）完整显示、触控高度充足，顶栏与「参考户型」标题均未溢出或裁切
+- [x] 已登录态代码路径核对：已登录分支 JSX（返回管理 / 我的账号下拉 / 下载设计图）逐行未改动（未登录账号，无法截图对比）
+- [x] 运行 `pnpm run lint` 与 `pnpm run build`，均无新增报错
+- [ ] 点击「登录」→ 打开 `AuthDialog`（与改动前 `p.login` 行为一致）— 需人工点击确认
+- [ ] 打开「保存▾」→ 菜单出现「保存到本地」「保存到云端」两项；点「保存到本地」触发下载（2D 导出设计图 / 3D 导出当前视角），点「保存到云端」拉起 `AuthDialog` 的 cloud intent — 需人工点击确认
+- [ ] 悬停「保存▾」背景变浅橙、文字保持橙色；Tab 聚焦出现 `focus-visible` 描边 — 需人工交互确认
+- [x] 深色模式检查：`index.css` 中不存在 `.dark` 主题变量块（`--primary` 仅定义于 `:root`），UI 无深色主题，该项不适用（已登录态/3D 的 Moon/Sun 图标是场景夜模式，非 UI 主题）
