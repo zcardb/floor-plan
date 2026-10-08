@@ -155,7 +155,8 @@ const dangerIconAction = 'h-8 w-8 text-destructive hover:bg-destructive/10 hover
 - [x] 预览渲染正常（desktop_1280 与 mobile_390 各一张截图），状态显示「本机已保存」，无新的控制台报错。
 - [ ] 浏览器（预览）人工确认：打开项目**不再**出现「发现较新的本机恢复副本」弹窗。— 需登录态，本地无法进入项目管理页，未验证。
 - [ ] 浏览器人工确认：本机默认方案「三室两厅两卫 · 原木之家」删除后刷新不再出现。— 同上，未验证。
-- [ ] 浏览器人工确认：卡片删除图标为红色。— 仅由 DOM 断言 + `--destructive` token 保证，未做视觉核对。
+- [x] 删除图标为红色的证据：DOM 断言确认「删除X」按钮 class 含 `text-destructive`；构建产物 CSS 含 `.text-destructive{color:hsl(var(--destructive))}` 与 `hover:bg-destructive/10`，`:root` 中 `--destructive: 5 61% 42%` 未被并行改动移除。
+- [ ] 浏览器人工确认：卡片删除图标视觉为红色。— 需登录态，页面级视觉未核对。
 - [x] 代码层面确认：`useProjects.ts` 不再读写任何 `interior-recovery-*` key（grep 无命中）。
 
 ## 备注

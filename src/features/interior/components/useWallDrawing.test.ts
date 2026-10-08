@@ -13,10 +13,13 @@ function harness(snap = true) {
   const design: { current: Design } = { current: { ...blankDesign(), walls: [{ id: 'target', a: [0, 0] as Point, b: [6000, 0] as Point, thickness: 200, kind: 'partition' as const }] } };
   const commit = vi.fn((next: Design) => { design.current = next; });
   const done = vi.fn();
+  // Deterministic hook harness deliberately drives the drawing hook directly.
+  /* eslint-disable react-hooks/rules-of-hooks */
   const render = (enabled = true) => {
     hooks.r = 0; hooks.s = 0; hooks.effects = [];
     return useWallDrawing(enabled, design, 0.1, snap, commit, done);
   };
+  /* eslint-enable react-hooks/rules-of-hooks */
   return { render, design, commit, done };
 }
 beforeEach(() => { hooks.refs = []; hooks.states = []; hooks.effects = []; hooks.r = 0; hooks.s = 0; });
@@ -47,10 +50,11 @@ describe('共享连续取点状态机（绘墙）', () => {
     d.down([1000, 50], 1, [0, 0]); d.up([1000, 2000], 1, [10, 0]);
     expect(h.design.current.walls[1].a).toEqual([1000, 50]);
     d.down([1000, 2000], 1, [20, 20]); d.up([3000, 2000], 1, [30, 20]);
-    d.down([3000, 2000], 1, [40, 20]); d.up([1000, 50], 1, [50, 20]);
-    expect(h.commit).toHaveBeenCalledTimes(3);
+    d.down([3000, 2000], 1, [40, 20]); d.up([3000, 50], 1, [50, 20]);
+    d.down([3000, 50], 1, [60, 20]); d.up([1000, 50], 1, [70, 20]);
+    expect(h.commit).toHaveBeenCalledTimes(4);
     expect(h.done).toHaveBeenCalledOnce(); expect(h.render().draft).toBeNull();
-    d.up([1000, 50], 1, [50, 20]); expect(h.commit).toHaveBeenCalledTimes(3);
+    d.up([1000, 50], 1, [70, 20]); expect(h.commit).toHaveBeenCalledTimes(4);
   });
   it.each(['Enter', 'Escape'])('%s 清理草稿并退出，保留已提交段', key => {
     const listener = vi.fn(); vi.stubGlobal('window', { addEventListener: listener, removeEventListener: vi.fn() });

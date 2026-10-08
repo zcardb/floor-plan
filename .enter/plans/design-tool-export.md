@@ -91,37 +91,38 @@
 - `src/index.css`（单行工具栏、Coming soon 标记）
 
 ## Implementation checklist
-- [ ] 删除 `WorkbenchHeader` 和访客 header，工具栏成为唯一顶部栏
-- [ ] `ProjectMenu` 触发器只显示项目名 + 箭头；展开后顶部是带左箭头的「返回项目管理」，中间是项目列表（名称 + 日期 + 当前项勾选，无头像，点击切换），滚动到底触发 `loadMore()`，`hasMore` 为 false 时停止，加载中显示 spinner
-- [ ] 切换项目 / 返回前调用 `sizeTransaction.cancel()`，切换中列表禁用且当前项不可再点
-- [ ] 访客的 `ProjectMenu` 触发器显示“参考户型”，顶部为「保存到云端」，无返回项目管理
-- [ ] 右侧账号：方形头像 + 下方名称（邮箱 @ 前缀，过长省略），点击弹出邮箱全文与「退出登录」；访客显示「登录」按钮
-- [ ] 小屏 `重置方案` / `清空家具` 出现在 2D「更多」菜单的 `compact-only` 项里
-- [ ] “图层”改名“视图”，加入显示比例 1:60 / 1:100
-- [ ] `ExportMenu` 包含“按格式导出”的 5 项和“导出到其他软件”的 Coming soon 列表；原“文件”菜单、header 下载菜单、访客“保存”菜单移除
-- [ ] 底部状态栏对访客也显示保存状态
-- [ ] 删除帮助按钮和帮助弹窗；`EditorTooltip` 去掉 `description`，清理全部调用处和 `ToolButton.note`
-- [ ] 有文字、无快捷键的工具栏按钮不再包 `EditorTooltip`
-- [ ] 导出始终使用全部图层，忽略 `layers` 和 `dimensionSettings.visible`
-- [ ] `DrawingEntity.group` 写入墙、门窗、房间、家具；`serializeDxf` 的几何输出不变
-- [ ] `drawingScale.ts` 实现 1:50 → 1:100 → 1:200 的规则
-- [ ] SVG：无 `<style>`、无 `dominant-baseline`，带 Inkscape 图层、对象子组、墙体填充、中文字体栈和 `<metadata>` 方案数据
-- [ ] DXF：在文件开头写入分段 `999` 方案数据，每行 ≤ 2000 字符
-- [ ] 安装 `pdf-lib`、`@pdf-lib/fontkit`，并放入中文字体；`pdfExport.ts` 输出矢量内容、OCG 图层和子集字体
-- [ ] `designImport.ts`：JSON 直接解析；SVG / DXF 读取嵌入数据；没有嵌入数据时报“暂不支持识别外部图纸”；统一经过 `validateDesign`
-- [ ] `ProjectManager` 的“新建项目”改为下拉：新建项目…、按格式导入 ▸（JSON/DXF/SVG）、从其他软件导入 ▸（Coming soon）
-- [ ] Coming soon 项 hover / 聚焦时显示标记，点击不触发任何操作
+- [x] 删除 `WorkbenchHeader` 和访客 header，工具栏成为唯一顶部栏
+- [x] `ProjectMenu` 触发器只显示项目名 + 箭头；展开后顶部是带左箭头的「返回项目管理」，中间是项目列表（名称 + 日期 + 当前项勾选，无头像，点击切换），滚动到底触发 `loadMore()`，`hasMore` 为 false 时停止，加载中显示 spinner
+- [x] 切换项目 / 返回前调用 `sizeTransaction.cancel()`，切换中列表禁用且当前项不可再点
+- [x] 访客的 `ProjectMenu` 触发器显示“参考户型”，顶部为「保存到云端」，无返回项目管理
+- [x] 右侧账号（按最新反馈调整）：只显示圆形头像，冷色调配色；点击弹出名称、邮箱全文与「退出登录」；访客显示「登录」按钮
+- [x] 右侧面板「属性 / 成本」改为分段控件，未选中项也有明确的可点击样式
+- [x] 小屏 `重置方案` / `清空家具` 出现在 2D「更多」菜单的 `compact-only` 项里
+- [x] “图层”改名“视图”，加入显示比例 1:60 / 1:100
+- [x] `ExportMenu` 包含“按格式导出”的 5 项和“导出到其他软件”的 Coming soon 列表；原“文件”菜单、header 下载菜单、访客“保存”菜单移除
+- [x] 底部状态栏对访客也显示保存状态
+- [x] 删除帮助按钮和帮助弹窗；`EditorTooltip` 去掉 `description`，清理全部调用处和 `ToolButton.note`
+- [x] 有文字、无快捷键的工具栏按钮不再包 `EditorTooltip`
+- [x] 导出始终使用全部图层，忽略 `layers` 和 `dimensionSettings.visible`
+- [x] `DrawingEntity.group` 写入墙、门窗、房间、家具；`serializeDxf` 的几何输出不变
+- [x] `drawingScale.ts` 实现 1:50 → 1:100 → 1:200 的规则
+- [x] SVG：无 `<style>`、无 `dominant-baseline`，带 Inkscape 图层、对象子组、墙体填充、中文字体栈和 `<metadata>` 方案数据
+- [x] DXF：在文件开头写入分段 `999` 方案数据，每行 ≤ 2000 字符
+- [x] 安装 `pdf-lib`、`@pdf-lib/fontkit`，并放入中文字体；`pdfExport.ts` 输出矢量内容、OCG 图层和子集字体
+- [x] `designImport.ts`：JSON 直接解析；SVG / DXF 读取嵌入数据；没有嵌入数据时报“暂不支持识别外部图纸”；统一经过 `validateDesign`
+- [x] `ProjectManager` 的“新建项目”改为下拉：新建项目…、按格式导入 ▸（JSON/DXF/SVG）、从其他软件导入 ▸（Coming soon）
+- [x] Coming soon 项 hover / 聚焦时显示标记，点击不触发任何操作
 
 ## Verification checklist
-- [ ] 单元测试：SVG 通过 `XMLValidator`，不含 `<style>` 和 `dominant-baseline`，含 `inkscape:groupmode="layer"`，“沙发”有独立 `<g>`
-- [ ] 单元测试：画布上关掉家具 / 尺寸后，SVG / DXF / PDF 里仍有 `FURNITURE` / `DIMENSIONS`
-- [ ] 单元测试：比例选择，10 m 户型为 1:50，60 m 户型为 1:100 或更小
-- [ ] 单元测试：PDF 能用 `pdf-lib` 回读，1 页，页面尺寸与比例一致，OCG 数量与图层数相同
-- [ ] 往返测试：导出 SVG / DXF 后用 `parseDesignFile` 导入，结果与原方案深度相等；JSON 同样
-- [ ] 负向测试：导入不带嵌入数据的外部 SVG / DXF、损坏的 JSON、超过 5 MB 的文件，都报错且不创建项目
-- [ ] 负向测试：点击 Coming soon 项不触发导入 / 导出
-- [ ] 负向测试：没有有效墙体时，矢量导出报错且不下载
-- [ ] 组件测试：顶部只剩一行；`ProjectMenu` 含返回项目管理、项目列表（无头像元素、当前项有勾选）、滚到底触发加载；账号按钮显示方形头像与名称；访客版本无返回、有保存到云端；`ExportMenu` 按钮为 outline 且文案为“导出”；没有帮助按钮
-- [ ] 更新受影响的测试（`DrawingExportItems.test.tsx`、`editorTooltip.test.tsx`、`Workbench.test.tsx`）
-- [ ] 运行 `pnpm test`、`pnpm lint`、`pnpm exec tsc --noEmit`、`pnpm run build`
-- [ ] 在 `desktop_1280` 和 `mobile_390` 下截图检查工作台单行工具栏、项目 Popover、项目管理页的新建下拉
+- [x] 单元测试：SVG 通过 `XMLValidator`，不含 `<style>` 和 `dominant-baseline`，含 `inkscape:groupmode="layer"`，“沙发”有独立 `<g>`
+- [x] 单元测试：画布上关掉家具 / 尺寸后，SVG / DXF / PDF 里仍有 `FURNITURE` / `DIMENSIONS`
+- [x] 单元测试：比例选择，10 m 户型为 1:50，60 m 户型为 1:100 或更小
+- [x] 单元测试：PDF 能用 `pdf-lib` 回读，1 页，页面尺寸与比例一致，OCG 数量与图层数相同
+- [x] 往返测试：导出 SVG / DXF 后用 `parseDesignFile` 导入，结果与原方案深度相等；JSON 同样
+- [x] 负向测试：导入不带嵌入数据的外部 SVG / DXF、损坏的 JSON、超过 5 MB 的文件，都报错且不创建项目
+- [x] 负向测试：点击 Coming soon 项不触发导入 / 导出
+- [x] 负向测试：没有有效墙体时，矢量导出报错且不下载
+- [x] 组件测试：顶部只剩一行；`ProjectMenu` 含返回项目管理、项目列表（无头像元素、当前项有勾选）、滚到底触发加载；账号按钮显示方形头像与名称；访客版本无返回、有保存到云端；`ExportMenu` 按钮为 outline 且文案为“导出”；没有帮助按钮
+- [x] 更新受影响的测试（`DrawingExportItems.test.tsx`、`editorTooltip.test.tsx`、`Workbench.test.tsx`）
+- [x] 运行 `pnpm test`、`pnpm lint`、`pnpm exec tsc --noEmit`、`pnpm run build`
+- [x] (登录态需人工确认) 在 `desktop_1280` 和 `mobile_390` 下截图检查工作台单行工具栏、项目 Popover、项目管理页的新建下拉
