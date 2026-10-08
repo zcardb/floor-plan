@@ -557,6 +557,7 @@
   .layer-checkbox {
     width: 14px;
     height: 14px;
+    flex-shrink: 0;
     display: grid;
     place-items: center;
     border: 1px solid hsl(var(--border));

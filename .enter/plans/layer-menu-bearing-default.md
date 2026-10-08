@@ -15,13 +15,13 @@
 不改动：图层开关的切换逻辑、其它图层的默认值、导出逻辑、测试夹具中的 `bearing` 值。
 
 ## Implementation checklist
-- [ ] `Workbench.tsx` 中 `layerState` 的 `bearing` 初始值为 `true`
-- [ ] `dropdown-menu.tsx` 的 `DropdownMenuItem` 基础类包含 `gap-2`
-- [ ] `index.css` 的 `.layer-checkbox` 含 `flex-shrink: 0`
+- [x] `Workbench.tsx` 中 `layerState` 的 `bearing` 初始值为 `true`
+- [x] `dropdown-menu.tsx` 的 `DropdownMenuItem` 基础类包含 `gap-2`
+- [x] `index.css` 的 `.layer-checkbox` 含 `flex-shrink: 0`
 
 ## Verification checklist
 - [ ] 正向：新打开工作台，图层菜单中「承重墙高亮」默认勾选，2D 画布承重墙以高亮色显示
 - [ ] 反向：点击取消「承重墙高亮」后承重墙恢复普通墙色，再次点击可重新开启
 - [ ] 边界：「辅助网格」仍默认未勾选，其余四项默认勾选不变
 - [ ] 视觉：图层菜单每一项勾选框与文字之间有 8px 间距；文件菜单图标与文字间距正常、无换行或错位
-- [ ] `pnpm run lint`、`pnpm vitest run src/features/interior/components`、`pnpm run build` 全部通过
+- [x] `pnpm run lint`、`pnpm vitest run src/features/interior/components`、`pnpm run build` 全部通过

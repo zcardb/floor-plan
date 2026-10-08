@@ -172,7 +172,7 @@ export function Workbench(p: Props) {
       dims: true,
       labels: true,
       furn: true,
-      bearing: false,
+      bearing: true,
       snap: true,
     }),
     [sceneOptions, setSceneOptions] = useState<SceneOptions>({
