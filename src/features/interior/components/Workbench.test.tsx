@@ -1,8 +1,8 @@
 import { isValidElement, type ReactElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Design, Project } from '../model/types';
+import type { Design, LibraryItem, Project } from '../model/types';
 
-const state = vi.hoisted(() => ({ values: [] as unknown[], cursor: 0, effects: [] as (() => unknown)[], design: null as Design | null, change: vi.fn(), commit: vi.fn(), cancel: vi.fn(), confirm: vi.fn() }));
+const state = vi.hoisted(() => ({ values: [] as unknown[], cursor: 0, effects: [] as (() => unknown)[], design: null as Design | null, furniture: [] as LibraryItem[], change: vi.fn(), commit: vi.fn(), cancel: vi.fn(), confirm: vi.fn() }));
 vi.mock('react', async original => ({
   ...await original<typeof import('react')>(),
   useState: (initial: unknown) => {
@@ -20,6 +20,7 @@ vi.mock('./CustomFurnitureDialog', () => ({ CustomFurnitureDialog: () => null })
 vi.mock('../cloud/useFloorCatalog', () => ({ useFloorCatalog: () => ({ items: [], loading: false, error: '', load: async () => {}, save: async () => {} }) }));
 vi.mock('../cloud/useWallCatalog', () => ({ useWallCatalog: () => ({ items: [], loading: false, error: '', load: async () => {}, save: async () => {} }) }));
 vi.mock('../cloud/useOpeningCatalog', () => ({ useOpeningCatalog: () => ({ items: [], loading: false, error: '', load: async () => {}, save: async () => {} }) }));
+vi.mock('../cloud/useFurnitureCatalog', () => ({ useFurnitureCatalog: () => ({ items: state.furniture, loading: false, error: '', hasMore: false, count: state.furniture.length, counts: {}, load: async () => {}, save: async () => {}, remove: async () => {}, reset: () => {} }) }));
 vi.mock('../model/useDesign', () => ({ useDesign: () => ({
   design: state.design, current: { get current() { return state.design; } }, change: state.change, commit: state.commit, preview: vi.fn(), undo: vi.fn(), redo: vi.fn(),
   counts: { undo: 0, redo: 0 }, sizeTransaction: { flush: vi.fn(), cancel: state.cancel },
@@ -48,7 +49,7 @@ function text(tree: ReactNode): string {
   if (Array.isArray(tree)) return tree.map(text).join('');
   return isValidElement<{ children?: ReactNode }>(tree) ? text(tree.props.children) : '';
 }
-function render() {
+function render(overrides: Partial<Parameters<typeof Workbench>[0]> = {}) {
   state.cursor = 0;
   const noop = vi.fn();
   return nodes(Workbench({
@@ -56,13 +57,14 @@ function render() {
     projectNavigation: { projectList: [], hasMore: false, listLoading: false, onOpen: noop, onLoadMore: noop },
     update: noop, status: { kind: 'saved' as const, label: '' }, loggedIn: false, projects: noop, login: noop, logout: noop,
     cloudSave: noop,
+    ...overrides,
   }));
 }
 function tools(tree: Node[]) {
   const group = tree.find(node => node.props.className === 'tool-group')!;
   return nodes(group);
 }
-beforeEach(() => { state.values = []; state.cursor = 0; state.effects = []; state.design = blankDesign(); state.change.mockReset(); state.commit.mockReset(); state.cancel.mockReset(); });
+beforeEach(() => { state.values = []; state.cursor = 0; state.effects = []; state.design = blankDesign(); state.furniture = []; state.change.mockReset(); state.commit.mockReset(); state.cancel.mockReset(); });
 describe('合并确认与快照', () => {
   it('取消无提交，确认仅提交一次并选中原根，过期拒绝', async () => {
     const original = blankDesign();
@@ -207,6 +209,32 @@ describe('2D 常用工具与顶部工具栏', () => {
     expect(more.props.className).toContain('compact-only');
     state.values[2] = '3d';
     expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['鸟瞰', '漫游', '俯视', '剖切']);
+  });
+});
+describe('账号家具库并入左侧家具库', () => {
+  const furnace = { catalogId: 'custom-furnace', name: '火炉', category: '客厅', type: 'stove', w: 1200, d: 400, height: 900, color: '#b7c4b0', price: 800 } as LibraryItem;
+  const sofa = { ...furnace, catalogId: 'custom-sofa', name: '账号沙发' } as LibraryItem;
+  const libraryNode = (loggedIn = true) => render({ loggedIn }).find(n => n.props.customItems !== undefined)!;
+  const names = (node: Node) => (node.props.customItems as LibraryItem[]).map(item => item.name);
+  it('登录后账号家具进入侧栏，与项目目录同 id 的只保留项目版本', () => {
+    state.design = { ...blankDesign(), customCatalog: [sofa] };
+    state.furniture = [sofa, furnace];
+    expect(names(libraryNode())).toEqual(['账号沙发', '火炉']);
+    expect(names(libraryNode(false))).toEqual(['账号沙发']);
+  });
+  it('账号家具放进画布时登记进项目目录，重复放置与内置家具都不登记', () => {
+    const add = (item: LibraryItem) => (libraryNode().props.add as (item: LibraryItem) => void)(item);
+    const applied = () => (state.change.mock.calls[state.change.mock.calls.length - 1][0] as (design: Design) => Design)(state.design!);
+    add(furnace);
+    const next = applied();
+    expect(next.customCatalog?.map(item => item.catalogId)).toEqual(['custom-furnace']);
+    expect(next.furniture.map(item => item.name)).toEqual(['火炉']);
+    state.design = next; state.change.mockClear();
+    add(furnace);
+    expect(applied().customCatalog?.map(item => item.catalogId)).toEqual(['custom-furnace']);
+    state.change.mockClear();
+    add({ ...furnace, catalogId: 'stove:燃气灶', name: '燃气灶' });
+    expect(applied().customCatalog?.map(item => item.catalogId)).toEqual(['custom-furnace']);
   });
 });
 describe('单行顶部工具栏', () => {
