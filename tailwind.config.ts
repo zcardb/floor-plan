@@ -24,6 +24,7 @@ export default {
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',
 				background: 'hsl(var(--background))',
+                'toast-surface': 'hsl(var(--toast-surface) / var(--toast-surface-alpha))',
                 canvas: 'hsl(var(--canvas))',
                 teal: 'hsl(var(--teal))',
 				foreground: 'hsl(var(--foreground))',
@@ -38,6 +39,14 @@ export default {
 				destructive: {
 					DEFAULT: 'hsl(var(--destructive))',
 					foreground: 'hsl(var(--destructive-foreground))'
+				},
+				success: {
+					DEFAULT: 'hsl(var(--success))',
+					foreground: 'hsl(var(--success-foreground))'
+				},
+				warning: {
+					DEFAULT: 'hsl(var(--warning))',
+					foreground: 'hsl(var(--warning-foreground))'
 				},
 				muted: {
 					DEFAULT: 'hsl(var(--muted))',

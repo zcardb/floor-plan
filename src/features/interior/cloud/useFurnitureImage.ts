@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { LibraryItem } from '../model/types';
+import { notify } from "@/lib/notify";
 async function invoke(name: string, body: object) {
   const { data, error } = await supabase.functions.invoke(name, { body });
   if (error instanceof FunctionsHttpError) {
@@ -72,8 +73,10 @@ export function useFurnitureImage() {
       }
       throw new Error("图片仍在生成，请稍后重试");
     } catch (err) {
-      if (run === epoch.current)
+      if (run === epoch.current) {
         setError(err instanceof Error ? err.message : "图片生成失败");
+        notify.error("家具图片生成失败", err);
+      }
     } finally {
       if (run === epoch.current) setBusy(false);
     }

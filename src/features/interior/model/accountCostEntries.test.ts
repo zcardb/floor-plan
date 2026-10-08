@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { categories, library } from '../data/catalog';
-import { blankDesign } from '../data/templates';
+import { blankDesign, referenceDesign } from '../data/templates';
 import { accountCostEntries, accountCostSource, costCategories, filterCostEntries } from './accountCostEntries';
 import { setPrice, priceOf } from './costs';
 
@@ -54,5 +54,13 @@ describe('账号单价来源与配置不变量', () => {
     const next = setPrice(d, 'floorPrices', 'wood', 200);
     expect(next.costSettings?.constructionPrices).toEqual(d.costSettings.constructionPrices);
     expect(next.costSettings?.wallPrices).toEqual(d.costSettings.wallPrices);
+  });
+  it('账号自定义地面进入地面单价列表，来源为账号地面库', () => {
+    const floor = { key: 'custom-11111111-1111-4111-8111-111111111111', name: '混凝土浇筑', pattern: 'seamless' as const, color: '#b8b8b0', price: 90 };
+    const entry = accountCostEntries([], {}, [floor]).find(item => item.key === floor.key)!;
+    expect(entry).toMatchObject({ group: 'floorPrices', category: '地面', name: '混凝土浇筑', unit: 'm²' });
+    const design = { ...referenceDesign(), customFloors: [floor] };
+    expect(priceOf(design, 'floorPrices', floor.key)).toBe(90);
+    expect(accountCostSource(design, entry)).toBe('账号地面库');
   });
 });

@@ -1,193 +1,121 @@
 import { useMemo, useState } from "react";
-import { ArrowLeft, Plus, Trash2, Wallet } from "lucide-react";
-import {
-  calculateCosts,
-  setPrice,
-  validPrice,
-  type CostRow,
-} from "../model/costs";
-import { uid, type Design } from "../model/types";
-import { useContext } from 'react';
-import { CostDefaultsContext, useCostDesign } from './CostDefaultsContext';
-import { priceSource, restorePrice } from '../model/costDefaults';
-import { PriceInput } from "./PriceInput";
-import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
+import { Wallet } from "lucide-react";
+import { calculateCosts, furnitureKey } from "../model/costs";
+import { costBreakdown } from "../model/costBreakdown";
+import { inRoom } from "../model/geometry";
+import { yuan } from "../model/money";
+import type { Design, Selection } from "../model/types";
+import { useCostDesign } from "./CostDefaultsContext";
+import { CostCategoryList } from "./CostCategoryList";
+import { CostHero } from "./CostHero";
+import { RoomCostDetail } from "./RoomCostDetail";
+import { RoomCostList } from "./RoomCostList";
+
+/**
+ * 成本页：口径跟随选中对象——选中房间（或房内家具）时看本间，
+ * 否则看全屋。
+ */
 export function CostPanel({
   design,
+  selection,
   change,
   back,
+  select,
 }: {
   design: Design;
+  selection: Selection;
   change: (fn: (d: Design) => Design) => void;
   back: () => void;
+  select: (s: Selection) => void;
 }) {
-  const effective = useCostDesign(design), defaults = useContext(CostDefaultsContext);
-  const c = useMemo(() => calculateCosts(effective), [effective]),
-    [name, setName] = useState(""),
-    [amount, setAmount] = useState(""),
-    [error, setError] = useState("");
-  const rows = (rs: CostRow[]) =>
-    rs.map((r) => (
-      <div className="cost-detail" key={r.group + r.key}>
-        <div className="cost-detail-heading">
-          <b>{r.name}</b>
-          <span>
-            ¥{r.subtotal.toLocaleString("zh-CN", { maximumFractionDigits: 2 })}
-          </span>
-        </div>
-        <small>
-          {r.quantity.toFixed(r.unit === "件" ? 0 : 2)} {r.unit} ·{" "}
-          {priceSource(design, defaults, r.group, r.key)} · 元/{r.unit}
-        </small>
-        <PriceInput
-          key={r.group + r.key + String(r.price)}
-          value={r.price}
-          label={r.name + "单价"}
-          onApply={(v) => change((d) => setPrice(d, r.group, r.key, v, defaults))}
-        />
-        {priceSource(design, defaults, r.group, r.key) === '项目覆盖' && <button className="back-link" onClick={() => change(d => restorePrice(d, r.group, r.key))}>恢复账号默认</button>}
-        {r.group === "floorPrices" && (
-          <MaterialProcurementEditor
-            design={design}
-            material={r.key}
-            change={change}
-          />
-        )}
-      </div>
-    ));
+  const effective = useCostDesign(design),
+    c = useMemo(() => calculateCosts(effective), [effective]),
+    b = useMemo(() => costBreakdown(effective), [effective]),
+    [onlyUnpriced, setOnlyUnpriced] = useState(false);
+  const furniture = selection?.kind === "furniture"
+      ? effective.furniture.find((f) => f.id === selection.id)
+      : undefined,
+    roomId =
+      selection?.kind === "room"
+        ? selection.id
+        : furniture
+          ? effective.rooms.find((r) => inRoom([furniture.cx, furniture.cy], r))?.id
+          : undefined,
+    room = b.rooms.find((r) => r.roomId === roomId);
+  if (room)
+    return (
+      <RoomCostDetail
+        design={effective}
+        room={room}
+        wholeTotal={b.total}
+        highlightedFurniture={furniture ? furnitureKey(furniture) : undefined}
+        change={change}
+        back={back}
+      />
+    );
+  const drift = Math.abs(b.roomTotal + b.sharedTotal - b.total);
   return (
     <>
       <div className="panel-heading">
         <span>
           <Wallet size={15} />
-          成本管理
+          全屋成本
         </span>
-        <button onClick={back} aria-label="返回属性">
-          <ArrowLeft size={16} />
-        </button>
+        <span className="mini-label">{b.rooms.length} 个空间</span>
       </div>
       <section>
-        <div className="cost-summary">
-          <small>整体成本 · 已录入费用</small>
-          <strong>
-            ¥{c.total.toLocaleString("zh-CN", { maximumFractionDigits: 2 })}
-          </strong>
-          <div>
-            <span>软装 ¥{Math.round(c.softTotal).toLocaleString()}</span>
-            <span>硬装 ¥{Math.round(c.hardTotal).toLocaleString()}</span>
-          </div>
+        <CostHero
+          eyebrow="全屋硬装 · 已录入费用"
+          amount={b.hardTotal}
+          hard={b.hardTotal}
+          soft={b.softTotal}
+          softUnpriced={c.soft.filter((r) => r.price === null).length}
+          priced={b.pricedCount}
+          total={b.priceableCount}
+          onlyUnpriced={onlyUnpriced}
+          onToggleUnpriced={() => setOnlyUnpriced((v) => !v)}
+        />
+        <div className="cost-total-line">
+          <span>硬装 + 软装合计</span>
+          <b>{yuan(b.total)}</b>
         </div>
-        {c.unpriced > 0 && (
+        {b.unpriced > 0 && (
           <p className="cost-warning">
-            {c.unpriced} 类项目未定价，当前总额不是完整报价。
+            {b.unpriced} 类项目未定价，当前合计不是完整报价。
+          </p>
+        )}
+        {drift > 1 && (
+          <p className="cost-warning" role="alert">
+            房间分摊与总额存在 {yuan(drift)} 的取整差额。
           </p>
         )}
         <p className="footnote">
-          单价修改仅影响当前项目所有同款家具／同材质空间。地面按设定损耗与采购取整计算；墙面扣除对应门窗面积。
+          地面含损耗与采购取整；墙面扣除对应门窗；门窗按相邻房间平分；拆改、新建与人工为全屋公共项。
         </p>
       </section>
       <section>
         <h3 className="section-title">
-          软装<span>¥{Math.round(c.softTotal).toLocaleString()}</span>
+          费用明细 <small>点击类别展开</small>
         </h3>
-        {rows(c.soft)}
-        {!c.soft.length && <p className="muted-note">尚未放置家具。</p>}
+        <CostCategoryList
+          design={effective}
+          rows={[...c.hard, ...c.soft]}
+          labor={c.labor}
+          onlyUnpriced={onlyUnpriced}
+          change={change}
+        />
       </section>
       <section>
         <h3 className="section-title">
-          硬装<span>¥{Math.round(c.hardTotal).toLocaleString()}</span>
+          按房间 <small>点击查看本间</small>
         </h3>
-        {rows(c.hard)}
-        <p className="footnote">
-          门窗按 m²；墙体施工按长度 × 层高，参考现有墙不计新建费用。
-        </p>
-      </section>
-      <section>
-        <h3 className="section-title">
-          人工费用 <small>独立总价条目</small>
-        </h3>
-        {c.labor.map((item) => (
-          <div className="labor-item" key={item.id}>
-            <div>
-              <b>{item.name}</b>
-              <button
-                title="删除费用"
-                onClick={() =>
-                  change((d) => ({
-                    ...d,
-                    costSettings: {
-                      ...d.costSettings,
-                      labor: c.labor.filter((l) => l.id !== item.id),
-                    },
-                  }))
-                }
-              >
-                <Trash2 size={13} />
-              </button>
-            </div>
-            <PriceInput
-              key={item.id + item.amount}
-              value={item.amount}
-              label={item.name + "总费用"}
-              onApply={(v) =>
-                change((d) => ({
-                  ...d,
-                  costSettings: {
-                    ...d.costSettings,
-                    labor: c.labor.map((l) =>
-                      l.id === item.id ? { ...l, amount: v ?? 0 } : l,
-                    ),
-                  },
-                }))
-              }
-            />
-          </div>
-        ))}
-        <form
-          className="labor-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const v = Number(amount);
-            if (!name.trim() || amount === "" || !validPrice(v)) {
-              setError("请填写名称和非负费用");
-              return;
-            }
-            change((d) => ({
-              ...d,
-              costSettings: {
-                ...d.costSettings,
-                labor: [
-                  ...(d.costSettings?.labor || []),
-                  { id: uid(), name: name.trim(), amount: v },
-                ],
-              },
-            }));
-            setName("");
-            setAmount("");
-            setError("");
-          }}
-        >
-          <input
-            aria-label="人工费用名称"
-            placeholder="例如：铺贴人工费"
-            maxLength={100}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <input
-            aria-label="人工总费用"
-            placeholder="总费用 / 元"
-            type="number"
-            min={0}
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-          <button>
-            <Plus size={14} />
-            添加人工
-          </button>
-          {error && <small role="alert">{error}</small>}
-        </form>
+        <RoomCostList design={effective} breakdown={b} select={select} />
+        <div className="room-cost-total">
+          <span>各房间合计</span>
+          <b>{yuan(b.roomTotal)}</b>
+          <span>+ 公共项</span>
+          <b>{yuan(b.sharedTotal)}</b>
+        </div>
       </section>
     </>
   );

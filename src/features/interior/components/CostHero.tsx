@@ -1,4 +1,5 @@
 import { yuan } from "../model/money";
+import { EditorTooltip } from "@/components/ui/editor-tooltip";
 
 /** 成本页顶部：主金额、硬装/软装拆分、定价完成度。 */
 export function CostHero({
@@ -55,14 +56,19 @@ export function CostHero({
             <span>
               已定价 <b>{priced}</b> / {total} 项
             </span>
-            {priced! < total && onToggleUnpriced && (
-              <button
-                className={onlyUnpriced ? "active" : ""}
-                aria-pressed={onlyUnpriced}
-                onClick={onToggleUnpriced}
+            {(priced ?? 0) < total && onToggleUnpriced && (
+              <EditorTooltip
+                label={onlyUnpriced ? "显示全部" : "只看未定价"}
+                description={onlyUnpriced ? "恢复显示所有费用项" : "只列出还没填写单价的费用项"}
               >
-                {onlyUnpriced ? "显示全部" : "只看未定价"}
-              </button>
+                <button
+                  className={onlyUnpriced ? "active" : ""}
+                  aria-pressed={onlyUnpriced}
+                  onClick={onToggleUnpriced}
+                >
+                  {onlyUnpriced ? "显示全部" : "只看未定价"}
+                </button>
+              </EditorTooltip>
             )}
           </div>
           <div

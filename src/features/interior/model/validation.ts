@@ -74,6 +74,7 @@ export function validateDesign(value: unknown): Design {
       !point(w.b) ||
       !finite(w.thickness, 50, 1000) ||
       (w.loadBearing !== undefined && typeof w.loadBearing !== 'boolean') ||
+      (w.exteriorRootId !== undefined && (w.kind !== 'exterior' || typeof w.exteriorRootId !== 'string' || !w.exteriorRootId.length || w.exteriorRootId.length > 100)) ||
       length(w) < 50 ||
       !["bearing", "exterior", "partition", "low"].includes(w.kind)
     )

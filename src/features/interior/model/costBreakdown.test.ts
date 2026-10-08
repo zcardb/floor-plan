@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { blankDesign } from "../data/templates";
+import { blankDesign, referenceDesign } from "../data/templates";
 import { calculateCosts, setPrice } from "./costs";
 import { costBreakdown, selectionCost } from "./costBreakdown";
 import { rect } from "./geometry";
@@ -123,6 +123,49 @@ describe("按房间成本分摊", () => {
       2000,
     );
   });
+  it("只贴一间房边界的窗全额归该房间，不做 0.5 分摊", () => {
+    const d = setPrice(twoRoomDesign(), "openingPrices", "window", 800);
+    d.walls.push({
+      id: "north",
+      a: [0, 0],
+      b: [6000, 0],
+      thickness: 240,
+      kind: "exterior",
+    });
+    // 窗中心 x=2000，宽 1200，完全落在客厅（x 0–4000）一侧。
+    d.openings.push({
+      id: "win",
+      wallId: "north",
+      kind: "window",
+      offset: 2000,
+      width: 1200,
+      height: 1500,
+      sill: 900,
+    });
+    const b = costBreakdown(d),
+      windowOf = (id: string) =>
+        b.rooms
+          .find((r) => r.roomId === id)!
+          .hard.filter((p) => p.group === "openingPrices" && p.key === "window"),
+      total = calculateCosts(d).hard.find(
+        (r) => r.group === "openingPrices" && r.key === "window",
+      )!.subtotal;
+    expect(windowOf("big")).toHaveLength(1);
+    expect(windowOf("big")[0].subtotal).toBeCloseTo(total, 1);
+    expect(windowOf("big")[0].note).toBeUndefined();
+    expect(windowOf("small")).toHaveLength(0);
+  });
+  it("空项目不报错，金额全部为 0", () => {
+    const d = blankDesign();
+    d.rooms = [];
+    d.furniture = [];
+    d.openings = [];
+    const b = costBreakdown(d);
+    expect(b.rooms).toEqual([]);
+    expect(b.total).toBe(0);
+    expect(b.roomTotal + b.sharedTotal).toBe(0);
+    expect(selectionCost(d, { kind: "room", id: "missing" })).toBeNull();
+  });
   it("未定价条目计数而不产生金额", () => {
     const d = twoRoomDesign();
     d.furniture = [
@@ -142,6 +185,37 @@ describe("按房间成本分摊", () => {
     expect(b.unpriced).toBeGreaterThan(0);
     expect(b.softTotal).toBe(0);
     expect(b.pricedCount).toBeLessThan(b.priceableCount);
+  });
+});
+describe("真实户型的分解一致性", () => {
+  for (const [name, make] of [
+    ["参考户型", referenceDesign],
+    ["空白户型", blankDesign],
+  ] as const) {
+    it(`${name}：各房间 + 公共项 = 总额，且分摊不产生负值`, () => {
+      const d = make(),
+        b = costBreakdown(d),
+        parts = [
+          ...b.rooms.flatMap((r) => [...r.hard, ...r.soft]),
+          ...b.shared,
+        ];
+      expect(b.roomTotal + b.sharedTotal).toBeCloseTo(b.total, 1);
+      expect(b.hardTotal + b.softTotal).toBeCloseTo(b.total, 1);
+      expect(parts.every((p) => p.subtotal >= 0)).toBe(true);
+      expect(parts.every((p) => p.quantity >= 0)).toBe(true);
+    });
+  }
+  it("参考户型里每间房的家具都落在自己的房间内", () => {
+    const d = referenceDesign(),
+      b = costBreakdown(d),
+      housed = b.rooms.reduce(
+        (s, r) => s + r.soft.reduce((n, p) => n + p.quantity, 0),
+        0,
+      ),
+      outside = b.shared
+        .filter((p) => p.group === "furniturePrices")
+        .reduce((n, p) => n + p.quantity, 0);
+    expect(housed + outside).toBe(d.furniture.length);
   });
 });
 describe("选中对象的成本", () => {

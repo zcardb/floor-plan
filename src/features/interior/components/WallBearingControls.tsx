@@ -1,5 +1,5 @@
 import { LockKeyhole, ShieldCheck } from 'lucide-react';
-import { toast } from 'sonner';
+import { notify } from '@/lib/notify';
 import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { isBearingWall, setWallBearing } from '../model/wallPolicy';
@@ -10,8 +10,8 @@ export function WallBearingControls({ design, wall, change }: { design: Design; 
   const original = wall.kind === 'bearing', bearing = isBearingWall(wall), demolished = design.demolished.includes(wall.id);
   const toggle = async () => {
     if (bearing && !(await confirm({ title: '取消承重标记？', description: '取消软件标记不代表现实中可拆除，墙体承重性质仍须依据建筑结构图或专业评估。', confirmText: '取消标记' }))) return;
-    try { change(d => setWallBearing(d, wall.id, !bearing)); }
-    catch (error) { toast.error(error instanceof Error ? error.message : '标记失败，请重试'); }
+    try { change(d => setWallBearing(d, wall.id, !bearing)); notify.success(bearing ? '已取消承重标记' : '已标记为承重墙，墙体与洞口已保护'); }
+    catch (error) { notify.error(bearing ? '取消承重标记失败' : '标记承重墙失败', error); }
   };
   return <div className="wall-bearing-controls">
     <p className="wall-bearing-status">{original ? <LockKeyhole size={15} /> : <ShieldCheck size={15} />}<span>{original ? '原始承重墙 · 已锁定' : bearing ? '承重墙 · 用户标记' : '未标记承重'}</span></p>

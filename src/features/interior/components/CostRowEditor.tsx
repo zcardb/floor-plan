@@ -1,4 +1,5 @@
 import { useContext } from "react";
+import { EditorTooltip } from "@/components/ui/editor-tooltip";
 import { setPrice, type CostRow } from "../model/costs";
 import { priceSource, restorePrice } from "../model/costDefaults";
 import { yuanPrecise } from "../model/money";
@@ -6,6 +7,7 @@ import type { Design } from "../model/types";
 import { CostDefaultsContext } from "./CostDefaultsContext";
 import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
 import { PriceInput } from "./PriceInput";
+import { notify } from "@/lib/notify";
 
 /** 全屋口径下一条价格条目：金额、来源与改价入口。 */
 export function CostRowEditor({
@@ -42,12 +44,17 @@ export function CostRowEditor({
         }
       />
       {source === "项目覆盖" && (
-        <button
-          className="back-link"
-          onClick={() => change((d) => restorePrice(d, row.group, row.key))}
-        >
-          恢复账号默认
-        </button>
+        <EditorTooltip label="恢复账号默认" description="丢弃本项目单独设置的单价，改用账号默认价">
+          <button
+            className="back-link"
+            onClick={() => {
+              change((d) => restorePrice(d, row.group, row.key));
+              notify.success(`「${row.name}」已恢复账号默认价`);
+            }}
+          >
+            恢复账号默认
+          </button>
+        </EditorTooltip>
       )}
       {row.group === "floorPrices" && (
         <MaterialProcurementEditor

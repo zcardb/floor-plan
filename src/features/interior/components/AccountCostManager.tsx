@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Armchair, Check, Layers, Loader2, Plus, Search, X } from 'lucide-react';
+import { LoadError } from './LoadError';
 import { Button } from '@/components/ui/button';
+import { notify } from '@/lib/notify';
 import { categories } from '../data/catalog';
 import { formatMeters } from '../model/lengthUnits';
 import { priceOf } from '../model/costs';
@@ -11,17 +13,17 @@ import { CmsFilterBar } from './CmsFilterBar';
 import { CostItemVisual } from './CostItemVisual';
 import { AccountCostDialog } from './AccountCostDialog';
 import { useAccountCostCommit } from './useAccountCostCommit';
-import type { LibraryItem, Design } from '../model/types';
+import type { CustomFloor, LibraryItem, Design } from '../model/types';
 
-export function AccountCostManager({ settings, save, saving, error, items, onDirty, onNew, hasMore, loading, catalogError, loadMore }: {
+export function AccountCostManager({ settings, save, saving, error, items, floors = [], onDirty, onNew, hasMore, loading, catalogError, loadMore, reload }: {
   settings: AccountCostSettings; save: (settings: AccountCostSettings) => Promise<boolean>; saving: boolean; error: string;
-  items: LibraryItem[]; onDirty: (dirty: boolean) => void; onNew: (category: string) => void;
-  hasMore: boolean; loading: boolean; catalogError: string; loadMore: () => void;
+  items: LibraryItem[]; floors?: CustomFloor[]; onDirty: (dirty: boolean) => void; onNew: (category: string) => void;
+  hasMore: boolean; loading: boolean; catalogError: string; loadMore: () => void; reload: () => void;
 }) {
   const [category, setCategory] = useState('全部'), [query, setQuery] = useState(''), [editing, setEditing] = useState<CostEntry | null>(null);
   const commit = useAccountCostCommit({ settings, save, onDirty });
-  const design: Design = { ...referenceDesign(), customCatalog: items, costSettings: commit.settings };
-  const entries = accountCostEntries(items, commit.settings);
+  const design: Design = { ...referenceDesign(), customCatalog: items, customFloors: floors, costSettings: commit.settings };
+  const entries = accountCostEntries(items, commit.settings, floors);
   const visible = filterCostEntries(entries, category, query);
   const blocks = [...materialCostCategories, ...categories].map(title => ({ title, entries: visible.filter(entry => entry.category === title) })).filter(block => block.entries.length);
   const groups: { major: CostMajor; icon: typeof Layers; names: string[] }[] = [{ major: '硬装', icon: Layers, names: materialCostCategories }, { major: '软装', icon: Armchair, names: categories }];
@@ -29,7 +31,8 @@ export function AccountCostManager({ settings, save, saving, error, items, onDir
   const pick = (next: string) => setCategory(current => current === next ? '全部' : next);
   const busy = saving || commit.busy;
   const failure = error || commit.error;
-  const change = (update: (design: Design) => Design) => { void commit.apply(current => update({ ...design, costSettings: current }).costSettings as AccountCostSettings); };
+  const change = (update: (design: Design) => Design) => commit.apply(current => update({ ...design, costSettings: current }).costSettings as AccountCostSettings);
+  const retry = async () => { if (await commit.retry()) notify.success('账号默认价已保存并生效'); };
   return <div className="account-cost-page">
     <header className="cms-heading cost-heading">
       <div><span className="cost-eyebrow">工作室价格库</span><h1>账号默认成本</h1><p>在这里设好单价，各项目可直接沿用。</p></div>
@@ -47,8 +50,8 @@ export function AccountCostManager({ settings, save, saving, error, items, onDir
         </div>)}
       </div>
     </div>
-    {failure && <div className="cost-save-error" role="alert"><span>{failure}</span>{commit.pending && <Button variant="outline" disabled={busy} onClick={() => void commit.retry()}>重试保存</Button>}</div>}
-    {catalogError && <p role="alert" className="form-error">{catalogError}</p>}
+    {failure && <div className="cost-save-error" role="alert"><span>{failure}</span>{commit.pending && <Button variant="outline" disabled={busy} onClick={() => void retry()}>重试保存</Button>}</div>}
+    {catalogError && <LoadError title="家具与地面读取失败" message={catalogError} retrying={loading} onRetry={reload}/>}
     <div className="cost-results-heading"><h2>{category === '全部' ? '全部单价' : category + '单价'}<span>{visible.length} 项{hasMore ? ' · 已加载' : ''}</span></h2>{category === '全部' ? <span>按需设置，无需全部填写</span> : <button type="button" className="cost-clear-filter" onClick={() => setCategory('全部')}><X size={14}/>查看全部</button>}</div>
     {blocks.map(block => <section key={block.title} className="cms-category-block" aria-label={block.title + '单价'}>
       <h2>{block.title}<span>{block.entries.length} 项</span></h2>
@@ -62,7 +65,7 @@ export function AccountCostManager({ settings, save, saving, error, items, onDir
       })}</div>
     </section>)}
     {!loading && !visible.length && <div className="cms-empty"><Search size={30}/><h2>没有匹配的项目</h2><p>{hasMore ? '可加载更多家具，或调整分类与搜索。' : '换个分类，或清空搜索再试。'}</p><Button variant="outline" onClick={() => { setCategory('全部'); setQuery(''); }}>清空筛选</Button></div>}
-    {hasMore && <div className="cms-more"><Button variant="outline" disabled={loading || busy} onClick={loadMore}>加载更多账号家具款式</Button></div>}
-    {editing && <AccountCostDialog group={editing.group} entryKey={editing.key} name={editing.name} groupTitle={editing.category} unit={entries.find(entry => entry.key === editing.key && entry.group === editing.group)?.unit || editing.unit} design={design} change={change} price={priceOf(design, editing.group, editing.key)} busy={busy} error={failure} saved={commit.saved} retry={commit.pending ? () => void commit.retry() : undefined} done={() => { if (!busy) setEditing(null); }}/> }
+    {hasMore && <div className="cms-more"><Button variant="outline" loading={loading} disabled={busy} onClick={loadMore}>加载更多账号家具款式</Button></div>}
+    {editing && <AccountCostDialog group={editing.group} entryKey={editing.key} name={editing.name} groupTitle={editing.category} unit={entries.find(entry => entry.key === editing.key && entry.group === editing.group)?.unit || editing.unit} design={design} change={change} price={priceOf(design, editing.group, editing.key)} busy={busy} error={failure} saved={commit.saved} retry={commit.pending ? () => void retry() : undefined} done={() => { if (!busy) setEditing(null); }}/> }
   </div>;
 }

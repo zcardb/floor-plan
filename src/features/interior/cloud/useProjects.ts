@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
-import { toast } from "sonner";
+import { errorMessage, notify } from "@/lib/notify";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { createProject } from "../data/templates";
 import { validateDesign } from "../model/validation";
@@ -24,10 +24,41 @@ function initialProjects(): Project[] {
         cloud: false,
       }));
     }
-  } catch {
-    toast.error("本机项目读取失败，可通过 JSON 文件恢复");
+  } catch (cause) {
+    notify.error("本机项目读取失败，可通过 JSON 文件恢复", cause);
   }
   return [createProject("reference")];
+}
+export type SaveStatusKind = "saved" | "saving" | "dirty" | "error" | "conflict";
+export interface SaveStatus {
+  kind: SaveStatusKind;
+  label: string;
+}
+const STATUS = {
+  local: { kind: "saved", label: "本机已保存" },
+  localFailed: { kind: "error", label: "本机保存失败" },
+  saving: { kind: "saving", label: "正在云端保存…" },
+  cloud: { kind: "saved", label: "云端已保存" },
+  cloudFailed: { kind: "error", label: "云端保存失败" },
+  conflict: { kind: "conflict", label: "版本冲突，请另存" },
+  dirty: { kind: "dirty", label: "有待保存更改" },
+  recovery: { kind: "dirty", label: "恢复副本待保存" },
+} as const satisfies Record<string, SaveStatus>;
+/** 保存状态是否需要用户处理（失败或冲突）。 */
+export const isSaveProblem = (status: SaveStatus) =>
+  status.kind === "error" || status.kind === "conflict";
+/** 把抛出的网络异常归一成 { error }，调用方只需处理一种失败形态，loading 不会卡死。 */
+async function attempt<T extends { data: unknown; error: unknown }>(
+  request: PromiseLike<T>,
+): Promise<T | { data: null; error: Error }> {
+  try {
+    return await request;
+  } catch (cause) {
+    return {
+      data: null,
+      error: cause instanceof Error ? cause : new Error("网络异常，请重试"),
+    };
+  }
 }
 export interface ProjectSummary {
   id: string;
@@ -43,7 +74,9 @@ export function useProjects() {
     [cloud, setCloud] = useState<ProjectSummary[]>([]),
     [active, setActive] = useState<Project | null>(defaultGuest),
     [ready, setReady] = useState(false),
-    [status, setStatus] = useState("本机已保存"),
+    [status, setStatus] = useState<SaveStatus>(STATUS.local),
+    [listError, setListError] = useState(""),
+    [signingOut, setSigningOut] = useState(false),
     [loading, setLoading] = useState(false),
     [listReady, setListReady] = useState(false),
     [hasMore, setHasMore] = useState(false);
@@ -54,7 +87,8 @@ export function useProjects() {
     dirty = useRef(false),
     timer = useRef<ReturnType<typeof setTimeout> | null>(null),
     saving = useRef<Promise<boolean> | null>(null),
-    editVersion = useRef(0);
+    editVersion = useRef(0),
+    signOutLock = useRef(false);
   sessionRef.current = session;
   activeRef.current = active;
   guestsRef.current = guests;
@@ -63,11 +97,11 @@ export function useProjects() {
     guestsRef.current = ps;
     try {
       localStorage.setItem(KEY, JSON.stringify(ps));
-      setStatus("本机已保存");
+      setStatus(STATUS.local);
       return true;
-    } catch {
-      setStatus("本机保存失败");
-      toast.error("本机存储空间不足，请导出 JSON 保留方案");
+    } catch (cause) {
+      setStatus(STATUS.localFailed);
+      notify.error("本机存储空间不足，请导出 JSON 保留方案", cause);
       return false;
     }
   }, []);
@@ -76,6 +110,7 @@ export function useProjects() {
       if (!sessionRef.current) return;
       const generation = epoch.current;
       setLoading(true);
+      setListError("");
       const start = more ? cloud.length : 0;
       let result;
       try {
@@ -87,14 +122,16 @@ export function useProjects() {
       } catch (cause) {
         if (generation !== epoch.current) return;
         setLoading(false); setListReady(true);
-        toast.error("云端项目读取失败：" + (cause instanceof Error ? cause.message : "请重试"));
+        setListError(errorMessage(cause, "请检查网络后重试"));
+        notify.error("云端项目读取失败", cause);
         return;
       }
       if (generation !== epoch.current) return;
       const { data, error } = result;
       setLoading(false); setListReady(true);
       if (error) {
-        toast.error("云端项目读取失败：" + error.message);
+        setListError(error.message);
+        notify.error("云端项目读取失败", error);
         return;
       }
       const list = data.map((r) => ({
@@ -122,9 +159,10 @@ export function useProjects() {
         dirty.current = false;
         setCloud([]);
         setListReady(false);
+        setListError("");
         setLoading(false);
         const guest = defaultGuest(); activeRef.current = guest; setActive(guest);
-        setStatus('本机已保存');
+        setStatus(STATUS.local);
       }
       sessionRef.current = s;
       setSession(s);
@@ -132,7 +170,7 @@ export function useProjects() {
       if (s) setTimeout(() => void loadListRef.current(), 0);
     });
     void supabase.auth.getSession().then(({ data, error }) => {
-      if (error) toast.error("登录状态恢复失败");
+      if (error) notify.error("登录状态恢复失败", error);
       setReady(true);
       if (data.session && !sessionRef.current) {
         sessionRef.current = data.session;
@@ -153,7 +191,7 @@ export function useProjects() {
     try {
       localStorage.setItem(KEY, JSON.stringify(guestsRef.current));
     } catch {
-      setStatus("本机保存失败");
+      setStatus(STATUS.localFailed);
     }
   }, []);
   const save = useCallback(async (): Promise<boolean> => {
@@ -170,7 +208,7 @@ export function useProjects() {
     const p = activeRef.current;
     if (!p) return true;
     if (!p.cloud) {
-      if (!sessionRef.current) { try { localStorage.setItem(DEMO_KEY, JSON.stringify(p)); return true; } catch { toast.error('本机保存失败，请下载备份'); return false; } }
+      if (!sessionRef.current) { try { localStorage.setItem(DEMO_KEY, JSON.stringify(p)); return true; } catch (cause) { notify.error('本机保存失败，请下载备份', cause); return false; } }
       return persist(guestsRef.current);
     }
     if (!dirty.current) return true;
@@ -178,9 +216,9 @@ export function useProjects() {
     if (!s) return false;
     const generation = epoch.current,
       version = editVersion.current;
-    setStatus("正在云端保存…");
+    setStatus(STATUS.saving);
     const work = (async () => {
-      const { data, error } = await supabase
+      const { data, error } = await attempt(supabase
         .from("interior_design_projects")
         .update({
           name: p.name,
@@ -191,15 +229,12 @@ export function useProjects() {
         .eq("id", p.id)
         .eq("revision", p.revision)
         .select("id,revision,updated_at")
-        .maybeSingle();
+        .maybeSingle());
       if (generation !== epoch.current) return false;
       if (error || !data) {
-        setStatus(error ? "云端保存失败" : "版本冲突，请另存");
-        toast.error(
-          error
-            ? "保存失败，已保留本机恢复副本"
-            : "项目已在其它窗口修改，请另存新项目以保留当前设计",
-        );
+        setStatus(error ? STATUS.cloudFailed : STATUS.conflict);
+        if (error) notify.error("云端保存失败，已保留本机恢复副本", error);
+        else notify.fail("项目已在其它窗口修改，请另存新项目以保留当前设计");
         return false;
       }
       const next = {
@@ -225,7 +260,7 @@ export function useProjects() {
         ),
       );
       dirty.current = version !== editVersion.current;
-      setStatus(dirty.current ? "有待保存更改" : "云端已保存");
+      setStatus(dirty.current ? STATUS.dirty : STATUS.cloud);
       return true;
     })();
     saving.current = work;
@@ -246,19 +281,19 @@ export function useProjects() {
       editVersion.current++;
       if (p.cloud) {
         dirty.current = true;
-        setStatus("有待保存更改");
+        setStatus(STATUS.dirty);
         try {
           localStorage.setItem(
             "interior-recovery-" + sessionRef.current?.user.id + "-" + p.id,
             JSON.stringify(next),
           );
-        } catch {
-          toast.error("恢复副本保存失败，请立即导出 JSON");
+        } catch (cause) {
+          notify.error("恢复副本保存失败，请立即导出 JSON", cause);
         }
         if (timer.current) clearTimeout(timer.current);
         timer.current = setTimeout(() => void save(), 1000);
       } else if (!sessionRef.current) {
-        try { localStorage.setItem(DEMO_KEY, JSON.stringify(next)); setStatus('本机已保存'); } catch { setStatus('本机保存失败'); }
+        try { localStorage.setItem(DEMO_KEY, JSON.stringify(next)); setStatus(STATUS.local); } catch { setStatus(STATUS.localFailed); }
       } else persist(guestsRef.current.map((r) => (r.id === p.id ? next : r)));
     },
     [persist, save],
@@ -275,21 +310,21 @@ export function useProjects() {
         if (found) {
           activeRef.current = found;
           setActive(found);
-          setStatus("本机已保存");
+          setStatus(STATUS.local);
           return true;
         }
         return false;
       }
       setLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await attempt(supabase
         .from("interior_design_projects")
         .select("*")
         .eq("id", p.id)
-        .maybeSingle();
+        .maybeSingle());
       if (generation !== epoch.current) return false;
       setLoading(false);
       if (error || !data) {
-        toast.error("项目加载失败，请重试");
+        notify.error("项目加载失败", error ?? "项目不存在或无访问权限");
         return false;
       }
       try {
@@ -321,10 +356,10 @@ export function useProjects() {
         }
         activeRef.current = found;
         setActive(found);
-        setStatus(dirty.current ? "恢复副本待保存" : "云端已保存");
+        setStatus(dirty.current ? STATUS.recovery : STATUS.cloud);
         return true;
-      } catch {
-        toast.error("项目数据不完整，请导入备份");
+      } catch (cause) {
+        notify.error("项目数据不完整，请导入备份", cause);
         return false;
       }
     },
@@ -358,20 +393,20 @@ export function useProjects() {
       };
       if (toCloud) {
         if (!sessionRef.current) {
-          toast.error("请先登录");
+          notify.fail("请先登录");
           return false;
         }
-        const { error } = await supabase
+        const { error } = await attempt(supabase
           .from("interior_design_projects")
           .insert({
             id: next.id,
             name: next.name,
             state: next.state as unknown as Json,
             schema_version: 2,
-          });
+          }));
         if (generation !== epoch.current) return false;
         if (error) {
-          toast.error("创建云端项目失败：" + error.message);
+          notify.error("创建云端项目失败", error);
           return false;
         }
         setCloud((c) => [
@@ -384,7 +419,7 @@ export function useProjects() {
           },
           ...c,
         ]);
-        setStatus("云端已保存");
+        setStatus(STATUS.cloud);
       } else persist([next, ...guestsRef.current]);
       epoch.current++;
       dirty.current = false;
@@ -405,16 +440,16 @@ export function useProjects() {
       updatedAt: new Date().toISOString(),
       cloud: true,
     };
-    const { error } = await supabase
+    const { error } = await attempt(supabase
       .from("interior_design_projects")
       .insert({
         id: next.id,
         name: next.name,
         state: next.state as unknown as Json,
         schema_version: 2,
-      });
+      }));
     if (error) {
-      toast.error("保存到云端失败：" + error.message);
+      notify.error("保存到云端失败", error);
       return false;
     }
     setCloud((c) => [
@@ -431,24 +466,24 @@ export function useProjects() {
     dirty.current = false;
     activeRef.current = next;
     setActive(next);
-    setStatus("云端已保存");
-    toast.success("已保存到云端项目「修改的第一个版本」");
+    setStatus(STATUS.cloud);
+    notify.success("已保存到云端项目「" + next.name + "」");
     return true;
   }, []);
   const remove = useCallback(
     async (p: ProjectSummary) => {
-      if (!sessionRef.current) return;
-      if (!(await save())) return;
+      if (!sessionRef.current) return false;
+      if (!(await save())) return false;
       const generation = epoch.current;
       if (p.cloud) {
-        const { error } = await supabase
+        const { error } = await attempt(supabase
           .from("interior_design_projects")
           .delete()
-          .eq("id", p.id);
-        if (generation !== epoch.current) return;
+          .eq("id", p.id));
+        if (generation !== epoch.current) return false;
         if (error) {
-          toast.error("删除失败：" + error.message);
-          return;
+          notify.error("删除项目「" + p.name + "」失败", error);
+          return false;
         }
         setCloud((c) => c.filter((r) => r.id !== p.id));
       } else persist(guestsRef.current.filter((r) => r.id !== p.id));
@@ -458,21 +493,22 @@ export function useProjects() {
         const next = guestsRef.current[0] || null;
         activeRef.current = next;
         setActive(next);
-        setStatus("本机已保存");
+        setStatus(STATUS.local);
       }
-      toast.success("项目已删除");
+      notify.success("已删除项目「" + p.name + "」");
+      return true;
     },
     [persist, save],
   );
   const rename = useCallback(
     async (p: ProjectSummary, name: string) => {
-      if(!sessionRef.current)return;
+      if(!sessionRef.current)return false;
       const generation=epoch.current;
       name = name.trim();
-      if (!name || name.length > 100) return;
-      if (!(await save())) return;
+      if (!name || name.length > 100) { notify.fail("项目名称需为 1～100 个字符"); return false; }
+      if (!(await save())) return false;
       if (p.cloud) {
-        const { data, error } = await supabase
+        const { data, error } = await attempt(supabase
           .from("interior_design_projects")
           .update({
             name,
@@ -482,11 +518,11 @@ export function useProjects() {
           .eq("id", p.id)
           .eq("revision", p.revision)
           .select("revision")
-          .maybeSingle();
-        if(generation!==epoch.current)return;
+          .maybeSingle());
+        if(generation!==epoch.current)return false;
         if (error || !data) {
-          toast.error("重命名失败或版本已变化，请重新加载");
-          return;
+          notify.error("重命名失败", error ?? "项目版本已变化，请重新加载后重试");
+          return false;
         }
         setCloud((c) =>
           c.map((r) =>
@@ -508,22 +544,45 @@ export function useProjects() {
           setActive(next);
         }
       }
+      notify.success("已重命名为「" + name + "」");
+      return true;
     },
     [persist, save],
   );
   const duplicate = useCallback(
     async (p: ProjectSummary) => {
-      if (!(await open(p))) return;
+      if (!(await open(p))) return false;
       const current = activeRef.current;
-      if (current)
-        await create({ ...current, name: current.name + " · 副本" }, !!p.cloud);
+      if (!current) return false;
+      const name = current.name + " · 副本";
+      if (!(await create({ ...current, name }, !!p.cloud))) return false;
+      notify.success("已复制为「" + name + "」");
+      return true;
     },
     [open, create],
   );
-  const signOut = async () => {
-    if (!(await save())) return;
-    const { error } = await supabase.auth.signOut();
-    if (error) toast.error("退出失败，请重试");
+  const signOut = async (): Promise<boolean> => {
+    if (signOutLock.current) return false;
+    signOutLock.current = true;
+    setSigningOut(true);
+    try {
+      if (!(await save())) {
+        notify.fail("当前设计尚未保存成功，已取消退出登录");
+        return false;
+      }
+      const { error } = await attempt(
+        supabase.auth.signOut().then(({ error }) => ({ data: null, error })),
+      );
+      if (error) {
+        notify.error("退出登录失败", error);
+        return false;
+      }
+      notify.success("已退出登录");
+      return true;
+    } finally {
+      signOutLock.current = false;
+      setSigningOut(false);
+    }
   };
   return {
     guests,
@@ -534,6 +593,7 @@ export function useProjects() {
     status,
     loading,
     listReady,
+    listError,
     hasMore,
     update,
     save,
@@ -546,5 +606,6 @@ export function useProjects() {
     loadMore: () => loadList(true),
     reload: () => loadList(),
     signOut,
+    signingOut,
   };
 }

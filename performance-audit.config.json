@@ -5,8 +5,11 @@
     "html": "index.html",
     "entry": "index.html",
     "kind": "app",
-    "initialDynamicImports": ["_browser-ponyfill-DFBoxAHC.js"],
-    "deferredDynamicImports": [{"key":"src/features/interior/scene/Scene3D.tsx","trigger":"interaction","reason":"Only loaded when the user explicitly switches from the 2D workbench to 3D."}],
+    "initialDynamicImports": ["_browser-ponyfill-B2B7efwu.js"],
+    "deferredDynamicImports": [
+      {"key":"src/features/interior/scene/Scene3D.tsx","trigger":"interaction","reason":"Only loaded when the user explicitly switches from the 2D workbench to 3D."},
+      {"key":"src/features/interior/model/drawingExport.ts","trigger":"interaction","reason":"Only loaded when the user requests SVG or DXF drawing export."}
+    ],
     "initialFonts": []
   }]
 }

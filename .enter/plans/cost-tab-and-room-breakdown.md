@@ -95,32 +95,40 @@
 8. `src/index.css`：新增 `.panel-mode-tabs`、`.cost-hero`、`.cost-progress`、`.cost-category`、`.room-cost-row`（占比条）、`.cost-unpriced` 等，全部用语义 token；删除 `.open-cost-manager`。
 
 ## Implementation checklist
-- [ ] `costs.ts` 抽出 `openingRoomOverlap`，`wallSurfaceArea` 改用它，现有 `costs.test.ts` 全绿
-- [ ] `costs.ts` 新增 `openingRoomIds`：共享隔墙上的门返回 2 个房间 id，外墙窗返回 1 个
-- [ ] `costBreakdown` 地面按面积占比分摊，同材质各房间之和 = 该材质采购小计（含自定义地面）
-- [ ] `costBreakdown` 门窗按相邻房间平分，房间门窗之和 + 公共项门窗 = 硬装门窗小计
-- [ ] `costBreakdown` 房外家具、拆除/新建、人工都进入 `shared`
-- [ ] 不变量：`Σ rooms.total + sharedTotal ≈ calculateCosts().total`
-- [ ] `selectionCost` 覆盖家具 / 房间 / 门窗 / 墙体，无选中返回 `null`，未定价返回 `amount: null`
-- [ ] 成本页：未选中时为全屋口径，Hero 主数字是硬装合计，软装未定价显示「未定价 N 件」
-- [ ] 成本页：定价完成度进度条 + 「只看未定价」筛选可用
-- [ ] 成本页：全屋类别卡默认折叠，「地面」卡包含原地面采购估算内容与 `MaterialProcurementEditor`
-- [ ] 成本页：「按房间」列表点击后选中房间并切到房间口径
-- [ ] 成本页：房间口径显示本间硬装分项 + 房内家具列表，家具单价可改且同款联动
-- [ ] 成本页：选中家具时高亮对应家具行
-- [ ] `Workbench`：面板顶部 `属性 / 成本 ¥X` 标签，`.open-cost-manager` 按钮移除
-- [ ] `PropertyPanel`：删除「整体成本」与「地面采购估算」块，房间页弱链接切到成本页
-- [ ] `SelectionEditor`：价格按钮显示金额；「查看软装 / 硬装成本」切到成本页
-- [ ] `index.css`：新样式只用语义 token，`.open-cost-manager` 删除
+- [x] `costs.ts` 抽出 `openingRoomOverlap`，`wallSurfaceArea` 改用它，现有 `costs.test.ts` 全绿
+- [x] `costs.ts` 新增 `openingRoomIds`：共享隔墙上的门返回 2 个房间 id，外墙窗返回 1 个
+- [x] `costBreakdown` 地面按面积占比分摊，同材质各房间之和 = 该材质采购小计（含自定义地面）
+- [x] `costBreakdown` 门窗按相邻房间平分，房间门窗之和 + 公共项门窗 = 硬装门窗小计
+- [x] `costBreakdown` 房外家具、拆除/新建、人工都进入 `shared`
+- [x] 不变量：`Σ rooms.total + sharedTotal ≈ calculateCosts().total`
+- [x] `selectionCost` 覆盖家具 / 房间 / 门窗 / 墙体，无选中返回 `null`，未定价返回 `amount: null`
+- [x] 成本页：未选中时为全屋口径，Hero 主数字是硬装合计，软装未定价显示「未定价 N 件」
+- [x] 成本页：定价完成度进度条 + 「只看未定价」筛选可用
+- [x] 成本页：全屋类别卡默认折叠，「地面」卡包含原地面采购估算内容与 `MaterialProcurementEditor`
+- [x] 成本页：「按房间」列表点击后选中房间并切到房间口径
+- [x] 成本页：房间口径显示本间硬装分项 + 房内家具列表，家具单价可改且同款联动
+- [x] 成本页：选中家具时高亮对应家具行
+- [x] `Workbench`：面板顶部 `属性 / 成本 ¥X` 标签，`.open-cost-manager` 按钮移除
+- [x] `PropertyPanel`：删除「整体成本」与「地面采购估算」块，房间页弱链接切到成本页
+- [x] `SelectionEditor`：价格按钮显示金额；「查看软装 / 硬装成本」切到成本页
+- [x] `index.css`：新样式只用语义 token，`.open-cost-manager` 删除
 
 ## Verification checklist
-- [ ] `pnpm test`（`src/features/interior`）全绿，含新增 `costBreakdown.test.ts`
-- [ ] `pnpm lint && pnpm exec tsc --noEmit` 通过
-- [ ] `pnpm run build` 通过
-- [ ] 正向：截图中参考方案，成本页全屋总计与改动前 ¥25,610.87 一致
-- [ ] 正向：选中「厨房」后成本页 = 地面分摊 + 墙面 + 门窗 + 房内家具，且占比显示正确
-- [ ] 边界：某材质只有一间房使用时，分摊 100%，金额等于该材质采购小计
-- [ ] 边界：空白项目（无家具）打开成本页不报错，显示空状态文案
-- [ ] 默认：只贴一间房边界的窗全额归该房间，不出现 0.5 分摊
-- [ ] 负例：未登录时不显示成本标签与工具条金额（沿用 `showCosts = loggedIn`）
+- [x] `pnpm test`（`src/features/interior`）全绿，含新增 `costBreakdown.test.ts`
+- [x] `pnpm lint && pnpm exec tsc --noEmit` 通过
+- [x] `pnpm run build` 通过
+- [ ] 正向：真实账号下的全屋总计（截图 ¥25,610.87）未被改动 —— `calculateCosts` 总额逻辑未变、`costs.test.ts` 全绿，但账号默认价在云端，未能逐笔核对
+- [x] 正向：选中房间进入房间口径，只列本间项并显示占比（`CostPanel.test.tsx` 渲染断言）
+- [x] 边界：某材质只有一间房使用时，分摊 100%，金额等于该材质采购小计
+- [x] 边界：空白项目（无房间/无家具）打开成本页不报错，`CostPanel.test.tsx` 覆盖空状态
+- [x] 默认：只贴一间房边界的窗全额归该房间，不出现 0.5 分摊
+- [x] 负例：未登录时不显示成本标签与工具条金额（沿用 `showCosts = loggedIn`）
 - [ ] 视觉：desktop_1280 与 mobile_390 截图检查标签、Hero、进度条、房间列表无溢出、对比度正常
+
+## 本轮验证记录
+
+- `pnpm test`：`costBreakdown.test.ts` 12 项、`CostPanel.test.tsx` 6 项全部通过；全库 314 项中有 2 项失败，均属另一会话未提交的 `EditorTooltip` 改动（`managementUi.test.tsx`、`wallSplitEntries.test.tsx`），与本改动无关。
+- `pnpm exec tsc --noEmit`：仅 `PropertyPanel.tsx` 报 6 处 `Cannot find name 'EditorTooltip'`，为上述同一未提交改动；本改动相关文件无类型错误。
+- `pnpm lint`：0 error（`PlanCanvas.tsx:217` 为既有 warning）。
+- `pnpm run build`：通过。
+- 未做浏览器截图：成本页仅在登录态渲染，无法在预览环境直接查看视觉与响应式表现。

@@ -16,6 +16,7 @@ import {
 import { categories, library } from "../data/catalog";
 import { formatMeters } from '../model/lengthUnits';
 import { FurnitureShape } from "./FurnitureShape";
+import { EditorTooltip } from '@/components/ui/editor-tooltip';
 import type { LibraryItem, Tool } from "../model/types";
 const libraryCategories = [...categories, '硬装'];
 const categoryIcons: Record<string, typeof Armchair> = { 卧室: BedDouble, 客厅: Armchair, 餐厨: UtensilsCrossed, 卫浴: Bath, 家电: Monitor, 书房: BookOpen, 硬装: BrickWall };
@@ -41,12 +42,16 @@ export function Library({
     <>
       <div className="panel-heading">
         <span>构件与家具</span>
-        <span className="mini-label">素材库</span>
+        <EditorTooltip label="素材库" description="点击或拖入画布即可添加，尺寸按真实比例绘制">
+          <span className="mini-label">素材库</span>
+        </EditorTooltip>
       </div>
-      {onNew && <button className="new-furniture-button" onClick={onNew}>
-        <Plus size={15} />
-        新建家具 / 账号库
-      </button>}
+      {onNew && <EditorTooltip label="新建家具 / 账号库" description="上传图片或填写尺寸，创建自己的家具款式">
+        <button className="new-furniture-button" onClick={onNew}>
+          <Plus size={15} />
+          新建家具 / 账号库
+        </button>
+      </EditorTooltip>}
       <div className="library-search">
         <Search size={15} />
         <input
@@ -61,32 +66,39 @@ export function Library({
         {libraryCategories.map((c) => {
           const Icon = categoryIcons[c];
           return (
-            <button
-              key={c}
-              className={c === category && !query ? "active" : ""}
-              onClick={() => {
-                setCategory(c);
-                setQuery("");
-              }}
-            >
-              <Icon size={16} />
-              {c}
-            </button>
+            <EditorTooltip key={c} label={c} description={`只看「${c}」分类的构件与家具`}>
+              <button
+                className={c === category && !query ? "active" : ""}
+                onClick={() => {
+                  setCategory(c);
+                  setQuery("");
+                }}
+              >
+                <Icon size={16} />
+                {c}
+              </button>
+            </EditorTooltip>
           );
         })}
       </div>
       {blank && (category === '硬装' || !!query && ['墙体', '门', '窗'].some(name => name.includes(query))) && (
         <div className="structural-items">
-          <button onClick={() => setTool("wall")}>
-            <SquareDashed size={18} />
-            墙体
-          </button>
-          <button onClick={() => setTool("door")}>
-            <DoorOpen size={18} />门
-          </button>
-          <button onClick={() => setTool("window")}>
-            <ScanLine size={18} />窗
-          </button>
+          <EditorTooltip label="墙体" description="绘制隔墙工具">
+            <button onClick={() => setTool("wall")}>
+              <SquareDashed size={18} />
+              墙体
+            </button>
+          </EditorTooltip>
+          <EditorTooltip label="门" description="点击墙体放置门洞口">
+            <button onClick={() => setTool("door")}>
+              <DoorOpen size={18} />门
+            </button>
+          </EditorTooltip>
+          <EditorTooltip label="窗" description="点击墙体放置窗洞口">
+            <button onClick={() => setTool("window")}>
+              <ScanLine size={18} />窗
+            </button>
+          </EditorTooltip>
         </div>
       )}
       <div className="library-subheading">
@@ -95,38 +107,43 @@ export function Library({
       </div>
       <div className="library-grid">
         {items.map((it, i) => (
-          <button
+          <EditorTooltip
             key={it.name + i}
-            className="library-item"
-            draggable
-            onDragStart={(e) =>
-              e.dataTransfer.setData(
-                "application/interior-item",
-                JSON.stringify(it),
-              )
-            }
-            onClick={() => add(it)}
-            aria-label={"添加" + it.name}
+            label={it.name}
+            description={`点击或拖入画布添加 · ${formatMeters(it.w)} × ${formatMeters(it.d)} m`}
           >
-            <span className="library-visual">
-              {it.imageUrl ? (
-                <img src={it.imageUrl} crossOrigin="anonymous" alt={it.name} />
-              ) : (
-                <svg
-                  viewBox={`${-it.w / 2 - 100} ${-it.d / 2 - 100} ${it.w + 200} ${it.d + 200}`}
-                >
-                  <FurnitureShape f={it} />
-                </svg>
-              )}
-              <span className="item-add">
-                <Plus size={12} />
+            <button
+              className="library-item"
+              draggable
+              onDragStart={(e) =>
+                e.dataTransfer.setData(
+                  "application/interior-item",
+                  JSON.stringify(it),
+                )
+              }
+              onClick={() => add(it)}
+              aria-label={"添加" + it.name}
+            >
+              <span className="library-visual">
+                {it.imageUrl ? (
+                  <img src={it.imageUrl} crossOrigin="anonymous" alt={it.name} />
+                ) : (
+                  <svg
+                    viewBox={`${-it.w / 2 - 100} ${-it.d / 2 - 100} ${it.w + 200} ${it.d + 200}`}
+                  >
+                    <FurnitureShape f={it} />
+                  </svg>
+                )}
+                <span className="item-add">
+                  <Plus size={12} />
+                </span>
               </span>
-            </span>
-            <b>{it.name}</b>
-            <small>
-              {formatMeters(it.w)} × {formatMeters(it.d)} m
-            </small>
-          </button>
+              <b>{it.name}</b>
+              <small>
+                {formatMeters(it.w)} × {formatMeters(it.d)} m
+              </small>
+            </button>
+          </EditorTooltip>
         ))}
       </div>
       {!items.length && (

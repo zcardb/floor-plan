@@ -10,6 +10,7 @@ import { parseMeterDraft } from '../model/lengthUnits';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ColorPickerField } from './ColorPickerField';
 import { FloorSwatch } from './FloorSwatch';
+import { notify } from '@/lib/notify';
 
 type Props = { categoryField: ReactNode; accountOnly: boolean; onCancel: () => void; onSave: (floor: CustomFloor, account: boolean) => Promise<void> };
 
@@ -24,10 +25,10 @@ export function CustomFloorForm({ categoryField, accountOnly, onCancel, onSave }
   const preview = customFloorMaterial({ ...floor(), length: parseMeterDraft(length) || 800, width: parseMeterDraft(width) || 800 });
   const submit = async () => {
     const item = floor();
-    if (!validCustomFloor(item)) { setError(seamless ? '请填写名称及非负单价' : '请填写名称、0.05～20 m 的单块尺寸及非负单价'); return; }
+    if (!validCustomFloor(item)) { const message = seamless ? '请填写名称及非负单价' : '请填写名称、0.05～20 m 的单块尺寸及非负单价'; setError(message); notify.fail(message); return; }
     setSaving(true); setError('');
     try { await onSave(item, account || accountOnly); }
-    catch (e) { setError(e instanceof Error ? e.message : '保存失败，请重试'); }
+    catch (e) { setError(e instanceof Error ? e.message : '保存失败，请重试'); notify.error('地面「' + item.name + '」保存失败', e); }
     finally { setSaving(false); }
   };
   return <form onSubmit={e => { e.preventDefault(); void submit(); }}>

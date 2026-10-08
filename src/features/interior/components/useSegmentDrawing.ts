@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
+import { notify } from "@/lib/notify";
 import { resolveWallPoint, resolveWallHover, type WallSnap } from '../model/wallDrawing';
 import type { Design, Point } from '../model/types';
 
@@ -47,7 +47,7 @@ export function useSegmentDrawing(enabled: boolean, design: React.RefObject<Desi
         chain.current = { start: result.point, first: c.first };
         setDraft({ a: result.point, b: result.point });
       }
-    } catch (e) { toast.error(e instanceof Error ? e.message : '线段无效'); }
+    } catch (e) { notify.fail(e instanceof Error ? e.message : '线段无效'); }
   };
   return { draft, candidate, hover, clear, move,
     clearHover: () => { setCandidate(null); setHover(null); },

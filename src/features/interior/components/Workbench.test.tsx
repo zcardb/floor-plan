@@ -17,13 +17,16 @@ vi.mock('react', async original => ({
 vi.mock('@/components/ui/confirm-dialog', () => ({ useConfirm: () => vi.fn() }));
 vi.mock('./CustomFurnitureDialog', () => ({ CustomFurnitureDialog: () => null }));
 vi.mock('../model/useDesign', () => ({ useDesign: () => ({
-  design: state.design, current: { current: state.design }, change: state.change, commit: state.commit, preview: vi.fn(), undo: vi.fn(), redo: vi.fn(),
+  design: state.design, current: { get current() { return state.design; } }, change: state.change, commit: state.commit, preview: vi.fn(), undo: vi.fn(), redo: vi.fn(),
   counts: { undo: 0, redo: 0 }, sizeTransaction: { flush: vi.fn(), cancel: state.cancel },
 }) }));
 import { Workbench } from './Workbench';
 import { blankDesign, referenceDesign } from '../data/templates';
 import { PlanCanvas } from './PlanCanvas';
 import { DimensionEditDialog } from './DimensionEditDialog';
+import { WallSplitDialog } from './WallSplitDialog';
+import { PropertyPanel } from './PropertyPanel';
+import { SelectionEditor } from './SelectionEditor';
 import { perimeterDimensions } from '../model/perimeterDimensions';
 import type { DimensionSegment } from '../model/perimeterDimensions';
 
@@ -44,7 +47,7 @@ function render() {
   return nodes(Workbench({
     project: { id: 'test', name: '测试', state: state.design } as Project,
     projectNavigation: { projectList: [], hasMore: false, listLoading: false, onOpen: noop, onLoadMore: noop },
-    update: noop, status: '', loggedIn: false, projects: noop, login: noop, logout: noop,
+    update: noop, status: { kind: 'saved' as const, label: '' }, loggedIn: false, projects: noop, login: noop, logout: noop,
     save: noop, cloudSave: noop, importProject: noop,
   }));
 }
@@ -53,6 +56,35 @@ function tools(tree: Node[]) {
   return nodes(group);
 }
 beforeEach(() => { state.values = []; state.cursor = 0; state.effects = []; state.design = blankDesign(); state.change.mockReset(); state.commit.mockReset(); state.cancel.mockReset(); });
+describe('分割墙段共享入口及快照提交', () => {
+  const open = (entry: typeof PropertyPanel | typeof SelectionEditor = PropertyPanel) => {
+    const canvas = render().find(n => n.type === PlanCanvas)!;
+    (canvas.props.select as (s: unknown) => void)({ kind: 'wall', id: 'outer-0' });
+    (render().find(n => n.type === entry)!.props.splitWall as (id: string) => void)('outer-0');
+    return render().find(n => n.type === WallSplitDialog)!;
+  };
+  it('两个入口共用分割dialog，应用一次历史并选中指定段，取消不提交', () => {
+    for (const entry of [PropertyPanel, SelectionEditor]) {
+      state.values = []; state.commit.mockClear();
+      const dialog = open(entry), before = state.design;
+      expect(state.commit).not.toHaveBeenCalled();
+      (dialog.props.onApply as (cuts: number[], selected: number) => void)([300, 800], 1);
+      expect(state.commit).toHaveBeenCalledOnce(); expect(state.commit.mock.calls[0][1]).toBe(before);
+      const next = state.commit.mock.calls[0][0] as Design;
+      expect(next.walls).toHaveLength(6);
+      expect(state.values[0]).toEqual({ kind: 'wall', id: next.walls[1].id });
+      expect(render().some(n => n.type === WallSplitDialog)).toBe(false);
+    }
+    state.values = []; state.commit.mockClear(); (open().props.onClose as () => void)(); expect(state.commit).not.toHaveBeenCalled();
+  });
+  it('设计改变拒绝过期提交，已拆墙不能打开，3D入口隐藏', () => {
+    const dialog = open(); state.design = structuredClone(state.design!);
+    expect(() => (dialog.props.onApply as (cuts: number[], i: number) => void)([300], 0)).toThrow('设计已变化');
+    expect(state.commit).not.toHaveBeenCalled(); expect(render().some(n => n.type === WallSplitDialog)).toBe(false);
+    state.values = []; state.design!.demolished = ['outer-0']; expect(open()).toBeUndefined();
+    state.values[2] = '3d'; expect(render().find(n => n.type === PropertyPanel)!.props.splitWall).toBeUndefined();
+  });
+});
 describe('承重墙删除保护', () => {
   it('选中用户标记墙或其洞口后删除均不提交', () => {
     const d = blankDesign(); d.walls.push({ id: 'bearing', kind: 'partition', a: [3000, 0], b: [3000, 6000], thickness: 240, loadBearing: true });
@@ -96,7 +128,7 @@ describe('尺寸驱动墙体提交链', () => {
 });
 describe('2D 常用工具与更多菜单', () => {
   it('直接展示选择、绘墙、门、窗，并切换对应画布工具及选中态', () => {
-    expect(tools(render()).filter(node => node.props.label).map(node => node.props.label)).toEqual(['选择', '绘墙', '门', '窗']);
+    expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['选择', '绘墙', '门', '窗']);
     for (const [label, tool] of [['选择', 'select'], ['绘墙', 'wall'], ['门', 'door'], ['窗', 'window']]) {
       const button = tools(render()).find(node => node.props.label === label)!;
       (button.props.onClick as () => void)();
@@ -160,9 +192,9 @@ describe('2D 常用工具与更多菜单', () => {
   });
   it('参考户型不开放绘墙和门窗，3D 保持原有工具', () => {
     state.design = referenceDesign();
-    expect(tools(render()).filter(node => node.props.label).map(node => node.props.label)).toEqual(['选择']);
+    expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['选择']);
     state.values[2] = '3d';
-    expect(tools(render()).filter(node => node.props.label).map(node => node.props.label)).toEqual(['鸟瞰', '漫游', '俯视', '剖切']);
+    expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['鸟瞰', '漫游', '俯视', '剖切']);
     expect(tools(render()).some(node => node.props['aria-label'] === '更多')).toBe(false);
   });
 });

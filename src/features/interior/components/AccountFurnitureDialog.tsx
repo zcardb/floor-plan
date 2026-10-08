@@ -8,6 +8,7 @@ import { PriceInput } from './PriceInput';
 import { FurnitureShape } from './FurnitureShape';
 import { FurnitureGeometryEditor } from './FurnitureGeometryEditor';
 import { formatMeters } from '../model/lengthUnits';
+import { notify } from '@/lib/notify';
 export function AccountFurnitureDialog({item,isCustom,referencePrice,onOpenChange,onChanged,applyDefaultPrice,remove,saveGeometry,commitBusy=false,commitError='',retryPrice,saved=false}:{commitBusy?:boolean;commitError?:string;retryPrice?:()=>Promise<boolean>;saved?:boolean;saveGeometry?:(item:LibraryItem)=>Promise<boolean>;applyDefaultPrice:(price:number|null)=>Promise<boolean>;item:LibraryItem;isCustom:boolean;referencePrice:number|null;onOpenChange:(v:boolean)=>void;onChanged:(next:LibraryItem|null)=>void;remove:(catalogId:string)=>Promise<boolean>}){
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[confirming,setConfirming]=useState(false);
   const [editorPhase,setEditorPhase]=useState<'idle'|'generating'|'saving'>('idle');
@@ -17,20 +18,20 @@ export function AccountFurnitureDialog({item,isCustom,referencePrice,onOpenChang
   const retry=async()=>{
     if(working||!retryPrice)return;
     setBusy(true);setError('');
-    try { if(!await retryPrice())setError('未能保存，请重试。'); }
+    try { if(await retryPrice())notify.success('「'+item.name+'」账号默认单价已保存'); else setError('未能保存，请重试。'); }
     catch(cause){setError(cause instanceof Error?cause.message:'保存失败，请重试');}
     finally{setBusy(false);}
   };
-  const applyPrice=async(price:number|null)=>{
-    if(working||retryPrice)return;setBusy(true);setError('');
-    try { if(await applyDefaultPrice(price))onChanged({...item,price}); else setError('未能保存，本次修改已保留，请重试。'); }
-    catch(e){setError(e instanceof Error?e.message:'保存失败，请重试');}
+  const applyPrice=async(price:number|null):Promise<boolean>=>{
+    if(working||retryPrice)return false;setBusy(true);setError('');
+    try { const ok=await applyDefaultPrice(price); if(ok)onChanged({...item,price}); else setError('未能保存，本次修改已保留，请重试。'); return ok; }
+    catch(e){setError(e instanceof Error?e.message:'保存失败，请重试');notify.error('「'+item.name+'」单价保存失败',e);return false;}
     finally {setBusy(false);}
   };
   const drop=async()=>{
     if(working||retryPrice)return;setBusy(true);setError('');
-    try { await remove(item.catalogId!);setConfirming(false);onChanged(null);onOpenChange(false); }
-    catch(e){setError(e instanceof Error?e.message:'删除失败，请重试');setConfirming(false);}
+    try { await remove(item.catalogId!);setConfirming(false);onChanged(null);onOpenChange(false);notify.success('已删除家具「'+item.name+'」'); }
+    catch(e){setError(e instanceof Error?e.message:'删除失败，请重试');setConfirming(false);notify.error('删除家具「'+item.name+'」失败',e);}
     finally {setBusy(false);}
   };
   return <>
@@ -52,7 +53,7 @@ export function AccountFurnitureDialog({item,isCustom,referencePrice,onOpenChang
             </dl>
             {isCustom?<div className="cms-detail-price">
               <span className="cms-detail-label">账号默认单价 · 元 / 件</span>
-              <PriceInput key={String(item.price)} value={item.price??null} disabled={working||!!retryPrice} label={item.name+'账号默认单价'} onApply={v=>void applyPrice(v)}/>
+              <PriceInput key={String(item.price)} value={item.price??null} disabled={working||!!retryPrice} label={item.name+'账号默认单价'} onApply={applyPrice}/>
               <small>仅影响未单独调价的项目；项目内改价仍以项目为准。</small>
             </div>:<div className="cms-detail-price">
               <span className="cms-detail-label">当前账号单价</span>

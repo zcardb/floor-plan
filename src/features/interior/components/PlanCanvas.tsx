@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { canEditWall, canDemolishWall, isBearingWall, openingIsLocked } from '../model/wallPolicy';
 import {
   area,
@@ -271,13 +271,14 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
             a.download = "户型方案-2D.png";
             a.click();
             setTimeout(() => URL.revokeObjectURL(u), 1000);
-          }
+            notify.success("2D 图片已下载");
+          } else notify.error("2D 图片导出失败", "浏览器未能生成图片，请重试");
           URL.revokeObjectURL(url);
         });
       };
       img.onerror = () => {
         URL.revokeObjectURL(url);
-        toast.error("图片导出失败，请重试");
+        notify.error("2D 图片导出失败", "图纸渲染失败，请重试");
       };
       img.src = url;
     },
@@ -286,15 +287,17 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     const d = current.current,
       w = d.walls.find((w) => w.id === id)!;
     if (!canDemolishWall(w))
-      return toast.error("承重墙和建筑外墙不可拆除");
+      return notify.fail("承重墙和建筑外墙不可拆除");
+    const restoring = d.demolished.includes(id);
     commit(
       rebuildRooms({
         ...d,
-        demolished: d.demolished.includes(id)
+        demolished: restoring
           ? d.demolished.filter((v) => v !== id)
           : [...d.demolished, id],
       }),
     );
+    notify.success(restoring ? "已恢复墙体" : "已拆除墙体，可撤销恢复");
   };
   const finish = (cancel = false) => {
     const dr = drag.current;
@@ -319,7 +322,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
             : d;
         commit(next, dr.before);
         if (next.rooms.length !== dr.before.rooms.length)
-          toast.info("房间划分已更新，请检查名称与地面材质");
+          notify.info("房间划分已更新，请检查名称与地面材质");
       }
       return;
     }
@@ -357,7 +360,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
             mm(e),
           );
         } catch {
-          toast.error("无法放置此构件");
+          notify.fail("无法放置此构件");
         }
       }}
       onPointerDown={(e) => {
@@ -407,13 +410,13 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         if ((tool === "door" || tool === "window") && wid) {
           const wall = design.walls.find((w) => w.id === wid)!;
           if (isBearingWall(wall)) {
-            toast.error("承重墙不可新增开口");
+            notify.fail("承重墙不可新增开口");
             return;
           }
           const width = tool === "door" ? 900 : 1200,
             L = length(wall);
           if (width > L) {
-            toast.error("此墙段长度不足");
+            notify.fail("此墙段长度不足");
             return;
           }
           const offset = Math.min(
@@ -427,7 +430,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
                 Math.abs(o.offset - offset) < (o.width + width) / 2,
             )
           ) {
-            toast.error("门窗不能重叠");
+            notify.fail("门窗不能重叠");
             return;
           }
           const o = {

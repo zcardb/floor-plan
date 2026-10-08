@@ -6,7 +6,7 @@ import { PriceInput } from './PriceInput';
 import { MaterialProcurementEditor } from './MaterialProcurementEditor';
 export function AccountCostDialog({ group, entryKey, name, groupTitle, unit, design, change, price, done, busy = false, error = '', saved = false, retry }: {
   group: PriceGroup; entryKey: string; name: string; groupTitle: string; unit: string; design: Design;
-  change: (fn: (design: Design) => Design) => void; price: number | null; done: () => void;
+  change: (fn: (design: Design) => Design) => void | Promise<boolean>; price: number | null; done: () => void;
   busy?: boolean; error?: string; saved?: boolean; retry?: () => void;
 }) {
   return <Dialog open onOpenChange={open => { if (!open && !busy) done(); }}>

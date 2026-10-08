@@ -8,6 +8,7 @@ import { serializeDrawing, downloadDrawing } from './drawingExport';
 import { furnitureDrawing } from './furnitureDrawing';
 import { perimeterDimensions } from './perimeterDimensions';
 import { editDimensionWalls } from './dimensionWallEdit';
+import { splitWall } from './wallSplit';
 import type { Layers } from './types';
 const layers:Layers={grid:true,dims:true,labels:true,furn:true,bearing:true,snap:true};
 function fixture(){
@@ -18,6 +19,16 @@ function fixture(){
   d.measures.push({id:'measure',a:[0,0],b:[1000,0]});return d;
 }
 describe('工程交换图',()=>{
+  it('分割后SVG/DXF保持洞口和净距，子段均能矢量导出',()=>{
+    const d=fixture(), next=splitWall(d,'partition',[50,300]).design;
+    const before=createDrawingDocument(d,layers),after=createDrawingDocument(next,layers);
+    expect(after.dimensions.map(dim=>dim.measurement)).toEqual(before.dimensions.map(dim=>dim.measurement));
+    expect(after.entities.filter(e=>e.layer==='OPENINGS')).toEqual(before.entities.filter(e=>e.layer==='OPENINGS'));
+    expect(XMLValidator.validate(serializeDrawing(next,layers,'svg'))).toBe(true);
+    const parsed=new DxfParser().parseSync(serializeDrawing(next,layers,'dxf'))!;
+    expect(parsed.entities.filter(e=>e.type==='DIMENSION')).toHaveLength(after.dimensions.length);
+    expect(parsed.entities.filter(e=>e.layer==='WALLS')).toHaveLength(after.entities.filter(e=>e.layer==='WALLS').length);
+  });
   it('尺寸驱动后DXF/SVG和JSON保留真实新净距，而非文字覆盖', () => {
     const d = fixture();
     const binding = perimeterDimensions(d)!.chains.flatMap(c => c.segments).find(s => s.binding?.startWalls.includes('partition') && s.binding.endWalls.includes('outer-1'))!.binding!;

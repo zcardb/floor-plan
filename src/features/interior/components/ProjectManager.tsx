@@ -1,28 +1,97 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { ManagementLoading } from './ManagementLoading';
-import { Plus,Pencil,Copy,Trash2,LayoutTemplate,RefreshCw,Loader2 } from 'lucide-react';
+import { LoadError } from './LoadError';
+import { Plus, Pencil, Copy, Trash2, LayoutTemplate, RefreshCw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select,SelectContent,SelectItem,SelectTrigger,SelectValue } from '@/components/ui/select';
-import { Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription } from '@/components/ui/dialog';
-import { AlertDialog,AlertDialogContent,AlertDialogHeader,AlertDialogTitle,AlertDialogDescription,AlertDialogFooter,AlertDialogCancel,AlertDialogAction } from '@/components/ui/alert-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog';
+import { useAsyncAction } from '@/hooks/useAsyncAction';
+import { notify } from '@/lib/notify';
 import { createProject } from '../data/templates';
-import type { useProjects,ProjectSummary } from '../cloud/useProjects';
-const iconAction='h-8 w-8 text-muted-foreground hover:text-foreground';
-export function ProjectManager({projects,opened}:{projects:ReturnType<typeof useProjects>;opened:()=>void}){
-  const [creating,setCreating]=useState(false),[name,setName]=useState(''),[template,setTemplate]=useState<'blank'|'reference'>('blank'),[rename,setRename]=useState<ProjectSummary|null>(null),[deleting,setDeleting]=useState<ProjectSummary|null>(null),[busy,setBusy]=useState(false);
-  const list:ProjectSummary[]=[...projects.guests.map(g=>({id:g.id,name:g.name,updatedAt:g.updatedAt,revision:g.revision,cloud:false})),...projects.cloud].sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
-  const opening=useRef(false);
-  const [openingId,setOpeningId]=useState<string|null>(null);
-  const open=async(row:ProjectSummary)=>{if(opening.current)return;opening.current=true;setOpeningId(row.id);try{if(await projects.open(row))opened();}finally{opening.current=false;setOpeningId(null);}};
-  const rowActions=(row:ProjectSummary)=><><Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'重命名'+row.name} onClick={()=>{setRename(row);setName(row.name);}}><Pencil size={16}/></Button>{row.cloud&&<Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'复制'+row.name} onClick={()=>void projects.duplicate(row)}><Copy size={16}/></Button>}<Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'删除'+row.name} onClick={()=>setDeleting(row)}><Trash2 size={16}/></Button></>;
-  return <><div className="cms-heading"><div><h1>项目管理</h1><p>把每个空间的灵感，保存成独立方案。</p></div><div className="cms-heading-actions"><Button variant="ghost" size="icon" className="cms-refresh-button" aria-label="刷新项目" title="刷新项目" disabled={projects.loading} aria-busy={projects.loading&&!openingId} onClick={()=>void projects.reload()}><RefreshCw className={projects.loading&&!openingId?'animate-spin':''}/></Button><Button className="cms-create-button" onClick={()=>{setName('');setCreating(true);}}><Plus/>新建项目</Button></div></div>
-  {projects.loading&&!list.length&&<ManagementLoading label="加载项目"/>}
-  {!projects.loading&&!list.length&&<div className="cms-empty"><LayoutTemplate size={36}/><h2>还没有设计项目</h2><p>新建空白户型，开始规划你的空间。</p></div>}
-  <div className="cms-project-grid">{list.map(row=><article className="cms-card" key={row.id}><button type="button" className="cms-card-open" aria-label={'打开项目 '+row.name} aria-busy={openingId===row.id} disabled={!!openingId} onClick={()=>void open(row)}/>{openingId===row.id?<Loader2 className="animate-spin" size={30}/>:<LayoutTemplate size={30}/>}<h2>{row.name}</h2><p>{new Date(row.updatedAt).toLocaleDateString('zh-CN')}</p><div className="cms-card-actions">{rowActions(row)}</div></article>)}</div>
-  {projects.hasMore&&<div className="project-list-footer"><Button variant="ghost" disabled={projects.loading} onClick={()=>void projects.loadMore()}>加载更多</Button></div>}
-  <Dialog open={creating||!!rename} onOpenChange={v=>{if(!v){setCreating(false);setRename(null);}}}><DialogContent><DialogHeader><DialogTitle>{rename?'重命名项目':'新建项目'}</DialogTitle><DialogDescription>项目内容与单独调价互不影响。</DialogDescription></DialogHeader><form className="cms-form" onSubmit={async e=>{e.preventDefault();setBusy(true);if(rename){await projects.rename(rename,name);setRename(null);}else if(await projects.create(createProject(template,name),true)){setCreating(false);opened();}setBusy(false);}}><div className="cms-field"><Label htmlFor="project-name">项目名称</Label><Input id="project-name" required maxLength={100} value={name} onChange={e=>setName(e.target.value)}/></div>{!rename&&<div className="cms-field"><Label htmlFor="project-template">户型模板</Label><Select value={template} onValueChange={v=>setTemplate(v as typeof template)}><SelectTrigger id="project-template"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="blank">空白户型</SelectItem><SelectItem value="reference">参考户型</SelectItem></SelectContent></Select></div>}<Button disabled={busy}>{busy?'正在保存…':'确认保存'}</Button></form></DialogContent></Dialog>
-  <AlertDialog open={!!deleting} onOpenChange={v=>{if(!v)setDeleting(null);}}><AlertDialogContent className="confirm-dialog"><AlertDialogHeader><AlertDialogTitle>删除「{deleting?.name}」？</AlertDialogTitle><AlertDialogDescription>不可撤销。请先下载需要保留的方案。</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>取消</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={()=>{if(deleting)void projects.remove(deleting);setDeleting(null);}}>删除项目</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+import type { useProjects, ProjectSummary } from '../cloud/useProjects';
+
+const iconAction = 'h-8 w-8 text-muted-foreground hover:text-foreground';
+type Projects = ReturnType<typeof useProjects>;
+
+export function ProjectManager({ projects, opened }: { projects: Projects; opened: () => void }) {
+  const [creating, setCreating] = useState(false), [name, setName] = useState(''), [template, setTemplate] = useState<'blank' | 'reference'>('blank');
+  const [rename, setRename] = useState<ProjectSummary | null>(null), [deleting, setDeleting] = useState<ProjectSummary | null>(null);
+  const list: ProjectSummary[] = [
+    ...projects.guests.map(g => ({ id: g.id, name: g.name, updatedAt: g.updatedAt, revision: g.revision, cloud: false })),
+    ...projects.cloud,
+  ].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+
+  // 卡片级操作共用一把锁：同一时间只处理一个项目，避免打开/复制/删除互相打架。
+  const rowAction = useAsyncAction(
+    async (kind: 'open' | 'duplicate' | 'remove', row: ProjectSummary) => {
+      if (kind === 'open') { if (await projects.open(row)) opened(); return; }
+      if (kind === 'duplicate') { if (await projects.duplicate(row)) opened(); return; }
+      if (await projects.remove(row)) setDeleting(null);
+    },
+    (kind, row) => kind + ':' + row.id,
+  );
+  const submit = useAsyncAction(async () => {
+    if (rename) { if (await projects.rename(rename, name)) setRename(null); return; }
+    const project = createProject(template, name);
+    if (await projects.create(project, true)) { setCreating(false); notify.success('已创建项目「' + project.name + '」'); opened(); }
+  });
+  const busyRow = rowAction.pendingKey?.split(':')[1] ?? null;
+  const isPending = (kind: string, row: ProjectSummary) => rowAction.pendingKey === kind + ':' + row.id;
+  const refreshing = projects.loading && !rowAction.pending;
+
+  const rowActions = (row: ProjectSummary) => <>
+    <Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'重命名' + row.name} disabled={rowAction.pending} onClick={() => { setRename(row); setName(row.name); }}><Pencil size={16} /></Button>
+    {row.cloud && <Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'复制' + row.name} disabled={rowAction.pending} aria-busy={isPending('duplicate', row)} onClick={() => void rowAction.run('duplicate', row)}>{isPending('duplicate', row) ? <Loader2 className="animate-spin" size={16} /> : <Copy size={16} />}</Button>}
+    <Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'删除' + row.name} disabled={rowAction.pending} onClick={() => setDeleting(row)}><Trash2 size={16} /></Button>
+  </>;
+
+  return <>
+    <div className="cms-heading">
+      <div><h1>项目管理</h1><p>把每个空间的灵感，保存成独立方案。</p></div>
+      <div className="cms-heading-actions">
+        <Button variant="ghost" size="icon" className="cms-refresh-button" aria-label="刷新项目" title="刷新项目" disabled={projects.loading} aria-busy={refreshing} onClick={() => void projects.reload()}><RefreshCw className={refreshing ? 'animate-spin' : ''} /></Button>
+        <Button className="cms-create-button" disabled={rowAction.pending} onClick={() => { setName(''); setCreating(true); }}><Plus />新建项目</Button>
+      </div>
+    </div>
+    {projects.listError && <LoadError title="云端项目读取失败" message={projects.listError} retrying={projects.loading} onRetry={() => void projects.reload()} />}
+    {projects.loading && !list.length && <ManagementLoading label="加载项目" />}
+    {!projects.loading && !projects.listError && !list.length && <div className="cms-empty"><LayoutTemplate size={36} /><h2>还没有设计项目</h2><p>新建空白户型，开始规划你的空间。</p></div>}
+    <div className="cms-project-grid">{list.map(row => {
+      const working = busyRow === row.id;
+      return <article className={'cms-card' + (working ? ' is-busy' : '')} key={row.id} aria-busy={working}>
+        <button type="button" className="cms-card-open" aria-label={'打开项目 ' + row.name} disabled={rowAction.pending} onClick={() => void rowAction.run('open', row)} />
+        {working ? <Loader2 className="animate-spin" size={30} /> : <LayoutTemplate size={30} />}
+        <h2>{row.name}</h2>
+        <p>{isPending('remove', row) ? '正在删除…' : isPending('duplicate', row) ? '正在复制…' : new Date(row.updatedAt).toLocaleDateString('zh-CN')}</p>
+        <div className="cms-card-actions">{rowActions(row)}</div>
+      </article>;
+    })}</div>
+    {projects.hasMore && <div className="project-list-footer"><Button variant="ghost" loading={projects.loading && !!list.length} disabled={projects.loading} onClick={() => void projects.loadMore()}>加载更多</Button></div>}
+
+    <Dialog open={creating || !!rename} onOpenChange={v => { if (!v && !submit.pending) { setCreating(false); setRename(null); } }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>{rename ? '重命名项目' : '新建项目'}</DialogTitle><DialogDescription>项目内容与单独调价互不影响。</DialogDescription></DialogHeader>
+        <form className="cms-form" onSubmit={e => { e.preventDefault(); void submit.run(); }}>
+          <fieldset className="contents" disabled={submit.pending}>
+            <div className="cms-field"><Label htmlFor="project-name">项目名称</Label><Input id="project-name" required maxLength={100} value={name} onChange={e => setName(e.target.value)} /></div>
+            {!rename && <div className="cms-field"><Label htmlFor="project-template">户型模板</Label><Select value={template} onValueChange={v => setTemplate(v as typeof template)} disabled={submit.pending}><SelectTrigger id="project-template"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="blank">空白户型</SelectItem><SelectItem value="reference">参考户型</SelectItem></SelectContent></Select></div>}
+          </fieldset>
+          <Button loading={submit.pending} disabled={!name.trim()}>{submit.pending ? '正在保存…' : '确认保存'}</Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+
+    <AlertDialog open={!!deleting} onOpenChange={v => { if (!v && !rowAction.pending) setDeleting(null); }}>
+      <AlertDialogContent className="confirm-dialog">
+        <AlertDialogHeader><AlertDialogTitle>删除「{deleting?.name}」？</AlertDialogTitle><AlertDialogDescription>不可撤销。请先下载需要保留的方案。</AlertDialogDescription></AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={rowAction.pending}>取消</AlertDialogCancel>
+          <Button variant="destructive" loading={!!deleting && isPending('remove', deleting)} onClick={() => { if (deleting) void rowAction.run('remove', deleting); }}>删除项目</Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </>;
 }

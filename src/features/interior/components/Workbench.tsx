@@ -4,6 +4,11 @@ import { canEditWall, openingIsLocked } from '../model/wallPolicy';
 import { DrawingExportItems } from './DrawingExportItems';
 import type { DrawingFormat } from '../model/drawingExport';
 import { DimensionEditDialog } from './DimensionEditDialog';
+import { WallSplitDialog } from './WallSplitDialog';
+import { splitWall as splitWallModel } from '../model/wallSplit';
+import { mergeWall as mergeWallModel, wallMergeGroup } from '../model/wallMerge';
+import { isBearingWall } from '../model/wallPolicy';
+import { length } from '../model/geometry';
 import { dimensionEditPolicy, editDimensionWalls } from '../model/dimensionWallEdit';
 import type { DimensionBinding } from '../model/dimensionBinding';
 import type { DimensionSegment } from '../model/perimeterDimensions';
@@ -13,7 +18,6 @@ import {
   Check,
   ChevronDown,
   Cloud,
-  CircleDollarSign,
   Copy,
   DoorOpen,
   Download,
@@ -50,7 +54,7 @@ import {
   X,
 } from "lucide-react";
 import { WorkbenchHeader, type WorkbenchHeaderProps } from "./WorkbenchHeader";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -60,17 +64,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { EditorTooltip } from "@/components/ui/editor-tooltip";
 import { useDesign } from "../model/useDesign";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { center, norm, pushOut, rebuildRooms } from "../model/geometry";
@@ -90,29 +90,34 @@ import { validateDesign } from "../model/validation";
 import { Library } from "./Library";
 import { PropertyPanel } from "./PropertyPanel";
 import { CostPanel } from "./CostPanel";
+import { PanelModeTabs } from "./PanelModeTabs";
 import { CustomFurnitureDialog } from "./CustomFurnitureDialog";
 import { SelectionEditor, type SelectionEditorHandle } from "./SelectionEditor";
 import { furnitureKey } from "../model/costs";
 import type { ScreenRect } from "../model/selectionAnchor";
 import { PlanCanvas, type CanvasHandle } from "./PlanCanvas";
 import type { Scene3D, SceneHandle, SceneOptions } from "../scene/Scene3D";
+import { isSaveProblem, type SaveStatus } from "../cloud/useProjects";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 type SceneComponent = typeof Scene3D;
 interface Props {
   project: Project;
   projectNavigation: Pick<WorkbenchHeaderProps, 'projectList' | 'hasMore' | 'listLoading' | 'onOpen' | 'onLoadMore'>;
   update: (d: Design) => void;
-  status: string;
+  status: SaveStatus;
   loggedIn: boolean;
   email?: string;
   projects: () => void;
   login: () => void;
   logout: () => void;
+  loggingOut?: boolean;
   save: () => void;
-  cloudSave: () => void;
-  importProject: (d: Design, name: string) => void;
+  cloudSave: () => Promise<boolean>;
+  importProject: (d: Design, name: string) => Promise<boolean>;
 }
 function ToolButton({
   label,
+  note,
   shortcut,
   active,
   children,
@@ -120,6 +125,7 @@ function ToolButton({
   disabled = false,
 }: {
   label: string;
+  note?: string;
   shortcut?: string;
   active?: boolean;
   children: React.ReactNode;
@@ -127,26 +133,20 @@ function ToolButton({
   disabled?: boolean;
 }) {
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className="tool-button-wrap">
-          <button
-            className={"tool-button " + (active ? "active" : "")}
-            onClick={onClick}
-            disabled={disabled}
-            aria-label={label}
-            aria-pressed={active}
-          >
-            {children}
-            <span>{label}</span>
-          </button>
-        </span>
-      </TooltipTrigger>
-      <TooltipContent side="bottom" sideOffset={8} className="tool-tooltip">
-        <span>{label}</span>
-        {shortcut && <kbd>{shortcut}</kbd>}
-      </TooltipContent>
-    </Tooltip>
+    <EditorTooltip label={label} description={note} shortcut={shortcut}>
+      <span className="tool-button-wrap">
+        <button
+          className={"tool-button " + (active ? "active" : "")}
+          onClick={onClick}
+          disabled={disabled}
+          aria-label={label}
+          aria-pressed={active}
+        >
+          {children}
+          <span>{label}</span>
+        </button>
+      </span>
+    </EditorTooltip>
   );
 }
 export function Workbench(p: Props) {
@@ -192,23 +192,51 @@ export function Workbench(p: Props) {
     sizeTransaction.cancel();
     const before = model.current.current;
     const policy = dimensionEditPolicy(before, segment.binding);
-    if (policy.reason || !segment.binding) { toast.info(policy.reason || '此尺寸仅供查看'); return; }
+    if (policy.reason || !segment.binding) { notify.info(policy.reason || '此尺寸仅供查看'); return; }
     setSelection(null);
     setDimensionEdit({ binding: segment.binding, before });
   };
-  const [costOpen, setCostOpen] = useState(false),
+  const [wallSplit, setWallSplit] = useState<{ wallId: string; before: Design } | null>(null);
+  const splitValid = wallSplit && view === '2d' && tool === 'select' && d === wallSplit.before &&
+    selection?.kind === 'wall' && selection.id === wallSplit.wallId;
+  useEffect(() => { if (wallSplit && !splitValid) setWallSplit(null); }, [wallSplit, splitValid]);
+  const openWallSplit = (wallId: string) => {
+    sizeTransaction.cancel();
+    const before = model.current.current;
+    if (!before.walls.some(w => w.id === wallId) || before.demolished.includes(wallId)) return;
+    setDimensionEdit(null);
+    setDrawer(null);
+    setWallSplit({ wallId, before });
+  };
+  const cancelWallSplit = async (wallId: string) => {
+    sizeTransaction.cancel();
+    const before = model.current.current;
+    const group = wallMergeGroup(before, wallId);
+    if (group.length < 2) return;
+    const bearing = group.some(isBearingWall);
+    const ok = await confirm({ title: '取消分割并合并墙段？', description: `将 ${group.length} 段合并为 ${(group.reduce((sum, w) => sum + length(w), 0) / 1000).toFixed(2)} m 的整段墙。${bearing ? '承重保护将保留；若原来只有局部用户标记，合并后整段将被保护。' : '不会自动标记承重。'} 门窗位置保持不变，可撤销。`, confirmText: '取消分割' });
+    if (!ok) return;
+    try {
+      if (model.current.current !== before) throw new Error('设计已变化，请重新选择墙体');
+      const result = mergeWallModel(before, wallId);
+      commit(result.design, before);
+      setSelection({ kind: 'wall', id: result.selectedId });
+      notify.success('已取消分割，连续墙段已合并');
+    } catch (e) { notify.fail(e instanceof Error ? e.message : '取消分割失败'); }
+  };
+  const [panelMode, setPanelMode] = useState<"props" | "cost">("props"),
     [customOpen, setCustomOpen] = useState(false);
   const saveCustom = (item: LibraryItem) => {
     if (!p.loggedIn) return;
     change((d) => d.customCatalog?.some((i) => i.catalogId === item.catalogId)
       ? d : { ...d, customCatalog: [...(d.customCatalog || []), item] });
-    toast.success("家具已加入当前项目目录");
+    notify.success("家具已加入当前项目目录");
   };
   const saveCustomFloor = (floor: CustomFloor) => {
     if (!p.loggedIn) return;
     change((d) => d.customFloors?.some((f) => f.key === floor.key)
       ? d : { ...d, customFloors: [...(d.customFloors || []), floor] });
-    toast.success("地面已加入当前项目，可在房间材质中选择");
+    notify.success("地面已加入当前项目，可在房间材质中选择");
   };
   const stage = useRef<HTMLElement>(null),
     editor = useRef<SelectionEditorHandle>(null);
@@ -242,7 +270,7 @@ export function Workbench(p: Props) {
           setView("3d");
         }
       } catch {
-        toast.error("3D 引擎加载失败，请重试；2D 仍可编辑");
+        notify.error("3D 引擎加载失败，2D 仍可编辑", "模块加载失败，请检查网络后重试");
       } finally {
         if (mounted.current) setSceneLoading(false);
       }
@@ -278,7 +306,7 @@ export function Workbench(p: Props) {
       setSelection({ kind: "furniture", id: f.id });
       setTool("select");
       setDrawer(null);
-      toast.success("已添加 " + it.name);
+      notify.success("已添加 " + it.name);
     },
     [d, selection, view, change],
   );
@@ -308,24 +336,29 @@ export function Workbench(p: Props) {
     };
     change((d) => ({ ...d, furniture: [...d.furniture, next] }));
     setSelection({ kind: "furniture", id: next.id });
+    notify.success(`已复制「${f.name}」`);
   }, [d, selection, change]);
   const remove = useCallback(() => {
     if (!selection) return;
     const s = selection;
-    if (s.kind === "furniture")
+    if (s.kind === "furniture") {
+      const f = d.furniture.find((f) => f.id === s.id);
       change((d) => ({
         ...d,
         furniture: d.furniture.filter((f) => f.id !== s.id),
       }));
+      if (f) notify.success(`已删除「${f.name}」，可撤销恢复`);
+    }
     else if (s.kind === "opening") {
       const opening = d.openings.find(o => o.id === s.id);
-      if (opening && openingIsLocked(d, opening.wallId)) return toast.error('承重墙上的门窗洞口不可删除');
+      if (opening && openingIsLocked(d, opening.wallId)) return notify.fail('承重墙上的门窗洞口不可删除');
       change((d) => ({ ...d, openings: d.openings.filter((o) => o.id !== s.id) }));
+      if (opening) notify.success(`已删除${opening.kind === "door" ? "门" : "窗"}，可撤销恢复`);
     }
     else if (s.kind === "wall") {
       const w = d.walls.find((w) => w.id === s.id);
       if (!w || !canEditWall(d, w))
-        return toast.error("此墙体不可删除");
+        return notify.fail("此墙体不可删除");
       change((d) =>
         rebuildRooms({
           ...d,
@@ -333,6 +366,7 @@ export function Workbench(p: Props) {
           openings: d.openings.filter((o) => o.wallId !== s.id),
         }),
       );
+      notify.success("已删除墙体，可撤销恢复");
     }
     setSelection(null);
   }, [d, selection, change]);
@@ -404,15 +438,30 @@ export function Workbench(p: Props) {
     if (view === "2d") canvas.current?.exportImage();
     else scene.current?.shot();
   };
-  const exportDrawing = async (format: DrawingFormat) => {
-    sizeTransaction.cancel();
+  const cloudSave = useAsyncAction(p.cloudSave);
+  const importJson = useAsyncAction(async (f: File) => {
+    try {
+      const raw = JSON.parse(await f.text()),
+        d = validateDesign(raw.state || raw);
+      return await p.importProject(d, raw.name || f.name.replace(/\.json$/, ""));
+    } catch (e) {
+      notify.error("导入失败，文件格式不正确", e);
+      return false;
+    }
+  });
+  const exportDrawingAction = useAsyncAction(async (format: DrawingFormat) => {
     const snapshot = structuredClone(model.current.current);
     try {
       const { downloadDrawing } = await import('../model/drawingExport');
       downloadDrawing(snapshot, layers, format, p.project.name);
+      notify.success(format === 'dxf' ? '已导出 CAD 图纸（DXF）' : '已导出矢量图（SVG）');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : '工程图导出失败');
+      notify.error('工程图导出失败', error);
     }
+  });
+  const exportDrawing = (format: DrawingFormat) => {
+    sizeTransaction.cancel();
+    return exportDrawingAction.run(format);
   };
   const exportJson = () => {
     sizeTransaction.cancel();
@@ -426,6 +475,7 @@ export function Workbench(p: Props) {
     a.download = p.project.name + ".json";
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+    notify.success("JSON 备份已下载");
   };
   const clearFurniture = async () => {
     if (!d.furniture.length) return;
@@ -436,8 +486,10 @@ export function Workbench(p: Props) {
       tone: "destructive",
     });
     if (!ok) return;
+    const count = d.furniture.length;
     change((d) => ({ ...d, furniture: [] }));
     setSelection(null);
+    notify.success(`已清空 ${count} 件家具，可撤销恢复`);
   };
   const resetDesign = async () => {
     const ok = await confirm({
@@ -449,9 +501,12 @@ export function Workbench(p: Props) {
     if (!ok) return;
     change(() => (d.template === "blank" ? blankDesign() : referenceDesign()));
     setSelection(null);
+    notify.success("已重置为初始模板，可撤销恢复");
   };
   const clearMeasures = () => {
-    if (d.measures.length) change((d) => ({ ...d, measures: [] }));
+    if (!d.measures.length) return;
+    change((d) => ({ ...d, measures: [] }));
+    notify.success("已清除全部测量");
   };
   const tip =
     tool === "wall"
@@ -473,7 +528,7 @@ export function Workbench(p: Props) {
         (hidePanel ? "hide-properties" : "")
       }
     >
-      {p.loggedIn ? <WorkbenchHeader {...p.projectNavigation} project={p.project} email={p.email} view={view} onBack={()=>{sizeTransaction.cancel();p.projects();}} onOpen={async row=>{sizeTransaction.cancel();return p.projectNavigation.onOpen(row);}} onLogout={p.logout} onDownload={exportImage} onExportDrawing={format => void exportDrawing(format)} /> : <header className="main-header">
+      {p.loggedIn ? <WorkbenchHeader {...p.projectNavigation} project={p.project} email={p.email} view={view} onBack={()=>{sizeTransaction.cancel();p.projects();}} onOpen={async row=>{sizeTransaction.cancel();return p.projectNavigation.onOpen(row);}} onLogout={p.logout} loggingOut={p.loggingOut} onDownload={exportImage} onExportDrawing={format => void exportDrawing(format)} /> : <header className="main-header">
         <div className="brand-mark">
           <LayoutTemplate size={23} />
         </div>
@@ -487,36 +542,36 @@ export function Workbench(p: Props) {
         <span className="project-title">参考户型</span>
         <span className="save-indicator">
           <span
-            className={
-              p.status.includes("失败") || p.status.includes("冲突")
-                ? "error-dot"
-                : "status-dot"
-            }
+            className={isSaveProblem(p.status) ? "error-dot" : "status-dot"}
           />
-          {p.status}
+          {p.status.label}
         </span>
         <div className="header-spacer" />
         <>
-        <Button size="sm" className="login-button" onClick={p.login}>
-          <UserRound />
-          <span>登录</span>
-        </Button>
+        <EditorTooltip label="登录" description="登录后项目自动保存到云端，可管理多个方案">
+          <Button size="sm" className="login-button" onClick={p.login}>
+            <UserRound />
+            <span>登录</span>
+          </Button>
+        </EditorTooltip>
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="save-button">
-              <Save />
-              <span>保存</span>
-              <ChevronDown size={12} />
-            </Button>
-          </DropdownMenuTrigger>
+          <EditorTooltip label="保存" description="下载图片 / 工程图，或保存到云端">
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="save-button">
+                <Save />
+                <span>保存</span>
+                <ChevronDown size={12} />
+              </Button>
+            </DropdownMenuTrigger>
+          </EditorTooltip>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={exportImage}>
               <Download />
               保存到本地
             </DropdownMenuItem>
-            <DrawingExportItems disabled={view !== '2d'} onExport={format => void exportDrawing(format)} />
-            <DropdownMenuItem onClick={p.cloudSave}>
-              <Cloud />
+            <DrawingExportItems disabled={view !== '2d' || exportDrawingAction.pending} onExport={format => void exportDrawing(format)} />
+            <DropdownMenuItem disabled={cloudSave.pending} onClick={() => void cloudSave.run()}>
+              {cloudSave.pending ? <Loader2 className="animate-spin" /> : <Cloud />}
               保存到云端
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -524,31 +579,45 @@ export function Workbench(p: Props) {
       </header>}
       <div className="main-toolbar">
         <div className="view-switch">
-          <button
-            className={view === "2d" ? "active" : ""}
-            onClick={() => void toggleView("2d")}
+          <EditorTooltip
+            label="2D 平面"
+            description="俯视平面图，布置家具与墙体"
+            shortcut="T"
           >
-            <LayoutTemplate size={15} />
-            2D 平面
-          </button>
-          <button
-            className={view === "3d" ? "active" : ""}
-            onClick={() => void toggleView("3d")}
+            <button
+              className={view === "2d" ? "active" : ""}
+              onClick={() => void toggleView("2d")}
+            >
+              <LayoutTemplate size={15} />
+              2D 平面
+            </button>
+          </EditorTooltip>
+          <EditorTooltip
+            label="3D 场景"
+            description="立体预览，可漫游与查看光照"
+            shortcut="T"
             disabled={sceneLoading}
           >
-            {sceneLoading ? (
-              <Loader2 className="animate-spin" size={15} />
-            ) : (
-              <Layers3 size={15} />
-            )}
-            3D 场景
-          </button>
+            <button
+              className={view === "3d" ? "active" : ""}
+              onClick={() => void toggleView("3d")}
+              disabled={sceneLoading}
+            >
+              {sceneLoading ? (
+                <Loader2 className="animate-spin" size={15} />
+              ) : (
+                <Layers3 size={15} />
+              )}
+              3D 场景
+            </button>
+          </EditorTooltip>
         </div>
         <span className="toolbar-divider" />
         {view === "2d" ? (
           <div className="tool-group">
             <ToolButton
               label="选择"
+              note="点选对象查看属性，拖动移动家具与隔墙"
               shortcut="V"
               active={tool === "select"}
               onClick={() => setTool("select")}
@@ -558,6 +627,7 @@ export function Workbench(p: Props) {
             {d.template === "blank" && (
               <ToolButton
                 label="绘墙"
+                note="连续点击绘制隔墙，双击 / 右键 / Enter 完成"
                 active={tool === "wall"}
                 onClick={() => setTool("wall")}
               >
@@ -566,27 +636,29 @@ export function Workbench(p: Props) {
             )}
             {d.template === "blank" && (
               <>
-                <ToolButton label="门" active={tool === "door"} onClick={() => setTool("door")}>
+                <ToolButton label="门" note="点击墙体放置门" active={tool === "door"} onClick={() => setTool("door")}>
                   <DoorOpen size={16} />
                 </ToolButton>
-                <ToolButton label="窗" active={tool === "window"} onClick={() => setTool("window")}>
+                <ToolButton label="窗" note="点击墙体放置窗" active={tool === "window"} onClick={() => setTool("window")}>
                   <ScanLine size={16} />
                 </ToolButton>
               </>
             )}
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className={
-                    "tool-button " + (tool === "measure" || tool === "demolish" ? "active" : "")
-                  }
-                  aria-label="更多"
-                >
-                  <Settings2 size={16} />
-                  <span>更多</span>
-                  <ChevronDown size={12} />
-                </button>
-              </DropdownMenuTrigger>
+              <EditorTooltip label="更多" description="测量距离、清除测量线、拆改非承重墙">
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className={
+                      "tool-button " + (tool === "measure" || tool === "demolish" ? "active" : "")
+                    }
+                    aria-label="更多"
+                  >
+                    <Settings2 size={16} />
+                    <span>更多</span>
+                    <ChevronDown size={12} />
+                  </button>
+                </DropdownMenuTrigger>
+              </EditorTooltip>
               <DropdownMenuContent>
                 <DropdownMenuItem onSelect={() => setTool("measure")}>
                   <Ruler />
@@ -629,6 +701,7 @@ export function Workbench(p: Props) {
           <div className="tool-group">
             <ToolButton
               label="鸟瞰"
+              note="拖动旋转视角，滚轮缩放"
               active={sceneOptions.mode === "orbit"}
               onClick={() => setSceneOptions((o) => ({ ...o, mode: "orbit" }))}
             >
@@ -636,6 +709,7 @@ export function Workbench(p: Props) {
             </ToolButton>
             <ToolButton
               label="漫游"
+              note="以人的视角在室内行走"
               active={sceneOptions.mode === "walk"}
               onClick={() => {
                 setSelection(null);
@@ -644,11 +718,12 @@ export function Workbench(p: Props) {
             >
               <UserRound size={16} />
             </ToolButton>
-            <ToolButton label="俯视" onClick={() => scene.current?.top()}>
+            <ToolButton label="俯视" note="切换到正上方俯视角度" onClick={() => scene.current?.top()}>
               <LayoutTemplate size={16} />
             </ToolButton>
             <ToolButton
               label="剖切"
+              note="隐藏墙体上半部分，看清室内布局"
               active={sceneOptions.cut}
               onClick={() => setSceneOptions((o) => ({ ...o, cut: !o.cut }))}
             >
@@ -660,6 +735,7 @@ export function Workbench(p: Props) {
         <div className="tool-group">
           <ToolButton
             label="撤销"
+            note="回退上一步修改"
             shortcut="Ctrl Z"
             onClick={undo}
             disabled={!counts.undo}
@@ -668,6 +744,7 @@ export function Workbench(p: Props) {
           </ToolButton>
           <ToolButton
             label="重做"
+            note="恢复刚撤销的修改"
             shortcut="Ctrl ⇧ Z"
             onClick={redo}
             disabled={!counts.redo}
@@ -677,11 +754,12 @@ export function Workbench(p: Props) {
         </div>
         <span className="toolbar-divider" />
         <div className="tool-group danger-actions">
-          <ToolButton label="重置方案" onClick={resetDesign}>
+          <ToolButton label="重置方案" note="墙体、家具与测量恢复为初始模板，可撤销" onClick={resetDesign}>
             <RotateCcw size={16} />
           </ToolButton>
           <ToolButton
             label="清空家具"
+            note={d.furniture.length ? "移除所有家具，保留墙体与材质，可撤销" : "当前没有家具"}
             disabled={!d.furniture.length}
             onClick={clearFurniture}
           >
@@ -691,13 +769,15 @@ export function Workbench(p: Props) {
         <div className="header-spacer" />
         <div className="toolbar-right">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="tool-button">
-                <Layers3 size={16} />
-                <span>图层</span>
-                <ChevronDown size={12} />
-              </button>
-            </DropdownMenuTrigger>
+            <EditorTooltip label="图层" description="显示或隐藏尺寸、房间名、家具、网格、承重高亮与吸附">
+              <DropdownMenuTrigger asChild>
+                <button className="tool-button" aria-label="图层">
+                  <Layers3 size={16} />
+                  <span>图层</span>
+                  <ChevronDown size={12} />
+                </button>
+              </DropdownMenuTrigger>
+            </EditorTooltip>
             <DropdownMenuContent align="end">
               {(
                 ["dims", "labels", "furn", "grid", "bearing", "snap"] as const
@@ -732,19 +812,21 @@ export function Workbench(p: Props) {
             </DropdownMenuContent>
           </DropdownMenu>
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="tool-button">
-                <FolderOpen size={16} />
-                <span>文件</span>
-                <ChevronDown size={12} />
-              </button>
-            </DropdownMenuTrigger>
+            <EditorTooltip label="文件" description="下载图片与工程图、保存、导出或导入方案 JSON">
+              <DropdownMenuTrigger asChild>
+                <button className="tool-button" aria-label="文件">
+                  <FolderOpen size={16} />
+                  <span>文件</span>
+                  <ChevronDown size={12} />
+                </button>
+              </DropdownMenuTrigger>
+            </EditorTooltip>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={exportImage}>
                 <Download />
                 {view === "2d" ? "下载 2D 图片" : "下载当前 3D 视角"}
               </DropdownMenuItem>
-              <DrawingExportItems disabled={view !== '2d'} onExport={format => void exportDrawing(format)} />
+              <DrawingExportItems disabled={view !== '2d' || exportDrawingAction.pending} onExport={format => void exportDrawing(format)} />
               <DropdownMenuItem onClick={()=>{sizeTransaction.cancel();p.save();}}>
                 <Save />
                 立即保存当前项目
@@ -768,8 +850,8 @@ export function Workbench(p: Props) {
                 下载方案 JSON
               </DropdownMenuItem>
               {p.loggedIn && (
-                <DropdownMenuItem onClick={() => file.current?.click()}>
-                  <FolderOpen />
+                <DropdownMenuItem disabled={importJson.pending} onClick={() => file.current?.click()}>
+                  {importJson.pending ? <Loader2 className="animate-spin" /> : <FolderOpen />}
                   导入 JSON 为新项目
                 </DropdownMenuItem>
               )}
@@ -790,26 +872,30 @@ export function Workbench(p: Props) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <button
-            className="toolbar-icon"
-            title="操作帮助"
-            onClick={() => setHelp(true)}
-          >
-            <HelpCircle size={17} />
-          </button>
-          <button
-            className="toolbar-icon"
-            title="全屏"
-            onClick={() => {
-              if (document.fullscreenElement) void document.exitFullscreen();
-              else
-                document.documentElement
-                  .requestFullscreen?.()
-                  .catch(() => toast.info("当前浏览器不支持全屏"));
-            }}
-          >
-            <Expand size={17} />
-          </button>
+          <EditorTooltip label="操作帮助" description="三步上手说明">
+            <button
+              className="toolbar-icon"
+              aria-label="操作帮助"
+              onClick={() => setHelp(true)}
+            >
+              <HelpCircle size={17} />
+            </button>
+          </EditorTooltip>
+          <EditorTooltip label="全屏" description="全屏查看设计，再次点击退出">
+            <button
+              className="toolbar-icon"
+              aria-label="全屏"
+              onClick={() => {
+                if (document.fullscreenElement) void document.exitFullscreen();
+                else
+                  document.documentElement
+                    .requestFullscreen?.()
+                    .catch(() => notify.info("当前浏览器不支持全屏"));
+              }}
+            >
+              <Expand size={17} />
+            </button>
+          </EditorTooltip>
         </div>
       </div>
       <aside
@@ -836,20 +922,24 @@ export function Workbench(p: Props) {
             </span>
           </div>
           <div className="stage-pane-buttons">
-            <button onClick={() => togglePane("lib")} title="家具库">
-              {hideLib ? (
-                <PanelLeftOpen size={16} />
-              ) : (
-                <PanelLeftClose size={16} />
-              )}
-            </button>
-            <button onClick={() => togglePane("panel")} title="属性面板">
-              {hidePanel ? (
-                <PanelRightOpen size={16} />
-              ) : (
-                <PanelRightClose size={16} />
-              )}
-            </button>
+            <EditorTooltip label={hideLib ? "展开家具库" : "收起家具库"} description="左侧构件与家具面板">
+              <button onClick={() => togglePane("lib")} aria-label={hideLib ? "展开家具库" : "收起家具库"}>
+                {hideLib ? (
+                  <PanelLeftOpen size={16} />
+                ) : (
+                  <PanelLeftClose size={16} />
+                )}
+              </button>
+            </EditorTooltip>
+            <EditorTooltip label={hidePanel ? "展开属性面板" : "收起属性面板"} description="右侧属性与成本面板">
+              <button onClick={() => togglePane("panel")} aria-label={hidePanel ? "展开属性面板" : "收起属性面板"}>
+                {hidePanel ? (
+                  <PanelRightOpen size={16} />
+                ) : (
+                  <PanelRightClose size={16} />
+                )}
+              </button>
+            </EditorTooltip>
           </div>
         </div>
         {view === "2d" ? (
@@ -883,7 +973,7 @@ export function Workbench(p: Props) {
             add={add}
             onError={() => {
               setView("2d");
-              toast.error("设备无法启动 3D，请继续使用 2D 编辑");
+              notify.fail("设备无法启动 3D，请继续使用 2D 编辑");
             }}
             onAnchor={onAnchor}
             exitWalk={() => setSceneOptions((o) => ({ ...o, mode: "orbit" }))}
@@ -897,31 +987,42 @@ export function Workbench(p: Props) {
         {tool !== "select" && tool !== "wall" && (
           <div className="mode-hint">
             {tip}
-            <button onClick={() => setTool("select")}>
-              <X size={13} />
-            </button>
+            <EditorTooltip label="退出当前工具" description="回到选择模式" shortcut="Esc">
+              <button onClick={() => setTool("select")} aria-label="退出当前工具">
+                <X size={13} />
+              </button>
+            </EditorTooltip>
           </div>
         )}
         {view === "3d" && (
           <div className="scene-light-control">
-            <button
-              onClick={() =>
-                setSceneOptions((o) => ({ ...o, night: !o.night }))
-              }
+            <EditorTooltip
+              label={sceneOptions.night ? "切换到白天" : "切换到夜晚"}
+              description="改变 3D 场景的光照氛围"
+              side="top"
             >
-              {sceneOptions.night ? <Moon size={16} /> : <Sun size={16} />}
-            </button>
-            <input
-              aria-label="日照时间"
-              type="range"
-              min={7}
-              max={18}
-              step={0.25}
-              value={sceneOptions.hour}
-              onChange={(e) =>
-                setSceneOptions((o) => ({ ...o, hour: Number(e.target.value) }))
-              }
-            />
+              <button
+                aria-label={sceneOptions.night ? "切换到白天" : "切换到夜晚"}
+                onClick={() =>
+                  setSceneOptions((o) => ({ ...o, night: !o.night }))
+                }
+              >
+                {sceneOptions.night ? <Moon size={16} /> : <Sun size={16} />}
+              </button>
+            </EditorTooltip>
+            <EditorTooltip label="日照时间" description="拖动调整 7:00–18:00 的阳光角度" side="top">
+              <input
+                aria-label="日照时间"
+                type="range"
+                min={7}
+                max={18}
+                step={0.25}
+                value={sceneOptions.hour}
+                onChange={(e) =>
+                  setSceneOptions((o) => ({ ...o, hour: Number(e.target.value) }))
+                }
+              />
+            </EditorTooltip>
             <span>
               {String(Math.floor(sceneOptions.hour)).padStart(2, "0")}:
               {String(Math.round((sceneOptions.hour % 1) * 60)).padStart(
@@ -938,38 +1039,55 @@ export function Workbench(p: Props) {
           </div>
         )}
         <div className="canvas-zoom">
-          <button
-            aria-label="缩小"
-            onClick={() =>
-              view === "2d"
-                ? canvas.current?.zoom(0.8)
-                : scene.current?.zoom(0.8)
-            }
+          <EditorTooltip label="缩小" side="top">
+            <button
+              aria-label="缩小"
+              onClick={() =>
+                view === "2d"
+                  ? canvas.current?.zoom(0.8)
+                  : scene.current?.zoom(0.8)
+              }
+            >
+              <Minus size={16} />
+            </button>
+          </EditorTooltip>
+          <EditorTooltip
+            label={view === "2d" ? "当前显示比例" : "3D 视图"}
+            description={view === "2d" ? "可在「文件」菜单切换 1:60 / 1:100" : undefined}
+            side="top"
           >
-            <Minus size={16} />
-          </button>
-          <span>
-            {view === "2d" ? "1:" + Math.round(96 / 25.4 / scale) : "3D"}
-          </span>
-          <button
-            aria-label="放大"
-            onClick={() =>
-              view === "2d"
-                ? canvas.current?.zoom(1.25)
-                : scene.current?.zoom(1.25)
-            }
-          >
-            <Plus size={16} />
-          </button>
+            <span tabIndex={0}>
+              {view === "2d" ? "1:" + Math.round(96 / 25.4 / scale) : "3D"}
+            </span>
+          </EditorTooltip>
+          <EditorTooltip label="放大" side="top">
+            <button
+              aria-label="放大"
+              onClick={() =>
+                view === "2d"
+                  ? canvas.current?.zoom(1.25)
+                  : scene.current?.zoom(1.25)
+              }
+            >
+              <Plus size={16} />
+            </button>
+          </EditorTooltip>
           <i />
-          <button
-            aria-label="适应窗口"
-            onClick={() =>
-              view === "2d" ? canvas.current?.fit() : scene.current?.iso()
-            }
+          <EditorTooltip
+            label="适应窗口"
+            description={view === "2d" ? "让整个户型完整显示在画布中" : "回到默认斜视角"}
+            shortcut="F"
+            side="top"
           >
-            <Maximize2 size={15} />
-          </button>
+            <button
+              aria-label="适应窗口"
+              onClick={() =>
+                view === "2d" ? canvas.current?.fit() : scene.current?.iso()
+              }
+            >
+              <Maximize2 size={15} />
+            </button>
+          </EditorTooltip>
         </div>
         {dimensionValid && <DimensionEditDialog design={dimensionEdit.before} binding={dimensionEdit.binding}
           onClose={() => setDimensionEdit(null)} onApply={(millimeters, fixed) => {
@@ -979,7 +1097,18 @@ export function Workbench(p: Props) {
             setDimensionEdit(null);
             if (next !== current) commit(next, current);
           }} />}
+        {splitValid && <WallSplitDialog design={wallSplit.before} wallId={wallSplit.wallId}
+          onClose={() => setWallSplit(null)} onApply={(cuts, selectedSegment) => {
+            const current = model.current.current;
+            if (current !== wallSplit.before) throw new Error('设计已变化，请重新选择墙体');
+            const result = splitWallModel(current, wallSplit.wallId, cuts, selectedSegment);
+            commit(result.design, current);
+            setWallSplit(null);
+            setSelection({ kind: 'wall', id: result.selectedId });
+          }} />}
         <SelectionEditor
+          splitWall={view === '2d' ? openWallSplit : undefined}
+          mergeWall={view === '2d' ? id => void cancelWallSplit(id) : undefined}
           key={`${selection?.kind}:${selection?.id}`}
           ref={editor}
           design={d}
@@ -993,53 +1122,57 @@ export function Workbench(p: Props) {
           transaction={sizeTransaction} showCosts={p.loggedIn}
           hidden={tool !== 'select' || !!drawer || (view === "3d" && sceneOptions.mode === "walk")}
           details={() => {
-            setCostOpen(false);
+            setPanelMode("props");
             if (matchMedia("(max-width:1100px)").matches) setDrawer("panel");
             else setHidePanel(false);
           }}
           costs={() => {
-            setCostOpen(true);
+            setPanelMode("cost");
             if (matchMedia("(max-width:1100px)").matches) setDrawer("panel");
             else setHidePanel(false);
           }}
         />
-        <button className="mobile-library" onClick={() => togglePane("lib")}>
-          <Armchair size={19} />
-          家具库
-        </button>
+        <EditorTooltip label="家具库" description="打开构件与家具列表" side="top">
+          <button className="mobile-library" onClick={() => togglePane("lib")}>
+            <Armchair size={19} />
+            家具库
+          </button>
+        </EditorTooltip>
       </main>
       <aside
         className={
           "property-panel " + (drawer === "panel" ? "drawer-open" : "")
         }
       >
+        {p.loggedIn && (
+          <PanelModeTabs
+            design={d}
+            mode={panelMode}
+            onChange={setPanelMode}
+          />
+        )}
         <div className="panel-scroll">
-          {p.loggedIn && costOpen ? (
+          {p.loggedIn && panelMode === "cost" ? (
             <CostPanel
               design={d}
+              selection={selection}
               change={change}
-              back={() => setCostOpen(false)}
+              select={select}
+              back={() => select(null)}
             />
           ) : (
-            <>
-              {p.loggedIn && <button
-                className="open-cost-manager"
-                onClick={() => setCostOpen(true)}
-              >
-                <CircleDollarSign size={16} />
-                软装 / 硬装成本
-              </button>}
-              <PropertyPanel
-                transaction={sizeTransaction} showCosts={p.loggedIn}
-                design={d}
-                selection={selection}
-                select={select}
-                change={change}
-                duplicate={duplicate}
-                remove={remove}
-                rotate={() => rotate()}
-              />
-            </>
+            <PropertyPanel
+              splitWall={view === '2d' && tool === 'select' ? openWallSplit : undefined}
+              transaction={sizeTransaction} showCosts={p.loggedIn}
+              design={d}
+              selection={selection}
+              select={select}
+              change={change}
+              duplicate={duplicate}
+              remove={remove}
+              rotate={() => rotate()}
+              openCosts={() => setPanelMode("cost")}
+            />
           )}
         </div>
       </aside>
@@ -1067,8 +1200,8 @@ export function Workbench(p: Props) {
           X 0 / Y 0 m
         </span>
         <span className="status-tip" title={tip}>{tip}</span>
-        {(tool === 'wall' || tool === 'measure') && <button className="status-finish-wall" onClick={() => setTool('select')}>{tool === 'wall' ? '完成绘墙' : '完成测量'}</button>}
-        {p.loggedIn && <span className={'workspace-save-status' + (p.status.includes('失败') || p.status.includes('冲突') ? ' is-error' : '')} role="status" title={p.status}><span className={p.status.includes('失败') || p.status.includes('冲突') ? 'error-dot' : 'status-dot'} />{p.status}</span>}
+        {(tool === 'wall' || tool === 'measure') && <EditorTooltip label={tool === 'wall' ? '完成绘墙' : '完成测量'} description="结束当前草稿并回到选择模式" side="top"><button className="status-finish-wall" onClick={() => setTool('select')}>{tool === 'wall' ? '完成绘墙' : '完成测量'}</button></EditorTooltip>}
+        {p.loggedIn && <span className={'workspace-save-status' + (isSaveProblem(p.status) ? ' is-error' : '')} role="status" title={p.status.label}><span className={isSaveProblem(p.status) ? 'error-dot' : 'status-dot'} />{p.status.label}</span>}
         <span className="status-safe">
           <ShieldCheck size={13} />
           设计示意 · 拆改须专业确认
@@ -1082,18 +1215,12 @@ export function Workbench(p: Props) {
         onChange={async (e) => {
           const f = e.target.files?.[0];
           e.target.value = "";
-          if (!f || !p.loggedIn) return;
+          if (!f || !p.loggedIn || importJson.pending) return;
           if (f.size > 5000000) {
-            toast.error("文件不得超过 5 MB");
+            notify.fail("导入失败：文件不得超过 5 MB");
             return;
           }
-          try {
-            const raw = JSON.parse(await f.text()),
-              d = validateDesign(raw.state || raw);
-            p.importProject(d, raw.name || f.name.replace(/\.json$/, ""));
-          } catch (e) {
-            toast.error(e instanceof Error ? e.message : "文件格式不正确");
-          }
+          await importJson.run(f);
         }}
       />
       {p.loggedIn && <CustomFurnitureDialog

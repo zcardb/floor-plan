@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AccountCostSettings } from '../model/costDefaults';
+import { notify } from '@/lib/notify';
 
 // One applied edit is one version-checked write. Failed edits remain retryable.
 export function useAccountCostCommit({ settings, save, onDirty }: {
@@ -24,10 +25,10 @@ export function useAccountCostCommit({ settings, save, onDirty }: {
       const success = await save(next);
       if (generation !== epoch.current) return false;
       if (success) { latest.current = next; setPending(null); setSaved(true); onDirty(false); }
-      else setError('未能保存，本次修改已保留，请重试。');
+      else { setError('未能保存，本次修改已保留，请重试。'); notify.error('账号默认价保存失败', '本次修改已保留，请点击「重试保存」'); }
       return success;
     } catch (cause) {
-      if (generation === epoch.current) setError(cause instanceof Error ? cause.message : '保存失败，请重试。');
+      if (generation === epoch.current) { setError(cause instanceof Error ? cause.message : '保存失败，请重试。'); notify.error('账号默认价保存失败', cause); }
       return false;
     } finally {
       if (generation === epoch.current) { lock.current = false; setBusy(false); }

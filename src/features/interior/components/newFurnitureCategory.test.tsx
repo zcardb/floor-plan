@@ -2,7 +2,7 @@ import { isValidElement, type ReactNode, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LibraryItem } from '../model/types';
 
-const harness = vi.hoisted(() => ({ slots: [] as unknown[], cursor: 0, category: '全部', generate: vi.fn(), save: vi.fn() }));
+const harness = vi.hoisted(() => ({ slots: [] as unknown[], cursor: 0, category: '全部', generate: vi.fn(), save: vi.fn(), loadFloors: vi.fn(), loadCatalog: vi.fn() }));
 vi.mock('react', async importOriginal => ({
   ...await importOriginal<typeof import('react')>(),
   useState(initial: unknown) {
@@ -13,11 +13,12 @@ vi.mock('react', async importOriginal => ({
   useRef(initial: unknown) { const index = harness.cursor++; if (!(index in harness.slots)) harness.slots[index] = { current: initial }; return harness.slots[index]; },
   useEffect() {},
   useMemo(calculate: () => unknown) { return calculate(); },
+  useCallback(callback: unknown) { return callback; },
 }));
 vi.mock('./useAccountCostCommit', () => ({ useAccountCostCommit: () => ({ settings: {}, busy: false, pending: null, error: '', saved: false }) }));
 vi.mock('../cloud/useFurnitureImage', () => ({ useFurnitureImage: () => ({ cancel: () => {}, generate: harness.generate, busy: false }) }));
-vi.mock('../cloud/useFloorCatalog', () => ({ useFloorCatalog: () => ({ items: [], loading: false, error: '', load: vi.fn(), save: vi.fn() }) }));
-vi.mock('../cloud/useFurnitureCatalog', () => ({ useFurnitureCatalog: () => ({ items: [], count: 0, counts: {}, reset: () => {}, save: harness.save }) }));
+vi.mock('../cloud/useFloorCatalog', () => ({ useFloorCatalog: () => ({ items: [], loading: false, error: '', load: harness.loadFloors, save: vi.fn() }) }));
+vi.mock('../cloud/useFurnitureCatalog', () => ({ useFurnitureCatalog: () => ({ items: [], count: 0, counts: {}, reset: () => {}, load: harness.loadCatalog, save: harness.save }) }));
 import { newFurnitureCategory } from '../model/newFurnitureCategory';
 import { AccountFurnitureLibrary } from './AccountFurnitureLibrary';
 import { AccountCostManager } from './AccountCostManager';
@@ -48,7 +49,7 @@ describe('新建家具默认分类', () => {
     const click = nodes(furniture).find(node => Array.isArray(node.props.children) && node.props.children.includes('新建家具') && typeof node.props.onClick === 'function');
     expect(click).toBeDefined(); (click!.props.onClick as () => void)(); expect(onNew).toHaveBeenLastCalledWith(category);
     fresh();
-    const costs = render(() => AccountCostManager({ settings: {}, save: async () => true, saving: false, error: '', items: [], onDirty: () => {}, onNew, hasMore: false, loading: false, catalogError: '', loadMore: () => {} }));
+    const costs = render(() => AccountCostManager({ settings: {}, save: async () => true, saving: false, error: '', items: [], onDirty: () => {}, onNew, hasMore: false, loading: false, catalogError: '', loadMore: () => {}, reload: () => {} }));
     const button = nodes(costs).find(node => node.props.className === 'cost-new');
     (button!.props.onClick as () => void)(); expect(onNew).toHaveBeenLastCalledWith(category);
   });
@@ -95,5 +96,27 @@ describe('新建家具默认分类', () => {
     (form.find(node => node.props.value === 'tile' && typeof node.props.onValueChange === 'function')!.props.onValueChange as (value: string) => void)('seamless');
     form = nodes(render(() => CustomFloorForm(formProps)));
     expect(form.some(node => node.props.id === 'floor-length')).toBe(false);
+  });
+  it('账号页新建家具或地面后自动刷新对应列表', () => {
+    harness.loadFloors.mockReset(); harness.loadCatalog.mockReset();
+    const projects = { session: { user: { id: 'owner', email: 'test@example.com' } } } as ReturnType<typeof useProjects>;
+    const costs = { settings: {}, saving: false } as ReturnType<typeof useAccountCosts>;
+    const page = () => render(() => AccountCMS({ projects, costs, opened: () => {} }));
+    const menu = nodes(page()).find(node => node.type === 'button' && Array.isArray(node.props.children) && node.props.children.includes('家具管理'));
+    (menu!.props.onClick as () => void)();
+    const library = nodes(page()).find(node => node.type === AccountFurnitureLibrary)!;
+    expect(library.props.floors).toEqual([]);
+    (library.props.onNew as (value: string) => void)('地面');
+    const dialog = nodes(page()).find(node => node.type === CustomFurnitureDialog)!;
+    (dialog.props.onCreateFloor as () => void)();
+    expect(harness.loadFloors).toHaveBeenCalledTimes(1);
+    (dialog.props.onCreate as () => void)();
+    expect(harness.loadCatalog).toHaveBeenCalledTimes(1);
+  });
+  it('家具管理展示账号地面，并计入“地面”筛选', () => {
+    harness.category = '地面';
+    const floor = { key: 'custom-11111111-1111-4111-8111-111111111111', name: '混凝土浇筑', pattern: 'seamless' as const, color: '#b8b8b0', price: null };
+    const tree = nodes(render(() => AccountFurnitureLibrary({ catalog, floors: [floor], defaults: {}, saveDefaults: async () => true, onDirty: () => {}, onNew: () => {} })));
+    expect(tree.some(node => node.type === 'b' && node.props.children === '混凝土浇筑')).toBe(true);
   });
 });

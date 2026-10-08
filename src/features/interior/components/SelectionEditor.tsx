@@ -20,7 +20,6 @@ import {
   GripVertical,
   DoorOpen,
 } from "lucide-react";
-import { toast } from "sonner";
 import {
   Popover,
   PopoverTrigger,
@@ -28,7 +27,7 @@ import {
 } from "@/components/ui/popover";
 import { floorMaterialOf, floorMaterialsOf } from "../model/floorMaterials";
 import { FURNITURE_COLORS } from "../data/palette";
-import { WallBearingControls } from './WallBearingControls';
+import { WallOptionsMenu } from './WallOptionsMenu';
 import { canEditWall, openingIsLocked, wallKindName } from '../model/wallPolicy';
 import { length } from "../model/geometry";
 import { SizeFields } from './SizeFields';
@@ -42,6 +41,8 @@ import {
   type PriceGroup,
 } from "../model/costs";
 import { placeEditor, type ScreenRect } from "../model/selectionAnchor";
+import { selectionCost } from "../model/costBreakdown";
+import { yuan } from "../model/money";
 import type { Design, Selection } from "../model/types";
 import { PriceInput } from "./PriceInput";
 import { CostDefaultsContext, useCostDesign } from './CostDefaultsContext';
@@ -49,6 +50,7 @@ import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
 import { EditorSelect } from './EditorSelect';
 import { formatMeters } from '../model/lengthUnits';
 import { Button } from '@/components/ui/button';
+import { EditorTooltip } from '@/components/ui/editor-tooltip';
 import { DoorOrientationControls } from './DoorOrientationControls';
 import { changeDoorOrientation } from '../model/doorOrientation';
 import { useEditorDrag } from './useEditorDrag';
@@ -69,6 +71,8 @@ interface Props {
   hidden: boolean;
   showCosts: boolean;
   transaction: SizeTransaction;
+  splitWall?: (wallId: string) => void;
+  mergeWall?: (wallId: string) => void;
 }
 const colors = FURNITURE_COLORS;
 export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
@@ -224,6 +228,12 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         unit: "m²",
       };
     if (!f && !w && !r && !o) return null;
+    // 工具条直接显示选中对象的金额贡献：房间为本间合计，家具为单价，门窗/墙体为施工金额。
+    const cost = p.showCosts ? selectionCost(costDesign, p.selection) : null,
+      costLabel =
+        cost?.amount === null || cost === null
+          ? "未定价"
+          : (r ? "本间 " : "") + yuan(cost.amount);
     return (
       <div
         ref={el}
@@ -233,7 +243,9 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         onPointerDown={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
-        <Button type="button" variant="ghost" size="icon" className="visual-editor-drag-handle" aria-label="拖动编辑工具条" title="拖动工具条，或用方向键移动" {...editorDrag.handlers}><GripVertical size={15} /></Button>
+        <EditorTooltip label="拖动工具条" description="按住拖到合适位置，也可聚焦后用方向键移动">
+          <Button type="button" variant="ghost" size="icon" className="visual-editor-drag-handle" aria-label="拖动编辑工具条" {...editorDrag.handlers}><GripVertical size={15} /></Button>
+        </EditorTooltip>
         <span className="visual-object-name">
           {f?.name ||
             r?.name ||
@@ -244,19 +256,24 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             open={open === "size"}
             onOpenChange={(v) => setPanel(v, "size")}
           >
-            <PopoverTrigger asChild>
-              <button title="调整尺寸" className="visual-size-trigger">
-                <Ruler size={15} />
-                <span>
-                  {f
-                    ? `${formatMeters(f.w)} × ${formatMeters(f.d)} m`
-                    : w
-                      ? `${formatMeters(length(w))} m`
-                      : `${formatMeters(o?.width ?? 0)} m`}
-                </span>
-                <ChevronDown size={12} />
-              </button>
-            </PopoverTrigger>
+            <EditorTooltip
+              label="尺寸与位置"
+              description={f ? "修改宽、深、中心坐标与旋转角度" : w ? "修改墙体长度与墙厚" : "修改宽度、高度与沿墙位置"}
+            >
+              <PopoverTrigger asChild>
+                <button className="visual-size-trigger" aria-label="调整尺寸与位置">
+                  <Ruler size={15} />
+                  <span>
+                    {f
+                      ? `${formatMeters(f.w)} × ${formatMeters(f.d)} m`
+                      : w
+                        ? `${formatMeters(length(w))} m`
+                        : `${formatMeters(o?.width ?? 0)} m`}
+                  </span>
+                  <ChevronDown size={12} />
+                </button>
+              </PopoverTrigger>
+            </EditorTooltip>
             <PopoverContent
               className="visual-editor-popover"
               side="bottom"
@@ -275,44 +292,45 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </PopoverContent>
           </Popover>
         )}
-        {w && <Popover open={open === 'bearing'} onOpenChange={value => setPanel(value, 'bearing')}>
-          <PopoverTrigger asChild><Button type="button" variant="ghost" size="sm" aria-label="墙体承重属性">承重<ChevronDown size={12} /></Button></PopoverTrigger>
-          <PopoverContent className="visual-editor-popover"><h3>墙体承重属性</h3><WallBearingControls design={p.design} wall={w} change={p.change} /></PopoverContent>
-        </Popover>}
+        {w && <WallOptionsMenu design={p.design} wall={w} change={p.change} splitWall={p.splitWall} mergeWall={p.mergeWall} />}
         {(f || w) && (
-          <div className="visual-colors" aria-label="常用颜色">
-            {colors.map((c) => (
-              <button
-                key={c}
-                className={(f?.color || w?.color) === c ? "selected" : ""}
-                style={{ background: c }}
-                title={"设置颜色 " + c}
-                aria-label={"设置颜色 " + c}
-                onClick={() => paint(c)}
-              />
-            ))}
-            <label className="visual-custom-color" title="自定义颜色">
-              <Palette size={15} />
-              <input
-                type="color"
-                value={f?.color || w?.color || "#eee9de"}
-                onChange={(e) => paint(e.target.value)}
-              />
-            </label>
-          </div>
+          <EditorTooltip label="常用颜色" description="点击圆点直接替换当前对象颜色，调色板可自定义">
+            <div className="visual-colors" role="group" aria-label="常用颜色">
+              {colors.map((c) => (
+                <button
+                  key={c}
+                  className={(f?.color || w?.color) === c ? "selected" : ""}
+                  style={{ background: c }}
+                  aria-label={"设置颜色 " + c}
+                  onClick={() => paint(c)}
+                />
+              ))}
+              <label className="visual-custom-color">
+                <Palette size={15} />
+                <input
+                  aria-label="自定义颜色"
+                  type="color"
+                  value={f?.color || w?.color || "#eee9de"}
+                  onChange={(e) => paint(e.target.value)}
+                />
+              </label>
+            </div>
+          </EditorTooltip>
         )}
         {r && (
           <Popover
             open={open === "material"}
             onOpenChange={(v) => setPanel(v, "material")}
           >
-            <PopoverTrigger asChild>
-              <button>
-                <Palette size={15} />
-                材质
-                <ChevronDown size={12} />
-              </button>
-            </PopoverTrigger>
+            <EditorTooltip label="房间材质" description="分别设置这间房的地面与墙面材质">
+              <PopoverTrigger asChild>
+                <button aria-label="房间材质">
+                  <Palette size={15} />
+                  材质
+                  <ChevronDown size={12} />
+                </button>
+              </PopoverTrigger>
+            </EditorTooltip>
             <PopoverContent className="visual-editor-popover">
               <h3>房间材质</h3>
               <EditorSelect label="地面" value={r.mat}
@@ -325,7 +343,9 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           </Popover>
         )}
         {o?.kind === 'door' && <Popover open={open === 'direction'} onOpenChange={value => setPanel(value, 'direction')}>
-          <PopoverTrigger asChild><Button type="button" variant="ghost" size="sm" className="visual-door-direction" aria-label="调整门开向"><DoorOpen size={15} />开向<ChevronDown size={12} /></Button></PopoverTrigger>
+          <EditorTooltip label="门开向" description="设置门铰链在哪一侧、门扇朝哪边开">
+            <PopoverTrigger asChild><Button type="button" variant="ghost" size="sm" className="visual-door-direction" aria-label="调整门开向"><DoorOpen size={15} />开向<ChevronDown size={12} /></Button></PopoverTrigger>
+          </EditorTooltip>
           <PopoverContent className="visual-editor-popover"><h3>门开向</h3><DoorOrientationControls door={o} onChange={patch => p.change(d => changeDoorOrientation(d, o.id, patch))} /></PopoverContent>
         </Popover>}
         {p.showCosts && price && (
@@ -333,12 +353,23 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             open={open === "price"}
             onOpenChange={(v) => setPanel(v, "price")}
           >
-            <PopoverTrigger asChild>
-              <button title="调整单价">
-                <CircleDollarSign size={16} />
-                <ChevronDown size={11} />
-              </button>
-            </PopoverTrigger>
+            <EditorTooltip
+              label={r ? "本间成本 · 调整单价" : "调整单价"}
+              description={`当前 ${costLabel}；修改会同步到本项目所有同款 / 同材质对象`}
+            >
+              <PopoverTrigger asChild>
+                <button
+                  className="visual-cost-trigger"
+                  aria-label={`调整单价，当前${costLabel}`}
+                >
+                  <CircleDollarSign size={15} />
+                  <span className={cost?.amount === null ? "is-unpriced" : ""}>
+                    {costLabel}
+                  </span>
+                  <ChevronDown size={11} />
+                </button>
+              </PopoverTrigger>
+            </EditorTooltip>
             <PopoverContent className="visual-editor-popover">
               <h3>
                 {price.name}单价 · 元/{price.unit}
@@ -351,13 +382,8 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
                   priceOf(costDesign, price.group, price.key)
                 }
                 value={priceOf(costDesign, price.group, price.key)}
-                onApply={(v) => {
-                  try {
-                    p.change((d) => setPrice(d, price!.group, price!.key, v, defaults));
-                  } catch {
-                    toast.error("价格无效");
-                  }
-                }}
+                label={price.name + "单价"}
+                onApply={(v) => p.change((d) => setPrice(d, price!.group, price!.key, v, defaults))}
               />
               {price.group === "floorPrices" && (
                 <MaterialProcurementEditor
@@ -367,32 +393,46 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
                 />
               )}
               <button className="visual-cost-link" onClick={p.costs}>
-                查看软装 / 硬装成本
+                {r ? "查看本间成本明细" : "查看软装 / 硬装成本"}
               </button>
             </PopoverContent>
           </Popover>
         )}
         {f && (
           <>
-            <button type="button" aria-label="旋转 90°" title="旋转" onClick={p.rotate}>
-              <RotateCw size={15} />
-            </button>
-            <button aria-label="复制对象" onClick={p.duplicate}>
-              <Copy size={15} />
-            </button>
+            <EditorTooltip label="旋转 90°" description="顺时针旋转，Shift + R 逆时针" shortcut="R">
+              <button type="button" aria-label="旋转 90°" onClick={p.rotate}>
+                <RotateCw size={15} />
+              </button>
+            </EditorTooltip>
+            <EditorTooltip label="复制对象" description="在旁边复制一件同款家具" shortcut="Ctrl D">
+              <button type="button" aria-label="复制对象" onClick={p.duplicate}>
+                <Copy size={15} />
+              </button>
+            </EditorTooltip>
           </>
         )}
         {(f || (o && !openingIsLocked(p.design, o.wallId)) || editableWall) && (
-          <button aria-label="删除对象" onClick={p.remove}>
-            <Trash2 size={15} />
-          </button>
+          <EditorTooltip
+            label="删除对象"
+            description={f ? "移除这件家具，可撤销" : w ? "删除这面隔墙及墙上门窗，可撤销" : "删除这个门窗洞口，可撤销"}
+            shortcut="Delete"
+          >
+            <button type="button" aria-label="删除对象" onClick={p.remove}>
+              <Trash2 size={15} />
+            </button>
+          </EditorTooltip>
         )}
-        <button aria-label="详细属性" onClick={p.details}>
-          <Settings2 size={16} />
-        </button>
-        <button aria-label="取消选择" onClick={p.close}>
-          <X size={15} />
-        </button>
+        <EditorTooltip label="详细属性" description="在右侧面板打开完整参数">
+          <button type="button" aria-label="详细属性" onClick={p.details}>
+            <Settings2 size={16} />
+          </button>
+        </EditorTooltip>
+        <EditorTooltip label="取消选择" description="关闭这条工具条" shortcut="Esc">
+          <button type="button" aria-label="取消选择" onClick={p.close}>
+            <X size={15} />
+          </button>
+        </EditorTooltip>
       </div>
     );
   },

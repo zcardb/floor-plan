@@ -9,7 +9,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Mail, LockKeyhole, Cloud, Loader2 } from "lucide-react";
+import { Mail, LockKeyhole, Cloud } from "lucide-react";
+import { notify } from "@/lib/notify";
 const authInput =
   "h-auto border-0 bg-transparent px-0 py-0 text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 md:text-xs max-[700px]:text-base";
 export function AuthDialog({
@@ -53,24 +54,31 @@ export function AuthDialog({
             e.preventDefault();
             setError("");
             setMessage("");
+            if (busy) return;
             setBusy(true);
             const form = new FormData(e.currentTarget),
               email = String(form.get("email")),
               password = String(form.get("password"));
-            const result = signup
-              ? await supabase.auth.signUp({
-                  email,
-                  password,
-                  options: { emailRedirectTo: window.location.origin + "/" },
-                })
-              : await supabase.auth.signInWithPassword({ email, password });
-            setBusy(false);
+            let result;
+            try {
+              result = signup
+                ? await supabase.auth.signUp({
+                    email,
+                    password,
+                    options: { emailRedirectTo: window.location.origin + "/" },
+                  })
+                : await supabase.auth.signInWithPassword({ email, password });
+            } catch (cause) {
+              setError("网络异常，请检查网络后重试。" + (cause instanceof Error && cause.message ? "（" + cause.message + "）" : ""));
+              return;
+            } finally {
+              setBusy(false);
+            }
             if (result.error) {
-              setError(
-                result.error.message.includes("Invalid login")
-                  ? "邮箱或密码不正确，请重试。"
-                  : result.error.message,
-              );
+              const invalid = result.error.message.includes("Invalid login");
+              setError(invalid ? "邮箱或密码不正确，请重试。" : result.error.message);
+              if (invalid) notify.fail("登录失败：邮箱或密码不正确");
+              else notify.error(signup ? "注册失败" : "登录失败", result.error);
               return;
             }
             if (!result.data.session) {
@@ -79,11 +87,14 @@ export function AuthDialog({
                   ? "注册成功，请查收验证邮件。完成验证后登录，当前的设计会自动保存到云端。"
                   : "注册成功，请查收验证邮件。完成验证后登录进入工作室。",
               );
+              notify.success("注册成功，请查收验证邮件", email);
               return;
             }
+            notify.success(signup ? "注册成功，已登录" : "登录成功", email);
             onOpenChange(false);
           }}
         >
+          <fieldset className="contents" disabled={busy}>
           <label className="auth-field">
             <span>邮箱</span>
             <div>
@@ -113,6 +124,7 @@ export function AuthDialog({
               />
             </div>
           </label>
+          </fieldset>
           {message && (
             <p role="status" className="muted-note">
               {message}
@@ -123,13 +135,14 @@ export function AuthDialog({
               {error}
             </p>
           )}
-          <Button className="auth-submit" disabled={busy}>
-            {busy && <Loader2 className="animate-spin" />}
+          <Button className="auth-submit" loading={busy}>
             {signup ? (saving ? "注册并保存到云端" : "注册并继续") : "登录"}
           </Button>
         </form>
         <button
+          type="button"
           className="auth-toggle"
+          disabled={busy}
           onClick={() => {
             setSignup(!signup);
             setError("");

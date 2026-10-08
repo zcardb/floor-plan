@@ -9,6 +9,7 @@ import { furnitureTypes, resolvedFurnitureType, appearanceDimensions, type Furni
 import { FurnitureShape } from './FurnitureShape';
 import { meterDraft, resolveMeterDraft } from '../model/lengthUnits';
 import { useFurnitureImage } from '../cloud/useFurnitureImage';
+import { notify } from '@/lib/notify';
 
 export function FurnitureGeometryEditor({item,save,onSaved,onWorkChange}:{item:LibraryItem;save:(item:LibraryItem)=>Promise<boolean>;onSaved:(item:LibraryItem)=>void;onWorkChange?:(phase:'idle'|'generating'|'saving')=>void}) {
   const [type,setType]=useState(item.type),[shape,setShape]=useState<FurnitureOutline>(item.shape||'reference'),[width,setWidth]=useState(meterDraft(item.w)),[depth,setDepth]=useState(meterDraft(item.d)),[saving,setSaving]=useState(false),[error,setError]=useState('');
@@ -23,19 +24,19 @@ export function FurnitureGeometryEditor({item,save,onSaved,onWorkChange}:{item:L
   const invalidate=()=>{ai.cancel();request.current=undefined;setError('');};
   const generate=async()=>{
     if(lock.current)return;
-    if(!validDimensions){setError('尺寸应为0.05～20 m');return;}
+    if(!validDimensions){setError('尺寸应为0.05～20 m');notify.fail('尺寸应为 0.05～20 m');return;}
     lock.current=true;setError('');request.current??=uid();
     try{const url=await ai.generate({...preview,height:item.height||700},request.current,()=>{request.current=undefined;});if(url)request.current=undefined;}
     finally{lock.current=false;}
   };
   const apply=async(withImage=false)=>{
     if(lock.current)return;
-    if(!validDimensions){setError('尺寸应为0.05～20 m');return;}
+    if(!validDimensions){setError('尺寸应为0.05～20 m');notify.fail('尺寸应为 0.05～20 m');return;}
     if(withImage&&!ai.image)return;
     lock.current=true;setSaving(true);setError('');
     const next=withImage?{...preview,imageUrl:ai.image}:preview;
-    try {if(await save(next)){if(mounted.current){ai.cancel();onSaved(next);}}else if(mounted.current)setError('家具保存失败，生成图片已保留，可重试保存');}
-    catch(e){if(mounted.current)setError(e instanceof Error?e.message:'保存失败');}
+    try {if(await save(next)){notify.success(withImage?'「'+item.name+'」参考几何与图片已保存':'「'+item.name+'」参考几何已保存');if(mounted.current){ai.cancel();onSaved(next);}}else{notify.error('「'+item.name+'」保存失败','生成图片已保留，可重试保存');if(mounted.current)setError('家具保存失败，生成图片已保留，可重试保存');}}
+    catch(e){notify.error('「'+item.name+'」保存失败',e);if(mounted.current)setError(e instanceof Error?e.message:'保存失败');}
     finally{lock.current=false;if(mounted.current)setSaving(false);}
   };
   return <details className="furniture-geometry-editor"><summary>调整参考类型与外形</summary><div className="furniture-geometry-fields">

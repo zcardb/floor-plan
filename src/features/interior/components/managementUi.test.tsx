@@ -68,7 +68,7 @@ describe('管理端精简与加载分支', () => {
     expect(empty).not.toContain('cms-loading-placeholder');
   });
   it('成本页账号家具读取使用搜索框原位反馈并保留价格列表', () => {
-    const html = render(createElement(AccountCostManager, { settings: {}, save: async () => true, saving: false, error: '', items: [], onDirty: () => {}, onNew: () => {}, hasMore: false, loading: true, catalogError: '', loadMore: () => {} }));
+    const html = render(createElement(AccountCostManager, { settings: {}, save: async () => true, saving: false, error: '', items: [], onDirty: () => {}, onNew: () => {}, hasMore: false, loading: true, catalogError: '', loadMore: () => {}, reload: () => {} }));
     expect(html).toContain('aria-busy="true"');
     expect(html).toContain('cms-item-card--cost');
     expect(html).not.toContain('cost-list-row');

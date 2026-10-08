@@ -1,5 +1,6 @@
 import { useEffect,useRef,useState } from 'react';
 import { Plus,Loader2,Cloud } from 'lucide-react';
+import { LoadError } from './LoadError';
 import { Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +22,7 @@ import { useFurnitureImage } from '../cloud/useFurnitureImage';
 import { useFurnitureCatalog } from '../cloud/useFurnitureCatalog';
 import { FurnitureShape } from './FurnitureShape';
 import { furnitureTypes, resolvedFurnitureType, appearanceDimensions, needsParameterOnly, type FurnitureOutline } from '../model/furnitureAppearance';
+import { notify } from '@/lib/notify';
 type Props = { open:boolean; onOpenChange:(v:boolean)=>void; loggedIn:boolean; login:()=>void; onCreate:(i:LibraryItem)=>void; onImport:(i:LibraryItem)=>void; onCreateFloor?:(f:CustomFloor)=>void; ownerKey:string; accountOnly?:boolean; initialCategory?:string };
 const tabTrigger = 'gap-[5px] rounded px-2.5 py-1.5 text-[11px] max-[700px]:px-[7px] max-[700px]:text-[10px]';
 export function CustomFurnitureDialog({open,onOpenChange,loggedIn,login,onCreate,onImport,onCreateFloor,ownerKey,accountOnly=false,initialCategory='客厅'}:Props){
@@ -28,20 +30,22 @@ export function CustomFurnitureDialog({open,onOpenChange,loggedIn,login,onCreate
   const ai=useFurnitureImage(),catalog=useFurnitureCatalog(),floors=useFloorCatalog(),cancel=ai.cancel,reset=catalog.reset;
   const epoch=useRef(0),lock=useRef(false),id=useRef(uid()),pendingRef=useRef<LibraryItem|null>(null),latest=useRef({open,ownerKey}); latest.current={open,ownerKey};
   useEffect(()=>{const generation=epoch;epoch.current++;lock.current=false;pendingRef.current=null;setPending(null);setSaving(false);setError('');cancel();reset();id.current=uid();return()=>{generation.current++;};},[open,ownerKey,cancel,reset]);
+  const loadCatalog=catalog.load,loadFloors=floors.load,hasFloors=!!onCreateFloor;
+  useEffect(()=>{if(open&&!accountOnly&&tab==='account'){void loadCatalog();if(hasFloors)void loadFloors();}},[open,accountOnly,tab,loadCatalog,loadFloors,hasFloors]);
   const [typeChoice,setTypeChoice]=useState('auto'),[shape,setShape]=useState<FurnitureOutline>('reference');
   const type=resolvedFurnitureType(name,typeChoice);
   const parametersRequired=needsParameterOnly({type,shape});
   const finish=async(item:LibraryItem,run:number)=>{
     if(run!==epoch.current||!latest.current.open)return;
     setSaving(true);
-    try { if(account||accountOnly)await catalog.save(item);if(run!==epoch.current)return;onCreate(item);pendingRef.current=null;setPending(null);setName('');onOpenChange(false); }
-    catch(e){if(run===epoch.current)setError(e instanceof Error?e.message:'保存失败，图片已保留，请重试保存');}
+    try { if(account||accountOnly)await catalog.save(item);if(run!==epoch.current)return;onCreate(item);if(accountOnly)notify.success('已保存到账号家具库「'+item.name+'」');pendingRef.current=null;setPending(null);setName('');onOpenChange(false); }
+    catch(e){if(run===epoch.current){setError(e instanceof Error?e.message:'保存失败，图片已保留，请重试保存');notify.error('家具「'+item.name+'」保存失败',e);}}
     finally {if(run===epoch.current)setSaving(false);}
   };
   const create=async(parametersOnly=false)=>{
     if(!loggedIn){login();return;}if(lock.current)return;
     const width=parseMeterDraft(w),depth=shape==='circle'?width:parseMeterDraft(d),height=parseMeterDraft(h),amount=price.trim()===''?null:Number(price);
-    if(!name.trim()||![width,depth].every(n=>Number.isFinite(n)&&n>=50&&n<=20000)||!Number.isFinite(height)||height<50||height>8000||(amount!==null&&!validPrice(amount))){setError('请填写名称、有效尺寸及非负单价');return;}
+    if(!name.trim()||![width,depth].every(n=>Number.isFinite(n)&&n>=50&&n<=20000)||!Number.isFinite(height)||height<50||height>8000||(amount!==null&&!validPrice(amount))){setError('请填写名称、有效尺寸及非负单价');notify.fail('请填写名称、有效尺寸及非负单价');return;}
     lock.current=true;setError('');const run=epoch.current;
     let item=pendingRef.current||{catalogId:id.current,name:name.trim(),category,type,shape,w:width,d:depth,height,color,price:amount};
     pendingRef.current=item;setPending(item);
@@ -57,15 +61,16 @@ export function CustomFurnitureDialog({open,onOpenChange,loggedIn,login,onCreate
     if(!loggedIn){login();return;}
     if(toAccount)await floors.save(floor);
     onCreateFloor?.(floor);onOpenChange(false);
+    if(accountOnly)notify.success('已保存到账号地面库「'+floor.name+'」');
   };
   const accountPanel=<>
     {onCreateFloor&&floors.items.length>0&&<><p className="muted-note">{floors.items.length} 款 · 账号地面</p><div className="account-floor-list">{floors.items.map(f=><button key={f.key} type="button" onClick={()=>{if(!loggedIn)return;onCreateFloor(f);onOpenChange(false);}}><FloorSwatch material={customFloorMaterial(f)}/><span>{f.name}<small>{floorPatterns.find(p=>p.value===f.pattern)?.label} · {f.price===null?'未定价':`¥${f.price}/m²`}</small></span><Plus size={14}/></button>)}</div></>}
     {floors.error&&<p className="form-error">{floors.error}</p>}
     <p className="muted-note">{catalog.count} 款 · 账号目录款式数</p>
-    {catalog.error&&<p className="form-error">{catalog.error}</p>}
+    {catalog.error&&<LoadError title="账号家具读取失败" message={catalog.error} retrying={catalog.loading} onRetry={()=>void loadCatalog()}/>}
     <div className="account-furniture-list">{catalog.items.map(i=><button key={i.catalogId} onClick={()=>{if(!loggedIn)return;onImport(i);onOpenChange(false);}}>{i.imageUrl?<img src={i.imageUrl} crossOrigin="anonymous" alt={i.name}/>:<svg viewBox={`${-i.w/2-100} ${-i.d/2-100} ${i.w+200} ${i.d+200}`}><FurnitureShape f={i}/></svg>}<span>{i.name}<small>{i.category} · {i.price===null?'未定价':`¥${i.price}`}</small></span><Plus size={14}/></button>)}</div>
-    {catalog.hasMore&&<Button disabled={catalog.loading} onClick={()=>void catalog.load(true)}>加载更多</Button>}
-    {!catalog.loading&&!catalog.items.length&&<p>账号库暂无家具。</p>}
+    {catalog.hasMore&&<Button loading={catalog.loading} onClick={()=>void catalog.load(true)}>加载更多</Button>}
+    {!catalog.loading&&!catalog.error&&!catalog.items.length&&<p>账号库暂无家具。</p>}
   </>;
   const categoryField=<div className="custom-field">
     <Label htmlFor="furniture-category">分类</Label>
@@ -104,6 +109,6 @@ export function CustomFurnitureDialog({open,onOpenChange,loggedIn,login,onCreate
   </form>;
   const createForm=category===FLOOR_CATEGORY?<CustomFloorForm categoryField={categoryField} accountOnly={accountOnly} onCancel={()=>onOpenChange(false)} onSave={saveFloor}/>:furnitureForm;
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="custom-furniture-dialog"><DialogHeader><DialogTitle>新建你的家具</DialogTitle><DialogDescription>{accountOnly?'保存到账号家具库，可在各项目中使用。':'默认保存当前项目，可选同时加入账号库。'}参考类型可按名称匹配或手动选择；画布按参考几何绘制，生成图不代表精确3D建模。</DialogDescription></DialogHeader>
-  {accountOnly?createForm:<Tabs value={tab} onValueChange={next=>{setTab(next);if(next==='account'){void catalog.load();if(onCreateFloor)void floors.load();}}}><TabsList className="project-tabs"><TabsTrigger value="create" className={tabTrigger}><Plus size={14}/>新建家具</TabsTrigger><TabsTrigger value="account" className={tabTrigger}><Cloud size={14}/>账号家具库</TabsTrigger></TabsList><TabsContent value="create">{createForm}</TabsContent><TabsContent value="account">{accountPanel}</TabsContent></Tabs>}
+  {accountOnly?createForm:<Tabs value={tab} onValueChange={setTab}><TabsList className="project-tabs"><TabsTrigger value="create" className={tabTrigger}><Plus size={14}/>新建家具</TabsTrigger><TabsTrigger value="account" className={tabTrigger}><Cloud size={14}/>账号家具库</TabsTrigger></TabsList><TabsContent value="create">{createForm}</TabsContent><TabsContent value="account">{accountPanel}</TabsContent></Tabs>}
   </DialogContent></Dialog>;
 }

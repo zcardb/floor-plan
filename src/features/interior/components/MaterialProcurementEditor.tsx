@@ -10,6 +10,8 @@ import type { Design, MaterialProcurement } from "../model/types";
 import { useCostDesign } from './CostDefaultsContext';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { EditorTooltip } from '@/components/ui/editor-tooltip';
+import { notify } from '@/lib/notify';
 import { EditorSelect } from './EditorSelect';
 import { meterDraft, parseMeterDraft } from '../model/lengthUnits';
 export function MaterialProcurementEditor({
@@ -19,7 +21,7 @@ export function MaterialProcurementEditor({
 }: {
   design: Design;
   material: string;
-  change: (fn: (d: Design) => Design) => void;
+  change: (fn: (d: Design) => Design) => void | Promise<boolean>;
 }) {
   const effective = useCostDesign(design);
   const saved = effective.costSettings?.procurement?.[material],
@@ -83,27 +85,30 @@ export function MaterialProcurementEditor({
           <small>未填写规格，暂按面积计价</small>
         )}
       </div>
-      <Button type="button" variant="link" size="sm"
-        className="editor-procurement-toggle"
-        onClick={() => {
-          setExpanded(!expanded);
-          setDraft(saved || defaultProcurement(material, design));
-          setSizes(sizeDrafts(saved || defaultProcurement(material, design)));
-          setPrice(String(priceOf(effective, "floorPrices", material) ?? ""));
-        }}
-      >
-        规格 / 损耗 / 计价单位{expanded ? " −" : " ＋"}
-      </Button>
+      <EditorTooltip label="采购规格" description="填写单片尺寸、损耗率与计价单位，用于估算采购数量">
+        <Button type="button" variant="link" size="sm"
+          className="editor-procurement-toggle"
+          onClick={() => {
+            setExpanded(!expanded);
+            setDraft(saved || defaultProcurement(material, design));
+            setSizes(sizeDrafts(saved || defaultProcurement(material, design)));
+            setPrice(String(priceOf(effective, "floorPrices", material) ?? ""));
+          }}
+        >
+          规格 / 损耗 / 计价单位{expanded ? " −" : " ＋"}
+        </Button>
+      </EditorTooltip>
       {expanded && (
         <form
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
+            const label = floorMaterialOf(design, material).name;
             try {
               validateProcurement(draft);
               const v = price.trim() === "" ? null : Number(price);
               if (v !== null && !validPrice(v))
                 throw new Error("请输入非负有效单价");
-              change((d) => ({
+              const result = change((d) => ({
                 ...d,
                 costSettings: {
                   ...d.costSettings,
@@ -119,8 +124,10 @@ export function MaterialProcurementEditor({
               }));
               setError("");
               setExpanded(false);
+              if ((await result) !== false) notify.success(`「${label}」采购规格已应用`);
             } catch (err) {
               setError(err instanceof Error ? err.message : "规格无效");
+              notify.fail(`采购规格未应用：${err instanceof Error ? err.message : "规格无效"}`);
             }
           }}
         >

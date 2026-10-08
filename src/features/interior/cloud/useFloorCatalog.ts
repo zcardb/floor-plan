@@ -8,13 +8,21 @@ export function useFloorCatalog() {
   const epoch = useRef(0);
   const load = useCallback(async () => {
     const run = ++epoch.current; setLoading(true); setError('');
-    const { data: { session } } = await supabase.auth.getSession();
-    if (run !== epoch.current) return;
-    if (!session) { setItems([]); setLoading(false); return; }
-    const { data, error: readError } = await supabase.from('interior_floor_catalog').select('*').order('created_at', { ascending: false }).limit(200);
-    if (run !== epoch.current) return;
-    setLoading(false);
-    if (readError) { setError(readError.message); return; }
+    let data;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (run !== epoch.current) return;
+      if (!session) { setItems([]); setLoading(false); return; }
+      const result = await supabase.from('interior_floor_catalog').select('*').order('created_at', { ascending: false }).limit(200);
+      if (run !== epoch.current) return;
+      setLoading(false);
+      if (result.error) { setError(result.error.message); return; }
+      data = result.data;
+    } catch (cause) {
+      if (run !== epoch.current) return;
+      setLoading(false); setError(cause instanceof Error ? cause.message : '地面材质读取失败，请重试');
+      return;
+    }
     setItems((data || []).map(r => ({
       key: r.floor_key, name: r.name, pattern: r.pattern as FloorPattern, color: r.color,
       price: r.price === null ? null : Number(r.price),

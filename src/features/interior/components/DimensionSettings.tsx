@@ -1,6 +1,6 @@
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { toast } from 'sonner';
+import { notify } from "@/lib/notify";
 import { dimensionSettings, changeDimensionSetting } from '../model/dimensionSettings';
 import { meterDraft, parseMeterDraft } from '../model/lengthUnits';
 import type { Design } from '../model/types';
@@ -25,7 +25,7 @@ export function DimensionSettings({ design, change }: { design: Design; change: 
               change(d => changeDimensionSetting(d, key, value));
             } catch (error) {
               e.currentTarget.value = meterDraft(settings[key]);
-              toast.error(error instanceof Error ? error.message : '标注距离无效');
+              notify.fail(error instanceof Error ? error.message : '标注距离无效');
             }
           }} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
       </label>)}

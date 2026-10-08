@@ -12,7 +12,7 @@ import {
   CSS2DRenderer,
   CSS2DObject,
 } from "three/examples/jsm/renderers/CSS2DRenderer.js";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { floorMaterialOf } from "../model/floorMaterials";
 import { floorTexture } from "./floorTexture";
 import { doorOrientation } from '../model/doorOrientation';
@@ -205,7 +205,8 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
             a.download = "户型方案-3D视角.png";
             a.click();
             setTimeout(() => URL.revokeObjectURL(url), 1000);
-          }
+            notify.success("3D 视角图片已下载");
+          } else notify.error("3D 图片导出失败", "浏览器未能生成图片，请重试");
         });
         if (helper) helper.visible = true;
       },
@@ -926,7 +927,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
               p,
             );
           } catch {
-            toast.error("无法放置家具");
+            notify.fail("无法放置家具");
           }
         }}
       >

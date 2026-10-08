@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Input } from '@/components/ui/input';
+import { EditorTooltip } from '@/components/ui/editor-tooltip';
 import { formatMeters, meterDraft, parseMeterDraft, toMeters } from '../model/lengthUnits';
 import { changeDoorOrientation } from '../model/doorOrientation';
 import { DoorOrientationControls } from './DoorOrientationControls';
@@ -13,22 +14,22 @@ import {
   Info,
   LayoutGrid,
   Ruler,
+  Scissors,
 } from "lucide-react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { floorMaterialOf, floorMaterialsOf } from "../model/floorMaterials";
 import {
-  calculateCosts,
   furnitureKey,
   priceOf,
   setPrice,
 } from "../model/costs";
 import { PriceInput } from "./PriceInput";
-import { projectProcurement } from "../model/materialProcurement";
-import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
+import { selectionCost } from "../model/costBreakdown";
+import { yuan } from "../model/money";
 import { editSelection } from "../model/selectionEdits";
 import { useCostDesign } from './CostDefaultsContext';
 import { SizeFields } from './SizeFields';
-import { WallBearingControls } from './WallBearingControls';
+import { WallOptionsMenu } from './WallOptionsMenu';
 import { canEditWall, openingIsLocked, wallKindName } from '../model/wallPolicy';
 import { RotationControls } from './RotationControls';
 import { DimensionSettings } from './DimensionSettings';
@@ -56,6 +57,10 @@ interface Props {
   rotate: () => void;
   showCosts: boolean;
   transaction: SizeTransaction;
+  splitWall?: (wallId: string) => void;
+  mergeWall?: (wallId: string) => void;
+  /** 切到成本页；成本页口径跟随当前选中对象。 */
+  openCosts: () => void;
 }
 export function PropertyPanel({
   design,
@@ -66,6 +71,9 @@ export function PropertyPanel({
   change,
   duplicate,
   remove,
+  splitWall,
+  mergeWall,
+  openCosts,
 }: Props) {
   const d = useCostDesign(design);
   const confirm = useConfirm();
@@ -79,7 +87,7 @@ export function PropertyPanel({
     try {
       change((d) => editSelection(d, s, values));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "尺寸无效");
+      notify.fail(e instanceof Error ? e.message : "尺寸无效");
     }
   };
   const input = (
@@ -110,14 +118,14 @@ export function PropertyPanel({
             try {
               const result = update(v);
               if (result instanceof Promise) void result.then(applied => { if (!applied) restore(); }).catch(error => {
-                restore(); toast.error(error instanceof Error ? error.message : '户型调整失败');
+                restore(); notify.fail(error instanceof Error ? error.message : '户型调整失败');
               });
             } catch (error) {
-              restore(); toast.error(error instanceof Error ? error.message : '户型调整失败');
+              restore(); notify.fail(error instanceof Error ? error.message : '户型调整失败');
             }
           } else {
             restore();
-            toast.error("请输入允许范围内的有效数值");
+            notify.fail("请输入允许范围内的有效数值");
           }
         }}
         onKeyDown={(e) => {
@@ -160,18 +168,17 @@ export function PropertyPanel({
     </div>
   );
   const back = (
-    <button className="back-link" onClick={() => select(null)}>
-      <ArrowLeft size={14} />
-      返回方案总览
-    </button>
+    <EditorTooltip label="返回方案总览" description="取消选中，回到整个户型的统计视图">
+      <button className="back-link" onClick={() => select(null)}>
+        <ArrowLeft size={14} />
+        返回方案总览
+      </button>
+    </EditorTooltip>
   );
-  const costs = calculateCosts(d);
+  const roomCost = r ? selectionCost(d, { kind: "room", id: r.id }) : null;
   const total = d.rooms
-      .filter((r) => r.counted !== false)
-      .reduce((a, r) => a + area(r), 0),
-    cost = costs.hard
-      .filter((r) => r.group === "floorPrices")
-      .reduce((sum, r) => sum + r.subtotal, 0);
+    .filter((r) => r.counted !== false)
+    .reduce((a, r) => a + area(r), 0);
   if (f)
     return (
       <>
@@ -262,40 +269,48 @@ export function PropertyPanel({
             </p>
           </div>}
           <div className="property-actions">
-            <Button size="sm" variant="outline" onClick={duplicate}>
-              <Copy />
-              复制
-            </Button>
-            <Button size="sm" variant="outline" onClick={remove}>
-              <Trash2 />
-              删除
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() =>
-                change((d) => ({
-                  ...d,
-                  furniture: [...d.furniture.filter((g) => g.id !== f.id), f],
-                }))
-              }
-            >
-              <ArrowUpToLine />
-              置顶
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() =>
-                change((d) => ({
-                  ...d,
-                  furniture: [f, ...d.furniture.filter((g) => g.id !== f.id)],
-                }))
-              }
-            >
-              <ArrowDownToLine />
-              置底
-            </Button>
+            <EditorTooltip label="复制" description="在旁边复制一件同款家具">
+              <Button size="sm" variant="outline" onClick={duplicate}>
+                <Copy />
+                复制
+              </Button>
+            </EditorTooltip>
+            <EditorTooltip label="删除" description="移除这件家具，可撤销">
+              <Button size="sm" variant="outline" onClick={remove}>
+                <Trash2 />
+                删除
+              </Button>
+            </EditorTooltip>
+            <EditorTooltip label="置顶" description="让这件家具盖在其他家具之上显示">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() =>
+                  change((d) => ({
+                    ...d,
+                    furniture: [...d.furniture.filter((g) => g.id !== f.id), f],
+                  }))
+                }
+              >
+                <ArrowUpToLine />
+                置顶
+              </Button>
+            </EditorTooltip>
+            <EditorTooltip label="置底" description="让这件家具被其他家具盖住显示">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() =>
+                  change((d) => ({
+                    ...d,
+                    furniture: [f, ...d.furniture.filter((g) => g.id !== f.id)],
+                  }))
+                }
+              >
+                <ArrowDownToLine />
+                置底
+              </Button>
+            </EditorTooltip>
           </div>
         </section>
         <div className="panel-note">
@@ -369,23 +384,19 @@ export function PropertyPanel({
               rooms: d.rooms.map((g) => (g.id === r.id ? { ...g, mat: v } : g)),
             })),
           )}
-          {showCosts && <><div className="estimate-line">
-            <span>本项目同材质采购合计</span>
-            <b>
-              ¥
-              {Math.round(
-                costs.hard.find(
-                  (g) => g.group === "floorPrices" && g.key === r.mat,
-                )?.subtotal || 0,
-              ).toLocaleString()}
-            </b>
-          </div>
-          <MaterialProcurementEditor
-            key={r.mat}
-            design={design}
-            material={r.mat}
-            change={change}
-          /></>}
+          {showCosts && (
+            <EditorTooltip label="本间成本" description="查看这间房的硬装与软装费用明细">
+              <button className="room-cost-link" onClick={openCosts}>
+                <span>本间成本</span>
+                <b>
+                  {roomCost?.amount === null
+                    ? "未定价"
+                    : yuan(roomCost?.amount ?? 0)}
+                </b>
+                <ChevronRight size={13} />
+              </button>
+            </EditorTooltip>
+          )}
         </section>
         <section>
           <h3 className="section-title">
@@ -423,13 +434,17 @@ export function PropertyPanel({
           <h3 className="section-title">
             {editable ? "可编辑内部墙体" : "受保护墙体"}
           </h3>
-          <WallBearingControls design={design} wall={w} change={change} />
+          <WallOptionsMenu design={design} wall={w} change={change} splitWall={splitWall} mergeWall={mergeWall} />
+          <p className="muted-note">分割与承重标记独立；取消分割不会解除承重保护。实际承重性质须专业确认。</p>
+          {design.demolished.includes(w.id) && <p className="muted-note">请先撤销拆除，再分割墙段。</p>}
           <SizeFields key={w.id} design={design} selection={s} transaction={transaction}/>
           {editable && (
-            <Button variant="outline" size="sm" onClick={remove}>
-              <Trash2 />
-              删除隔墙
-            </Button>
+            <EditorTooltip label="删除隔墙" description="删除这面隔墙及墙上门窗，可撤销">
+              <Button variant="outline" size="sm" onClick={remove}>
+                <Trash2 />
+                删除隔墙
+              </Button>
+            </EditorTooltip>
           )}
           <p className="muted-note">
             {editable
@@ -454,10 +469,16 @@ export function PropertyPanel({
           {back}
           <SizeFields key={o.id} design={design} selection={s} transaction={transaction}/>
           {o.kind === 'door' && <DoorOrientationControls door={o} onChange={patch => change(d => changeDoorOrientation(d, o.id, patch))} />}
-          <Button variant="outline" size="sm" disabled={openingIsLocked(design, o.wallId)} onClick={remove}>
-            <Trash2 />
-            删除开口
-          </Button>
+          <EditorTooltip
+            label="删除开口"
+            description={openingIsLocked(design, o.wallId) ? "承重墙上的门窗洞口不可删除" : "删除这个门窗洞口，可撤销"}
+            disabled={openingIsLocked(design, o.wallId)}
+          >
+            <Button variant="outline" size="sm" disabled={openingIsLocked(design, o.wallId)} onClick={remove}>
+              <Trash2 />
+              删除开口
+            </Button>
+          </EditorTooltip>
         </section>
       </>
     );
@@ -465,18 +486,22 @@ export function PropertyPanel({
   return (
     <>
       <div className="panel-tabs">
-        <button
-          className={tab === "overview" ? "active" : ""}
-          onClick={() => setTab("overview")}
-        >
-          方案总览
-        </button>
-        <button
-          className={tab === "settings" ? "active" : ""}
-          onClick={() => setTab("settings")}
-        >
-          户型设置
-        </button>
+        <EditorTooltip label="方案总览" description="总面积、各房间面积与费用概览">
+          <button
+            className={tab === "overview" ? "active" : ""}
+            onClick={() => setTab("overview")}
+          >
+            方案总览
+          </button>
+        </EditorTooltip>
+        <EditorTooltip label="户型设置" description="户型净尺寸、层高、尺寸标注与快捷键说明">
+          <button
+            className={tab === "settings" ? "active" : ""}
+            onClick={() => setTab("settings")}
+          >
+            户型设置
+          </button>
+        </EditorTooltip>
       </div>
       {tab === "settings" ? (
         <>
@@ -588,29 +613,6 @@ export function PropertyPanel({
       ) : (
         <>
           <section>
-            {showCosts && <><div className="cost-summary">
-              <small>整体成本 · 已录入费用</small>
-              <strong>
-                ¥
-                {costs.total.toLocaleString("zh-CN", {
-                  maximumFractionDigits: 2,
-                })}
-              </strong>
-              <div>
-                <span>
-                  软装 ¥{Math.round(costs.softTotal).toLocaleString()}
-                </span>
-                <span>
-                  硬装 ¥{Math.round(costs.hardTotal).toLocaleString()}
-                </span>
-              </div>
-            </div>
-            {costs.unpriced > 0 && (
-              <p className="cost-warning">
-                {costs.unpriced} 类费用未定价，可在成本管理中填写。
-              </p>
-            )}
-            </>}
             <div className="overview-top">
               <span>空间，恰到好处。</span>
               <LayoutGrid size={17} />
@@ -660,45 +662,6 @@ export function PropertyPanel({
             </div>
             <p className="footnote">按墙内净尺寸计算；* 飘窗不计入使用面积。</p>
           </section>
-          {showCosts && <section>
-            <h3 className="section-title">
-              地面采购估算<span className="soft-badge">含损耗 / 取整</span>
-            </h3>
-            <div className="cost-list">
-              {Object.entries(floorMaterialsOf(d)).map(([key, m]) => {
-                const a = d.rooms
-                  .filter((r) => r.mat === key)
-                  .reduce((s, r) => s + area(r), 0);
-                return (
-                  a > 0 && (
-                    <div key={key}>
-                      <span>
-                        <i style={{ background: m.color }} />
-                        {m.name}
-                        <small>{a.toFixed(1)} m²</small>
-                      </span>
-                      <b>
-                        ¥
-                        {Math.round(
-                          costs.hard.find(
-                            (r) => r.group === "floorPrices" && r.key === key,
-                          )?.subtotal || 0,
-                        ).toLocaleString()}
-                      </b>
-                    </div>
-                  )
-                );
-              })}
-            </div>
-            <div className="budget-total">
-              <small>地面材料参考合计</small>
-              <strong>
-                <span>¥</span>
-                {Math.round(cost).toLocaleString()}
-              </strong>
-            </div>
-            <p className="footnote">仅包含地面材料，不含人工及其他装修费用。</p>
-          </section>}
           <div className="panel-note">
             <Info size={15} />
             <p>选择房间更换地面材质，选择家具调整尺寸，设计与估算实时同步。</p>

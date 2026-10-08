@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { dimensionEditPolicy, type FixedDimensionSide } from '../model/dimensionWallEdit';
 import { formatMeters, meterDraft, parseMeterDraft } from '../model/lengthUnits';
 import type { Design } from '../model/types';
+import { notify } from '@/lib/notify';
 import type { DimensionBinding } from '../model/dimensionBinding';
 export function DimensionEditDialog({ design, binding, onApply, onClose }: {
   design: Design; binding: DimensionBinding; onApply: (millimeters: number, fixed: FixedDimensionSide) => void; onClose: () => void;
@@ -20,8 +21,10 @@ export function DimensionEditDialog({ design, binding, onApply, onClose }: {
     if (draft.trim() === initialDraft) { onClose(); return; }
     try {
       if (!fixed) throw new Error('请选择固定侧');
-      onApply(parseMeterDraft(draft), fixed);
-    } catch (e) { setError(e instanceof Error ? e.message : '尺寸修改失败'); }
+      const millimeters = parseMeterDraft(draft);
+      onApply(millimeters, fixed);
+      notify.success(`墙间净距已更新为 ${formatMeters(millimeters)} m`);
+    } catch (e) { const message = e instanceof Error ? e.message : '尺寸修改失败'; setError(message); notify.fail('净距未更新：' + message); }
   };
   return <Dialog open onOpenChange={open => { if (!open) onClose(); }}>
     <DialogContent className="dimension-edit-dialog">

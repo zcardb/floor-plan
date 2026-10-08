@@ -8,6 +8,7 @@ export interface Wall {
   thickness: number;
   kind: WallKind;
   loadBearing?: boolean;
+  exteriorRootId?: string;
   color?: string;
 }
 export interface Opening {
