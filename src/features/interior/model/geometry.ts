@@ -220,6 +220,31 @@ export function aabb(f: Furniture) {
     hh: (f.w / 2) * s + (f.d / 2) * c,
   };
 }
+/** Minimum furniture move step (mm) when no snap target is hit. */
+export const FURNITURE_STEP = 50;
+export const snapToStep = (v: number) => Math.round(v / FURNITURE_STEP) * FURNITURE_STEP;
+export interface SnapCandidate { v: number; dist: number }
+/** Closest wall-edge snap per axis for furniture centred at p, within tol. */
+export function wallSnapCandidates(f: Furniture, p: Point, d: Design, tol: number) {
+  const { hw, hh } = aabb(f);
+  let x: SnapCandidate | undefined, y: SnapCandidate | undefined;
+  for (const wall of d.walls.filter((w) => !d.demolished.includes(w.id))) {
+    const b = bbox(wallPoly(wall));
+    if (b.y2 >= p[1] - hh - tol && b.y <= p[1] + hh + tol)
+      for (const edge of [b.x, b.x2])
+        for (const v of [edge - hw, edge + hw]) {
+          const dist = Math.abs(v - p[0]);
+          if (dist < (x?.dist ?? tol)) x = { v, dist };
+        }
+    if (b.x2 >= p[0] - hw - tol && b.x <= p[0] + hw + tol)
+      for (const edge of [b.y, b.y2])
+        for (const v of [edge - hh, edge + hh]) {
+          const dist = Math.abs(v - p[1]);
+          if (dist < (y?.dist ?? tol)) y = { v, dist };
+        }
+  }
+  return { x, y };
+}
 export function snapMove(
   f: Furniture,
   p: Point,
@@ -227,30 +252,10 @@ export function snapMove(
   snap: boolean,
   tol = 150,
 ): Point {
-  let x = Math.round(p[0] / 10) * 10,
-    y = Math.round(p[1] / 10) * 10;
-  if (!snap) return [x, y];
-  const { hw, hh } = aabb(f);
-  let bx = tol,
-    by = tol;
-  for (const wall of d.walls.filter((w) => !d.demolished.includes(w.id))) {
-    const b = bbox(wallPoly(wall));
-    if (b.y2 >= p[1] - hh - tol && b.y <= p[1] + hh + tol)
-      for (const edge of [b.x, b.x2])
-        for (const v of [edge - hw, edge + hw])
-          if (Math.abs(v - p[0]) < bx) {
-            bx = Math.abs(v - p[0]);
-            x = v;
-          }
-    if (b.x2 >= p[0] - hw - tol && b.x <= p[0] + hw + tol)
-      for (const edge of [b.y, b.y2])
-        for (const v of [edge - hh, edge + hh])
-          if (Math.abs(v - p[1]) < by) {
-            by = Math.abs(v - p[1]);
-            y = v;
-          }
-  }
-  return [x, y];
+  const grid: Point = [snapToStep(p[0]), snapToStep(p[1])];
+  if (!snap) return grid;
+  const c = wallSnapCandidates(f, p, d, tol);
+  return [c.x?.v ?? grid[0], c.y?.v ?? grid[1]];
 }
 export function pushOut(f: Furniture, d: Design) {
   for (let i = 0; i < 4; i++) {
