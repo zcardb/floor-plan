@@ -25,6 +25,7 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import { materials } from "../data/catalog";
+import { FURNITURE_COLORS } from "../data/palette";
 import { length } from "../model/geometry";
 import { SizeFields } from './SizeFields';
 import type { SizeTransaction } from '../model/sizeTransaction';
@@ -58,15 +59,7 @@ interface Props {
   showCosts: boolean;
   transaction: SizeTransaction;
 }
-const colors = [
-  "#efe6d8",
-  "#c9d6df",
-  "#b7c4b0",
-  "#d8c7dc",
-  "#d6b99a",
-  "#9b7250",
-  "#3d3a34",
-];
+const colors = FURNITURE_COLORS;
 export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
   function SelectionEditor(p, ref) {
     const costDesign = useCostDesign(p.design), defaults = useContext(CostDefaultsContext);
