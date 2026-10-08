@@ -1,4 +1,5 @@
 import { wallPoly, length } from "./geometry";
+import { doorSwingPoints } from './doorOrientation';
 import type { Design, Point, Selection } from "./types";
 export interface ScreenRect {
   left: number;
@@ -34,10 +35,7 @@ export function selectionPoints(d: Design, s: Selection): Point[] {
   if (!o || !w) return [];
   const L = length(w), dx = (w.b[0]-w.a[0])/L, dy = (w.b[1]-w.a[1])/L;
   const points: Point[] = [[-o.width/2,-w.thickness/2],[o.width/2,-w.thickness/2],[o.width/2,w.thickness/2],[-o.width/2,w.thickness/2]];
-  if (o.kind === 'door') {
-    // Quarter-circle swing, identical to the plan's local negative-Y door leaf.
-    for (let i=0;i<=12;i++) { const a=-Math.PI/2+i*Math.PI/24; points.push([-o.width/2+o.width*Math.cos(a),o.width*Math.sin(a)]); }
-  }
+  if (o.kind === 'door') points.push(...doorSwingPoints(o));
   return points.map(([x,y]) => [w.a[0]+dx*(o.offset+x)-dy*y,w.a[1]+dy*(o.offset+x)+dx*y]);
 }
 export function localWallPoint(d: Design, id: string, fraction: number): Point | null {

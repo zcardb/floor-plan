@@ -16,6 +16,8 @@ export interface Opening {
   offset: number;
   width: number;
   open?: boolean;
+  hinge?: 'start' | 'end';
+  swingSide?: -1 | 1;
   height?: number;
   sill?: number;
 }

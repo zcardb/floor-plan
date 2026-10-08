@@ -138,6 +138,8 @@ export function validateDesign(value: unknown): Design {
     if (
       !w ||
       !["door", "window"].includes(o.kind) ||
+      (o.hinge !== undefined && !['start', 'end'].includes(o.hinge)) ||
+      (o.swingSide !== undefined && o.swingSide !== -1 && o.swingSide !== 1) ||
       !finite(o.width, 100, 10000) ||
       !finite(o.offset, 0) ||
       o.offset - o.width / 2 < -0.01 ||

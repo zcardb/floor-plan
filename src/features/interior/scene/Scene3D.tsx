@@ -14,6 +14,7 @@ import {
 } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import { toast } from "sonner";
 import { materials } from "../data/catalog";
+import { doorOrientation } from '../model/doorOrientation';
 import {
   area,
   bbox,
@@ -75,6 +76,7 @@ interface Runtime {
     id: string;
     angle: number;
     open: boolean;
+    rotationSign: number;
     width: number;
   }[];
   ray: THREE.Raycaster;
@@ -564,7 +566,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         for (const door of r.doors)
           door.group.rotation.y +=
             (door.angle +
-              (door.open ? Math.PI / 2 : 0) -
+              (door.open ? door.rotationSign * Math.PI / 2 : 0) -
               door.group.rotation.y) *
             Math.min(1, dt * 8);
         r.helper?.update();
@@ -814,17 +816,18 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
             const pivot = new THREE.Group();
             const ang = Math.atan2(w.b[1] - w.a[1], w.b[0] - w.a[0]),
               ww = o.width / 1000;
+            const { mirrorX, rotationSign } = doorOrientation(o);
             pivot.position.set(
-              x - (Math.cos(ang) * ww) / 2,
+              x - mirrorX * (Math.cos(ang) * ww) / 2,
               0,
-              z - (Math.sin(ang) * ww) / 2,
+              z - mirrorX * (Math.sin(ang) * ww) / 2,
             );
-            pivot.rotation.y = angle + Math.PI / 2;
+            pivot.rotation.y = angle + rotationSign * Math.PI / 2;
             const leaf = new THREE.Mesh(
               new THREE.BoxGeometry(ww, Math.min(H, dims.height / 1000), 0.04),
               mat("#bc9a74"),
             );
-            leaf.position.set(ww / 2, Math.min(H, dims.height / 1000) / 2, 0);
+            leaf.position.set(mirrorX * ww / 2, Math.min(H, dims.height / 1000) / 2, 0);
             leaf.castShadow = true;
             pivot.add(leaf);
             pivot.userData.door = o.id;
@@ -835,6 +838,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
               id: o.id,
               angle,
               open: true,
+              rotationSign,
               width: ww,
             });
           }

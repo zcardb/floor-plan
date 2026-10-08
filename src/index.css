@@ -2270,6 +2270,16 @@
   color: hsl(var(--foreground));
   font-size: 11px;
 }
+.visual-editor-drag-handle {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  flex: 0 0 auto;
+  color: hsl(var(--muted-foreground));
+}
+.visual-editor-drag-handle[data-dragging="true"] { cursor: grabbing; }
+.visual-selection-editor > .visual-editor-drag-handle { width: 26px; height: 30px; padding: 3px; }
+.door-orientation-controls { display: grid; gap: 6px; }
 .visual-object-name {
   max-width: 110px;
   overflow: hidden;

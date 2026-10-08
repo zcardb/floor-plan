@@ -17,6 +17,8 @@ import {
   Palette,
   CircleDollarSign,
   LockKeyhole,
+  GripVertical,
+  DoorOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -43,6 +45,10 @@ import { CostDefaultsContext, useCostDesign } from './CostDefaultsContext';
 import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
 import { EditorSelect } from './EditorSelect';
 import { formatMeters } from '../model/lengthUnits';
+import { Button } from '@/components/ui/button';
+import { DoorOrientationControls } from './DoorOrientationControls';
+import { changeDoorOrientation } from '../model/doorOrientation';
+import { useEditorDrag } from './useEditorDrag';
 export interface SelectionEditorHandle {
   update: (r: ScreenRect | null) => void;
 }
@@ -70,6 +76,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
       latest = useRef(p),
       anchor = useRef<ScreenRect | null>(null);
     latest.current = p;
+    const editorDrag = useEditorDrag(el, p.stage, () => setOpen(null));
     const position = (r: ScreenRect | null) => {
       anchor.current = r;
       const node = el.current,
@@ -99,19 +106,21 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         pos && !latest.current.hidden ? "visible" : "hidden";
       node.style.pointerEvents =
         pos && !latest.current.hidden ? "auto" : "none";
-      if (pos && !node.contains(document.activeElement)) node.style.transform = `translate3d(${pos.x}px,${pos.y}px,0)`;
+      if (pos && (editorDrag.manual.current || !node.contains(document.activeElement))) editorDrag.place(pos);
     };
-    useImperativeHandle(ref, () => ({ update: position }));
+    const positionRef = useRef(position);
+    positionRef.current = position;
+    useImperativeHandle(ref, () => ({ update: r => positionRef.current(r) }));
     useEffect(() => {
       const node = el.current,
         stage = p.stage.current;
       if (!node || !stage) return;
-      const observer = new ResizeObserver(() => position(anchor.current));
+      const observer = new ResizeObserver(() => positionRef.current(anchor.current));
       observer.observe(node);
       observer.observe(stage);
       return () => observer.disconnect();
     }, [p.stage, p.selection?.id]);
-    useEffect(() => position(anchor.current), [p.hidden]);
+    useEffect(() => positionRef.current(anchor.current), [p.hidden]);
     const f =
         p.selection?.kind === "furniture"
           ? p.design.furniture.find((f) => f.id === p.selection!.id)
@@ -221,6 +230,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         onPointerDown={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
+        <Button type="button" variant="ghost" size="icon" className="visual-editor-drag-handle" aria-label="拖动编辑工具条" title="拖动工具条，或用方向键移动" {...editorDrag.handlers}><GripVertical size={15} /></Button>
         <span className="visual-object-name">
           {f?.name ||
             r?.name ||
@@ -307,6 +317,10 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </PopoverContent>
           </Popover>
         )}
+        {o?.kind === 'door' && <Popover open={open === 'direction'} onOpenChange={value => setPanel(value, 'direction')}>
+          <PopoverTrigger asChild><Button type="button" variant="ghost" size="sm" className="visual-door-direction" aria-label="调整门开向"><DoorOpen size={15} />开向<ChevronDown size={12} /></Button></PopoverTrigger>
+          <PopoverContent className="visual-editor-popover"><h3>门开向</h3><DoorOrientationControls door={o} onChange={patch => p.change(d => changeDoorOrientation(d, o.id, patch))} /></PopoverContent>
+        </Popover>}
         {p.showCosts && price && (
           <Popover
             open={open === "price"}

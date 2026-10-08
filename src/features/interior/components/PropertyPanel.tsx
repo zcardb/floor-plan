@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Input } from '@/components/ui/input';
 import { formatMeters, meterDraft, parseMeterDraft, toMeters } from '../model/lengthUnits';
+import { changeDoorOrientation } from '../model/doorOrientation';
+import { DoorOrientationControls } from './DoorOrientationControls';
 import {
   ArrowLeft,
   ArrowUpToLine,
@@ -452,6 +454,7 @@ export function PropertyPanel({
         <section>
           {back}
           <SizeFields key={o.id} design={design} selection={s} transaction={transaction}/>
+          {o.kind === 'door' && <DoorOrientationControls door={o} onChange={patch => change(d => changeDoorOrientation(d, o.id, patch))} />}
           <Button variant="outline" size="sm" onClick={remove}>
             <Trash2 />
             删除开口

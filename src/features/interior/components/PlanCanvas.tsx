@@ -35,6 +35,7 @@ import { resolveWallPoint,validateWallSegment } from '../model/wallDrawing';
 import { useWallDrawing } from './useWallDrawing';
 import { WallHoverOverlay } from './WallHoverOverlay';
 import { formatMeters } from '../model/lengthUnits';
+import { doorOrientation } from '../model/doorOrientation';
 import { dragOpening } from '../model/openingDrag';
 import { isCompletionClick, supportsPointerCompletion } from '../model/toolCompletion';
 export interface CanvasHandle {
@@ -768,7 +769,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
                 />
               </>
             ) : (
-              <>
+              <g transform={`scale(${doorOrientation(o).mirrorX} ${doorOrientation(o).mirrorY})`}>
                 <path
                   d={`M${-o.width / 2} 0V${-o.width}`}
                   stroke="var(--plan-wood-dark)"
@@ -781,7 +782,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
                   strokeWidth={10}
                   strokeDasharray="50 40"
                 />
-              </>
+              </g>
             )}
           </g>
         );
