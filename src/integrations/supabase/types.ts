@@ -3465,6 +3465,33 @@ export type Database = {
         }
         Relationships: []
       }
+      interior_furniture_image_regenerations: {
+        Row: {
+          catalog_id: string
+          created_at: string
+          owner_id: string
+          request_id: string
+          status: string
+          task_id: string | null
+        }
+        Insert: {
+          catalog_id: string
+          created_at?: string
+          owner_id?: string
+          request_id: string
+          status?: string
+          task_id?: string | null
+        }
+        Update: {
+          catalog_id?: string
+          created_at?: string
+          owner_id?: string
+          request_id?: string
+          status?: string
+          task_id?: string | null
+        }
+        Relationships: []
+      }
       interior_furniture_image_requests: {
         Row: {
           catalog_id: string

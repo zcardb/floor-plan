@@ -35,14 +35,14 @@ export function useFurnitureImage() {
     },
     [],
   );
-  const generate = async (item: LibraryItem) => {
+  const generate = async (item: LibraryItem, requestId?: string, onTaskFailed?: () => void) => {
     cancel();
     const run = epoch.current;
     setBusy(true);
     setError("");
     setImage("");
     try {
-      const data = await invoke("interior-furniture-image-submit", { item });
+      const data = await invoke("interior-furniture-image-submit", { item, ...(requestId ? { request_id: requestId } : {}) });
       if (run !== epoch.current) return;
       setTaskId(data.task_id);
       for (let i = 0; i < 120; i++) {
@@ -51,12 +51,14 @@ export function useFurnitureImage() {
           task_id: data.task_id,
         });
         if (run !== epoch.current) return;
-        if (result.status === "failed")
+        if (result.status === "failed") {
+          onTaskFailed?.();
           throw new Error(
             typeof result.error === "string"
               ? result.error
               : result.error?.message || "图片生成失败",
           );
+        }
         if (result.status === "succeed") {
           const url = result.images?.[0]?.url;
           if (!url) throw new Error("生成结果没有图片");

@@ -1,40 +1,43 @@
-## 后续调整（已实现）
-用户将测量基准改为较近墙端：取 `Math.min(offset, length(wall) - offset)`，文案为「距近端 X 米」。两端均显示 0 米，中点为半墙长，反向墙定义不改变结果。截图中遮挡墙体的绘墙说明浮条已移除，说明沿用底部 `status-tip`，「完成绘墙」按钮迁到底部状态栏，其他工具提示不变。修改文件包括 `WallHoverOverlay.tsx`、其测试、`Workbench.tsx` 和 `index.css`。
-
-验证：71 项测试、lint、类型检查和构建通过。桌面 1280 与移动 390 截图显示平面画布正常；截图是在选择模式，绘墙提示及完成按钮的真实交互仍未验证。截图发现同时修改中的 `PlanCanvas.tsx` 使用 `formatMeters` 未导入，已补齐该导入并重新构建及截图确认不再崩溃。浏览器性能、构建审计和部署 HTTP 仍未验证。
-
 ## Context
-绘墙模式目前在已有墙体上悬停时，只显示连接圆点和「点击连接」。用户确认需要显示**墙体起点到悬停点的距离**，例如「距起点 3 米」，不是整面墙总长，也不是新绘墙段长度。本次仅调整平面画布悬停提示，不修改数据库、墙体数据或其他工具。
+用户反馈在自定义户型绘墙过程中没有看到实时近端距离，并明确要求：绘墙、测量时双击或右键即可完成。完成语义已确认：**保留已确认内容，丢弃尚未确认的预览，退出到选择模式**。不扩大到参考户型或普通选择模式，不修改后端或用户已有数据。
+
+## 已有实现与本次问题
+- 已有 `WallHoverOverlay.tsx` 可显示「距近端 X 米」，使用 `nearestOnWall().offset`、`length()` 与 `formatMeters()`，不拦截指针、不进入导出。
+- 当前提示直接依赖绘墙连接 `candidate`。`resolveWallPoint()` 在起笔后施加轴向约束；关闭吸附时没有 target，所以该提示不能独立反映鼠标在墙体上的实时位置。本次分离悬停测距与实际绘墙连接候选，不修改连接规则。
+- `PlanCanvas.tsx` 尚无双击或右键结束处理；测量第二点在 pointerdown 提交，绘墙在 pointerup 提交，必须防止双击第二次点击创建新起点或多余墙段。
+- 之前专项 9 项、全量 71 项测试与构建通过；桌面/移动截图为选择模式，不能证明绘墙交互通过。现已发现全局 Playwright，但现有 Chromium 启动 SIGTRAP、Firefox 启动失败，尚未取得实际鼠标交互证据。
 
 ## 推荐实现
-- 复用 `useWallDrawing.move()` → `resolveWallPoint()` 得到的 `candidate.point` 和 `target.wallId`，提示位置与实际点击连接位置一致；保留已有端点优先、轴向约束、吸附开关和缩放容差规则。
-- 起点使用目标墙体的 `wall.a`；复用 `geometry.ts` 的 `nearestOnWall(candidate.point, wall).offset` 得到沿墙距离（毫米）。除以 1000 转换为米，最多三位小数并去掉末尾零，例如「距起点 3 米」「距起点 1.25 米」。
-- 提取小型 `WallHoverOverlay` 组件，保留原墙体高亮、连接圆点和「点击连接」，在圆点附近增加距离文本。复用 `--plan-selection`、`--plan-porcelain` 等现有语义颜色；文字、偏移和描边按 `1 / view.s` 保持屏幕尺寸稳定。提示不截获指针事件，也不进入导出图片。
-- 无目标墙体时不显示提示；移出画布时仅清除悬停候选，不清除绘墙链或草稿。退出绘墙模式、Enter、Esc 和指针取消继续沿用已有清理逻辑。
-- 直接从候选和墙体派生距离，不引入额外距离 state、effect、网络请求、依赖或高频全局更新。现有新墙段 `MeasureLine` 的毫米显示保持不变。
+1. **独立实时悬停测距**：在 `useWallDrawing.move(raw)` 中分别更新原有连接 candidate 与无起点轴向约束的墙体悬停候选。复用 `resolveWallPoint(raw, design, scale, true)` 找到附近有效墙体，再用 `nearestOnWall(raw, wall)` 投影到墙中心线作为测距点；近端值为 `min(offset, length-offset)`。即使绘墙吸附关闭，也能悬停测距，但实际点击仍遵守原吸附开关。鼠标离墙/画布、切换模式或完成时清空提示，不清除离开画布前的草稿。
+2. **保留连接语义**：`WallHoverOverlay` 接收独立悬停点和实际连接候选，只在两者对应同一墙体及同一连接点时展示「点击连接」，避免提示可连接但实际轴向约束不同。距离实时更新且不依赖草稿是否已起笔。
+3. **统一完成入口**：在画布增加完成绘墙/测量的清理函数，清空绘墙链、候选、测量起点、预览与相关指针拖动状态，再调用回调退出到选择模式。复用绘墙 `clear()`；将目前 `finishWall` 回调重命名为通用的 `finishTool`，同步修改 `Workbench` 调用处。完成不调用草稿提交或清空已确认内容。
+4. **双击和右键**：仅在绘墙/测量模式处理 `onDoubleClick`、`onContextMenu`，右键阻止浏览器菜单并完成。识别双击第二次 pointerdown/up 并跳过其普通绘制/测量处理，再由双击事件清理退出。第一下按现有单击语义确认有效段，第二下不重复提交，不产生零长度墙、重复测量线或新草稿；事件计数来源需在实际浏览器确认，必要时复用原生鼠标点击计数而非假定 PointerEvent.detail 可用。
+5. **提示与现有功能**：更新底部绘墙/测量说明，注明双击/右键结束；绘墙「完成绘墙」按钮和既有 Enter/Esc 仍保留。避免恢复遮挡墙面的浮条，不增加新依赖或网络请求。
 
-## 关键文件与复用点
-- `src/features/interior/components/PlanCanvas.tsx`：替换现有连接提示渲染，接入画布离开事件。
-- `src/features/interior/components/WallHoverOverlay.tsx`（新增）：集中渲染目标墙高亮、圆点、连接文案和米制距离。
-- `src/features/interior/components/useWallDrawing.ts`：提供只清除候选、不取消草稿的悬停清理入口。
-- `src/features/interior/components/WallHoverOverlay.test.tsx`（新增）：按现有 Vitest/服务端渲染测试方式覆盖提示。
-- 复用且不改变：`model/geometry.ts` 的 `nearestOnWall()`、`wallPoly()`；`model/wallDrawing.ts` 的 `resolveWallPoint()`；`model/wallDrawing.test.ts` 的吸附回归。
+## 关键文件与复用
+- `src/features/interior/components/PlanCanvas.tsx`：通用完成回调、测量预览清理、双击/右键处理与重复事件保护。
+- `src/features/interior/components/useWallDrawing.ts`：独立 hover 候选与统一清理。
+- `src/features/interior/components/WallHoverOverlay.tsx`：实时近端提示与连接文案条件。
+- `src/features/interior/components/Workbench.tsx`：通用完成回调和底部操作说明。
+- `src/features/interior/components/WallHoverOverlay.test.tsx`、`src/features/interior/model/wallDrawing.test.ts`：既有测距/吸附测试；新增针对事件完成与悬停状态的聚焦测试。
+- 复用 `model/geometry.ts` 的 `nearestOnWall`、`length`、`wallPoly`，`model/lengthUnits.ts` 的 `formatMeters`，`model/wallDrawing.ts` 的 `resolveWallPoint`、`validateWallSegment`，保留既有门窗/重叠墙校验。
 
 ## Implementation checklist
-- [x] 新增悬停组件，以目标墙 `a` 到当前连接候选的沿墙距离生成米制文案，保留连接提示。
-- [x] 在 `PlanCanvas.tsx` 使用悬停组件；目标不存在时安全地不渲染。
-- [x] 提示使用现有语义颜色、缩放补偿、`pointerEvents="none"` 和 `data-export-hide="true"`。
-- [x] `useWallDrawing.ts` 增加仅清空候选的入口，画布离开事件调用它，保留草稿和连续绘墙状态。
-- [x] 新增提示测试；不修改现有墙体、吸附规则、新墙段测量单位或后端数据。
+- [ ] `useWallDrawing.move` 使用原始鼠标点更新独立悬停目标，实际连接 candidate 仍使用原轴向与吸附参数。
+- [ ] 提示从原始鼠标的墙上投影点计算近端距离，起笔前后均更新，关闭吸附不禁用测距。
+- [ ] 「点击连接」仅在悬停点与实际连接候选一致时显示；离墙、完成、切换工具后无残留提示。
+- [ ] `PlanCanvas` 与 `Workbench` 一致改用 `finishTool`，结束测量清除 measureStart/draft/drag，结束绘墙复用 clear，不提交未确认草稿。
+- [ ] 画布双击第二次按下/抬起不触发额外提交或起笔，双击后退出选择模式。
+- [ ] 绘墙/测量右键仅清理退出并阻止菜单，其他工具右键行为保持不变。
+- [ ] 底部说明包含双击/右键结束；保留现有绘墙完成按钮与键盘操作。
 
 ## Verification checklist
-- [ ] 正向：6000 mm 墙体中点显示「距起点 3 米」；沿墙移动提示实时变化，小数去除尾零。
-- [x] 边界：起点显示 0 米，终点显示完整沿墙长度；水平、竖直、斜墙及反向定义墙均从 `wall.a` 测量。
-- [ ] 默认/负向：无候选、目标墙不存在、非绘墙工具和关闭吸附时不新增提示；拆除墙不成为目标，沿用原规则。
-- [ ] 生命周期：离开墙体或画布后提示消失，返回后恢复；离开画布不取消草稿；Enter、Esc、切换工具后不残留提示。
-- [ ] 回归：端点吸附、T 形连接、点击/拖动绘墙、连续绘墙、缩放和平移保持原行为；提示不阻挡点击、不进入图片导出。
-- [x] 执行 `pnpm exec vitest run src/features/interior/components/WallHoverOverlay.test.tsx src/features/interior/model/wallDrawing.test.ts`，然后执行 `pnpm test`、`pnpm check`、`pnpm run build`。
-
-验证记录：专项 9 项、全量 71 项测试通过；lint、类型检查、预览及生产构建通过。生产构建保留修改前已有的依赖指令、Browserslist 与大包告警。构建审计因技能运行环境缺少 `parse5` 无法执行（修改前后均如此），未修改业务依赖或审计配置。浏览器交互/性能、移动布局及部署 HTTP 未验证：环境无 Playwright/Puppeteer，未取得受控交互或部署证据；不宣称响应式或性能验收通过。距离、缺失目标、关闭吸附、拆除墙和缩放补偿已由组件测试覆盖，生命周期与真实导出仍待浏览器回归。
-- [ ] 性能验证：本项目按强交互 `app` 分类；批准后读取既有入口与 `performance-audit.config.json`，复用既有配置运行 `pnpm run build:prod` 与性能技能的 `audit-vite-build.mjs --profile app --dist dist --config performance-audit.config.json --strict`，记录原有告警，不扩展为全站优化。
-- [ ] 在实际绘墙入口检查悬停提示可读性和跟随行为；无指定设备时按 desktop_1280 与 mobile_390 检查该受影响画布（移动端只验证布局及原有触控绘墙行为，不承诺触屏 hover）。浏览器性能、部署 HTTP 或交互证据不可取得时明确标记未验证，不由构建通过推断。
+- [ ] 正向：6 米墙在 1 米、3 米、4 米位置分别显示近端 1、3、2 米，连续移动实时变化；起笔前后及关闭吸附时均能测距。
+- [ ] 边界：端点 0 米、中点半墙长、反向/水平/竖直/斜墙正确；已拆除墙不显示，远离墙体后不显示。
+- [ ] 正向：绘墙、测量双击或右键后回到选择模式，已确认段保留，未确认草稿消失。
+- [ ] 负向：双击不生成重复或零长度墙段/测量线、不留下新起点；右键不提交当前跟随鼠标的预览。
+- [ ] 默认：选择/结构工具不触发新结束逻辑；连接点与点击文案一致，门窗、重叠墙及最短墙段校验不变。
+- [ ] 生命周期：离画布只清空 hover，回来仍可继续草稿；结束后重新进入绘墙/测量无旧起点或指针状态。
+- [ ] 执行聚焦 Vitest 测试、`pnpm test`、`pnpm check`、`pnpm run build`、`pnpm run build:prod`。
+- [ ] 在独立临时浏览器自定义户型执行真实移动/双击/右键，不修改用户实际项目；若启动限制未解决，记录为未验证，不以测试或选择模式截图替代交互证据。
+- [ ] 布局验证只覆盖受影响绘墙入口；未指定设备时使用 desktop_1280/mobile_390，触屏不承诺 hover。浏览器性能、构建审计及部署 HTTP 单独标记状态；既有审计缺少 parse5 的环境阻塞不扩展为业务依赖改造。
