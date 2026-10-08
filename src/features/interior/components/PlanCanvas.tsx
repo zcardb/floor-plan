@@ -35,6 +35,7 @@ import { resolveWallPoint,validateWallSegment } from '../model/wallDrawing';
 import { useWallDrawing } from './useWallDrawing';
 import { WallHoverOverlay } from './WallHoverOverlay';
 import { formatMeters } from '../model/lengthUnits';
+import { dragOpening } from '../model/openingDrag';
 import { isCompletionClick, supportsPointerCompletion } from '../model/toolCompletion';
 export interface CanvasHandle {
   zoom: (k: number) => void;
@@ -287,6 +288,12 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       return;
     }
     const d = current.current;
+    if (dr.kind === 'openingmove') {
+      const original = dr.before.openings.find(o => o.id === dr.id);
+      const moved = d.openings.find(o => o.id === dr.id);
+      if (dr.moved && original && moved && original.offset !== moved.offset) commit(d, dr.before);
+      return;
+    }
     if (["move", "rot", "size", "wallmove", "endpoint"].includes(dr.kind)) {
       if (dr.moved) {
         const next =
@@ -464,6 +471,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           };
           commit({ ...design, openings: [...design.openings, o] });
           select({ kind: "opening", id: o.id });
+          finishTool();
           return;
         } else if (handle && selection) {
           base.kind = handle === "a" || handle === "b" ? "endpoint" : handle;
@@ -477,7 +485,9 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           base.offset = [p[0] - f.cx, p[1] - f.cy];
         } else if (oid) {
           select({ kind: "opening", id: oid });
-          return;
+          if (tool === 'door' || tool === 'window') finishTool();
+          base.kind = 'openingmove';
+          base.id = oid;
         } else if (wid && tool === "select") {
           const w = design.walls.find((w) => w.id === wid)!;
           wallClick.current={id:wid,fraction:nearestOnWall(p,w).offset/length(w)};
@@ -562,6 +572,11 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
                 ? [q[0], dr.start[1]]
                 : [dr.start[0], q[1]];
           setDraft({ a: dr.start, b: q });
+          return;
+        }
+        if (dr.kind === 'openingmove') {
+          const next = dragOpening(dr.before, dr.id!, dr.start, p);
+          if (next && next.openings.find(o => o.id === dr.id)?.offset !== current.current.openings.find(o => o.id === dr.id)?.offset) preview(next);
           return;
         }
         const next = structuredClone(dr.before),
