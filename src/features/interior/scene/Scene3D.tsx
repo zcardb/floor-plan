@@ -39,7 +39,8 @@ export interface SceneHandle {
   shot: () => void;
   top: () => void;
   iso: () => void;
-  room: (id: string) => void;
+  /** 鸟瞰时平滑飞到房间（"all" 为全屋）；漫游时传送到房间中心。 */
+  flyTo: (id: string) => void;
   zoom: (k: number) => void;
   ground: () => Point | null;
 }
@@ -58,8 +59,34 @@ interface Props {
   commit: (d: Design, before?: Design) => void;
   add: (it: LibraryItem, p: Point) => void;
   onError: () => void;
+  /** 首次构建完成、着色器编译完毕后触发。 */
+  onReady: () => void;
   exitWalk: () => void;
   onAnchor: (r: ScreenRect | null) => void;
+}
+interface Fly {
+  t0: number;
+  from: [THREE.Vector3, THREE.Vector3];
+  to: [THREE.Vector3, THREE.Vector3];
+}
+const FLY_MS = 900,
+  EYE = 1.6,
+  WALK_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
+const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+/** 漫游起点：面积最大的计入房间（通常是客厅）中心，朝向房间较长的方向。 */
+function walkStart(d: Design, roomId?: string) {
+  const rooms = d.rooms.filter((r) => r.counted !== false);
+  const room =
+    d.rooms.find((r) => r.id === roomId) ||
+    [...(rooms.length ? rooms : d.rooms)].sort((a, b) => area(b) - area(a))[0];
+  if (!room) return null;
+  const p = center(room),
+    b = bbox(room.rings[0]),
+    wide = b.x2 - b.x >= b.y2 - b.y;
+  return {
+    pos: new THREE.Vector3(p[0] / 1000, EYE, p[1] / 1000),
+    look: new THREE.Vector3(p[0] / 1000 + (wide ? 2 : 0), EYE, p[1] / 1000 + (wide ? 0 : 2)),
+  };
 }
 interface Runtime {
   renderer: THREE.WebGLRenderer;
@@ -85,6 +112,8 @@ interface Runtime {
   pointer: THREE.Vector2;
   helper: THREE.BoxHelper | null;
   textures: THREE.Texture[];
+  fly: Fly | null;
+  ready: boolean;
 }
 function clear(g: THREE.Group) {
   g.traverse((o) => {
@@ -105,30 +134,62 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
       latest = useRef(props);
     latest.current = props;
     const [paused, setPaused] = useState(true),
-      [touch, setTouch] = useState(false),
+      /** 指针锁定不可用（iframe 沙箱、触屏）时改为按住拖动转向。 */
+      [free, setFree] = useState(false),
       joy = useRef({ x: 0, y: 0 }),
       knob = useRef<HTMLElement>(null),
       keys = useRef(new Set<string>()),
       activeLook = useRef<{ id: number; x: number; y: number } | null>(null),
-      touchRef = useRef(false);
-    touchRef.current = touch;
-    const pose = (top = false, roomId?: string) => {
+      freeRef = useRef(false);
+    freeRef.current = free;
+    const coarse = () => matchMedia("(pointer:coarse)").matches;
+    /** 鸟瞰机位：[target, position]，方向沿用当前视角方位。 */
+    const viewOf = (top = false, roomId?: string): [THREE.Vector3, THREE.Vector3] | null => {
       const r = runtime.current;
-      if (!r) return;
+      if (!r) return null;
       const d = latest.current.design,
         room = d.rooms.find((r) => r.id === roomId),
-        b = bbox(room ? room.rings[0] : d.walls.flatMap((w) => [w.a, w.b])),
+        points = room ? room.rings[0] : d.walls.flatMap((w) => [w.a, w.b]);
+      if (!points.length) return null;
+      const b = bbox(points),
         x = (b.x + b.x2) / 2000,
         z = (b.y + b.y2) / 2000,
         size = Math.max(b.x2 - b.x, b.y2 - b.y) / 1000,
-        dist = size * (room ? 1.4 : 1.15) + 3;
-      r.orbit.target.set(x, 0, z);
-      r.camera.position.set(
-        top ? x : x + dist * 0.35,
-        dist,
-        top ? z + 0.001 : z + dist * 0.6,
-      );
+        dist = size * (room ? 1.4 : 1.15) + 3,
+        target = new THREE.Vector3(x, 0, z);
+      if (top) return [target, new THREE.Vector3(x, dist, z + 0.001)];
+      const dir = room
+        ? r.camera.position.clone().sub(r.orbit.target).setY(0)
+        : new THREE.Vector3(0.35, 0, 0.6);
+      if (dir.lengthSq() < 0.01) dir.set(0.35, 0, 0.6);
+      dir.normalize().multiplyScalar(dist * 0.7);
+      return [target, new THREE.Vector3(x + dir.x, dist, z + dir.z)];
+    };
+    const pose = (top = false, roomId?: string) => {
+      const r = runtime.current,
+        view = viewOf(top, roomId);
+      if (!r || !view) return;
+      r.fly = null;
+      r.orbit.target.copy(view[0]);
+      r.camera.position.copy(view[1]);
       r.camera.lookAt(r.orbit.target);
+    };
+    const fly = (top = false, roomId?: string) => {
+      const r = runtime.current,
+        view = viewOf(top, roomId);
+      if (!r || !view) return;
+      r.fly = {
+        t0: performance.now(),
+        from: [r.orbit.target.clone(), r.camera.position.clone()],
+        to: view,
+      };
+    };
+    const teleport = (roomId?: string) => {
+      const r = runtime.current,
+        start = walkStart(latest.current.design, roomId);
+      if (!r || !start) return;
+      r.camera.position.copy(start.pos);
+      r.camera.lookAt(start.look);
     };
     const ground = (x?: number, y?: number): Point | null => {
       const r = runtime.current;
@@ -210,9 +271,12 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         });
         if (helper) helper.visible = true;
       },
-      top: () => pose(true),
-      iso: () => pose(),
-      room: (id) => pose(false, id),
+      top: () => fly(true),
+      iso: () => fly(),
+      flyTo: (id) => {
+        if (latest.current.options.mode === "walk") teleport(id === "all" ? undefined : id);
+        else fly(false, id === "all" ? undefined : id);
+      },
       zoom: (k) => {
         const r = runtime.current;
         if (r) {
@@ -228,10 +292,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
       const el = host.current!;
       let renderer: THREE.WebGLRenderer;
       try {
-        renderer = new THREE.WebGLRenderer({
-          antialias: true,
-          preserveDrawingBuffer: true,
-        });
+        renderer = new THREE.WebGLRenderer({ antialias: true });
       } catch {
         latest.current.onError();
         return;
@@ -239,7 +300,10 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
       renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
       renderer.setSize(el.clientWidth, el.clientHeight);
       renderer.shadowMap.enabled = true;
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.shadowMap.type = THREE.PCFShadowMap;
+      // 阴影只在场景、光照或门变化时重算，避免每帧多渲染一遍整个场景
+      renderer.shadowMap.autoUpdate = false;
+      renderer.shadowMap.needsUpdate = true;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       el.prepend(renderer.domElement);
       const labels = new CSS2DRenderer();
@@ -294,6 +358,8 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         pointer: new THREE.Vector2(),
         helper: null,
         textures: [],
+        fly: null,
+        ready: false,
       };
       runtime.current = r;
       pose();
@@ -377,7 +443,8 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
       el.addEventListener("pointerdown", capture, true);
       const pd = (e: PointerEvent) => {
         down = [e.clientX, e.clientY];
-        if (latest.current.options.mode === "walk" && touchRef.current) {
+        r.fly = null;
+        if (latest.current.options.mode === "walk" && freeRef.current) {
           activeLook.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
           renderer.domElement.setPointerCapture(e.pointerId);
         }
@@ -418,6 +485,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
             furn.children
               .find((o) => o.userData.fid === f.id)
               ?.position.set(q[0] / 1000, 0, q[1] / 1000);
+            renderer.shadowMap.needsUpdate = true;
           }
         }
       };
@@ -481,6 +549,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
           latest.current.options.mode !== "walk"
         )
           return;
+        if (WALK_KEYS.has(e.code)) e.preventDefault();
         keys.current.add(e.code);
         if (e.code === "KeyE") {
           const hit = pick();
@@ -495,7 +564,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
       const lock = () => setPaused(false),
         unlock = () => setPaused(true),
         lockError = () => {
-          setTouch(true);
+          setFree(true);
           setPaused(false);
         };
       renderer.domElement.addEventListener("pointerdown", pd);
@@ -512,24 +581,28 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         const p: Point = [x * 1000, z * 1000],
           d = latest.current.design;
         for (const w of d.walls.filter((w) => !d.demolished.includes(w.id))) {
-          const L = length(w),
-            t =
+          const L = length(w);
+          if (!L) continue;
+          const raw =
               ((p[0] - w.a[0]) * (w.b[0] - w.a[0]) +
                 (p[1] - w.a[1]) * (w.b[1] - w.a[1])) /
-              (L * L);
-          if (t < 0 || t > 1) continue;
-          const dist =
-            Math.abs(
-              (p[0] - w.a[0]) * (w.b[1] - w.a[1]) -
-                (p[1] - w.a[1]) * (w.b[0] - w.a[0]),
-            ) / L;
-          if (dist < w.thickness / 2 + 180) {
-            const opening = d.openings.find(
-              (o) =>
-                o.wallId === w.id &&
-                t * L > o.offset - o.width / 2 + 180 &&
-                t * L < o.offset + o.width / 2 - 180,
+              (L * L),
+            t = Math.max(0, Math.min(1, raw)),
+            dist = Math.hypot(
+              p[0] - (w.a[0] + (w.b[0] - w.a[0]) * t),
+              p[1] - (w.a[1] + (w.b[1] - w.a[1]) * t),
             );
+          if (dist < w.thickness / 2 + 180) {
+            // 墙端、墙角没有门洞，直接挡住
+            const opening =
+              raw > 0 && raw < 1
+                ? d.openings.find(
+                    (o) =>
+                      o.wallId === w.id &&
+                      raw * L > o.offset - o.width / 2 + 180 &&
+                      raw * L < o.offset + o.width / 2 - 180,
+                  )
+                : undefined;
             if (!opening || opening.kind === "window") return true;
             const door = r.doors.find((o) => o.id === opening.id);
             if (door && !door.open) return true;
@@ -543,35 +616,46 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         raf = requestAnimationFrame(loop);
         const dt = Math.min((time - last) / 1000, 0.05);
         last = time;
-        if (document.hidden) return;
-        if (latest.current.options.mode === "orbit") orbit.update();
-        else if (walk.isLocked || touchRef.current) {
+        if (document.hidden || !r.ready) return;
+        if (r.fly) {
+          const t = Math.min(1, (time - r.fly.t0) / FLY_MS),
+            k = ease(t);
+          orbit.target.lerpVectors(r.fly.from[0], r.fly.to[0], k);
+          camera.position.lerpVectors(r.fly.from[1], r.fly.to[1], k);
+          camera.lookAt(orbit.target);
+          if (t >= 1) r.fly = null;
+        } else if (latest.current.options.mode === "orbit") orbit.update();
+        else if (walk.isLocked || freeRef.current) {
           const dir = new THREE.Vector3();
           camera.getWorldDirection(dir);
           dir.y = 0;
           dir.normalize();
           const right = new THREE.Vector3(-dir.z, 0, dir.x),
-            move = new THREE.Vector3();
-          if (keys.current.has("KeyW")) move.add(dir);
-          if (keys.current.has("KeyS")) move.sub(dir);
-          if (keys.current.has("KeyA")) move.sub(right);
-          if (keys.current.has("KeyD")) move.add(right);
+            move = new THREE.Vector3(),
+            held = (...codes: string[]) => codes.some((c) => keys.current.has(c));
+          if (held("KeyW", "ArrowUp")) move.add(dir);
+          if (held("KeyS", "ArrowDown")) move.sub(dir);
+          if (held("KeyA", "ArrowLeft")) move.sub(right);
+          if (held("KeyD", "ArrowRight")) move.add(right);
           move
             .addScaledVector(dir, -joy.current.y)
             .addScaledVector(right, joy.current.x);
           if (move.length() > 1) move.normalize();
-          move.multiplyScalar(dt * (keys.current.has("ShiftLeft") ? 2.5 : 1.4));
+          move.multiplyScalar(dt * (held("ShiftLeft", "ShiftRight") ? 2.5 : 1.4));
           if (!blocked(camera.position.x + move.x, camera.position.z))
             camera.position.x += move.x;
           if (!blocked(camera.position.x, camera.position.z + move.z))
             camera.position.z += move.z;
         }
-        for (const door of r.doors)
-          door.group.rotation.y +=
-            (door.angle +
-              (door.open ? door.rotationSign * Math.PI / 2 : 0) -
-              door.group.rotation.y) *
-            Math.min(1, dt * 8);
+        for (const door of r.doors) {
+          const delta =
+            door.angle +
+            (door.open ? door.rotationSign * Math.PI / 2 : 0) -
+            door.group.rotation.y;
+          if (Math.abs(delta) < 1e-4) continue;
+          door.group.rotation.y += delta * Math.min(1, dt * 8);
+          renderer.shadowMap.needsUpdate = true;
+        }
         r.helper?.update();
         const selected = latest.current.selection;
         const objects =
@@ -827,6 +911,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         }
         part(cursor, L, 0, w.kind === "low" ? Math.min(1, H) : H);
       }
+      r.renderer.shadowMap.needsUpdate = true;
     }, [
       props.design.walls,
       props.design.rooms,
@@ -841,11 +926,13 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
       if (!r) return;
       clear(r.furn);
       props.design.furniture.forEach((f) => r.furn.add(buildFurniture(f)));
+      r.renderer.shadowMap.needsUpdate = true;
     }, [props.design.furniture]);
     useEffect(() => {
       const r = runtime.current;
       if (!r) return;
       r.furn.visible = props.layers.furn;
+      r.renderer.shadowMap.needsUpdate = true;
       r.labelGroup.children.forEach(
         (o) =>
           (o.visible = props.layers.labels && props.options.mode === "orbit"),
@@ -885,32 +972,60 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         15,
       );
       r.sun.target.position.copy(r.orbit.target);
+      r.renderer.shadowMap.needsUpdate = true;
     }, [props.options]);
     useEffect(() => {
       const r = runtime.current;
       if (!r) return;
       keys.current.clear();
       joy.current = { x: 0, y: 0 };
-      setTouch(false);
+      setFree(false);
       setPaused(true);
       if (props.options.mode === "walk") {
         r.orbit.enabled = false;
-        const p = center(latest.current.design.rooms[0]);
-        r.camera.position.set(p[0] / 1000, 1.6, p[1] / 1000);
-        r.camera.lookAt(p[0] / 1000 + 2, 1.6, p[1] / 1000);
+        r.fly = null;
+        teleport();
       } else {
         r.walk.unlock();
         r.orbit.enabled = true;
-        pose();
+        fly();
       }
     }, [props.options.mode]);
+    // 必须放在所有构建 effect 之后：首帧前异步编译着色器，避免切到 3D 时主线程长时间卡死
+    useEffect(() => {
+      const r = runtime.current;
+      if (!r) return;
+      let alive = true;
+      const done = () => {
+        if (!alive || r.ready) return;
+        r.ready = true;
+        latest.current.onReady();
+      };
+      r.scene.updateMatrixWorld(true);
+      r.renderer.compileAsync(r.scene, r.camera).then(done, done);
+      // 个别驱动不回报并行编译状态时，兜底直接开始渲染
+      const timer = setTimeout(done, 4000);
+      return () => {
+        alive = false;
+        clearTimeout(timer);
+      };
+    }, []);
     const start = () => {
       const r = runtime.current;
       if (!r) return;
-      if (matchMedia("(pointer:coarse)").matches) {
-        setTouch(true);
+      const fallback = () => {
+        setFree(true);
         setPaused(false);
-      } else r.walk.lock();
+      };
+      if (coarse()) return fallback();
+      try {
+        const pending = r.walk.domElement?.requestPointerLock() as unknown as
+          | Promise<void>
+          | undefined;
+        pending?.catch?.(fallback);
+      } catch {
+        fallback();
+      }
     };
     return (
       <div
@@ -931,11 +1046,11 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
           }
         }}
       >
-        {props.options.mode === "walk" && paused && !touch && (
+        {props.options.mode === "walk" && paused && !free && (
           <div className="walk-overlay" onClick={start}>
             <div>
               <h3>走进你的设计</h3>
-              <p>WASD 移动 · 鼠标转向 · E 开关门</p>
+              <p>WASD / 方向键移动 · 鼠标转向 · Shift 加速 · E 开关门</p>
               <p>触屏使用摇杆移动 · 拖动屏幕转向</p>
               <button className="walk-start">点击开始漫游</button>
             </div>
@@ -944,7 +1059,10 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         {props.options.mode === "walk" && !paused && (
           <>
             <div className="crosshair" />
-            {touch && (
+            {free && !coarse() && (
+              <div className="walk-hint">按住鼠标拖动转向 · WASD / 方向键移动 · 点门开关</div>
+            )}
+            {free && coarse() && (
               <div
                 className="joystick"
                 onPointerDown={(e) => {

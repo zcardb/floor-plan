@@ -79,6 +79,7 @@ import {
 import { blankDesign, referenceDesign } from "../data/templates";
 import { library } from "../data/catalog";
 import { Library } from "./Library";
+import { RoomList } from "./RoomList";
 import { PropertyPanel } from "./PropertyPanel";
 import { CostPanel } from "./CostPanel";
 import { PanelModeTabs } from "./PanelModeTabs";
@@ -96,6 +97,13 @@ import type { Scene3D, SceneHandle, SceneOptions } from "../scene/Scene3D";
 import { isSaveProblem, type SaveStatus } from "../cloud/useProjects";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 type SceneComponent = typeof Scene3D;
+/** 3D 模块只下载一次：空闲时预加载，点击时复用同一个 promise。 */
+let scenePromise: Promise<typeof import("../scene/Scene3D")> | null = null;
+const loadScene = () =>
+  (scenePromise ??= import("../scene/Scene3D").catch((e) => {
+    scenePromise = null;
+    throw e;
+  }));
 interface Props {
   project: Project;
   projectNavigation: ProjectNavigation;
@@ -152,6 +160,7 @@ export function Workbench(p: Props) {
     [view, setView] = useState<"2d" | "3d">("2d"),
     [Scene, setScene] = useState<SceneComponent | null>(null),
     [sceneLoading, setSceneLoading] = useState(false),
+    [roomFocus, setRoomFocus] = useState<string | null>(null),
     [hideLib, setHideLib] = useState(false),
     [hidePanel, setHidePanel] = useState(false),
     [drawer, setDrawer] = useState<"lib" | "panel" | null>(null),
@@ -273,34 +282,59 @@ export function Workbench(p: Props) {
   const canvas = useRef<CanvasHandle>(null),
     scene = useRef<SceneHandle>(null),
     mounted = useRef(true);
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mounted.current = true;
+    const preload = () => void loadScene().catch(() => undefined);
+    if ("requestIdleCallback" in window) {
+      const id = requestIdleCallback(preload, { timeout: 4000 });
+      return () => {
+        mounted.current = false;
+        cancelIdleCallback(id);
+      };
+    }
+    const id = setTimeout(preload, 1500);
+    return () => {
       mounted.current = false;
-    },
-    [],
-  );
+      clearTimeout(id);
+    };
+  }, []);
   const select = useCallback((s: Selection) => {
       sizeTransaction.flush();
       setSelection(s);
-      if (s?.kind === "room") scene.current?.room(s.id);
+      if (s?.kind === "room") scene.current?.flyTo(s.id);
     }, [sizeTransaction]),
     closePanels = useCallback(() => { sizeTransaction.flush(); setDrawer(null); }, [sizeTransaction]);
   const toggleView = async (next: "2d" | "3d") => {
-    if (next === "3d" && !Scene) {
-      setSceneLoading(true);
-      try {
-        const m = await import("../scene/Scene3D");
-        if (mounted.current) {
-          setScene(() => m.Scene3D);
-          setView("3d");
-        }
-      } catch {
-        notify.error("3D 引擎加载失败，2D 仍可编辑", "模块加载失败，请检查网络后重试");
-      } finally {
-        if (mounted.current) setSceneLoading(false);
-      }
-    } else setView(next);
     setTool("select");
+    if (next === view) return;
+    if (next === "2d") {
+      setView("2d");
+      setSceneLoading(false);
+      return;
+    }
+    // 先切到 3D 并显示加载遮罩，场景首帧编译完成（onReady）后再撤掉
+    setView("3d");
+    setSceneLoading(true);
+    if (Scene) return;
+    try {
+      const m = await loadScene();
+      if (mounted.current) setScene(() => m.Scene3D);
+    } catch {
+      if (mounted.current) {
+        setView("2d");
+        setSceneLoading(false);
+      }
+      notify.error("3D 引擎加载失败，2D 仍可编辑", "模块加载失败，请检查网络后重试");
+    }
+  };
+  const focusRoom = (id: string) => {
+    setRoomFocus(id);
+    if (view === "2d") {
+      if (id === "all") canvas.current?.fit();
+      else select({ kind: "room", id });
+    } else if (id === "all" && sceneOptions.mode === "walk")
+      setSceneOptions((o) => ({ ...o, mode: "orbit" }));
+    else scene.current?.flyTo(id);
   };
   const add = useCallback(
     (it: LibraryItem, point?: Point) => {
@@ -795,6 +829,13 @@ export function Workbench(p: Props) {
           blank={d.template === "blank"}
           customItems={[...projectCatalog, ...accountFurniture]}
           onNew={p.loggedIn ? () => setCustomOpen(true) : undefined}
+          rooms={
+            <RoomList
+              rooms={d.rooms}
+              active={selection?.kind === "room" ? selection.id : roomFocus}
+              onPick={focusRoom}
+            />
+          }
         />
       </aside>
       <main className="stage" ref={stage}>
@@ -858,12 +899,15 @@ export function Workbench(p: Props) {
             add={add}
             onError={() => {
               setView("2d");
+              setSceneLoading(false);
               notify.fail("设备无法启动 3D，请继续使用 2D 编辑");
             }}
+            onReady={() => setSceneLoading(false)}
             onAnchor={onAnchor}
             exitWalk={() => setSceneOptions((o) => ({ ...o, mode: "orbit" }))}
           />
-        ) : (
+        ) : null}
+        {view === "3d" && sceneLoading && (
           <div className="scene-loading">
             <Loader2 className="animate-spin" />
             正在加载 3D 场景…

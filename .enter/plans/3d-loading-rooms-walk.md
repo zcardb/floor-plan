@@ -46,20 +46,20 @@
 - 复用：`model/geometry.ts` 里的 `area`、`center`、`bbox`
 
 ## Implementation checklist
-- [ ] Workbench 挂载后在空闲时预加载 Scene3D 模块，`toggleView` 复用同一个 promise
-- [ ] 点击 3D 立即切换视图并显示 `.scene-loading`，导入失败时退回 2D 并提示
-- [ ] Scene3D 在首次构建后执行 `compileAsync`，完成后触发 `onReady`；Workbench 收到前一直显示加载遮罩
-- [ ] `shadowMap.autoUpdate=false`，在建筑/家具重建、光照变化、门动画、家具拖动时置 `needsUpdate`；阴影类型改为 PCFShadowMap
-- [ ] `buildFurniture` 按材质合并子网格，group 上的 `fid`、`scale.y`、位置和旋转保持不变
-- [ ] 移除 `preserveDrawingBuffer`，`shot()` 导出仍然有效
-- [ ] 新增 `RoomList.tsx`（房间名、面积、全屋合计、高亮），放在 Library 顶部
-- [ ] `SceneHandle.flyTo(id|"all")`：鸟瞰时平滑飞行，漫游时传送到房间中心、眼高 1.6m
-- [ ] 2D 下点击房间会选中该房间
-- [ ] `walk.lock()` 加 try/catch 和 promise 拒绝处理，失败后进入拖动视角模式
-- [ ] `touch` 拆分为 `free` 和摇杆显示，摇杆只在粗指针设备出现
-- [ ] 漫游起点改为最大计入房间中心，朝向长边
-- [ ] `blocked()` 计算到线段（t 夹到 [0,1]）的距离，墙角无法穿过
-- [ ] 支持方向键和 ShiftRight，漫游时方向键阻止页面滚动
+- [x] Workbench 挂载后在空闲时预加载 Scene3D 模块，`toggleView` 复用同一个 promise
+- [x] 点击 3D 立即切换视图并显示 `.scene-loading`，导入失败时退回 2D 并提示
+- [x] Scene3D 在首次构建后执行 `compileAsync`，完成后触发 `onReady`；Workbench 收到前一直显示加载遮罩
+- [x] `shadowMap.autoUpdate=false`，在建筑/家具重建、光照变化、门动画、家具拖动时置 `needsUpdate`；阴影类型改为 PCFShadowMap
+- [x] `buildFurniture` 按材质合并子网格，group 上的 `fid`、`scale.y`、位置和旋转保持不变
+- [x] 移除 `preserveDrawingBuffer`，`shot()` 导出仍然有效
+- [x] 新增 `RoomList.tsx`（房间名、面积、全屋合计、高亮），放在 Library 顶部
+- [x] `SceneHandle.flyTo(id|"all")`：鸟瞰时平滑飞行，漫游时传送到房间中心、眼高 1.6m
+- [x] 2D 下点击房间会选中该房间
+- [x] `walk.lock()` 加 try/catch 和 promise 拒绝处理，失败后进入拖动视角模式
+- [x] `touch` 拆分为 `free` 和摇杆显示，摇杆只在粗指针设备出现
+- [x] 漫游起点改为最大计入房间中心，朝向长边
+- [x] `blocked()` 计算到线段（t 夹到 [0,1]）的距离，墙角无法穿过
+- [x] 支持方向键和 ShiftRight，漫游时方向键阻止页面滚动
 
 ## Verification checklist
 - [ ] 正向：在预览中点「3D 场景」后，先看到加载占位，随后进入场景且不再无限转圈；鸟瞰拖动流畅
@@ -70,4 +70,4 @@
 - [ ] 边界：沿墙走到墙角时不能穿墙；门关闭后（E）无法通过，打开后可以通过
 - [ ] 边界：2D 下点房间只选中，不切换视图；面积为 0 或不计入的房间不出现在列表里
 - [ ] 回归：3D 截图导出正常；选中家具后的 BoxHelper 框和 3D 拖动家具仍然正常
-- [ ] 运行 `pnpm run lint`、`pnpm exec tsc --noEmit -p tsconfig.app.json`、`pnpm vitest run src/features/interior`、`pnpm run build`
+- [x] 运行 `pnpm run lint`、`pnpm exec tsc --noEmit -p tsconfig.app.json`、`pnpm vitest run src/features/interior`、`pnpm run build`

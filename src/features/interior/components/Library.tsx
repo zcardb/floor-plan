@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Search,
   Armchair,
@@ -26,12 +26,15 @@ export function Library({
   blank,
   customItems = [],
   onNew,
+  rooms,
 }: {
   add: (i: LibraryItem) => void;
   setTool: (t: Tool) => void;
   blank: boolean;
   customItems?: LibraryItem[];
   onNew?: () => void;
+  /** 顶部的房间快捷切换列表。 */
+  rooms?: ReactNode;
 }) {
   const [category, setCategory] = useState("客厅"),
     [query, setQuery] = useState("");
@@ -40,6 +43,7 @@ export function Library({
   );
   return (
     <>
+      {rooms}
       <div className="panel-heading">
         <span>构件与家具</span>
         <EditorTooltip label="素材库">

@@ -1,6 +1,36 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { Furniture } from "../model/types";
+/** 把一件家具的子网格按材质与投影设置合并，draw call 从几十个降到几个。 */
+function mergeParts(g: THREE.Group) {
+  const buckets = new Map<string, { material: THREE.Material; cast: boolean; parts: THREE.BufferGeometry[] }>();
+  const ids = new Map<THREE.Material, number>();
+  for (const o of [...g.children]) {
+    if (!(o instanceof THREE.Mesh) || Array.isArray(o.material)) continue;
+    o.updateMatrix();
+    const source = o.geometry as THREE.BufferGeometry,
+      geo = source.index ? source.toNonIndexed() : source.clone();
+    source.dispose();
+    geo.clearGroups();
+    geo.applyMatrix4(o.matrix);
+    if (!ids.has(o.material)) ids.set(o.material, ids.size);
+    const key = ids.get(o.material) + ":" + o.castShadow;
+    const bucket = buckets.get(key) || { material: o.material, cast: o.castShadow, parts: [] };
+    bucket.parts.push(geo);
+    buckets.set(key, bucket);
+    g.remove(o);
+  }
+  for (const { material, cast, parts } of buckets.values()) {
+    const merged = parts.length === 1 ? parts[0] : mergeGeometries(parts, false);
+    if (parts.length > 1) parts.forEach((p) => p.dispose());
+    if (!merged) continue;
+    const mesh = new THREE.Mesh(merged, material);
+    mesh.castShadow = cast;
+    mesh.receiveShadow = true;
+    g.add(mesh);
+  }
+}
 const cache = new Map<string, THREE.MeshStandardMaterial>();
 export function mat(color: string, roughness = 0.7) {
   const key = color + roughness;
@@ -505,6 +535,7 @@ export function buildFurniture(f: Furniture): THREE.Group {
     default:
       box(g, w, 0.7, d, c);
   }
+  mergeParts(g);
   if (f.height) {
     g.updateMatrixWorld(true);
     const bounds = new THREE.Box3().setFromObject(g),

@@ -49,6 +49,9 @@ describe('家具外观和成本分类',()=>{
     const circle=buildFurniture({...item,type:'generic',id:'circle',cx:0,cy:0,rot:0});
     expect(circle.children[0].type).toBe('Mesh');
     const fire=buildFurniture({...item,id:'fire',cx:0,cy:0,rot:0});
-    expect(fire.children.length).toBe(3);
+    // 同材质子网格会被合并：炉口为独立材质，整体顶点数多于普通圆柱
+    const verts=(g:typeof fire)=>g.children.reduce((s,o)=>s+((o as unknown as {geometry:{attributes:{position:{count:number}}}}).geometry.attributes.position.count),0);
+    expect(fire.children.length).toBe(2);
+    expect(verts(fire)).toBeGreaterThan(verts(circle));
   });
 });
