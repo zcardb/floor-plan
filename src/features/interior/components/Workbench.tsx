@@ -462,7 +462,7 @@ export function Workbench(p: Props) {
     if (!d.furniture.length) return;
     const ok = await confirm({
       title: "清空所有家具？",
-      description: "墙体、材质和测量会保留，可撤销恢复。",
+      description: "墙体、材质会保留，可撤销恢复。",
       confirmText: "清空家具",
       tone: "destructive",
     });
@@ -475,7 +475,7 @@ export function Workbench(p: Props) {
   const resetDesign = async () => {
     const ok = await confirm({
       title: "重置当前项目为其初始模板？",
-      description: "墙体、家具与测量都会恢复到初始模板，可撤销恢复。",
+      description: "墙体与家具都会恢复到初始模板，可撤销恢复。",
       confirmText: "重置方案",
       tone: "destructive",
     });

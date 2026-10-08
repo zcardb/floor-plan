@@ -3300,7 +3300,7 @@ button.room-cost-row:hover {
 /* 中段工具在窄屏可横向滑动，左侧项目菜单与右侧导出、账号始终可见 */
 .toolbar-scroll { display:flex; align-items:center; gap:14px; flex:1; min-width:0; overflow-x:auto; scrollbar-width:none; }
 .toolbar-scroll::-webkit-scrollbar { display:none; }
-.view-switch-suffix { margin-left:4px; }
+.view-switch-suffix { margin-left:-3px; }
 @media (max-width: 1100px) { .toolbar-scroll { gap:8px; } }
 @media (max-width: 600px) {
   .toolbar-scroll { gap:5px; }

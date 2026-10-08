@@ -57,7 +57,7 @@ describe('门窗 Visual editor 定位与可见性', () => {
     expect(h.node.style.transform).not.toBe(first);
     expect(h.node.style.visibility).toBe('visible');
   });
-  it('添加/测量等非选择模式保持隐藏，避免误显示', () => {
+  it('门窗等非选择模式保持隐藏，避免误显示', () => {
     const h = harness('door', true);
     h.update({ left: 100, top: 100, right: 150, bottom: 150 });
     expect(h.node.style.visibility).toBe('hidden');
