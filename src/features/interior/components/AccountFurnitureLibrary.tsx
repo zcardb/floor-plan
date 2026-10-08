@@ -37,7 +37,8 @@ export function AccountFurnitureLibrary({catalog,floors=[],defaults,saveDefaults
     const custom=customIds.has(it.catalogId!);
     const price=priceOf(priceDesign,'furniturePrices',it.catalogId!);
     const overridden=commit.settings.furniturePrices?.[it.catalogId!]!==undefined;
-    return <button className="cms-item-card" key={it.catalogId} disabled={commit.busy||!!commit.pending} onClick={()=>setDetail({...it,price})} aria-label={'查看'+it.name}>
+    return <EditorTooltip key={it.catalogId} label={it.name} description="点击查看外观尺寸与参考单价" disabled={commit.busy||!!commit.pending}>
+      <button className="cms-item-card" disabled={commit.busy||!!commit.pending} onClick={()=>setDetail({...it,price})} aria-label={'查看'+it.name}>
       <span className="cms-item-visual">
         {it.imageUrl?<img src={it.imageUrl} crossOrigin="anonymous" alt={it.name} loading="lazy"/>:<svg viewBox={`${-it.w/2-100} ${-it.d/2-100} ${it.w+200} ${it.d+200}`}><FurnitureShape f={it}/></svg>}
         <span className={'cms-item-badge'+(custom?' custom':'')}>{custom?'自定义':'内置'}</span>
@@ -45,10 +46,11 @@ export function AccountFurnitureLibrary({catalog,floors=[],defaults,saveDefaults
       <b>{it.name}</b>
       <small>{it.category} · {formatMeters(it.w)} × {formatMeters(it.d)} m</small>
       <span className="cms-item-price">{price===null?<em>未定价</em>:<>{overridden?'账号默认 ':custom?'':'参考价 '}¥{price}</>}</span>
-    </button>;
+      </button>
+    </EditorTooltip>;
   };
   return <>
-    <div className="cms-heading"><div><h1>账号家具库</h1><p>{total} 款家具 · 内置 {library.length} 款 + 自定义 {catalog.count} 款{floors.length?` · 账号地面 ${floors.length} 款`:''}（款式数，不是项目摆放件数）</p></div><Button disabled={commit.busy||!!commit.pending} onClick={()=>onNew(category)}><Plus/>新建家具</Button></div>
+    <div className="cms-heading"><div><h1>账号家具库</h1><p>{total} 款家具 · 内置 {library.length} 款 + 自定义 {catalog.count} 款{floors.length?` · 账号地面 ${floors.length} 款`:''}（款式数，不是项目摆放件数）</p></div><EditorTooltip label="新建家具" description="上传图片或填写尺寸，创建自己的家具款式" disabled={commit.busy||!!commit.pending}><Button disabled={commit.busy||!!commit.pending} onClick={()=>onNew(category)}><Plus/>新建家具</Button></EditorTooltip></div>
     <div className="cms-toolbar" aria-busy={catalog.loading}>
       <div className="cms-search">{catalog.loading?<Loader2 className="animate-spin" size={15} aria-label="加载家具"/>:<Search size={15}/>}<input aria-label="搜索家具" placeholder="搜索家具、家电…" value={query} onChange={e=>setQuery(e.target.value)}/></div>
       <CmsFilterBar chips={chips} value={category} onChange={setCategory}/>

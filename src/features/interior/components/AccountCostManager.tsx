@@ -54,16 +54,18 @@ export function AccountCostManager({ settings, save, saving, error, items, floor
     </div>
     {failure && <div className="cost-save-error" role="alert"><span>{failure}</span>{commit.pending && <Button variant="outline" disabled={busy} onClick={() => void retry()}>重试保存</Button>}</div>}
     {catalogError && <LoadError title="家具与地面读取失败" message={catalogError} retrying={loading} onRetry={reload}/>}
-    <div className="cost-results-heading"><h2>{category === '全部' ? '全部单价' : category + '单价'}<span>{visible.length} 项{hasMore ? ' · 已加载' : ''}</span></h2>{category === '全部' ? <span>按需设置，无需全部填写</span> : <button type="button" className="cost-clear-filter" onClick={() => setCategory('全部')}><X size={14}/>查看全部</button>}</div>
+    <div className="cost-results-heading"><h2>{category === '全部' ? '全部单价' : category + '单价'}<span>{visible.length} 项{hasMore ? ' · 已加载' : ''}</span></h2>{category === '全部' ? <span>按需设置，无需全部填写</span> : <EditorTooltip label="查看全部" description="清除分类筛选，显示所有单价项"><button type="button" className="cost-clear-filter" onClick={() => setCategory('全部')}><X size={14}/>查看全部</button></EditorTooltip>}</div>
     {blocks.map(block => <section key={block.title} className="cms-category-block" aria-label={block.title + '单价'}>
       <h2>{block.title}<span>{block.entries.length} 项</span></h2>
       <div className="cms-item-grid">{block.entries.map(entry => {
         const price = priceOf(design, entry.group, entry.key), source = accountCostSource(design, entry);
-        return <button type="button" className="cms-item-card cms-item-card--cost" key={entry.group + ':' + entry.key} aria-label={'编辑' + entry.name + '单价'} disabled={busy || !!commit.pending} onClick={() => setEditing(entry)}>
-          <span className="cms-item-visual"><CostItemVisual entry={entry}/><span className="cms-item-badge">{source}</span></span>
-          <b>{entry.name}</b><small>{entry.category}{entry.furniture?` · ${formatMeters(entry.furniture.w)} × ${formatMeters(entry.furniture.d)} m`:''}</small>
-          <span className="cms-item-price">{price === null ? '未定价' : `¥${price.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`}<small> / {entry.unit}</small></span>
-        </button>;
+        return <EditorTooltip key={entry.group + ':' + entry.key} label={entry.name + ' 单价'} description="点击修改这项的账号默认单价" disabled={busy || !!commit.pending}>
+          <button type="button" className="cms-item-card cms-item-card--cost" aria-label={'编辑' + entry.name + '单价'} disabled={busy || !!commit.pending} onClick={() => setEditing(entry)}>
+            <span className="cms-item-visual"><CostItemVisual entry={entry}/><span className="cms-item-badge">{source}</span></span>
+            <b>{entry.name}</b><small>{entry.category}{entry.furniture?` · ${formatMeters(entry.furniture.w)} × ${formatMeters(entry.furniture.d)} m`:''}</small>
+            <span className="cms-item-price">{price === null ? '未定价' : `¥${price.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`}<small> / {entry.unit}</small></span>
+          </button>
+        </EditorTooltip>;
       })}</div>
     </section>)}
     {!loading && !visible.length && <div className="cms-empty"><Search size={30}/><h2>没有匹配的项目</h2><p>{hasMore ? '可加载更多家具，或调整分类与搜索。' : '换个分类，或清空搜索再试。'}</p><Button variant="outline" onClick={() => { setCategory('全部'); setQuery(''); }}>清空筛选</Button></div>}
