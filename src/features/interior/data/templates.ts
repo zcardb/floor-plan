@@ -1,4 +1,5 @@
 import { library } from "./catalog";
+import { NEW_TEMPLATE_PRESETS, type TemplatePreset } from './templatePresets';
 import { normalizeFurniture } from "../model/costs";
 import { outerWalls, rect } from "../model/geometry";
 import {
@@ -267,6 +268,7 @@ export function referenceDesign(): Design {
   return {
     version: 2,
     template: "reference",
+    templateId: "reference",
     width: 11850,
     depth: 10560,
     thickness: 240,
@@ -309,16 +311,23 @@ export function blankDesign(): Design {
     demolished: [],
   };
 }
+export const TEMPLATE_PRESETS: TemplatePreset[] = [
+  { id: 'reference', name: '三室两厅两卫 · 原木之家', layout: '三室两厅两卫', description: '原木风格 · 双卫 · 完整家具方案', area: 125, build: referenceDesign },
+  ...NEW_TEMPLATE_PRESETS,
+];
+export const presetById = (id: string) => TEMPLATE_PRESETS.find(p => p.id === id);
+export const designForTemplate = (id: string): Design => (presetById(id) ?? TEMPLATE_PRESETS[0]).build();
+
 export function createProject(
-  template: Design["template"] = "blank",
+  template: string = "blank",
   name?: string,
 ): Project {
   return {
     id: uid(),
     name:
-      name || (template === "blank" ? "未命名户型" : "三室两厅两卫 · 原木之家"),
+      name || (template === "blank" ? "未命名户型" : presetById(template)?.name ?? TEMPLATE_PRESETS[0].name),
     state: {
-      ...(template === "blank" ? blankDesign() : referenceDesign()),
+      ...(template === "blank" ? blankDesign() : designForTemplate(template)),
       structureUnlocked: true,
     },
     updatedAt: new Date().toISOString(),

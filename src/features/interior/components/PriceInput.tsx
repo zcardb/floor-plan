@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useImperativeHandle, useState, type Ref } from "react";
 import { validPrice } from "../model/costs";
 import { yuanPrecise } from "../model/money";
 import { notify } from "@/lib/notify";
@@ -8,40 +8,49 @@ import { EditorTooltip } from '@/components/ui/editor-tooltip';
 
 /** 返回 false 表示未生效且调用方已自行提示（如云端保存失败）；抛错视为报错；其余视为成功。 */
 export type PriceApplyResult = void | boolean | Promise<void | boolean>;
+/** flush：输入有未应用的修改时按「应用」保存；无修改直接返回 true。 */
+export type PriceInputHandle = { flush: () => Promise<boolean> };
 
 export function PriceInput({
   value,
   onApply,
   label = "单价",
   disabled = false,
+  ref,
 }: {
   disabled?: boolean;
   value: number | null;
   onApply: (v: number | null) => PriceApplyResult;
   label?: string;
+  ref?: Ref<PriceInputHandle>;
 }) {
   const [text, setText] = useState(value === null ? "" : String(value)),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
-  const apply = async () => {
-    if (disabled || busy) return;
+  const apply = async (): Promise<boolean> => {
+    if (disabled || busy) return false;
     const v = text.trim() === "" ? null : Number(text);
     if (v !== null && !validPrice(v)) {
       setError("请输入非负有效金额");
       notify.fail(`「${label}」请输入非负有效金额`);
-      return;
+      return false;
     }
     setError("");
     setBusy(true);
     try {
       const result = await onApply(v);
-      if (result !== false) notify.success(v === null ? `「${label}」已设为未定价` : `「${label}」已更新为 ${yuanPrecise(v)}`);
+      if (result === false) return false;
+      notify.success(v === null ? `「${label}」已设为未定价` : `「${label}」已更新为 ${yuanPrecise(v)}`);
+      return true;
     } catch (cause) {
       notify.error(`「${label}」应用失败`, cause);
+      return false;
     } finally {
       setBusy(false);
     }
   };
+  const dirty = text.trim() !== (value === null ? "" : String(value));
+  useImperativeHandle(ref, () => ({ flush: async () => (dirty && !disabled ? apply() : true) }));
   return (
     <div className="price-entry">
       <Input

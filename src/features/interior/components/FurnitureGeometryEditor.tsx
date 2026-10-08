@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -11,7 +11,10 @@ import { meterDraft, resolveMeterDraft } from '../model/lengthUnits';
 import { useFurnitureImage } from '../cloud/useFurnitureImage';
 import { notify } from '@/lib/notify';
 
-export function FurnitureGeometryEditor({item,save,onSaved,onWorkChange}:{item:LibraryItem;save:(item:LibraryItem)=>Promise<boolean>;onSaved:(item:LibraryItem)=>void;onWorkChange?:(phase:'idle'|'generating'|'saving')=>void}) {
+/** flush：有未保存的几何或新图片时保存；无修改直接返回 true。 */
+export type FurnitureGeometryHandle = { flush: () => Promise<boolean> };
+
+export function FurnitureGeometryEditor({item,save,onSaved,onWorkChange,ref}:{item:LibraryItem;save:(item:LibraryItem)=>Promise<boolean>;onSaved:(item:LibraryItem)=>void;onWorkChange?:(phase:'idle'|'generating'|'saving')=>void;ref?:Ref<FurnitureGeometryHandle>}) {
   const [type,setType]=useState(item.type),[shape,setShape]=useState<FurnitureOutline>(item.shape||'reference'),[width,setWidth]=useState(meterDraft(item.w)),[depth,setDepth]=useState(meterDraft(item.d)),[saving,setSaving]=useState(false),[error,setError]=useState('');
   const ai=useFurnitureImage();
   const lock=useRef(false),request=useRef<string | undefined>(undefined),mounted=useRef(true);
@@ -29,16 +32,18 @@ export function FurnitureGeometryEditor({item,save,onSaved,onWorkChange}:{item:L
     try{const url=await ai.generate({...preview,height:item.height||700},request.current,()=>{request.current=undefined;});if(url)request.current=undefined;}
     finally{lock.current=false;}
   };
-  const apply=async(withImage=false)=>{
-    if(lock.current)return;
-    if(!validDimensions){setError('尺寸应为0.05～20 m');notify.fail('尺寸应为 0.05～20 m');return;}
-    if(withImage&&!ai.image)return;
+  const apply=async(withImage=false):Promise<boolean>=>{
+    if(lock.current)return false;
+    if(!validDimensions){setError('尺寸应为0.05～20 m');notify.fail('尺寸应为 0.05～20 m');return false;}
+    if(withImage&&!ai.image)return false;
     lock.current=true;setSaving(true);setError('');
     const next=withImage?{...preview,imageUrl:ai.image}:preview;
-    try {if(await save(next)){notify.success(withImage?'「'+item.name+'」参考几何与图片已保存':'「'+item.name+'」参考几何已保存');if(mounted.current){ai.cancel();onSaved(next);}}else{notify.error('「'+item.name+'」保存失败','生成图片已保留，可重试保存');if(mounted.current)setError('家具保存失败，生成图片已保留，可重试保存');}}
-    catch(e){notify.error('「'+item.name+'」保存失败',e);if(mounted.current)setError(e instanceof Error?e.message:'保存失败');}
+    try {if(await save(next)){notify.success(withImage?'「'+item.name+'」参考几何与图片已保存':'「'+item.name+'」参考几何已保存');if(mounted.current){ai.cancel();onSaved(next);}return true;}notify.error('「'+item.name+'」保存失败','生成图片已保留，可重试保存');if(mounted.current)setError('家具保存失败，生成图片已保留，可重试保存');return false;}
+    catch(e){notify.error('「'+item.name+'」保存失败',e);if(mounted.current)setError(e instanceof Error?e.message:'保存失败');return false;}
     finally{lock.current=false;if(mounted.current)setSaving(false);}
   };
+  const dirty=!!ai.image||type!==item.type||shape!==(item.shape||'reference')||width!==meterDraft(item.w)||(shape!=='circle'&&depth!==meterDraft(item.d));
+  useImperativeHandle(ref,()=>({flush:async()=>dirty?apply(!!ai.image):true}));
   return <details className="furniture-geometry-editor"><summary>调整参考类型与外形</summary><div className="furniture-geometry-fields">
     <Label>参考类型<Select value={type} onValueChange={value=>{invalidate();setType(value);}} disabled={busy}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="auto">按名称匹配</SelectItem>{furnitureTypes.map(option=><SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></Label>
     <Label>外形<Select value={shape} onValueChange={value=>{invalidate();setShape(value as FurnitureOutline);}} disabled={busy}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="reference">参考原形</SelectItem><SelectItem value="rectangle">方形</SelectItem><SelectItem value="circle">圆形</SelectItem></SelectContent></Select></Label>

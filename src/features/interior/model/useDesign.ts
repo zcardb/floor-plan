@@ -1,7 +1,9 @@
 import { useCallback, useRef, useState } from "react";
 import { createSizeTransaction, type SizeTransaction } from './sizeTransaction';
 import type { Design } from "./types";
-export function useDesign(initial: Design, onChange: (d: Design) => void) {
+export function useDesign(initial: Design, onChange: (d: Design) => void, readOnly = false) {
+  const locked = useRef(readOnly);
+  locked.current = readOnly;
   const [design, setDesign] = useState(initial),
     [counts, setCounts] = useState({ undo: 0, redo: 0 });
   const current = useRef(design),
@@ -10,12 +12,14 @@ export function useDesign(initial: Design, onChange: (d: Design) => void) {
     notify = useRef(onChange);
   notify.current = onChange;
   const set = useCallback((d: Design) => {
+    if (locked.current) return;
     current.current = d;
     setDesign(d);
   }, []);
   const transaction = useRef<SizeTransaction | null>(null);
   const commit = useCallback(
     (d: Design, before = current.current) => {
+      if (locked.current) return;
       transaction.current?.cancel();
       if (JSON.stringify(before) === JSON.stringify(d)) return;
       past.current.push(structuredClone(before));
@@ -28,10 +32,11 @@ export function useDesign(initial: Design, onChange: (d: Design) => void) {
     [set],
   );
   const change = useCallback(
-    (fn: (d: Design) => Design) => { transaction.current?.cancel(); commit(fn(structuredClone(current.current))); },
+    (fn: (d: Design) => Design) => { if (locked.current) return; transaction.current?.cancel(); commit(fn(structuredClone(current.current))); },
     [commit],
   );
   const undo = useCallback(() => {
+    if (locked.current) return;
     transaction.current?.cancel();
     const d = past.current.pop();
     if (!d) return;
@@ -41,6 +46,7 @@ export function useDesign(initial: Design, onChange: (d: Design) => void) {
     notify.current(d);
   }, [set]);
   const redo = useCallback(() => {
+    if (locked.current) return;
     transaction.current?.cancel();
     const d = future.current.pop();
     if (!d) return;

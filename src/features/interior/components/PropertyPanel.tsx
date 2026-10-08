@@ -32,6 +32,7 @@ import { WallOptionsMenu } from './WallOptionsMenu';
 import { canEditWall, canResizeWall, openingIsLocked, wallKindName } from '../model/wallPolicy';
 import { RotationControls } from './RotationControls';
 import { DimensionSettings } from './DimensionSettings';
+import { NorthSettings } from './NorthSettings';
 import type { SizeTransaction } from '../model/sizeTransaction';
 import {
   area,
@@ -613,6 +614,7 @@ export function PropertyPanel({
             </div>
           </section>
           <DimensionSettings design={design} change={change} />
+          <NorthSettings design={design} change={change} />
           <section>
             <h3 className="section-title">操作说明</h3>
             <div className="shortcut-list">

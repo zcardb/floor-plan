@@ -2,6 +2,7 @@ import { notify } from "@/lib/notify";
 import { createProject } from "../data/templates";
 import { validateDesign } from "../model/validation";
 import type { Project } from "../model/types";
+import { isPresetId } from '../data/templatePresets';
 
 export const GUEST_KEY = "interior-guest-projects-v2";
 export const GUEST_DEFAULT_KEY = "interior-guest-default-v1";
@@ -39,7 +40,7 @@ export function readGuests(): Project[] {
     notify.error("本机存储不可用，本机方案列表无法读取", cause);
     return [];
   }
-  if (!raw) return [systemProject()];
+  if (!raw) return [];
   try {
     const items = JSON.parse(raw) as Project[];
     if (!Array.isArray(items)) return [systemProject()];
@@ -53,15 +54,28 @@ export function readGuests(): Project[] {
 }
 
 /** 读取游客正在编辑的默认方案（不属于方案列表）。 */
-export function readGuestDefault(): Project {
+export const LAST_GUEST_TEMPLATE_KEY = 'interior-guest-template-v1';
+export const guestKeyFor = (id: string) => id === 'reference' ? GUEST_DEFAULT_KEY : `interior-guest-default-${id}`;
+export function lastGuestTemplate(): string {
+  try { const id = localStorage.getItem(LAST_GUEST_TEMPLATE_KEY); return isPresetId(id) ? id : 'reference'; } catch { return 'reference'; }
+}
+export function writeGuestDefault(project: Project): WriteResult {
   try {
-    const raw = localStorage.getItem(GUEST_DEFAULT_KEY);
+    const id = project.state.templateId ?? 'reference';
+    localStorage.setItem(guestKeyFor(id), JSON.stringify(project));
+    localStorage.setItem(LAST_GUEST_TEMPLATE_KEY, id);
+    return { ok: true };
+  } catch (cause) { return { ok: false, cause }; }
+}
+export function readGuestDefault(templateId = lastGuestTemplate()): Project {
+  try {
+    const raw = localStorage.getItem(guestKeyFor(templateId));
     if (raw) {
       const p = JSON.parse(raw) as Project;
       return { ...p, cloud: false, state: validateDesign(p.state) };
     }
   } catch { /* 读取失败时回落到新方案，不覆盖已有内容。 */ }
-  return createProject("reference");
+  return createProject(templateId);
 }
 
 /** 只负责写存储并如实返回结果；调用方拿到 ok 之后才更新界面状态。 */
