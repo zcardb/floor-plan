@@ -1276,15 +1276,13 @@
   .property-field.full {
     grid-column: 1/-1;
   }
-  .property-field input {
+  .property-field input[type="color"] {
     background: hsl(var(--background));
     border: 1px solid hsl(var(--border));
     border-radius: 5px;
     min-width: 0;
     width: 100%;
-    padding: 7px 9px;
     color: hsl(var(--foreground));
-    font-size: 11px;
   }
   .property-field input[type="color"] {
     padding: 3px;
@@ -2395,15 +2393,17 @@
   color: hsl(var(--muted-foreground));
   font-size: 10px;
 }
-.visual-editor-popover input,
-.visual-editor-popover select {
-  min-width: 0;
-  width: 100%;
-  border: 1px solid hsl(var(--border));
-  border-radius: 5px;
-  padding: 8px;
-  background: hsl(var(--background));
-  color: hsl(var(--foreground));
+@layer components {
+  .editor-control { @apply h-9 min-w-0 w-full rounded-md text-xs md:text-xs; }
+  .editor-action { @apply h-9 text-xs; }
+  .editor-field { @apply grid gap-1.5 mb-2; }
+  .editor-field label { @apply text-xs text-muted-foreground; }
+  .editor-select-menu { @apply max-h-72; }
+  .editor-procurement-toggle { @apply h-auto px-0 py-1 text-xs; }
+  .price-control { @apply flex-1 w-24; }
+}
+@media (max-width:700px) {
+  .editor-control { font-size:16px; }
 }
 .visual-size-fields {
   display: grid;
@@ -2679,16 +2679,7 @@
   color: hsl(var(--muted-foreground));
   min-width: 0;
 }
-.procurement-fields input,
-.procurement-fields select {
-  border: 1px solid hsl(var(--border));
-  border-radius: 5px;
-  padding: 8px;
-  background: hsl(var(--background));
-  color: hsl(var(--foreground));
-  min-width: 0;
-  width: 100%;
-}
+.procurement-fields .editor-field { margin-bottom:0; }
 .custom-dimensions {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

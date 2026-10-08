@@ -15,7 +15,7 @@ import type { LibraryItem, Design } from '../model/types';
 
 export function AccountCostManager({ settings, save, saving, error, items, onDirty, onNew, hasMore, loading, catalogError, loadMore }: {
   settings: AccountCostSettings; save: (settings: AccountCostSettings) => Promise<boolean>; saving: boolean; error: string;
-  items: LibraryItem[]; onDirty: (dirty: boolean) => void; onNew: () => void;
+  items: LibraryItem[]; onDirty: (dirty: boolean) => void; onNew: (category: string) => void;
   hasMore: boolean; loading: boolean; catalogError: string; loadMore: () => void;
 }) {
   const [category, setCategory] = useState('全部'), [query, setQuery] = useState(''), [editing, setEditing] = useState<CostEntry | null>(null);

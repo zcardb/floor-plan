@@ -15,7 +15,7 @@ import { referenceDesign } from '../data/templates';
 import { useAccountCostCommit } from './useAccountCostCommit';
 import { furnitureGeometryPayload } from '../model/furnitureGeometrySave';
 const builtinCounts=Object.fromEntries(categories.map(c=>[c,library.filter(i=>i.category===c).length]));
-export function AccountFurnitureLibrary({catalog,defaults,saveDefaults,onDirty,onNew}:{catalog:ReturnType<typeof useFurnitureCatalog>;defaults:AccountCostSettings;saveDefaults:(settings:AccountCostSettings)=>Promise<boolean>;onDirty:(dirty:boolean)=>void;onNew:()=>void}){
+export function AccountFurnitureLibrary({catalog,defaults,saveDefaults,onDirty,onNew}:{catalog:ReturnType<typeof useFurnitureCatalog>;defaults:AccountCostSettings;saveDefaults:(settings:AccountCostSettings)=>Promise<boolean>;onDirty:(dirty:boolean)=>void;onNew:(category:string)=>void}){
   const commit=useAccountCostCommit({settings:defaults,save:saveDefaults,onDirty});
   const priceDesign={...referenceDesign(),customCatalog:catalog.items,costSettings:commit.settings};
   const [category,setCategory]=useState('全部'),[query,setQuery]=useState(''),[detail,setDetail]=useState<LibraryItem|null>(null);
