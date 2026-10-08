@@ -1,0 +1,322 @@
+{
+  "schemaVersion": 2,
+  "profile": "app",
+  "dist": "dist",
+  "config": "performance-audit.config.json",
+  "base": "/",
+  "budgets": {
+    "initialJsBrotli": 153600,
+    "initialJsRaw": 512000,
+    "initialCssBrotli": 30720,
+    "initialFontRaw": 102400,
+    "initialFontCount": 2,
+    "lcpImageRaw": 256000
+  },
+  "manifest": "dist/.vite/manifest.json",
+  "errors": [],
+  "warnings": [
+    {
+      "code": "INITIAL_DYNAMIC_IMPORT",
+      "message": "Declared initial dynamic dependency \"_browser-ponyfill-DFBoxAHC.js\"; desired initial dynamic dependency count is zero",
+      "route": "/",
+      "key": "_browser-ponyfill-DFBoxAHC.js"
+    },
+    {
+      "code": "UNVERIFIED_ASSET",
+      "message": "Cannot verify css asset \"https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cormorant+Garamond:ital,wght@0,300..700;1,300..700&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Funnel+Display:wght@300..800&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&family=Lora:ital,wght@0,400..700;1,400..700&family=Manrope:wght@200..800&family=Merriweather:ital,opsz,wght@0,18..144,300..900;1,18..144,300..900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Nunito:ital,wght@0,200..1000;1,200..1000&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Oswald:wght@200..700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Poppins:ital,wght@0,100..900;1,100..900&family=Raleway:ital,wght@0,100..900;1,100..900&family=Roboto:ital,wght@0,100..900;1,100..900&family=Space+Grotesk:wght@300..700&family=Work+Sans:ital,wght@0,100..900;1,100..900&display=swap\": external URL; origin and size unknown",
+      "route": "/"
+    },
+    {
+      "code": "BUDGET_EXCEEDED",
+      "message": "initialJsBrotli: 252354 > 153600",
+      "route": "/",
+      "budget": "initialJsBrotli",
+      "actual": 252354,
+      "limit": 153600
+    },
+    {
+      "code": "BUDGET_EXCEEDED",
+      "message": "initialJsRaw: 971871 > 512000",
+      "route": "/",
+      "budget": "initialJsRaw",
+      "actual": 971871,
+      "limit": 512000
+    }
+  ],
+  "entries": [
+    {
+      "key": "index.html",
+      "file": "assets/index-CCiZfpw9.js",
+      "size": {
+        "raw": 960844,
+        "gzip": 298114,
+        "brotli": 248943
+      },
+      "reachableKeys": [
+        "_browser-ponyfill-DFBoxAHC.js",
+        "index.html",
+        "src/features/interior/scene/Scene3D.tsx"
+      ],
+      "staticImports": [],
+      "staticJs": {
+        "raw": 960844,
+        "gzip": 298114,
+        "brotli": 248943,
+        "files": [
+          {
+            "file": "assets/index-CCiZfpw9.js",
+            "size": {
+              "raw": 960844,
+              "gzip": 298114,
+              "brotli": 248943
+            }
+          }
+        ]
+      },
+      "staticCss": {
+        "raw": 106804,
+        "gzip": 19082,
+        "brotli": 16199,
+        "files": [
+          {
+            "file": "assets/index-BwChYvO-.css",
+            "size": {
+              "raw": 106804,
+              "gzip": 19082,
+              "brotli": 16199
+            }
+          }
+        ]
+      },
+      "potentialDynamicDepth": 1,
+      "hasDynamicCycle": true,
+      "potentialDynamicImports": [
+        {
+          "key": "_browser-ponyfill-DFBoxAHC.js",
+          "file": "assets/browser-ponyfill-DFBoxAHC.js",
+          "potentialDynamicDepth": 1,
+          "importedBy": [
+            "index.html"
+          ]
+        },
+        {
+          "key": "src/features/interior/scene/Scene3D.tsx",
+          "file": "assets/Scene3D-Ct69IHoz.js",
+          "potentialDynamicDepth": 1,
+          "importedBy": [
+            "index.html"
+          ]
+        }
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "url": "/",
+      "html": "index.html",
+      "entry": "index.html",
+      "kind": "app",
+      "metadata": {
+        "title": "筑间 Studio · 户型装修设计",
+        "hasStaticH1": false,
+        "rootHasText": false,
+        "rootTextLength": 0,
+        "bodyTextLength": 0,
+        "description": "规划户型、布置家具、预览 3D 空间。支持游客设计、图片下载和云端多项目管理。",
+        "canonical": "",
+        "jsonLd": [],
+        "hasValidJsonLd": false
+      },
+      "staticImports": [],
+      "htmlScriptManifestKeys": [
+        "index.html"
+      ],
+      "reachableKeys": [
+        "_browser-ponyfill-DFBoxAHC.js",
+        "index.html",
+        "src/features/interior/scene/Scene3D.tsx"
+      ],
+      "potentialDynamicDepth": 1,
+      "hasDynamicCycle": true,
+      "potentialDynamicImports": [
+        {
+          "key": "_browser-ponyfill-DFBoxAHC.js",
+          "file": "assets/browser-ponyfill-DFBoxAHC.js",
+          "potentialDynamicDepth": 1,
+          "importedBy": [
+            "index.html"
+          ],
+          "classification": "initial"
+        },
+        {
+          "key": "src/features/interior/scene/Scene3D.tsx",
+          "file": "assets/Scene3D-Ct69IHoz.js",
+          "potentialDynamicDepth": 1,
+          "importedBy": [
+            "index.html"
+          ],
+          "classification": "deferred",
+          "trigger": "interaction",
+          "reason": "Only loaded when the user explicitly switches from the 2D workbench to 3D."
+        }
+      ],
+      "initialDepth": 1,
+      "initialDepthBasis": "maximum potential graph depth of declared initial dynamic modules; not measured",
+      "initialJs": {
+        "raw": 971871,
+        "gzip": 301958,
+        "brotli": 252354,
+        "files": [
+          {
+            "file": "assets/browser-ponyfill-DFBoxAHC.js",
+            "size": {
+              "raw": 11027,
+              "gzip": 3844,
+              "brotli": 3411
+            }
+          },
+          {
+            "file": "assets/index-CCiZfpw9.js",
+            "size": {
+              "raw": 960844,
+              "gzip": 298114,
+              "brotli": 248943
+            }
+          }
+        ]
+      },
+      "initialCss": {
+        "raw": 106804,
+        "gzip": 19082,
+        "brotli": 16199,
+        "files": [
+          {
+            "file": "assets/index-BwChYvO-.css",
+            "size": {
+              "raw": 106804,
+              "gzip": 19082,
+              "brotli": 16199
+            }
+          }
+        ]
+      },
+      "initialFonts": {
+        "count": 0,
+        "localCount": 0,
+        "raw": 0,
+        "files": [],
+        "unverified": []
+      },
+      "lcpImage": {
+        "status": "not-declared",
+        "url": null,
+        "file": null,
+        "size": null
+      },
+      "assetReferences": [
+        {
+          "url": "/assets/index-CCiZfpw9.js",
+          "source": "script[src]",
+          "category": "script",
+          "module": true,
+          "file": "assets/index-CCiZfpw9.js",
+          "status": "local",
+          "size": {
+            "raw": 960844,
+            "gzip": 298114,
+            "brotli": 248943
+          }
+        },
+        {
+          "url": "/assets/index-BwChYvO-.css",
+          "source": "link[href]",
+          "category": "css",
+          "file": "assets/index-BwChYvO-.css",
+          "status": "local",
+          "size": {
+            "raw": 106804,
+            "gzip": 19082,
+            "brotli": 16199
+          }
+        },
+        {
+          "url": "https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cormorant+Garamond:ital,wght@0,300..700;1,300..700&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Funnel+Display:wght@300..800&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&family=Lora:ital,wght@0,400..700;1,400..700&family=Manrope:wght@200..800&family=Merriweather:ital,opsz,wght@0,18..144,300..900;1,18..144,300..900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Nunito:ital,wght@0,200..1000;1,200..1000&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Oswald:wght@200..700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Poppins:ital,wght@0,100..900;1,100..900&family=Raleway:ital,wght@0,100..900;1,100..900&family=Roboto:ital,wght@0,100..900;1,100..900&family=Space+Grotesk:wght@300..700&family=Work+Sans:ital,wght@0,100..900;1,100..900&display=swap",
+          "source": "link[href]",
+          "category": "css",
+          "file": null,
+          "status": "unverified",
+          "size": null,
+          "reason": "external URL; origin and size unknown"
+        }
+      ],
+      "imageCandidates": [],
+      "externalScriptCandidates": [],
+      "srcsetObservations": []
+    }
+  ],
+  "assets": {
+    "html": [
+      {
+        "file": "index.html",
+        "size": {
+          "raw": 2181,
+          "gzip": 1099,
+          "brotli": 783
+        },
+        "status": "mapped",
+        "routes": [
+          "/"
+        ]
+      }
+    ],
+    "fonts": [],
+    "images": [
+      {
+        "file": "favicon.ico",
+        "size": {
+          "raw": 15406,
+          "gzip": 6521,
+          "brotli": 5232
+        }
+      },
+      {
+        "file": "placeholder.svg",
+        "size": {
+          "raw": 3253,
+          "gzip": 919,
+          "brotli": 840
+        }
+      }
+    ],
+    "metadataFiles": {
+      "_headers": {
+        "exists": false,
+        "verification": "existence-only"
+      },
+      "robots.txt": {
+        "exists": true,
+        "verification": "existence-only"
+      },
+      "sitemap.xml": {
+        "exists": false,
+        "verification": "existence-only"
+      }
+    }
+  },
+  "verification": {
+    "build": "warning",
+    "browser": "not-run",
+    "http": "not-run"
+  },
+  "limitations": [
+    "This is a static build audit, not full performance verification. Browser and HTTP checks have not run.",
+    "JS/CSS raw, gzip and Brotli sizes are local per-file compression estimates, not measured production transfer.",
+    "The manifest describes potential imports, not observed first-paint requests or a measured waterfall. Dynamic classifications and initialDepth are declarations, not runtime measurements.",
+    "potentialDynamicDepth counts dynamic edges on cycle-free module paths; static edges cost zero. Entry/static modules are already loaded at depth zero, and back-edges cannot reload them. hasDynamicCycle describes graph structure, not infinite requests or measured runtime depth.",
+    "Initial JS/CSS include the entry static closure, declared initial dynamic static closures, and local HTML scripts/styles/modulepreloads, including manifest-known HTML script static closures. Runtime-injected assets and CSS background images are outside static detection.",
+    "HTML, font, image, and script inventories do not establish actual browser requests. Whole-dist font/image inventories use filename extensions. Only declared fonts and local font preloads count toward initial font budgets; unverified declared fonts count but have unknown bytes.",
+    "Image srcset parsing supports basic URL/width-or-density-descriptor lists, not the full browser selection algorithm. Data URL lists and unsupported descriptors are reported as unverified. Candidates are not measured LCP.",
+    "Remote assets are never fetched. Absolute/protocol-relative script URLs are external candidates; same-origin versus third-party ownership is unknown.",
+    "_headers, robots.txt and sitemap.xml checks are existence-only; deployed HTTP headers, caching, indexing and file semantics are not verified."
+  ]
+}
