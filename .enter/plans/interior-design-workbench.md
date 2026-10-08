@@ -1,8 +1,11 @@
 ## Context
-本次新增：参考所附 Enter Visual Editor 工具条，在选中墙体或家具后，于画布右上角显示就地编辑条；尺寸通过下拉面板修改，常用颜色直接展示。保留现有装修、项目保存、撤销与结构安全限制，不引入 AI 或代码编辑入口。
+本次新增：参考所附 Enter Visual Editor 工具条，在选中墙体或家具后，在选中对象附近显示动态跟随的就地编辑条；不是固定在画布或页面右上角。尺寸通过下拉面板修改，常用颜色直接展示。保留现有装修、项目保存、撤销与结构安全限制，不引入 AI 或代码编辑入口。
 
 ## 本次推荐实现：选中对象 Visual Editor
-- 新增 `src/features/interior/components/SelectionEditor.tsx`，替换现有底部 `selection-toolbar`，固定在画布右上角（不是整个页面右上角）。对象未选中、已删除或取消选择时隐藏；切换对象时重置展开面板与输入草稿。
+- 新增 `src/features/interior/components/SelectionEditor.tsx`，替换现有底部 `selection-toolbar`，动态锚定选中对象的屏幕包围盒。优先显示在对象右下方并留出间距；该位置不够时尝试下方、上方或左侧，最后限制在可见画布安全区域内，不写死坐标。选中A锚定A，选中B改为锚定B；对象未选中、已删除、完全离开视口或取消选择时隐藏，重新可见后恢复；切换对象时重置展开面板与输入草稿。
+- 2D位置：家具按旋转后的四角、墙体按 `wallPoly` 顶点、房间按多边形、门窗按墙上开口求边界，再通过 SVG `getScreenCTM()` 映射为屏幕坐标并转换到stage局部坐标。选择、拖动、改尺寸／旋转、缩放、平移及画布resize时更新锚点。
+- 3D位置：使用对应对象的世界包围盒顶点，通过当前相机投影计算屏幕包围盒；墙体网格需保留稳定wall ID用于定位。相机旋转／缩放／漫游以及对象修改时重算；相机后方或视口外对象不显示浮条。复用现有3D渲染循环，位置更新用ref／transform并按帧合并，不每帧重新渲染整个工作台。
+- 新增纯定位函数 `model/selectionAnchor.ts`，输入对象屏幕边界、画布可用区域、浮条实际尺寸及控件避让区域，输出位置／显示状态。用 ResizeObserver 测量浮条及画布尺寸；展开面板复用Popover的翻转／碰撞逻辑，不用固定猜测尺寸。
 - 工具条布局：对象类型／名称、尺寸摘要下拉、常用色圆点及自定义颜色、旋转／复制／删除等适用动作、详细属性入口、关闭。使用现有暖米色tokens、浮层阴影、lucide图标与 Tooltip；不照搬截图中与户型无关的字体、源码及“询问 AI”按钮。
 - 家具：尺寸面板显示宽／深／旋转及位置；常用色板一键修改 `Furniture.color`，自定义颜色可选。保留旋转90°、复制和删除，均复用现有回调。
 - 墙体：尺寸面板显示长度／厚度；仅空白户型的内部隔墙可编辑几何。承重墙、参考外墙等保留锁定说明，不能借浮条绕过原保护。墙体可调整外观颜色，但不代表更改结构类型；新增可选 `Wall.color`，旧项目无需迁移即可保持原默认色，承重高亮／拆除状态优先于外观颜色。
@@ -10,13 +13,15 @@
 - 尺寸草稿即时输入，Enter／应用提交，Esc／取消不写入；只接受既有范围内有限数值。连续一次调整只提交一次历史，色板点击提交一次；工具条修改与侧栏、2D、3D、JSON、游客／云端保存共享设计状态。
 - 复用 `useDesign.change`、`norm`、`length`、`rebuildRooms` 与现有旋转／复制／删除函数；将尺寸校验与修改提取到 `src/features/interior/model/selectionEdits.ts`，浮条和 `PropertyPanel.tsx` 共用，避免两处规则不一致。墙体缩短不可挤出门窗，门窗不得越界或重叠。
 - `PlanCanvas.tsx` 和 `Scene3D.tsx` 读取可选墙色，`validation.ts` 校验色值，PNG／JSON导出保留效果；浮条位于SVG／WebGL外，不进入截图。
-- 工具条点击不向画布冒泡，不触发拖动或取消选择；复用 Radix Popover 的焦点管理、键盘及点击外部关闭。移动端在画布顶部收成两行，尺寸面板不超出视口；避让现有画布标题、侧栏开关、3D日照控件和漫游提示。
+- 工具条点击不向画布冒泡，不触发拖动或取消选择；复用 Radix Popover 的焦点管理、键盘及点击外部关闭。移动端浮条可收成两行，但仍根据对象位置跟随，不能改为固定顶部工具条；尺寸面板不超出视口。动态避让画布标题、侧栏开关、缩放控件、3D日照控件和漫游提示；抽屉覆盖对象时不把浮条显示在抽屉上。
 
 ### 本次关键文件
-`src/features/interior/components/Workbench.tsx`、新增 `SelectionEditor.tsx`、`PropertyPanel.tsx`、新增 `model/selectionEdits.ts` 及其测试、`model/types.ts`、`model/validation.ts`、`components/PlanCanvas.tsx`、`scene/Scene3D.tsx`、`src/index.css`。复用现有 `src/components/ui/popover.tsx`，无新依赖或数据库迁移。
+`src/features/interior/components/Workbench.tsx`、新增 `SelectionEditor.tsx`、`PropertyPanel.tsx`、新增 `model/selectionEdits.ts`、`model/selectionAnchor.ts` 及其测试、`model/types.ts`、`model/validation.ts`、`components/PlanCanvas.tsx`、`scene/Scene3D.tsx`、`src/index.css`。复用现有 `src/components/ui/popover.tsx`，无新依赖或数据库迁移。
 
 ## Implementation checklist（本次）
-- [ ] 选择家具／墙体时右上角显示浮条，取消／删除选择后隐藏，原底部工具条不重复显示。
+- [ ] 选择家具／墙体时浮条动态显示在该对象附近，切换A／B改变锚点，取消／删除／完全离屏后隐藏，原底部工具条不重复显示。
+- [ ] 2D拖动／旋转／尺寸／平移／缩放／resize更新屏幕锚点，3D相机与对象变化通过现有循环更新投影锚点。
+- [ ] 实际浮条尺寸参与定位，右下方不够时翻转／限制在画布内，并避让覆盖控件。
 - [ ] 家具尺寸／位置／旋转下拉与常用／自定义颜色修改同一设计状态。
 - [ ] 隔墙长度／厚度编辑和锁定墙说明复用原结构保护与开口校验。
 - [ ] 可选墙色在2D／3D／JSON／PNG中一致，旧方案默认颜色兼容。
@@ -29,7 +34,9 @@
 - [ ] 空输入、负尺寸、NaN、超范围、取消和切换对象不产生非法数据或错误历史。
 - [ ] 旧JSON无墙色仍可导入，新JSON墙色往返通过，承重高亮／拆除样式不被覆盖。
 - [ ] 项目切换／关闭选择清除浮条，popover可键盘操作，图片不包含浮条。
-- [ ] `/` 在 desktop_1280 和 mobile_390 选择后检查浮条与展开尺寸面板；未指定目标设备，采用这两个尺寸。
+- [ ] 定位函数单元测试覆盖A／B不同位置、右下优先、四边越界、浮条尺寸变化及完全离屏隐藏。
+- [ ] 2D拖动／旋转家具、平移／缩放视图和3D转动相机后浮条仍锚定对象，不残留上个对象坐标。
+- [ ] `/` 在 desktop_1280 和 mobile_390 选择靠近中心及边缘对象，检查动态浮条与展开尺寸面板；未指定目标设备，采用这两个尺寸。
 - [ ] 执行 `pnpm test`、`pnpm lint`、`pnpm exec tsc -p tsconfig.app.json --noEmit`、`pnpm run build`、`pnpm run build:prod`；性能审计保留已有预算告警，浏览器交互或性能无法实测时明确未验证。
 
 ---
