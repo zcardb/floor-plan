@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import type { LibraryItem } from '../model/types';
 async function invoke(name: string, body: object) {
   const { data, error } = await supabase.functions.invoke(name, { body });
   if (error instanceof FunctionsHttpError) {
@@ -34,14 +35,14 @@ export function useFurnitureImage() {
     },
     [],
   );
-  const generate = async (prompt: string) => {
+  const generate = async (item: LibraryItem) => {
     cancel();
     const run = epoch.current;
     setBusy(true);
     setError("");
     setImage("");
     try {
-      const data = await invoke("interior-furniture-image-submit", { prompt });
+      const data = await invoke("interior-furniture-image-submit", { item });
       if (run !== epoch.current) return;
       setTaskId(data.task_id);
       for (let i = 0; i < 120; i++) {
@@ -60,7 +61,7 @@ export function useFurnitureImage() {
           const url = result.images?.[0]?.url;
           if (!url) throw new Error("生成结果没有图片");
           setImage(url);
-          return;
+          return url as string;
         }
         await new Promise<void>((resolve) => {
           cancelWait.current = resolve;

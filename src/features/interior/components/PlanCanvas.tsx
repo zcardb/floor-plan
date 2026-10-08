@@ -30,7 +30,9 @@ import {
 } from "../model/types";
 import { FurnitureShape } from "./FurnitureShape";
 import { MaterialDefs } from "./Materials";
-import { selectionPoints, type ScreenRect } from "../model/selectionAnchor";
+import { selectionPoints, localWallPoint, type ScreenRect } from "../model/selectionAnchor";
+import { resolveWallPoint,validateWallSegment } from '../model/wallDrawing';
+import { useWallDrawing } from './useWallDrawing';
 export interface CanvasHandle {
   zoom: (k: number) => void;
   fit: () => void;
@@ -50,6 +52,7 @@ interface Props {
   onScale: (s: number) => void;
   onCoord: (p: Point) => void;
   onAnchor: (r: ScreenRect | null) => void;
+  finishWall: () => void;
 }
 interface Drag {
   pid: number;
@@ -77,6 +80,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     onScale,
     onCoord,
     onAnchor,
+    finishWall,
   },
   ref,
 ) {
@@ -96,11 +100,13 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       view: typeof view;
       center: Point;
     } | null>(null);
+  const wallClick = useRef<{id:string;fraction:number}|null>(null);
+  const drawing = useWallDrawing(tool==='wall',current,view.s,layers.snap,commit,finishWall);
   useEffect(() => {
     const el = svg.current;
     if (!el) return;
     const matrix = el.getScreenCTM(),
-      bounds = el.getBoundingClientRect(),
+      bounds = el.closest('.stage')!.getBoundingClientRect(),
       pts = selectionPoints(design, selection);
     if (
       !matrix ||
@@ -117,7 +123,15 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       const q = p.matrixTransform(matrix);
       return [q.x - bounds.left, q.y - bounds.top];
     });
+    let local:ScreenRect['local'];
+    if(selection?.kind==='wall'){
+      const wall=design.walls.find(w=>w.id===selection.id)!;
+      const point=localWallPoint(design,wall.id,wallClick.current?.id===wall.id?wallClick.current.fraction:0.5)!;
+      const q=el.createSVGPoint();q.x=point[0];q.y=point[1];const p=q.matrixTransform(matrix);
+      local={x:Math.max(0,Math.min(el.clientWidth,p.x-bounds.left)),y:Math.max(0,Math.min(el.clientHeight,p.y-bounds.top))};
+    }
     onAnchor({
+      local,
       left: Math.min(...projected.map((p) => p[0])),
       top: Math.min(...projected.map((p) => p[1])),
       right: Math.max(...projected.map((p) => p[0])),
@@ -337,6 +351,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         svg.current!.setPointerCapture(e.pointerId);
         if (points.current.size === 2) {
           finish(true);
+          drawing.clear();
           const [a, b] = [...points.current.values()];
           pinch.current = {
             distance: Math.hypot(a[0] - b[0], a[1] - b[1]),
@@ -366,11 +381,11 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           wallToggle(wid);
           return;
         }
-        if (tool === "wall" || tool === "measure") {
-          if (tool === "wall" && design.template !== "blank") {
-            toast.info("参考户型保留原始结构，请新建空白户型绘墙");
-            return;
-          }
+        if(tool==='wall'){
+          if(design.template!=='blank')return;
+          select(null);drawing.down(p,e.pointerId,[e.clientX,e.clientY]);return;
+        }
+        if (tool === "measure") {
           const q = snapPoint(p, design);
           if (tool === "measure" && measureStart.current) {
             commit({
@@ -438,8 +453,9 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           select({ kind: "opening", id: oid });
           return;
         } else if (wid && tool === "select") {
-          select({ kind: "wall", id: wid });
           const w = design.walls.find((w) => w.id === wid)!;
+          wallClick.current={id:wid,fraction:nearestOnWall(p,w).offset/length(w)};
+          select({ kind: "wall", id: wid });
           if (design.template === "blank" && w.kind === "partition") {
             base.kind = "wallmove";
             base.id = wid;
@@ -471,6 +487,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         }
         const p = mm(e);
         onCoord(p);
+        if(tool==='wall'){drawing.move(p);return;}
         const dr = drag.current;
         if (!dr) {
           if (tool === "measure" && measureStart.current)
@@ -540,11 +557,9 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           } else if (dr.kind === "endpoint") {
             const key = dr.room as "a" | "b",
               other = key === "a" ? wall.b : wall.a,
-              q = snapPoint(p, next, 12 / view.s);
-            wall[key] =
-              Math.abs(q[0] - other[0]) > Math.abs(q[1] - other[1])
-                ? [q[0], other[1]]
-                : [other[0], q[1]];
+              q = resolveWallPoint(p,next,view.s,layers.snap,other,wall.id).point;
+            wall[key] = q;
+            try { validateWallSegment(next,wall.a,wall.b,wall.id); } catch { return; }
             if (length(wall) < 100) return;
             if (
               next.openings.some(
@@ -563,11 +578,13 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           if (points.current.size < 2) pinch.current = null;
           return;
         }
-        finish();
+        if(tool==='wall')drawing.up(mm(e),e.pointerId,[e.clientX,e.clientY]);
+        else finish();
       }}
       onPointerCancel={(e) => {
         points.current.delete(e.pointerId);
         pinch.current = null;
+        drawing.clear();
         finish(true);
       }}
     >
@@ -737,6 +754,8 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       {design.measures.map((m) => (
         <MeasureLine key={m.id} a={m.a} b={m.b} scale={view.s} />
       ))}
+      {tool==='wall' && drawing.draft && Math.hypot(drawing.draft.b[0]-drawing.draft.a[0],drawing.draft.b[1]-drawing.draft.a[1])>0 && <g data-export-hide="true" pointerEvents="none"><polygon points={wallPoly({id:'draft',...drawing.draft,thickness:design.thickness,kind:'partition'}).map(p=>p.join(',')).join(' ')} fill="var(--plan-selection-soft)" stroke="var(--plan-selection)" strokeWidth={1/view.s}/><MeasureLine a={drawing.draft.a} b={drawing.draft.b} scale={view.s}/></g>}
+      {tool==='wall' && drawing.candidate?.target && <g data-export-hide="true" pointerEvents="none"><polygon points={wallPoly(design.walls.find(w=>w.id===drawing.candidate?.target?.wallId)!).map(p=>p.join(',')).join(' ')} fill="var(--plan-selection-soft)" stroke="var(--plan-selection)" strokeWidth={2/view.s}/><circle cx={drawing.candidate.point[0]} cy={drawing.candidate.point[1]} r={6/view.s} fill="var(--plan-porcelain)" stroke="var(--plan-selection)" strokeWidth={2/view.s}/><text x={drawing.candidate.point[0]+12/view.s} y={drawing.candidate.point[1]-12/view.s} fontSize={12/view.s} fill="var(--plan-selection)">点击连接</text></g>}
       {draft && (
         <g data-export-hide="true">
           <MeasureLine a={draft.a} b={draft.b} scale={view.s} />
@@ -804,13 +823,12 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
                   />
                 </g>
               ))}
+          {selection.kind === 'opening' && <polygon points={selectionPoints(design, selection).map(p=>p.join(',')).join(' ')} fill="none" stroke="var(--plan-selection)" strokeWidth={2/view.s} pointerEvents="none"/>}
           {["wall", "opening"].includes(selection.kind) &&
             design.walls
               .filter(
                 (w) =>
-                  w.id === selection.id ||
-                  design.openings.find((o) => o.id === selection.id)?.wallId ===
-                    w.id,
+                  selection.kind === 'wall' && w.id === selection.id,
               )
               .map((w) => (
                 <g key={w.id}>

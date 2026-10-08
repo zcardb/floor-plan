@@ -18,7 +18,8 @@ export function AuthDialog({
 }) {
   const [signup, setSignup] = useState(false),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [message,setMessage]=useState('');
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="auth-dialog">
@@ -36,7 +37,7 @@ export function AuthDialog({
         <form
           onSubmit={async (e) => {
             e.preventDefault();
-            setError("");
+            setError("");setMessage('');
             setBusy(true);
             const form = new FormData(e.currentTarget),
               email = String(form.get("email")),
@@ -57,6 +58,7 @@ export function AuthDialog({
               );
               return;
             }
+            if(!result.data.session){setMessage('注册成功，请查收验证邮件。完成验证后登录进入工作室。');return;}
             onOpenChange(false);
           }}
         >
@@ -87,6 +89,7 @@ export function AuthDialog({
               />
             </div>
           </label>
+          {message&&<p role="status" className="muted-note">{message}</p>}
           {error && (
             <p className="form-error" role="alert">
               {error}

@@ -116,27 +116,29 @@ function ToolButton({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button
-          className={"tool-button " + (active ? "active" : "")}
-          onClick={onClick}
-          disabled={disabled}
-          aria-label={label}
-          aria-pressed={active}
-        >
-          {children}
-          <span>{label}</span>
-        </button>
+        <span className="tool-button-wrap">
+          <button
+            className={"tool-button " + (active ? "active" : "")}
+            onClick={onClick}
+            disabled={disabled}
+            aria-label={label}
+            aria-pressed={active}
+          >
+            {children}
+            <span>{label}</span>
+          </button>
+        </span>
       </TooltipTrigger>
-      <TooltipContent>
-        {label}
-        {shortcut ? " · " + shortcut : ""}
+      <TooltipContent side="bottom" sideOffset={8} className="tool-tooltip">
+        <span>{label}</span>
+        {shortcut && <kbd>{shortcut}</kbd>}
       </TooltipContent>
     </Tooltip>
   );
 }
 export function Workbench(p: Props) {
   const model = useDesign(p.project.state, p.update),
-    { design: d, change, commit, preview, undo, redo, counts } = model;
+    { design: d, change, commit, preview, undo, redo, counts, sizeTransaction } = model;
   const [selection, setSelection] = useState<Selection>(null),
     [tool, setTool] = useState<Tool>("select"),
     [view, setView] = useState<"2d" | "3d">("2d"),
@@ -147,6 +149,7 @@ export function Workbench(p: Props) {
     [drawer, setDrawer] = useState<"lib" | "panel" | null>(null),
     [help, setHelp] = useState(false),
     [scale, setScale] = useState(0.05);
+  useEffect(()=>{ sizeTransaction.flush(); },[selection?.id,tool,view,sizeTransaction]);
   const coordLabel = useRef<HTMLSpanElement>(null);
   const onCoord = useCallback((p: Point) => {
     if (coordLabel.current)
@@ -191,10 +194,11 @@ export function Workbench(p: Props) {
     [],
   );
   const select = useCallback((s: Selection) => {
+      sizeTransaction.flush();
       setSelection(s);
       if (s?.kind === "room") scene.current?.room(s.id);
-    }, []),
-    closePanels = useCallback(() => setDrawer(null), []);
+    }, [sizeTransaction]),
+    closePanels = useCallback(() => { sizeTransaction.flush(); setDrawer(null); }, [sizeTransaction]);
   const toggleView = async (next: "2d" | "3d") => {
     if (next === "3d" && !Scene) {
       setSceneLoading(true);
@@ -361,11 +365,15 @@ export function Workbench(p: Props) {
     else if (which === "lib") setHideLib((v) => !v);
     else setHidePanel((v) => !v);
   };
-  const exportImage = () =>
-    view === "2d" ? canvas.current?.exportImage() : scene.current?.shot();
+  const exportImage = () => {
+    sizeTransaction.cancel();
+    if (view === "2d") canvas.current?.exportImage();
+    else scene.current?.shot();
+  };
   const exportJson = () => {
+    sizeTransaction.cancel();
     const blob = new Blob(
-        [JSON.stringify({ name: p.project.name, ...d }, null, 2)],
+        [JSON.stringify({ name: p.project.name, ...model.current.current }, null, 2)],
         { type: "application/json" },
       ),
       url = URL.createObjectURL(blob),
@@ -375,7 +383,7 @@ export function Workbench(p: Props) {
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
-  const clear = () => {
+  const clearFurniture = () => {
     if (
       d.furniture.length &&
       window.confirm("清空所有家具？墙体、材质和测量会保留，可撤销恢复。")
@@ -384,11 +392,22 @@ export function Workbench(p: Props) {
       setSelection(null);
     }
   };
+  const resetDesign = () => {
+    if (window.confirm("重置当前项目为其初始模板？可撤销恢复。")) {
+      change(() =>
+        d.template === "blank" ? blankDesign() : referenceDesign(),
+      );
+      setSelection(null);
+    }
+  };
+  const clearMeasures = () => {
+    if (d.measures.length) change((d) => ({ ...d, measures: [] }));
+  };
   const tip =
     tool === "wall"
-      ? "拖动绘制隔墙 · 水平 / 垂直吸附 · 闭合空间自动生成房间"
+      ? "点击起点与转角连续绘墙 · 可拖动起段 · Enter 完成 / Esc 取消草稿"
       : tool === "measure"
-        ? "点击两点或拖动测量 · Shift 锁定方向"
+        ? "点击两点或拖动测量 · Shift 锁定方向 · 测量线可在右侧面板底部清除"
         : tool === "demolish"
           ? "点击非承重墙标记拆除，再次点击恢复"
           : tool === "door" || tool === "window"
@@ -415,7 +434,7 @@ export function Workbench(p: Props) {
           <small>把想象，变成家的模样</small>
         </div>
         <span className="header-divider" />
-        {p.loggedIn ? <button className="project-title" onClick={p.projects}>
+        {p.loggedIn ? <button className="project-title" onClick={()=>{sizeTransaction.cancel();p.projects();}}>
           <span>{p.project.name}</span><ChevronDown size={14} />
         </button> : <span className="project-title">参考户型</span>}
         <span className="save-indicator">
@@ -429,7 +448,7 @@ export function Workbench(p: Props) {
           {p.status}
         </span>
         <div className="header-spacer" />
-        {p.loggedIn ? <><button className="header-plain" onClick={p.projects}>
+        {p.loggedIn ? <><button className="header-plain" onClick={()=>{sizeTransaction.cancel();p.projects();}}>
           <FolderOpen size={16} />
           <span>返回管理</span>
         </button>
@@ -455,7 +474,7 @@ export function Workbench(p: Props) {
               将当前项目另存到云端
             </DropdownMenuItem>
           </DropdownMenuContent>
-        </DropdownMenu></> : <button className="header-plain" onClick={p.login}><UserRound size={16} />登录</button>}
+        </DropdownMenu></> : <button className="header-plain guest-login" onClick={p.login}><UserRound size={16} />登录</button>}
         <Button size="sm" className="download-button" onClick={exportImage}>
           <Download />
           <span>下载{view === "2d" ? "设计图" : "当前视角"}</span>
@@ -580,8 +599,26 @@ export function Workbench(p: Props) {
           >
             <Undo2 size={16} />
           </ToolButton>
-          <ToolButton label="重做" onClick={redo} disabled={!counts.redo}>
+          <ToolButton
+            label="重做"
+            shortcut="Ctrl ⇧ Z"
+            onClick={redo}
+            disabled={!counts.redo}
+          >
             <Redo2 size={16} />
+          </ToolButton>
+        </div>
+        <span className="toolbar-divider wide-only" />
+        <div className="tool-group danger-actions wide-only">
+          <ToolButton label="重置方案" onClick={resetDesign}>
+            <RotateCcw size={16} />
+          </ToolButton>
+          <ToolButton
+            label="清空家具"
+            onClick={clearFurniture}
+            disabled={!d.furniture.length}
+          >
+            <Trash2 size={16} />
           </ToolButton>
         </div>
         <div className="header-spacer" />
@@ -639,7 +676,7 @@ export function Workbench(p: Props) {
                 <Download />
                 {view === "2d" ? "下载 2D 图片" : "下载当前 3D 视角"}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={p.save}>
+              <DropdownMenuItem onClick={()=>{sizeTransaction.cancel();p.save();}}>
                 <Save />
                 立即保存当前项目
               </DropdownMenuItem>
@@ -669,33 +706,17 @@ export function Workbench(p: Props) {
                 <Cloud />
                 另存云端项目
               </DropdownMenuItem></>}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={clear}>
-                <Trash2 />
-                清空家具布置
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  if (
-                    window.confirm("重置当前项目为其初始模板？可撤销恢复。")
-                  ) {
-                    change(() =>
-                      d.template === "blank"
-                        ? blankDesign()
-                        : referenceDesign(),
-                    );
-                    setSelection(null);
-                  }
-                }}
-              >
+              <DropdownMenuSeparator className="compact-only" />
+              <DropdownMenuItem className="compact-only" onClick={resetDesign}>
                 <RotateCcw />
                 重置当前方案
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => change((d) => ({ ...d, measures: [] }))}
+                className="compact-only"
+                onClick={clearFurniture}
               >
-                <Ruler />
-                清除测量线
+                <Trash2 />
+                清空家具布置
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -776,6 +797,7 @@ export function Workbench(p: Props) {
             onScale={setScale}
             onCoord={onCoord}
             onAnchor={onAnchor}
+            finishWall={()=>setTool('select')}
           />
         ) : Scene ? (
           <Scene
@@ -804,7 +826,7 @@ export function Workbench(p: Props) {
           <div className="mode-hint">
             {tip}
             <button onClick={() => setTool("select")}>
-              <X size={13} />
+              {tool==='wall'?'完成绘墙':<X size={13} />}
             </button>
           </div>
         )}
@@ -888,7 +910,7 @@ export function Workbench(p: Props) {
           duplicate={duplicate}
           remove={remove}
           close={() => setSelection(null)}
-          showCosts={p.loggedIn}
+          transaction={sizeTransaction} showCosts={p.loggedIn}
           hidden={tool !== 'select' || !!drawer || (view === "3d" && sceneOptions.mode === "walk")}
           details={() => {
             setCostOpen(false);
@@ -911,33 +933,48 @@ export function Workbench(p: Props) {
           "property-panel " + (drawer === "panel" ? "drawer-open" : "")
         }
       >
-        {p.loggedIn && costOpen ? (
-          <CostPanel
-            design={d}
-            change={change}
-            back={() => setCostOpen(false)}
-          />
-        ) : (
-          <>
-            {p.loggedIn && <button
-              className="open-cost-manager"
-              onClick={() => setCostOpen(true)}
-            >
-              <CircleDollarSign size={16} />
-              软装 / 硬装成本
-            </button>}
-            <PropertyPanel
-              showCosts={p.loggedIn}
+        <div className="panel-scroll">
+          {p.loggedIn && costOpen ? (
+            <CostPanel
               design={d}
-              selection={selection}
-              select={select}
               change={change}
-              duplicate={duplicate}
-              remove={remove}
-              rotate={() => rotate()}
+              back={() => setCostOpen(false)}
             />
-          </>
-        )}
+          ) : (
+            <>
+              {p.loggedIn && <button
+                className="open-cost-manager"
+                onClick={() => setCostOpen(true)}
+              >
+                <CircleDollarSign size={16} />
+                软装 / 硬装成本
+              </button>}
+              <PropertyPanel
+                transaction={sizeTransaction} showCosts={p.loggedIn}
+                design={d}
+                selection={selection}
+                select={select}
+                change={change}
+                duplicate={duplicate}
+                remove={remove}
+                rotate={() => rotate()}
+              />
+            </>
+          )}
+        </div>
+        <div className="panel-footer">
+          <button
+            className="panel-action"
+            onClick={clearMeasures}
+            disabled={!d.measures.length}
+          >
+            <Ruler size={15} />
+            <span>清除测量线</span>
+            {d.measures.length > 0 && (
+              <span className="count">{d.measures.length}</span>
+            )}
+          </button>
+        </div>
       </aside>
       {drawer && (
         <button
@@ -1022,8 +1059,8 @@ export function Workbench(p: Props) {
               <div>
                 <strong>布置空间</strong>
                 <p>
-                  点击或拖入家具，选中后调整尺寸与材质。点击 3D
-                  预览，走进你的设计。
+                  点击或拖入家具，选中后调整尺寸与材质。测量线可在右侧面板底部一键清除。点击
+                  3D 预览，走进你的设计。
                 </p>
               </div>
             </li>

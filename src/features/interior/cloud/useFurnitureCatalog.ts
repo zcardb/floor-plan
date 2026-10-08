@@ -27,5 +27,10 @@ export function useFurnitureCatalog() {
     const {error}=await supabase.from('interior_furniture_catalog').upsert({owner_id:session.user.id,catalog_id:item.catalogId!,name:item.name,category:item.category,type:item.type,width:item.w,depth:item.d,height:item.height||700,color:item.color,price:item.price??null,image_url:item.imageUrl||null},{onConflict:'owner_id,catalog_id'});
     if(error)throw new Error(error.message);return true;
   },[]);
-  return {items,loading,error,count,counts,hasMore,load,save,reset};
+  const remove=useCallback(async(catalogId:string)=>{
+    const {data:{session}}=await supabase.auth.getSession(); if(!session)throw new Error('请先登录');
+    const {error}=await supabase.from('interior_furniture_catalog').delete().eq('owner_id',session.user.id).eq('catalog_id',catalogId);
+    if(error)throw new Error(error.message);return true;
+  },[]);
+  return {items,loading,error,count,counts,hasMore,load,save,remove,reset};
 }

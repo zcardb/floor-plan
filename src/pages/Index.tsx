@@ -1,81 +1,20 @@
-import { useState } from "react";
-import { FolderOpen, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useProjects } from "@/features/interior/cloud/useProjects";
-import { Workbench } from "@/features/interior/components/Workbench";
-import { AuthDialog } from "@/features/interior/components/AuthDialog";
-import { ProjectDialog } from "@/features/interior/components/ProjectDialog";
-import type { Design } from "@/features/interior/model/types";
-import { createProject } from "@/features/interior/data/templates";
-const Index = () => {
-  const projects = useProjects(),
-    [projectOpen, setProjectOpen] = useState(false),
-    [authOpen, setAuthOpen] = useState(false);
-  const cloudSave = () => {
-    if (!projects.session) {
-      setAuthOpen(true);
-      return;
-    }
-    if (projects.active)
-      void projects.create(
-        { ...projects.active, name: projects.active.name + " · 云端副本" },
-        true,
-      );
-  };
-  const importProject = (d: Design, name: string) => {
-    void projects.create(
-      { ...createProject(d.template, name), state: d },
-      !!projects.active?.cloud,
-    );
-  };
-  return (
-    <>
-      {projects.active ? (
-        <Workbench
-          key={projects.active.id}
-          project={projects.active}
-          update={projects.update}
-          status={projects.status}
-          loggedIn={!!projects.session}
-          email={projects.session?.user.email}
-          projects={() => setProjectOpen(true)}
-          login={() => setAuthOpen(true)}
-          logout={() => void projects.signOut()}
-          save={() => void projects.save()}
-          cloudSave={cloudSave}
-          importProject={importProject}
-        />
-      ) : (
-        <div className="no-project">
-          <FolderOpen size={44} />
-          <h1>给新空间，一个新开始</h1>
-          <p>创建空白户型，或从已有项目继续设计。</p>
-          <Button onClick={() => setProjectOpen(true)}>
-            <Plus />
-            新建 / 打开项目
-          </Button>
-        </div>
-      )}
-      <AuthDialog open={authOpen} onOpenChange={setAuthOpen} />
-      <ProjectDialog
-        open={projectOpen}
-        onOpenChange={setProjectOpen}
-        guests={projects.guests}
-        cloud={projects.cloud}
-        active={projects.active}
-        loggedIn={!!projects.session}
-        loading={projects.loading}
-        hasMore={projects.hasMore}
-        loadMore={() => void projects.loadMore()}
-        reload={() => void projects.reload()}
-        onOpen={projects.open}
-        onCreate={projects.create}
-        onRemove={projects.remove}
-        onRename={projects.rename}
-        onDuplicate={projects.duplicate}
-        login={() => setAuthOpen(true)}
-      />
-    </>
-  );
+import { useState } from 'react';
+import { useProjects } from '@/features/interior/cloud/useProjects';
+import { useAccountCosts } from '@/features/interior/cloud/useAccountCosts';
+import { Workbench } from '@/features/interior/components/Workbench';
+import { AuthDialog } from '@/features/interior/components/AuthDialog';
+import { AccountCMS } from '@/features/interior/components/AccountCMS';
+import { CostDefaultsContext } from '@/features/interior/components/CostDefaultsContext';
+import { createProject } from '@/features/interior/data/templates';
+import type { Design } from '@/features/interior/model/types';
+const Index=()=>{
+  const projects=useProjects(),costs=useAccountCosts(projects.session?.user.id);
+  const [authOpen,setAuthOpen]=useState(false),[editingOwner,setEditingOwner]=useState<string|null>(null);
+  const owner=projects.session?.user.id, editing=owner&&editingOwner===owner;
+  const manage=async()=>{if(await projects.save())setEditingOwner(null);};
+  const cloudSave=()=>{if(!owner||!projects.active)return;void projects.create({...projects.active,name:projects.active.name+' · 云端副本'},true);};
+  const importProject=(d:Design,name:string)=>{if(!owner)return;void projects.create({...createProject(d.template,name),state:d},true);};
+  if(!projects.ready)return <div className="no-project" role="status"><h1>正在恢复工作室…</h1></div>;
+  return <CostDefaultsContext.Provider value={owner?costs.settings:{}}>{owner&&!editing?<AccountCMS key={owner} projects={projects} costs={costs} opened={()=>setEditingOwner(owner)}/>:projects.active?<Workbench key={(owner||'guest')+projects.active.id} project={projects.active} update={projects.update} status={projects.status} loggedIn={!!owner} email={projects.session?.user.email} projects={()=>void manage()} login={()=>setAuthOpen(true)} logout={()=>{setEditingOwner(null);void projects.signOut();}} save={()=>void projects.save()} cloudSave={cloudSave} importProject={importProject}/>:null}<AuthDialog open={authOpen} onOpenChange={setAuthOpen}/></CostDefaultsContext.Provider>;
 };
 export default Index;

@@ -69,6 +69,7 @@ export function setPrice(
   group: PriceGroup,
   key: string,
   value: number | null,
+  defaults?: AccountCostSettings,
 ): Design {
   if (value !== null && !validPrice(value))
     throw new Error("价格必须是 0～100,000,000 的有效金额");
@@ -77,6 +78,7 @@ export function setPrice(
     costSettings: {
       ...d.costSettings,
       [group]: { ...d.costSettings?.[group], [key]: value },
+      ...(group === 'floorPrices' ? { procurement: { ...d.costSettings?.procurement, [key]: effectiveCostDesign(d, defaults).costSettings?.procurement?.[key] || {unit:'m²',waste:5} } } : {}),
     },
   };
 }

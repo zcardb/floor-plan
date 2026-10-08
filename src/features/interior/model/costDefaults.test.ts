@@ -1,0 +1,7 @@
+import {it,expect} from 'vitest';
+import {blankDesign} from '../data/templates';
+import {effectiveCostDesign,restorePrice} from './costDefaults';
+import {priceOf,calculateCosts} from './costs';
+it('逐键继承，0和null不当缺失处理',()=>{const d=blankDesign();d.costSettings={floorPrices:{wood:0,walnut:null}};const defaults={floorPrices:{wood:400,walnut:500,tile600:600}};expect(priceOf(d,'floorPrices','wood',defaults)).toBe(0);expect(priceOf(d,'floorPrices','walnut',defaults)).toBeNull();expect(priceOf(d,'floorPrices','tile600',defaults)).toBe(600);expect(priceOf(restorePrice(d,'floorPrices','wood'),'floorPrices','wood',defaults)).toBe(400);});
+it('旧项目单价保持m²，不被账号按箱解释',()=>{const d=blankDesign();d.costSettings={floorPrices:{tile600:160}};const defaults={floorPrices:{tile600:800},procurement:{tile600:{unit:'箱' as const,waste:5,length:600,width:600,perBox:4}}};const effective=effectiveCostDesign(d,defaults);expect(effective.costSettings?.procurement?.tile600.unit).toBe('m²');expect(priceOf(effective,'floorPrices','tile600')).toBe(160);delete d.costSettings.floorPrices.tile600;expect(effectiveCostDesign(d,defaults).costSettings?.procurement?.tile600.unit).toBe('箱');});
+it('全局更新只影响未覆盖值，人工不继承，不回写Design',()=>{const d=blankDesign(),before=JSON.stringify(d);const a=calculateCosts(d,{floorPrices:{wood:10}}),b=calculateCosts(d,{floorPrices:{wood:20}});expect(b.total).toBeGreaterThanOrEqual(a.total);expect(JSON.stringify(d)).toBe(before);expect(effectiveCostDesign(d,{labor:[{id:'l',name:'不继承',amount:999}]} as never).costSettings?.labor).toBeUndefined();});

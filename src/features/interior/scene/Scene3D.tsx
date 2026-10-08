@@ -315,20 +315,22 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         );
         for (const hit of hits) {
           let object = hit.object;
-          if (object.userData.glass) continue;
+          if (object.userData.glass && latest.current.options.mode === 'walk') continue;
           while (
             object.parent &&
             !object.userData.fid &&
             !object.userData.room &&
             !object.userData.door &&
+            !object.userData.opening &&
             !object.userData.wall &&
             object.parent !== scene
           )
             object = object.parent;
-          return { object, distance: hit.distance };
+          return { object, distance: hit.distance, point:hit.point };
         }
         return null;
       };
+      let wallClick:{id:string;fraction:number}|null=null;
       let down: Point | null = null,
         fdrag: {
           id: string;
@@ -447,10 +449,14 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         if (hit?.object.userData.door) {
           const door = r.doors.find((d) => d.id === hit.object.userData.door);
           if (door) door.open = !door.open;
+          if(latest.current.options.mode==='orbit')latest.current.select({kind:'opening',id:hit.object.userData.door});
         } else if (latest.current.options.mode === "orbit") {
+          if(hit?.object.userData.wall){const w=latest.current.design.walls.find(w=>w.id===hit.object.userData.wall);if(w){const dx=w.b[0]-w.a[0],dy=w.b[1]-w.a[1];wallClick={id:w.id,fraction:Math.max(0,Math.min(1,((hit.point.x*1000-w.a[0])*dx+(hit.point.z*1000-w.a[1])*dy)/(dx*dx+dy*dy)))};}}
           latest.current.select(
             hit?.object.userData.fid
               ? { kind: "furniture", id: hit.object.userData.fid }
+              : hit?.object.userData.opening
+                ? {kind:'opening',id:hit.object.userData.opening}
               : hit?.object.userData.room
                 ? { kind: "room", id: hit.object.userData.room }
                 : hit?.object.userData.wall
@@ -571,7 +577,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
               : selected?.kind === "room"
                 ? arch.children.filter((o) => o.userData.room === selected.id)
                 : selected?.kind === "opening"
-                  ? arch.children.filter((o) => o.userData.door === selected.id)
+                  ? arch.children.filter((o) => o.userData.opening === selected.id)
                   : [];
         if (
           objects.length &&
@@ -589,18 +595,23 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
                 const v = new THREE.Vector3(x, y, z).project(camera);
                 if (v.z >= -1 && v.z <= 1) pts.push(v);
               }
+          const stageRect=el.closest('.stage')!.getBoundingClientRect(),elRect=el.getBoundingClientRect();
+          const ox=elRect.left-stageRect.left,oy=elRect.top-stageRect.top;
+          let local:ScreenRect['local'];
+          if(selected?.kind==='wall'){const w=latest.current.design.walls.find(w=>w.id===selected.id);if(w){const t=wallClick?.id===w.id?wallClick.fraction:0.5;const p=new THREE.Vector3((w.a[0]+(w.b[0]-w.a[0])*t)/1000,Math.min(latest.current.design.height/2000,1.2),(w.a[1]+(w.b[1]-w.a[1])*t)/1000).project(camera);local={x:ox+Math.max(0,Math.min(el.clientWidth,(p.x+1)/2*el.clientWidth)),y:oy+Math.max(0,Math.min(el.clientHeight,(1-p.y)/2*el.clientHeight))};}}
           if (pts.length)
             latest.current.onAnchor({
-              left: Math.min(
+              local,
+              left: ox + Math.min(
                 ...pts.map((v) => ((v.x + 1) / 2) * el.clientWidth),
               ),
-              right: Math.max(
+              right: ox + Math.max(
                 ...pts.map((v) => ((v.x + 1) / 2) * el.clientWidth),
               ),
-              top: Math.min(
+              top: oy + Math.min(
                 ...pts.map((v) => ((1 - v.y) / 2) * el.clientHeight),
               ),
-              bottom: Math.max(
+              bottom: oy + Math.max(
                 ...pts.map((v) => ((1 - v.y) / 2) * el.clientHeight),
               ),
             });
@@ -795,6 +806,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
               });
               glass.material.userData.transient = true;
               glass.userData.glass = true;
+              glass.userData.opening = o.id;
               glass.rotation.y = angle;
               glass.castShadow = false;
             }
@@ -816,6 +828,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
             leaf.castShadow = true;
             pivot.add(leaf);
             pivot.userData.door = o.id;
+            pivot.userData.opening = o.id;
             r.arch.add(pivot);
             r.doors.push({
               group: pivot,

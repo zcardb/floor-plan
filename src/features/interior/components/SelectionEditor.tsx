@@ -1,5 +1,6 @@
 import {
   forwardRef,
+  useContext,
   useEffect,
   useImperativeHandle,
   useRef,
@@ -25,7 +26,8 @@ import {
 } from "@/components/ui/popover";
 import { materials } from "../data/catalog";
 import { length } from "../model/geometry";
-import { editSelection } from "../model/selectionEdits";
+import { SizeFields } from './SizeFields';
+import type { SizeTransaction } from '../model/sizeTransaction';
 import {
   furnitureKey,
   priceOf,
@@ -36,7 +38,7 @@ import {
 import { placeEditor, type ScreenRect } from "../model/selectionAnchor";
 import type { Design, Selection } from "../model/types";
 import { PriceInput } from "./PriceInput";
-import { useCostDesign } from './CostDefaultsContext';
+import { CostDefaultsContext, useCostDesign } from './CostDefaultsContext';
 import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
 export interface SelectionEditorHandle {
   update: (r: ScreenRect | null) => void;
@@ -54,6 +56,7 @@ interface Props {
   costs: () => void;
   hidden: boolean;
   showCosts: boolean;
+  transaction: SizeTransaction;
 }
 const colors = [
   "#efe6d8",
@@ -66,11 +69,9 @@ const colors = [
 ];
 export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
   function SelectionEditor(p, ref) {
-    const costDesign = useCostDesign(p.design);
+    const costDesign = useCostDesign(p.design), defaults = useContext(CostDefaultsContext);
     const el = useRef<HTMLDivElement>(null),
       [open, setOpen] = useState<string | null>(null),
-      [draft, setDraft] = useState<Record<string, string>>({}),
-      [error, setError] = useState(""),
       latest = useRef(p),
       anchor = useRef<ScreenRect | null>(null);
     latest.current = p;
@@ -81,7 +82,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
       if (!node || !stage) return;
       const obstacles = [
         ...stage.querySelectorAll(
-          ".stage-topline,.canvas-zoom,.scene-light-control,.mobile-library",
+          ".stage-topline,.canvas-zoom,.scene-light-control,.mobile-library,.mode-hint",
         ),
       ].map((e) => {
         const a = e.getBoundingClientRect(),
@@ -103,7 +104,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         pos && !latest.current.hidden ? "visible" : "hidden";
       node.style.pointerEvents =
         pos && !latest.current.hidden ? "auto" : "none";
-      if (pos) node.style.transform = `translate3d(${pos.x}px,${pos.y}px,0)`;
+      if (pos && !node.contains(document.activeElement)) node.style.transform = `translate3d(${pos.x}px,${pos.y}px,0)`;
     };
     useImperativeHandle(ref, () => ({ update: position }));
     useEffect(() => {
@@ -163,16 +164,6 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           : [];
     const setPanel = (v: boolean, key: string) => {
       setOpen(v ? key : null);
-      setError("");
-      if (v && key === "size")
-        setDraft(
-          Object.fromEntries(
-            fields.map(([k, , v]) => [
-              String(k),
-              String(Math.round(Number(v))),
-            ]),
-          ),
-        );
       position(anchor.current);
     };
     const paint = (value: string) => {
@@ -271,61 +262,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
                   原始建筑结构已锁定，不能修改尺寸。
                 </p>
               ) : (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (Object.values(draft).some((v) => v.trim() === "")) {
-                      setError("尺寸不能为空");
-                      return;
-                    }
-                    try {
-                      p.change((d) =>
-                        editSelection(
-                          d,
-                          p.selection,
-                          Object.fromEntries(
-                            Object.entries(draft).map(([k, v]) => [
-                              k,
-                              Number(v),
-                            ]),
-                          ),
-                        ),
-                      );
-                      setOpen(null);
-                    } catch (err) {
-                      setError(err instanceof Error ? err.message : "尺寸无效");
-                    }
-                  }}
-                >
-                  <div className="visual-size-fields">
-                    {fields.map(([key, label]) => (
-                      <label key={String(key)}>
-                        {label}
-                        <input
-                          type="number"
-                          value={draft[String(key)] ?? ""}
-                          onChange={(e) =>
-                            setDraft((v) => ({
-                              ...v,
-                              [String(key)]: e.target.value,
-                            }))
-                          }
-                        />
-                      </label>
-                    ))}
-                  </div>
-                  {error && (
-                    <p className="form-error" role="alert">
-                      {error}
-                    </p>
-                  )}
-                  <div className="visual-form-actions">
-                    <button type="button" onClick={() => setOpen(null)}>
-                      取消
-                    </button>
-                    <button type="submit">应用尺寸</button>
-                  </div>
-                </form>
+                <SizeFields design={p.design} selection={p.selection} transaction={p.transaction} close={()=>setOpen(null)}/>
               )}
             </PopoverContent>
           </Popover>
@@ -434,7 +371,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
                 value={priceOf(costDesign, price.group, price.key)}
                 onApply={(v) => {
                   try {
-                    p.change((d) => setPrice(d, price!.group, price!.key, v));
+                    p.change((d) => setPrice(d, price!.group, price!.key, v, defaults));
                   } catch {
                     toast.error("价格无效");
                   }

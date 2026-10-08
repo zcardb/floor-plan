@@ -1,10 +1,11 @@
-import { wallPoly } from "./geometry";
+import { wallPoly, length } from "./geometry";
 import type { Design, Point, Selection } from "./types";
 export interface ScreenRect {
   left: number;
   top: number;
   right: number;
   bottom: number;
+  local?: {x:number;y:number};
 }
 export function selectionPoints(d: Design, s: Selection): Point[] {
   if (!s) return [];
@@ -31,7 +32,18 @@ export function selectionPoints(d: Design, s: Selection): Point[] {
   const o = d.openings.find((o) => o.id === s.id),
     w = d.walls.find((w) => w.id === o?.wallId);
   if (!o || !w) return [];
-  return wallPoly(w);
+  const L = length(w), dx = (w.b[0]-w.a[0])/L, dy = (w.b[1]-w.a[1])/L;
+  const points: Point[] = [[-o.width/2,-w.thickness/2],[o.width/2,-w.thickness/2],[o.width/2,w.thickness/2],[-o.width/2,w.thickness/2]];
+  if (o.kind === 'door') {
+    // Quarter-circle swing, identical to the plan's local negative-Y door leaf.
+    for (let i=0;i<=12;i++) { const a=-Math.PI/2+i*Math.PI/24; points.push([-o.width/2+o.width*Math.cos(a),o.width*Math.sin(a)]); }
+  }
+  return points.map(([x,y]) => [w.a[0]+dx*(o.offset+x)-dy*y,w.a[1]+dy*(o.offset+x)+dx*y]);
+}
+export function localWallPoint(d: Design, id: string, fraction: number): Point | null {
+  const w=d.walls.find(w=>w.id===id);if(!w)return null;
+  const t=Math.max(0,Math.min(1,fraction));
+  return [w.a[0]+(w.b[0]-w.a[0])*t,w.a[1]+(w.b[1]-w.a[1])*t];
 }
 export function placeEditor(
   object: ScreenRect | null,
@@ -51,12 +63,14 @@ export function placeEditor(
     pad = 10,
     maxX = Math.max(pad, viewport.width - size.width - pad),
     maxY = Math.max(pad, viewport.height - size.height - pad);
+  const left=object.local?.x ?? object.left, right=object.local?.x ?? object.right;
+  const top=object.local?.y ?? object.top, bottom=object.local?.y ?? object.bottom;
   const candidates = [
-    [object.right + gap, object.bottom + gap],
-    [object.left, object.bottom + gap],
-    [object.left, object.top - size.height - gap],
-    [object.left - size.width - gap, object.top],
-    [object.right + gap, object.top],
+    [right + gap, bottom + gap],
+    [left, bottom + gap],
+    [left, top - size.height - gap],
+    [left - size.width - gap, top],
+    [right + gap, top],
   ];
   const clamp = (v: number, max: number) => Math.max(pad, Math.min(max, v));
   const overlap = (a: ScreenRect, b: ScreenRect) =>

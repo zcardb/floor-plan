@@ -43,7 +43,7 @@ export function CostPanel({
           key={r.group + r.key + String(r.price)}
           value={r.price}
           label={r.name + "单价"}
-          onApply={(v) => change((d) => setPrice(d, r.group, r.key, v))}
+          onApply={(v) => change((d) => setPrice(d, r.group, r.key, v, defaults))}
         />
         {priceSource(design, defaults, r.group, r.key) === '项目覆盖' && <button className="back-link" onClick={() => change(d => restorePrice(d, r.group, r.key))}>恢复账号默认</button>}
         {r.group === "floorPrices" && (

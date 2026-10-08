@@ -409,6 +409,8 @@ export function useProjects() {
   );
   const rename = useCallback(
     async (p: ProjectSummary, name: string) => {
+      if(!sessionRef.current)return;
+      const generation=epoch.current;
       name = name.trim();
       if (!name || name.length > 100) return;
       if (!(await save())) return;
@@ -424,6 +426,7 @@ export function useProjects() {
           .eq("revision", p.revision)
           .select("revision")
           .maybeSingle();
+        if(generation!==epoch.current)return;
         if (error || !data) {
           toast.error("重命名失败或版本已变化，请重新加载");
           return;

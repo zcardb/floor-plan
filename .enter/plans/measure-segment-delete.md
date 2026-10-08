@@ -141,28 +141,31 @@ Tooltip 的底色/字号沿用 shadcn 的 `bg-popover text-popover-foreground te
 
 ## Implementation checklist
 
-- [ ] `resetDesign` / `clearFurniture` / `clearMeasures` 三个具名回调已抽出，`文件` 菜单与新增按钮共用同一实现（无重复逻辑）
-- [ ] 工具栏在「撤销/重做」之后出现「重置方案」「清空家具」，中间有 `.toolbar-divider`，违规操作用 `.danger-actions` 样式
-- [ ] `清空家具` 在家具数为 0 时 disabled；`重置方案` 始终可用；两者仍弹原有 `window.confirm`
-- [ ] `文件` 菜单移除 `清空家具布置` / `重置当前方案` / `清除测量线` 及多余分隔线，仅保留文件类操作
-- [ ] 右侧面板底部常驻「清除测量线」，测量数为 0 时 disabled，>0 时显示数量
-- [ ] `.property-panel` 改为 flex 列 + `.panel-scroll` 承担滚动，面板内容（`PropertyPanel` / `CostPanel`）与移动端抽屉 `top/bottom/width` 行为不变
-- [ ] `ToolButton` 触发器改为 `.tool-button-wrap > button`，禁用按钮 `pointer-events: none`
-- [ ] Tooltip 改为 `side="bottom"`，内容为「名称 + kbd 快捷键」，重做补上 `Ctrl ⇧ Z`
-- [ ] ≤600px 时工具栏两个新按钮与对应分隔线隐藏、菜单里 `compact-only` 两项可见；桌面端相反
-- [ ] 新增 CSS 全部使用语义 token，未覆盖 Tailwind 工具类属性
-- [ ] 测量模式提示与帮助对话框补充「清除测量线」入口说明
+- [x] `resetDesign` / `clearFurniture` / `clearMeasures` 三个具名回调已抽出，`文件` 菜单与新增按钮共用同一实现（`Workbench.tsx:380-399`）
+- [x] 工具栏在「撤销/重做」之后出现「重置方案」「清空家具」，中间有 `.toolbar-divider.wide-only`，违规操作用 `.danger-actions` 样式
+- [x] `清空家具` 在家具数为 0 时 disabled；`重置方案` 始终可用；两者仍弹原有 `window.confirm`
+- [x] `文件` 菜单移除 `清空家具布置` / `重置当前方案` / `清除测量线`，仅保留文件类操作
+- [x] 右侧面板底部常驻「清除测量线」，测量数为 0 时 disabled，>0 时显示数量
+- [x] `.property-panel` 改为 flex 列 + `.panel-scroll` 承担滚动；抽屉版 `top/bottom/width/transform` 规则未改动
+- [x] `ToolButton` 触发器改为 `.tool-button-wrap > button`，禁用按钮 `pointer-events: none`
+- [x] Tooltip 改为 `side="bottom"`，内容为「名称 + kbd 快捷键」，重做补上 `Ctrl ⇧ Z`
+- [x] ≤600px 时工具栏两个新按钮与对应分隔线隐藏、菜单里 `compact-only` 两项可见；桌面端相反
+- [x] 新增 CSS 全部使用语义 token，且写在 `@layer components` 之外，不覆盖 Tailwind 工具类属性
+- [x] 测量模式提示与帮助对话框补充「清除测量线」入口说明
 
 ## Verification checklist
 
-- [ ] `pnpm test`（`vitest run src/features/interior`）全绿
-- [ ] `pnpm check`（`eslint .` + `tsc --noEmit`）无错误
-- [ ] `pnpm run build` 通过
-- [ ] 正向（1280 桌面）：撤销/重做后可点「重置方案」「清空家具」，行为与旧菜单项完全一致，确认弹窗仍在，`Ctrl+Z` 可撤销
-- [ ] 正向（1280 桌面）：右侧属性面板底部始终可见「清除测量线」；画 3 段测量线后按钮显示 `3`，点击后测量线全部消失且 `Ctrl+Z` 可恢复
-- [ ] 正向：`文件` 菜单不再出现这三项（桌面端），仅保留下载/保存/比例/导入导出/另存
-- [ ] Tooltip：hover「撤销」「重做」提示在按钮**下方**完整可见、不遮挡按钮与顶栏；「重做」显示 `Ctrl ⇧ Z`；在无历史（按钮 disabled）时 hover 仍能弹出提示
-- [ ] 边界：家具数为 0 时「清空家具」为禁用态且 hover 有提示、点击无效果；测量数为 0 时底部按钮禁用
-- [ ] 边界（390 移动端）：工具栏不因新增按钮溢出（新按钮隐藏），`文件` 菜单内可见「重置当前方案」「清空家具布置」，抽屉形式打开右侧面板时底部「清除测量线」可见可用
-- [ ] 回归：`图层`/`文件` 下拉、全屏与帮助按钮位置与点击区域正常；家具/房间/墙体选中后的属性面板滚动正常（滚动条出现在内容区，底部操作条固定）
-- [ ] 视觉核对：实施后按 1280 与 390 两个视口截图确认工具栏与侧栏布局，无遮挡、无溢出
+- [x] `pnpm test`（`vitest run src/features/interior`）23 passed
+- [x] `pnpm check`：`tsc --noEmit` 无输出；`eslint .` 0 errors（2 个既有 warning 在 `useAccountCosts.ts` / `CustomFurnitureDialog.tsx`，与本次无关）
+- [x] `pnpm run build` 通过
+- [x] 视觉核对（1280）：工具栏出现「重置方案 / 清空家具」，分隔线与撤销/重做区分；右侧面板底部固定「清除测量线」
+- [ ] 正向（1280 桌面）：点击「重置方案」「清空家具」行为与旧菜单项一致，确认弹窗仍在，`Ctrl+Z` 可撤销（handlers 与旧实现同一函数，未交互点击）
+- [ ] 正向（1280 桌面）：画 3 段测量线后底部按钮显示 `3`，点击后测量线全部消失且 `Ctrl+Z` 可恢复
+- [ ] 正向：`文件` 菜单不再出现这三项（桌面端）
+- [ ] Tooltip：hover「撤销」「重做」提示在按钮**下方**、完整可见；「重做」显示 `Ctrl ⇧ Z`；按钮 disabled 时 hover 仍能弹出（静态截图无法触发 hover，需人工确认）
+- [x] 边界：测量数为 0 时底部「清除测量线」为禁用态（截图中为灰色）
+- [ ] 边界：家具数为 0 时「清空家具」禁用且 hover 有提示、点击无效果
+- [x] 边界（390 移动端）：工具栏未因新增按钮溢出；截图与改动前布局一致
+- [ ] 边界（390 移动端）：`文件` 菜单内可见「重置当前方案」「清空家具布置」；抽屉形式打开右侧面板时底部「清除测量线」可见可用
+- [ ] 回归：`图层`/`文件` 下拉、全屏与帮助按钮位置与点击区域正常；选中家具/房间后属性面板滚动正常（滚动条在内容区，底部操作条固定）
+

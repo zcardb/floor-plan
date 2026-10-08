@@ -24,6 +24,8 @@ import { projectProcurement } from "../model/materialProcurement";
 import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
 import { editSelection } from "../model/selectionEdits";
 import { useCostDesign } from './CostDefaultsContext';
+import { SizeFields } from './SizeFields';
+import type { SizeTransaction } from '../model/sizeTransaction';
 import {
   area,
   bbox,
@@ -45,10 +47,12 @@ interface Props {
   remove: () => void;
   rotate: () => void;
   showCosts: boolean;
+  transaction: SizeTransaction;
 }
 export function PropertyPanel({
   design,
   showCosts,
+  transaction,
   selection: s,
   select,
   change,
@@ -360,7 +364,7 @@ export function PropertyPanel({
           </div>
           <MaterialProcurementEditor
             key={r.mat}
-            design={d}
+            design={design}
             material={r.mat}
             change={change}
           /></>}
@@ -405,22 +409,7 @@ export function PropertyPanel({
           <h3 className="section-title">
             {editable ? "可编辑内部墙体" : "原始建筑墙体"}
           </h3>
-          <div className="property-form">
-            {input(
-              "长度 / mm",
-              length(w),
-              (v) => applyEdit({ length: v }),
-              100,
-              50000,
-            )}
-            {input(
-              "墙厚 / mm",
-              w.thickness,
-              (v) => applyEdit({ thickness: v }),
-              50,
-              1000,
-            )}
-          </div>
+          <SizeFields key={w.id} design={design} selection={s} transaction={transaction}/>
           {editable && (
             <Button variant="outline" size="sm" onClick={remove}>
               <Trash2 />
@@ -441,7 +430,6 @@ export function PropertyPanel({
     );
   }
   if (o) {
-    const upd = (key: "offset" | "width", v: number) => applyEdit({ [key]: v });
     return (
       <>
         <div className="panel-heading">
@@ -449,16 +437,7 @@ export function PropertyPanel({
         </div>
         <section>
           {back}
-          <div className="property-form">
-            {input("宽度 / mm", o.width, (v) => upd("width", v), 100, 10000)}
-            {input(
-              "沿墙位置 / mm",
-              o.offset,
-              (v) => upd("offset", v),
-              0,
-              50000,
-            )}
-          </div>
+          <SizeFields key={o.id} design={design} selection={s} transaction={transaction}/>
           <Button variant="outline" size="sm" onClick={remove}>
             <Trash2 />
             删除开口

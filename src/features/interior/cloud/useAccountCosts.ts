@@ -7,6 +7,7 @@ export function useAccountCosts(owner?: string) {
   const [loading, setLoading] = useState(false), [saving, setSaving] = useState(false), [error, setError] = useState('');
   const epoch = useRef(0), revision = useRef<number | null>(null), busy = useRef(false);
   useEffect(() => {
+    const generation=epoch;
     const run = ++epoch.current;
     revision.current = null; setSettings({}); setError(''); setSaving(false); busy.current = false;
     if (!owner) { setLoading(false); return; }
@@ -18,7 +19,7 @@ export function useAccountCosts(owner?: string) {
       revision.current = data?.revision ?? null;
       setSettings((data?.settings || {}) as AccountCostSettings);
     });
-    return () => { epoch.current++; };
+    return () => { generation.current++; };
   }, [owner]);
   const save = useCallback(async (next: AccountCostSettings) => {
     if (!owner || busy.current || loading) return false;
