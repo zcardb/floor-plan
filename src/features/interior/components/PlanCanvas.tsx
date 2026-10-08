@@ -35,6 +35,7 @@ import { resolveWallPoint,validateWallSegment } from '../model/wallDrawing';
 import { useWallDrawing } from './useWallDrawing';
 import { WallHoverOverlay } from './WallHoverOverlay';
 import { formatMeters } from '../model/lengthUnits';
+import { isCompletionClick, supportsPointerCompletion } from '../model/toolCompletion';
 export interface CanvasHandle {
   zoom: (k: number) => void;
   fit: () => void;
@@ -54,7 +55,7 @@ interface Props {
   onScale: (s: number) => void;
   onCoord: (p: Point) => void;
   onAnchor: (r: ScreenRect | null) => void;
-  finishWall: () => void;
+  finishTool: () => void;
 }
 interface Drag {
   pid: number;
@@ -82,7 +83,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     onScale,
     onCoord,
     onAnchor,
-    finishWall,
+    finishTool,
   },
   ref,
 ) {
@@ -102,8 +103,9 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       view: typeof view;
       center: Point;
     } | null>(null);
+  const mouseDown = useRef<(() => void) | null>(null);
   const wallClick = useRef<{id:string;fraction:number}|null>(null);
-  const drawing = useWallDrawing(tool==='wall',current,view.s,layers.snap,commit,finishWall);
+  const drawing = useWallDrawing(tool==='wall',current,view.s,layers.snap,commit,finishTool);
   useEffect(() => {
     const el = svg.current;
     if (!el) return;
@@ -758,7 +760,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         <MeasureLine key={m.id} a={m.a} b={m.b} scale={view.s} />
       ))}
       {tool==='wall' && drawing.draft && Math.hypot(drawing.draft.b[0]-drawing.draft.a[0],drawing.draft.b[1]-drawing.draft.a[1])>0 && <g data-export-hide="true" pointerEvents="none"><polygon points={wallPoly({id:'draft',...drawing.draft,thickness:design.thickness,kind:'partition'}).map(p=>p.join(',')).join(' ')} fill="var(--plan-selection-soft)" stroke="var(--plan-selection)" strokeWidth={1/view.s}/><MeasureLine a={drawing.draft.a} b={drawing.draft.b} scale={view.s}/></g>}
-      {tool === 'wall' && <WallHoverOverlay walls={design.walls} candidate={drawing.candidate} scale={view.s} />}
+      {tool === 'wall' && <WallHoverOverlay walls={design.walls} candidate={drawing.hover} connection={drawing.candidate} scale={view.s} />}
       {draft && (
         <g data-export-hide="true">
           <MeasureLine a={draft.a} b={draft.b} scale={view.s} />
