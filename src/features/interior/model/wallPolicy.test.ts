@@ -4,6 +4,7 @@ import { canDemolishWall, canEditWall, canResizeWall, isBearingWall, setWallBear
 import { rebuildRooms, resizeBlank } from './geometry';
 import { calculateCosts } from './costs';
 import { editSelection } from './selectionEdits';
+import { createSizeTransaction } from './sizeTransaction';
 import { createDrawingDocument } from './drawingDocument';
 import type { Wall } from './types';
 const partition: Wall = { id: 'partition', kind: 'partition', a: [3000, 0], b: [3000, 6000], thickness: 240 };
@@ -86,5 +87,27 @@ describe('复制/新建项目的结构解锁', () => {
     expect(createProject('reference').state.structureUnlocked).toBe(true);
     expect(createProject('blank').state.structureUnlocked).toBe(true);
     expect(referenceDesign().structureUnlocked).toBeUndefined();
+  });
+  it('解锁墙体的尺寸边界仍按统一范围拒绝', () => {
+    const d = unlocked(), w = d.walls.find(w => w.id === 'w7')!;
+    const selection = { kind: 'wall' as const, id: w.id };
+    expect(editSelection(d, selection, { thickness: 50 }).walls.find(x => x.id === w.id)!.thickness).toBe(50);
+    expect(editSelection(d, selection, { thickness: 1000 }).walls.find(x => x.id === w.id)!.thickness).toBe(1000);
+    expect(editSelection(d, selection, { length: 100 }).walls.find(x => x.id === w.id)).toBeDefined();
+    for (const bad of [49, 1001, Number.NaN]) expect(() => editSelection(d, selection, { thickness: bad })).toThrow('允许范围');
+    expect(() => editSelection(d, selection, { length: 50 })).toThrow('允许范围');
+  });
+  it('非法尺寸回滚预览且不提交，合法尺寸可撤销到原值', () => {
+    const before = unlocked();
+    let design = before;
+    const transaction = createSizeTransaction(() => design, next => { design = next; }, (next, prev) => { design = next; expect(prev).toBe(before); });
+    const w = before.walls.find(x => x.id === 'w7')!;
+    const token = transaction.begin({ kind: 'wall', id: w.id });
+    expect(() => transaction.update(token, { thickness: '3000' })).toThrow('允许范围');
+    expect(design).toBe(before);
+    transaction.update(token, { thickness: '300' });
+    expect(design.walls.find(x => x.id === w.id)!.thickness).toBe(300);
+    expect(transaction.apply(token)).toBe(true);
+    expect(design.rooms.map(r => [r.id, r.name])).toEqual(before.rooms.map(r => [r.id, r.name]));
   });
 });

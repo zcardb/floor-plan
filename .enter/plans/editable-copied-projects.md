@@ -106,11 +106,11 @@
 - [x] `selectionEdits` 新增用例：解锁参考户型改外墙长度成功；未解锁仍抛「此墙体的结构尺寸已锁定」。
 - [x] `dimensionWallEdit` 新增用例：解锁参考户型的 `dimensionEditPolicy` 不再返回「参考户型的结构尺寸已锁定」；原有用例保持通过。
 - [x] `validation` 新增用例：`structureUnlocked: 'yes'` 被拒绝；`true` 与缺省通过。
-- [x] 本次相关测试全绿（排除 wallSplit* 后 53 个文件 / 332 条通过）；`pnpm test` 全量另有 5 条 wallSplit 失败，来自另一会话正在改的 `WallSplitDialog`/`wallSplitDraft`，与本次无关。
-- [x] `pnpm check`（`eslint .` + `tsc --noEmit`）无错误。
+- [x] 全量 `pnpm test`：56 个文件 / 362 条全部通过（之前 wallSplit 的 5 条失败已随并行改动修复）。
+- [x] `pnpm check`（`eslint .` + `tsc --noEmit`）无错误；仅剩 `PlanCanvas.tsx:218` 一条既有 warning，与本次无关。
 - [x] `pnpm run build` 通过。
-- [ ] 正向：新建参考户型项目，选外围墙改长度/墙厚即时生效，房间名称与地面跟随；选承重墙看到风险提示。
-- [ ] 反向：打开现有复制项目仍显示新锁定文案且尺寸不可编辑；对它再「复制」一次，副本可编辑。
-- [ ] 反向：空白项目的外围墙尺寸仍不可直接编辑（需走 `净宽/净深/外围墙厚`），房间划分行为不变。
-- [ ] 反向：删除按钮对外围墙/承重墙仍不出现；承重墙门窗洞口锁定行为不变。
-- [ ] 边界：墙厚 50/1000 mm、墙长 100 mm 上下限与越界输入的拒绝行为正确；墙尺寸修改可正常撤销/重做。
+- [x] 正向（`components/structureUnlock.test.tsx`）：新建参考户型项目，外围墙尺寸面板可输入；承重墙显示风险提示。真实交互（拖动、房间跟随）由 `roomFollow.test.ts` 覆盖，未在浏览器里手点。
+- [x] 反向（同上）：无解锁标记的旧项目显示新锁定文案、无输入框。「复制一次得到可编辑副本」由 `useProjects.ts:559` 写入标记 + `wallPolicy.test.ts` 判定覆盖，未端到端点击验证。
+- [x] 反向（同上）：空白项目即使带解锁标记，外围墙仍不能在单墙尺寸里编辑。
+- [x] 反向：删除权限不随解锁放开（`wallPolicy.test.ts`）；承重墙门窗洞口锁定文案独立且仍生效（`structureUnlock.test.tsx`）。
+- [x] 边界（`wallPolicy.test.ts`）：墙厚 50/1000 接受、49/1001/NaN 拒绝；墙长 100 接受、50 拒绝；非法输入回滚预览不提交，合法输入提交且房间不变。撤销/重做沿用既有 `commit(next, before)` 机制，未单独测。
