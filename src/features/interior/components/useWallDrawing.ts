@@ -16,7 +16,7 @@ export function useWallDrawing(enabled:boolean,design:React.RefObject<Design>,sc
       if(Math.hypot(result.point[0]-c.first[0],result.point[1]-c.first[1])<0.1){clear();latest.current.done();}else{chain.current={start:result.point,first:c.first};setDraft({a:result.point,b:result.point});}
     }catch(e){toast.error(e instanceof Error?e.message:'墙段无效');}
   };
-  return {draft,candidate,clear,move,
+  return {draft,candidate,clear,move,clearHover:()=>setCandidate(null),
     down(p:Point,id:number,screen:Point){const continuing=!!chain.current;if(!continuing){const {point}=move(p);chain.current={start:point,first:point};setDraft({a:point,b:point});}pointer.current={id,screen,continuing};},
     up(p:Point,id:number,screen:Point){const down=pointer.current;pointer.current=null;if(!down||down.id!==id)return;if(down.continuing||Math.hypot(screen[0]-down.screen[0],screen[1]-down.screen[1])>5)confirm(p);},
   };

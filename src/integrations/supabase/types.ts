@@ -3427,6 +3427,7 @@ export type Database = {
           name: string
           owner_id: string
           price: number | null
+          shape: string | null
           type: string
           width: number
         }
@@ -3442,6 +3443,7 @@ export type Database = {
           name: string
           owner_id?: string
           price?: number | null
+          shape?: string | null
           type: string
           width: number
         }
@@ -3457,6 +3459,7 @@ export type Database = {
           name?: string
           owner_id?: string
           price?: number | null
+          shape?: string | null
           type?: string
           width?: number
         }

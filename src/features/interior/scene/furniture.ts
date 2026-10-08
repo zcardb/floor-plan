@@ -111,10 +111,18 @@ function fronts(
 export function buildFurniture(f: Furniture): THREE.Group {
   const g = new THREE.Group(),
     w = f.w / 1000,
+    h = (f.height || 700) / 1000,
     d = f.d / 1000,
     c = f.color,
     bz = -d / 2;
-  switch (f.type) {
+  if (f.type === 'fireplace') {
+    if (f.shape === 'circle') cylinder(g,w/2,h,c); else box(g,w,h,d,c,0,0,0,true);
+    box(g,w*.45,h*.25,.012,'#252525',0,h*.2,d/2+.007);
+    cylinder(g,Math.min(w,d)*.14,h*.15,'#525252',0,h,-d*.15);
+  } else if (f.shape === 'circle') {
+    const body=cylinder(g,w/2,h,c); body.scale.z=d/w;
+  } else if (f.shape === 'rectangle') box(g,w,h,d,c);
+  else switch (f.type) {
     case "bed": {
       box(g, w, 0.28, d, "#9c8264", 0, 0.05, 0, true);
       box(g, w, 0.2, d - 0.08, "#f8f5ef", 0, 0.33, 0.03, true);

@@ -8,6 +8,10 @@ import { materials } from "../data/catalog";
 import { priceOf, validPrice } from "../model/costs";
 import type { Design, MaterialProcurement } from "../model/types";
 import { useCostDesign } from './CostDefaultsContext';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { EditorSelect } from './EditorSelect';
+import { meterDraft, parseMeterDraft } from '../model/lengthUnits';
 export function MaterialProcurementEditor({
   design,
   material,
@@ -34,14 +38,16 @@ export function MaterialProcurementEditor({
   ) => (
     <label key={key}>
       {label}
-      <input
+      <Input
+        className="editor-control"
         aria-label={materials[material].name + label}
         type="number"
-        value={draft[key] ?? ""}
+        step={key==='length'||key==='width'?0.001:'any'}
+        value={draft[key] === undefined ? '' : key==='length'||key==='width' ? meterDraft(draft[key]) : draft[key]}
         onChange={(e) =>
           setDraft((d) => ({
             ...d,
-            [key]: e.target.value === "" ? undefined : Number(e.target.value),
+            [key]: e.target.value === "" ? undefined : key==='length'||key==='width' ? parseMeterDraft(e.target.value) : Number(e.target.value),
           }))
         }
       />
@@ -66,8 +72,8 @@ export function MaterialProcurementEditor({
           <small>未填写规格，暂按面积计价</small>
         )}
       </div>
-      <button
-        className="procurement-toggle"
+      <Button type="button" variant="link" size="sm"
+        className="editor-procurement-toggle"
         onClick={() => {
           setExpanded(!expanded);
           setDraft(saved || defaultProcurement(material));
@@ -75,7 +81,7 @@ export function MaterialProcurementEditor({
         }}
       >
         规格 / 损耗 / 计价单位{expanded ? " −" : " ＋"}
-      </button>
+      </Button>
       {expanded && (
         <form
           onSubmit={(e) => {
@@ -107,30 +113,17 @@ export function MaterialProcurementEditor({
           }}
         >
           <div className="procurement-fields">
-            {field("length", "单张长 / mm")}
-            {field("width", "单张宽 / mm")}
+            {field("length", "单张长 / m")}
+            {field("width", "单张宽 / m")}
             {field("waste", "损耗 / %")}
             {field("perBox", "每箱张数")}
-            <label>
-              计价单位
-              <select
-                value={draft.unit}
-                onChange={(e) => {
-                  setDraft((d) => ({
-                    ...d,
-                    unit: e.target.value as MaterialProcurement["unit"],
-                  }));
-                  setPrice("");
-                }}
-              >
-                <option>m²</option>
-                <option>张</option>
-                <option>箱</option>
-              </select>
-            </label>
+            <EditorSelect label="计价单位" value={draft.unit}
+              options={['m²','张','箱'].map(value=>({value,label:value}))}
+              onChange={value=>{setDraft(d=>({...d,unit:value as MaterialProcurement['unit']}));setPrice('');}} />
             <label>
               单价 / 元每{draft.unit}
-              <input
+              <Input
+                className="editor-control"
                 aria-label="新单位单价"
                 type="number"
                 min={0}
@@ -147,7 +140,7 @@ export function MaterialProcurementEditor({
               {error}
             </p>
           )}
-          <button className="procurement-apply">应用采购规格</button>
+          <Button type="submit" size="sm" className="editor-action">应用采购规格</Button>
         </form>
       )}
     </div>

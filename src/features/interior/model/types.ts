@@ -1,3 +1,4 @@
+import type { FurnitureOutline } from './furnitureAppearance';
 export type Point = [number, number];
 export type WallKind = "bearing" | "exterior" | "partition" | "low";
 export interface Wall {
@@ -29,6 +30,7 @@ export interface Room {
 export interface Furniture {
   id: string;
   type: string;
+  shape?: FurnitureOutline;
   name: string;
   cx: number;
   cy: number;
@@ -107,6 +109,7 @@ export interface Material {
 export interface LibraryItem {
   catalogId?: string;
   type: string;
+  shape?: FurnitureOutline;
   name: string;
   w: number;
   d: number;

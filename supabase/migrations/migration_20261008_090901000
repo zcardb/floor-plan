@@ -1,0 +1,2 @@
+alter table public.interior_furniture_catalog add column if not exists shape text;
+alter table public.interior_furniture_catalog add constraint interior_catalog_shape_check check (shape is null or shape in ('reference','rectangle','circle'));

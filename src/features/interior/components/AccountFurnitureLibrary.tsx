@@ -8,9 +8,11 @@ import type { AccountCostSettings } from '../model/costDefaults';
 import { CmsFilterBar } from './CmsFilterBar';
 import { AccountFurnitureDialog } from './AccountFurnitureDialog';
 import { FurnitureShape } from './FurnitureShape';
+import { filterFurnitureLibrary } from '../model/furnitureAppearance';
 import { priceOf } from '../model/costs';
 import { referenceDesign } from '../data/templates';
 import { useAccountCostCommit } from './useAccountCostCommit';
+import { furnitureGeometryPayload } from '../model/furnitureGeometrySave';
 const builtinCounts=Object.fromEntries(categories.map(c=>[c,library.filter(i=>i.category===c).length]));
 export function AccountFurnitureLibrary({catalog,defaults,saveDefaults,onDirty,onNew}:{catalog:ReturnType<typeof useFurnitureCatalog>;defaults:AccountCostSettings;saveDefaults:(settings:AccountCostSettings)=>Promise<boolean>;onDirty:(dirty:boolean)=>void;onNew:()=>void}){
   const commit=useAccountCostCommit({settings:defaults,save:saveDefaults,onDirty});
@@ -19,9 +21,9 @@ export function AccountFurnitureLibrary({catalog,defaults,saveDefaults,onDirty,o
   const customIds=useMemo(()=>new Set(catalog.items.map(i=>i.catalogId)),[catalog.items]);
   const merged=useMemo(()=>[...catalog.items,...library.filter(l=>!customIds.has(l.catalogId))],[catalog.items,customIds]);
   const total=library.length+catalog.count;
-  const chips=[{id:'全部',label:'全部',meta:`${total} 款`},...categories.map(c=>({id:c,label:c,meta:`${(builtinCounts[c]||0)+(catalog.counts[c]||0)} 款`}))];
+  const chips=[{id:'全部',label:'全部',meta:`${total} 款`},{id:'自定义',label:'自定义',meta:`${catalog.count} 款`},...categories.map(c=>({id:c,label:c,meta:`${(builtinCounts[c]||0)+(catalog.counts[c]||0)} 款`}))];
   const keyword=query.trim(),searching=keyword!=='';
-  const visible=merged.filter(i=>searching?i.name.includes(keyword):category==='全部'||i.category===category);
+  const visible=filterFurnitureLibrary(merged,customIds,category,query);
   const blocks=searching||category!=='全部'
     ?[{title:searching?'搜索结果':category,items:visible}]
     :categories.map(c=>({title:c,items:visible.filter(i=>i.category===c)})).filter(b=>b.items.length);
@@ -43,13 +45,13 @@ export function AccountFurnitureLibrary({catalog,defaults,saveDefaults,onDirty,o
     <div className="cms-heading"><div><h1>账号家具库</h1><p>{total} 款家具 · 内置 {library.length} 款 + 自定义 {catalog.count} 款（款式数，不是项目摆放件数）</p></div><Button disabled={commit.busy||!!commit.pending} onClick={onNew}><Plus/>新建家具</Button></div>
     <div className="cms-toolbar" aria-busy={catalog.loading}>
       <div className="cms-search">{catalog.loading?<Loader2 className="animate-spin" size={15} aria-label="加载家具"/>:<Search size={15}/>}<input aria-label="搜索家具" placeholder="搜索家具、家电…" value={query} onChange={e=>setQuery(e.target.value)}/></div>
-      <CmsFilterBar chips={chips} value={searching?'':category} onChange={c=>{setQuery('');setCategory(c);}}/>
+      <CmsFilterBar chips={chips} value={category} onChange={setCategory}/>
     </div>
     {commit.error&&<div className="cost-save-error" role="alert"><span>{commit.error}</span><Button variant="outline" disabled={commit.busy} onClick={()=>void commit.retry()}>重试保存</Button></div>}
     {catalog.error&&<p role="alert" className="form-error">{catalog.error}</p>}
     {blocks.map(b=><section className="cms-category-block" key={b.title}><h2>{b.title}<span>{b.items.length} 款</span></h2><div className="cms-item-grid">{b.items.map(card)}</div></section>)}
     {!catalog.loading&&!visible.length&&<div className="cms-empty"><Armchair size={34}/><h2>没有匹配的家具</h2><p>换个分类，或清空搜索关键词再试。</p></div>}
     {catalog.hasMore&&<div className="cms-more"><Button variant="outline" disabled={catalog.loading} onClick={()=>void catalog.load(true)}>加载更多家具</Button></div>}
-    {detail&&<AccountFurnitureDialog key={detail.catalogId} item={{...detail,price:priceOf(priceDesign,'furniturePrices',detail.catalogId!)}} isCustom={customIds.has(detail.catalogId!)} referencePrice={priceOf(priceDesign,'furniturePrices',detail.catalogId!)} onOpenChange={v=>{if(!v)setDetail(null);}} onChanged={next=>{setDetail(next);if(!next)void catalog.load();}} applyDefaultPrice={price=>commit.apply(current=>({...current,furniturePrices:{...current.furniturePrices,[detail.catalogId!]:price}}))} remove={catalog.remove}/>}
+    {detail&&<AccountFurnitureDialog key={detail.catalogId} item={{...detail,price:priceOf(priceDesign,'furniturePrices',detail.catalogId!)}} isCustom={customIds.has(detail.catalogId!)} referencePrice={priceOf(priceDesign,'furniturePrices',detail.catalogId!)} commitBusy={commit.busy} commitError={commit.error} retryPrice={commit.pending?commit.retry:undefined} saved={commit.saved} saveGeometry={next=>{const stored=catalog.items.find(item=>item.catalogId===next.catalogId);if(!stored)return Promise.reject(new Error('家具数据尚未就绪，请重新加载后重试'));return catalog.save(furnitureGeometryPayload(next,stored));}} onOpenChange={v=>{if(!v)setDetail(null);}} onChanged={next=>{setDetail(next);void catalog.load();}} applyDefaultPrice={price=>commit.apply(current=>({...current,furniturePrices:{...current.furniturePrices,[detail.catalogId!]:price}}))} remove={catalog.remove}/>}
   </>;
 }

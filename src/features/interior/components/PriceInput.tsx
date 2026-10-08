@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { validPrice } from "../model/costs";
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 export function PriceInput({
   value,
   onApply,
@@ -25,7 +27,8 @@ export function PriceInput({
   };
   return (
     <div className="price-entry">
-      <input
+      <Input
+        className="editor-control price-control"
         aria-label={label}
         disabled={disabled}
         type="number"
@@ -47,7 +50,7 @@ export function PriceInput({
           }
         }}
       />
-      <button disabled={disabled} onClick={apply}>应用</button>
+      <Button type="button" variant="secondary" size="sm" className="editor-action" disabled={disabled} onClick={apply}>应用</Button>
       {error && <small role="alert">{error}</small>}
     </div>
   );

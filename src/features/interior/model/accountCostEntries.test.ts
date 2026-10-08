@@ -19,6 +19,12 @@ describe('账号成本分类与清单', () => {
     expect(filterCostEntries(merged, '地面', '测试床')).toHaveLength(0);
     expect(filterCostEntries(merged, '全部', '')).toHaveLength(entries.length);
   });
+  it('硬装软装切换仅展示对应大类，搜索不跨类泄露', () => {
+    expect(filterCostEntries(entries, '全部', '', '硬装')).toHaveLength(13);
+    expect(filterCostEntries(entries, '全部', '', '软装')).toHaveLength(library.length);
+    expect(filterCostEntries(entries, '全部', '地板', '软装')).toHaveLength(0);
+    expect(filterCostEntries(entries, '卧室', '床', '软装').every(entry => entry.category === '卧室')).toBe(true);
+  });
   it('采购计价单位保留', () => {
     expect(accountCostEntries([], { procurement: { wood: { unit: '箱', waste: 5 } } }).find(entry => entry.key === 'wood')?.unit).toBe('箱');
   });

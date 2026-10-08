@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Input } from '@/components/ui/input';
+import { formatMeters, meterDraft, parseMeterDraft, toMeters } from '../model/lengthUnits';
 import {
   ArrowLeft,
   ArrowUpToLine,
@@ -82,27 +84,31 @@ export function PropertyPanel({
     update: (v: number) => void | Promise<boolean>,
     min = -100000,
     max = 100000,
+    isLength = true,
   ) => (
     <label className="property-field" key={label}>
       {label}
-      <input
+      <Input
+        className="editor-control"
+        aria-label={label}
         type="number"
         key={label + value}
-        defaultValue={Math.round(value)}
-        min={min}
-        max={max}
-        step={10}
+        defaultValue={isLength ? meterDraft(value) : String(value)}
+        min={isLength ? toMeters(min) : min}
+        max={isLength ? toMeters(max) : max}
+        step={isLength ? 0.001 : 1}
         onBlur={(e) => {
           const target = e.target;
-          const v = Number(target.value);
+          const v = isLength ? parseMeterDraft(target.value) : Number(target.value);
+          const restore = () => { target.value = isLength ? meterDraft(value) : String(value); };
           if (target.value && Number.isFinite(v) && v >= min && v <= max) {
             const result = update(v);
             if (result instanceof Promise)
               void result.then((applied) => {
-                if (!applied) target.value = String(value);
+                if (!applied) restore();
               });
           } else {
-            target.value = String(value);
+            restore();
             toast.error("请输入允许范围内的有效数值");
           }
         }}

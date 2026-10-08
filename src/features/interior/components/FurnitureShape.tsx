@@ -2,7 +2,7 @@ import type { Furniture } from "../model/types";
 export function FurnitureShape({
   f,
 }: {
-  f: Pick<Furniture, "type" | "w" | "d" | "color">;
+  f: Pick<Furniture, "type" | "w" | "d" | "color" | "shape">;
 }) {
   const { type: t, w, d, color: c } = f,
     x = -w / 2,
@@ -28,7 +28,11 @@ export function FurnitureShape({
     <ellipse cx={a} cy={b} rx={rx} ry={ry} fill={fill} />
   );
   let shape;
-  if (t === "bed" || t === "crib")
+  if (t === 'fireplace') {
+    shape = <>{f.shape === 'circle' ? e(0,0,w/2,d/2,c) : r(x,y,w,d,c,35)}{e(0,-d*.15,w*.17,d*.17,'var(--plan-metal)')}{r(-w*.24,d*.12,w*.48,d*.15,'var(--plan-screen)',15)}</>;
+  } else if (f.shape === 'circle') shape = e(0,0,w/2,d/2,c);
+  else if (f.shape === 'rectangle') shape = r(x,y,w,d,c,0);
+  else if (t === "bed" || t === "crib")
     shape = (
       <>
         {r(x, y, w, d, "var(--plan-porcelain)", 35)}

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { ManagementLoading } from './ManagementLoading';
-import { Plus,Pencil,Copy,Trash2,Cloud,LayoutTemplate,RefreshCw,Loader2 } from 'lucide-react';
+import { Plus,Pencil,Copy,Trash2,LayoutTemplate,RefreshCw,Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,11 +13,10 @@ const iconAction='h-8 w-8 text-muted-foreground hover:text-foreground';
 export function ProjectManager({projects,opened}:{projects:ReturnType<typeof useProjects>;opened:()=>void}){
   const [creating,setCreating]=useState(false),[name,setName]=useState(''),[template,setTemplate]=useState<'blank'|'reference'>('blank'),[rename,setRename]=useState<ProjectSummary|null>(null),[deleting,setDeleting]=useState<ProjectSummary|null>(null),[busy,setBusy]=useState(false);
   const list:ProjectSummary[]=[...projects.guests.map(g=>({id:g.id,name:g.name,updatedAt:g.updatedAt,revision:g.revision,cloud:false})),...projects.cloud].sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
-  const copyToCloud=async(row:ProjectSummary)=>{const g=projects.guests.find(g=>g.id===row.id);if(g&&await projects.create(g,true))opened();};
   const opening=useRef(false);
   const [openingId,setOpeningId]=useState<string|null>(null);
   const open=async(row:ProjectSummary)=>{if(opening.current)return;opening.current=true;setOpeningId(row.id);try{if(await projects.open(row))opened();}finally{opening.current=false;setOpeningId(null);}};
-  const rowActions=(row:ProjectSummary)=><><Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'重命名'+row.name} onClick={()=>{setRename(row);setName(row.name);}}><Pencil size={16}/></Button>{row.cloud?<Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'复制'+row.name} onClick={()=>void projects.duplicate(row)}><Copy size={16}/></Button>:<Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'复制到云端'+row.name} title="复制到云端" onClick={()=>void copyToCloud(row)}><Cloud size={16}/></Button>}<Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'删除'+row.name} onClick={()=>setDeleting(row)}><Trash2 size={16}/></Button></>;
+  const rowActions=(row:ProjectSummary)=><><Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'重命名'+row.name} onClick={()=>{setRename(row);setName(row.name);}}><Pencil size={16}/></Button>{row.cloud&&<Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'复制'+row.name} onClick={()=>void projects.duplicate(row)}><Copy size={16}/></Button>}<Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'删除'+row.name} onClick={()=>setDeleting(row)}><Trash2 size={16}/></Button></>;
   return <><div className="cms-heading"><div><h1>项目管理</h1><p>把每个空间的灵感，保存成独立方案。</p></div><div className="cms-heading-actions"><Button variant="ghost" size="icon" className="cms-refresh-button" aria-label="刷新项目" title="刷新项目" disabled={projects.loading} aria-busy={projects.loading&&!openingId} onClick={()=>void projects.reload()}><RefreshCw className={projects.loading&&!openingId?'animate-spin':''}/></Button><Button className="cms-create-button" onClick={()=>{setName('');setCreating(true);}}><Plus/>新建项目</Button></div></div>
   {projects.loading&&!list.length&&<ManagementLoading label="加载项目"/>}
   {!projects.loading&&!list.length&&<div className="cms-empty"><LayoutTemplate size={36}/><h2>还没有设计项目</h2><p>新建空白户型，开始规划你的空间。</p></div>}

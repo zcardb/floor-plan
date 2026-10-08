@@ -1,98 +1,69 @@
-# 接入 shadcn 组件 + 重构项目管理卡片
+# Visual Editor 接入 shadcn，长度默认统一为米
 
-## Context（为什么改）
+## Context
 
-1. 「新建你的家具」弹窗以及账号相关的弹窗/表单里，分类、参考模型等仍在使用浏览器原生 `<select>` / `<input>` / `<input type="checkbox">` / `<input type="color">`，样式靠 `src/index.css` 里的自定义规则硬撑（截图 1 中下拉展开就是系统原生列表）。需要统一改为 shadcn 组件，让弹窗与表单获得一致的交互与视觉（Radix Select 浮层、Input、Checkbox、Tabs、Popover）。
-2. 「项目管理」卡片（截图 2）里同时存在「打开设计」按钮和右侧铅笔等图标按钮，语义重复；卡片上还有「本机」标签。改为：整张卡片可点击进入项目，去掉「打开设计」按钮与「本机」标签，仅保留 重命名 / 复制（本机为「上传到云端」）/ 删除 三个图标按钮。
+前一轮家具/项目弹窗的 shadcn 接入和项目卡片精简已完成，本轮不重新改动卡片业务。用户追加两项要求：继续替换 Visual Editor 等编辑控件，尤其截图中的地面/墙面下拉；家具、墙体、户型等所有长度尺寸输入与测量默认使用米。
 
-用户已确认的范围：**家具弹窗 + 其他弹窗/表单**，画布属性面板、选择编辑器、成本/材料面板等密集工具 UI 不动；卡片保留三个图标按钮（本机项目仍用「上传到云端」图标区分）。
+采用「界面米、内部毫米」：例如已有 1800 mm 家具显示为 1.8 m，输入 2.4 m 后仍保存为 2400 mm。这样无需迁移数据库，也不破坏旧项目、导入文件、几何运算、3D 和 AI 请求。没有额外单位切换器。
 
-## 一、shadcn 组件接入
+## 推荐实现
 
-### 1. `src/features/interior/components/CustomFurnitureDialog.tsx`（核心）
-- 分类 / 参考模型：`<select>` → `Select` + `SelectTrigger` + `SelectContent` + `SelectItem`（`SelectValue` 显示当前值，`onValueChange` 分别写 `setCategory` / `setType`；`categories` 与 `types` 数据源不变）。
-- 名称 / 宽深高 / 价格：`<input>` → `Input`（配 `Label htmlFor` + `id`），紧凑尺寸用 className（如 `h-9 text-xs`），保留原有 `aria-label`、`maxLength`、`required`、`type="number"` 等约束。
-- 「同时添加到账号家具库」：`<input type="checkbox">` → `Checkbox` + `Label`（`checked={account} onCheckedChange={setAccount}`）。
-- 「新建家具 / 账号家具库」两个 `.project-tabs` 原生按钮 → `Tabs` / `TabsList` / `TabsTrigger` / `TabsContent`（`value={tab}`、`onValueChange` 里保留「切到账号库时 `void catalog.load()`」的行为；`accountOnly` 时不渲染 Tabs，只渲染表单）。
-- 模型颜色：原生全宽 `<input type="color">` → `Popover` + `PopoverTrigger asChild`（`Button variant="outline"`，内含色块 + 当前色值文本）+ `PopoverContent` 内预设色板色块与自定义取色（沿用画面选择器已有的色板语言）。色板常量抽到新文件 `src/features/interior/data/palette.ts`（`FURNITURE_COLORS`），并让 `SelectionEditor.tsx` 改为引用它，删除其本地 `const colors`（纯去重，无视觉变化）。
-- 禁用态：保留 `<fieldset disabled>` 语义，同时对 `Select` / `Input` / `Checkbox` 显式传 `disabled={ai.busy||saving||!!pending}`（原判断抽成局部常量 `locked`），以得到 shadcn 的 disabled 视觉。
-- 表单提交、`create` / `finish` / `epoch` 竞态保护、`ai` / `catalog` 逻辑一行不改。
+### 1. 统一单位边界
+- 新增 `src/features/interior/model/lengthUnits.ts`：毫米→米、米→毫米、显示格式、输入草稿转换。长度显示最多三位小数并去掉无意义尾零（240 mm → 0.24 m）；输入初始化保留已有精度，不因打开表单而舍入旧尺寸。
+- 米制长度输入默认 `step=0.001`；把原有 min/max 换算成米。旋转角度仍为度，面积仍为 m²，金额、百分比、张数/箱数不换算。
+- 空字符串、负坐标与非法数值显式处理，不能把空输入当作 0，不能用默认尺寸掩盖无效输入。
 
-### 2. `src/features/interior/components/ProjectManager.tsx`（弹窗部分）
-- 新建/重命名弹窗：项目名称 `<input>` → `Input` + `Label`；户型模板 `<select>` → `Select` / `SelectItem`（`blank` = 空白户型，`reference` = 参考户型）。
-- 保留 `.cms-form` 容器与提交逻辑不变。
+### 2. Visual Editor 和关联编辑表单接入 shadcn
+- `SelectionEditor.tsx`：地面/墙面原生 select 换为现有 `Select/SelectTrigger/SelectValue/SelectContent/SelectItem`，复用 `materials`、`wallMaterials` 和 `p.change`；仍只改变当前房间的 `mat` 或 `wallMat`，未设置墙面时默认 `paint`。尺寸入口文字统一显示米。
+- `SizeFields.tsx`：换 `Input/Label`，米制输入草稿仅在调用 `transaction.update` 前转回毫米，`rot` 不转换。继续复用 `createSizeTransaction` 的即时预览、失焦合并一步撤销、Escape 取消和卸载处理；事务模型本身保持毫米。
+- `PriceInput.tsx`：换 `Input/Button`，保留 disabled、留空表示未定价、Enter 应用、Escape 恢复及非负金额验证。
+- `MaterialProcurementEditor.tsx`：计价单位换 `Select`，数值换 `Input`，展开/应用按钮换 `Button`。单张长宽输入为米，保存采购规格时转回毫米；损耗、每箱张数、价格不转换，切换计价单位仍清空单价。
+- `PropertyPanel.tsx`：此次需要改动的名称/数值表单同步换 `Input`。数值帮助函数显式区分长度和角度，避免按中文标签猜单位；保持 `editSelection`、`resizeBlank`、异步缩小户型确认/拒绝回滚逻辑。
+- 不扩展到全站搜索框、日照滑块、原生文件上传或自定义取色器；它们不属于此次长度编辑/材质选择链路。隐藏文件输入继续保持原生。
 
-### 3. `src/features/interior/components/AccountFurnitureDialog.tsx`
-- `.cms-primary-action` 原生按钮 → `Button`（「完成」，保留 busy 文案与 Loader2）；`.cms-danger-link` → `Button variant="ghost"` + 危险色文本（「删除家具」）。
-- 两个按钮都加 `cms-detail-action` 类，供移动端媒体查询继续生效。
+### 3. 其余长度入口全部统一米
+- `CustomFurnitureDialog.tsx`：宽/深/高/直径默认值从 1800/800 等变为 1.8/0.8 等；预览、验证、生成与保存边界统一转回毫米。保留形状联动、AI 请求去重和失败重试。
+- `FurnitureGeometryEditor.tsx`：现成 shadcn 控件保留，直径/宽深输入与错误范围换为米；`appearanceDimensions` 和保存回调收到毫米值。空/零/非法输入必须报错，不用原尺寸静默替代。
+- `PropertyPanel.tsx`：家具宽深/坐标、房间开间/进深、户型净宽净深、墙厚、层高改为米；既有面积和周长已经是米制，不重复转换。
+- `Library.tsx`、`AccountFurnitureLibrary.tsx`、`AccountFurnitureDialog.tsx`、`AccountCostManager.tsx`：家具尺寸摘要全部用米，包括详情中的高度。
+- `PlanCanvas.tsx`：`MeasureLine` 的已保存测量、正在测量、绘墙临时测量都显示米；`Dimensions` 水平/垂直尺寸链由裸毫米数字改为米制标注。SVG 几何坐标和线段布局仍保持毫米；导出复用这些文本，自然同步为米。
+- `Workbench.tsx`：底栏实时 X/Y 坐标及默认文案用米；现有「1 m」比例尺不动。
+- 新增的 `WallHoverOverlay.tsx` 已使用米显示「距起点」，保留既有行为，改用统一长度格式工具避免重复转换逻辑；保留 `WallHoverOverlay.test.tsx` 中吸附位置、距离和导出隐藏的回归检查。
+- `model/wallDrawing.ts`：最短墙段错误提示改成 0.1 m，校验阈值仍为 100 mm。
 
-### 4. `src/features/interior/components/AccountCostDialog.tsx`
-- `.cms-primary-action`「完成」→ `Button className="cms-detail-action"`。
+### 4. 样式与兼容
+- `src/index.css`：清理/收窄 `.visual-editor-popover input/select`、`.price-entry input/button`、`.procurement-fields input/select`、相关属性输入样式，避免未分层 CSS 覆盖 shadcn 的边框、焦点及禁用状态；保留紧凑布局与移动端可读字号。必要尺寸通过共享编辑控件变体/类集中定义，颜色使用现有语义令牌。
+- 验证 Select 嵌套 Popover 的 portal、焦点恢复、Escape、滚动与浮层层级，不让菜单点击透传为画布选择/删除快捷键。
+- 不修改数据库、生成客户端、项目 JSON 格式、模型数据单位、碰撞/吸附阈值、面积成本计算或 3D 转换。
 
-### 5. `src/features/interior/components/AuthDialog.tsx`
-- 邮箱 / 密码原生 `<input>` → `Input`，class 覆盖掉边框与内边距（`border-0 bg-transparent px-0 py-0 h-auto shadow-none focus-visible:ring-0 focus-visible:ring-offset-0`），保留外层图标容器 `.auth-field > div` 与原生校验属性（`type`、`required`、`minLength`、`autoComplete`、`name`）。
+## 关键文件与复用
 
-### 6. `src/features/interior/components/ProjectDialog.tsx`
-- `.project-name-entry` 与 `.rename-inline` 里的原生 `<input>` → `Input`（补 `flex-1 min-w-0`），创建/重命名逻辑与模板选择卡片（`.template-options`）不动。
+核心：`SelectionEditor.tsx`、`SizeFields.tsx`、`PropertyPanel.tsx`、`MaterialProcurementEditor.tsx`、`PriceInput.tsx`（均在 `src/features/interior/components/`）。
+长度边界：同目录 `CustomFurnitureDialog.tsx`、`FurnitureGeometryEditor.tsx`、`PlanCanvas.tsx`、`Workbench.tsx` 与各家具摘要组件；新增 `src/features/interior/model/lengthUnits.ts` 及测试。
 
-### 7. `src/index.css` 配套调整（关键，否则样式互相打架）
-- **必须收窄（未分层 CSS 会压过 Tailwind utilities）**：`~2483` 的 `.custom-furniture-fields input, .custom-furniture-fields select, ...` 只保留 `input[type="color"]` 部分（`.procurement-fields` 部分原样保留，不在本次范围）。收窄后弹窗内的 shadcn `Input` / `SelectTrigger` 才由 Tailwind class 控制。
-- `~299` 删除 `.cms-form input, .cms-form select` 规则（`cms-form` 仅被该弹窗使用），保留 `.cms-form, .cms-form label { display:grid; gap:12px }`；新增 `.cms-field { display:grid; gap:6px }`（label + 控件成组的间距）。
-- `~1446` `.project-tabs button.active` → 改为 `.project-tabs button[data-state='active']`（Radix 状态属性），并给 `TabsList` / `TabsTrigger` 用 className 指定紧凑尺寸（`h-auto p-[3px] gap-[3px]`、`gap-[5px] px-2.5 py-1.5 text-[11px] max-[700px]:px-[7px] max-[700px]:text-[10px]`），尺寸细节不依赖旧 CSS。
-- 新增（未分层区，与其它 `.custom-furniture-*` 同处）：`.furniture-color-trigger`、`.furniture-color-swatch`、`.furniture-color-grid`（含 `.selected` 状态），全部使用设计令牌（`hsl(var(--border))` / `hsl(var(--primary))` / `hsl(var(--ring))`）。
-- 移动端媒体查询 `~199` 的 `.cms-primary-action,.cms-danger-link { justify-content:center }` → 改指向 `.cms-detail-action`。
-
-## 二、项目管理卡片重构（`src/features/interior/components/ProjectManager.tsx`）
-
-- 卡片改为整卡可点：`<article className="cms-card">` 内加一个铺满的遮罩按钮
-  ```jsx
-  <button type="button" className="cms-card-open" aria-label={`打开项目 ${row.name}`}
-          onClick={async () => { if (await projects.open(row)) opened(); }} />
-  ```
-  仍然复用现有 `projects.open(row)` + `opened()` 链路。
-- 删除「打开设计」`Button` 与 `<span className="cms-card-tag">本机</span>`。
-- 三个操作改为 `Button variant="ghost" size="icon"`（`h-8 w-8`，`aria-label` 保留，`Pencil` / `Copy` 或 `Cloud` / `Trash2` 不变），放在 `.cms-card-actions` 内并置于遮罩之上，因此无需 `stopPropagation`。
-- `src/index.css`：`.cms-card` 增加 `position:relative; transition:border-color .18s ease, box-shadow .18s ease;` 与 `:hover` 令牌化高亮（`hsl(var(--primary) / .35)` + `var(--shadow-float)`）；新增 `.cms-card-open { position:absolute; inset:0; z-index:1; cursor:pointer; border-radius:inherit }` 与 `.cms-card-open:focus-visible { outline:2px solid hsl(var(--ring)); outline-offset:2px }`；`.cms-card-actions { position:relative; z-index:2; gap:6px; margin-top:20px }`；删除 `.cms-card-tag` 与 `.cms-card-actions>button:not(:first-child)` 两条已失效规则。
-
-## 非目标（本次不做）
-- 画布右侧属性面板、选择编辑器、成本面板、材料采购编辑器里的原生控件（含 `SizeFields`、`PriceInput`、`SelectionEditor` 的 select/color）。
-- 素材库搜索框、`CmsFilterBar` 筛选 chips、「刷新项目 / 加载更多」文本按钮。
-- `PriceInput` 保持原生 input（与画布密集面板共用，改成 shadcn 会连带改动画布 UI）。
-
-## 关键文件
-- `src/features/interior/components/CustomFurnitureDialog.tsx`
-- `src/features/interior/components/ProjectManager.tsx`
-- `src/features/interior/components/AccountFurnitureDialog.tsx`
-- `src/features/interior/components/AccountCostDialog.tsx`
-- `src/features/interior/components/AuthDialog.tsx`
-- `src/features/interior/components/ProjectDialog.tsx`
-- `src/features/interior/data/palette.ts`（新增）、`src/features/interior/components/SelectionEditor.tsx`（仅换色板来源）
-- `src/index.css`
-- 复用现成组件：`@/components/ui/{select,input,label,checkbox,tabs,popover,button,dialog,alert-dialog}`
+复用：现有 shadcn Select/Input/Label/Button；`createSizeTransaction`、`editSelection`、`resizeBlank`、`appearanceDimensions`、`validateProcurement`、`validPrice`，不复制业务计算。
 
 ## Implementation checklist
-- [x] `CustomFurnitureDialog.tsx`：分类、参考模型改为 shadcn `Select`，`onValueChange` 仍写入 `category` / `type`。
-- [x] `CustomFurnitureDialog.tsx`：名称、宽深高、价格改为 `Input` + `Label htmlFor`，校验与 `type="number"`、`maxLength`、`required` 保持不变。
-- [x] `CustomFurnitureDialog.tsx`：账号库勾选改为 `Checkbox` + `Label`，`accountOnly` 分支不渲染该勾选。
-- [x] `CustomFurnitureDialog.tsx`：`.project-tabs` 两个按钮改为 `Tabs` 结构，切到账号库仍触发 `catalog.load()`；`accountOnly` 时不渲染 Tabs。
-- [x] `CustomFurnitureDialog.tsx`：模型颜色改为 `Popover` + 色块色板 + 自定义取色，默认色 `#b7c4b0` 与 `setColor` 行为不变。
-- [x] `CustomFurnitureDialog.tsx`：`locked = ai.busy||saving||!!pending` 显式传给 Select/Input/Checkbox，`fieldset` 仍保留。
-- [x] 新增 `src/features/interior/data/palette.ts` 导出 `FURNITURE_COLORS`，`SelectionEditor.tsx` 改为引用它并删除本地 `colors`。
-- [x] `ProjectManager.tsx`：弹窗内项目名称 `Input`、户型模板 `Select`（blank/reference 两项），提交逻辑不变。
-- [x] `ProjectManager.tsx`：卡片加 `cms-card-open` 遮罩按钮触发 `projects.open(row)` + `opened()`，删除「打开设计」按钮与「本机」标签。
-- [x] `ProjectManager.tsx`：重命名/复制（本机为上传到云端）/删除改为 `Button variant="ghost" size="icon"`，`aria-label` 与调用链保留。
-- [x] `AccountFurnitureDialog.tsx`、`AccountCostDialog.tsx`：主/危险按钮改为 `Button` 并带 `cms-detail-action`。
-- [x] `AuthDialog.tsx`：邮箱/密码改为 `Input`（无边框覆盖），校验属性保留。
-- [x] `ProjectDialog.tsx`：创建项目名与重命名输入改为 `Input`。
-- [x] `src/index.css`：收窄 `.custom-furniture-fields input/select`；删 `.cms-form input/select`；`.project-tabs` active 选择器改用 `[data-state='active']`；新增 `.cms-field`、`.furniture-color-*`、`.cms-card-open` 与 `.cms-card` hover 规则；删除 `.cms-card-tag`、`.cms-card-actions>button:not(:first-child)`；移动端媒体查询改指 `.cms-detail-action`。
+- [ ] 新增长度转换/显示/草稿工具，明确旋转与非长度字段不转换。
+- [ ] Visual Editor 地面/墙面 Select 绑定原材质 key，保留 `paint` 默认值及单房间更新。
+- [ ] SizeFields 使用 shadcn Input，米制草稿转换后进入毫米事务，保留即时预览/取消/一步撤销。
+- [ ] PriceInput 使用 shadcn Input/Button，保留空值、金额验证与禁用/键盘行为。
+- [ ] 采购规格使用 shadcn Select/Input/Button；仅长宽换算，单位切换仍清空价格。
+- [ ] PropertyPanel 长度输入和名称采用 Input，长度范围/异步拒绝回滚均用正确单位，角度不转换。
+- [ ] 新建家具与参考几何编辑的默认值、形状联动、预览、限制提示及提交完成米↔毫米转换。
+- [ ] 所有素材库/账号家具/成本条目尺寸摘要及房间开间进深显示米。
+- [ ] PlanCanvas 测量线、绘墙临时距离、尺寸链和导出标注显示米，不修改 SVG 几何。
+- [ ] Workbench 实时坐标/默认坐标和墙段长度错误提示显示米。
+- [ ] 收窄旧编辑控件 CSS，集中定义紧凑样式与焦点/禁用态，保持主题令牌。
+- [ ] 添加单位工具与表单绑定回归测试，旧毫米数据不迁移、不重复换算。
 
 ## Verification checklist
-- [x] `pnpm lint` 通过（无 unused import，如 `Plus` / `Button` 仍在用）。
-- [x] `pnpm exec tsc --noEmit` 通过。
-- [x] `pnpm test` 通过（`src/features/interior` 下模型层测试不受 UI 改动影响，用于确认无回归）。
-- [x] `pnpm run build` 通过。
-- [ ] 正向：预览首页 → 素材库「新建家具 / 账号库」→ 弹窗内分类、参考模型可展开 shadcn 浮层并选中；宽深高、价格可输入；色板可选色；两个 Tab 可切换且账号库列表能加载。（需在预览中点击打开弹窗，截图工具无法打开弹窗，尚未人工点验）
-- [ ] 负向/边界：名称为空或尺寸超范围时提交仍报「请填写名称、有效尺寸及非负单价」，且不触发 AI 生成；生成中（`ai.busy`）时下拉/输入/勾选为禁用态；`accountOnly` 模式无 Tabs 与账号库勾选。（同上，需点击验证）
-- [ ] 卡片：点击卡片空白处或标题进入项目；点击铅笔/复制/删除图标只触发对应弹窗，不会顺带打开项目；「本机」标签与「打开设计」按钮不再出现。（项目管理需登录后才可见，预览环境未登录）
-- [x] 视觉：`website_screenshot` 打开运行中的应用根路径确认无布局破损（工作台与左侧素材库渲染正常）；项目卡片与弹窗内部仍待登录后点验。
-
+- [ ] 正向单位测试：1800→1.8，240→0.24，输入 2.4→2400；重复编辑不产生 1000 倍偏差。
+- [ ] 默认/负向测试：空输入不变 0；非法数值报错；未配置墙材质保持 paint；单价空值仍为 null。
+- [ ] 边界测试：0.05 m 家具、0.1 m 最短墙、负坐标、0.001 m 精度；旋转 90°、面积/采购数量不转换。
+- [ ] 输入旧项目尺寸后 preview/commit 得到毫米值；Escape 恢复旧值，失焦只增加一步撤销；拒绝缩小户型时显示恢复为米。
+- [ ] 房间两个材质下拉键盘/鼠标选择后仅更新目标房间，嵌套菜单不会关闭错误浮层或触发画布快捷键。
+- [ ] 家具圆形直径联动、宽深高预览、保存/重开一致；采购长宽修改后面积/箱数/成本结果不因换单位改变。
+- [ ] 现有渲染测试中涉及 mm 的断言按界面米制更新，保留内部毫米测试断言。
+- [ ] 执行 `pnpm lint`、`pnpm exec tsc -p tsconfig.app.json --noEmit`、`pnpm test`、`pnpm run build`。
+- [ ] 在同一受影响根路由验证桌面 1280 与手机 390（未指定设备，采用这两个宽度），检查米制标注与编辑浮层无截断；若无法打开浮层，明确标记该交互视觉未验证，不用首页截图替代。

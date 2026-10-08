@@ -6,23 +6,33 @@ import { AlertDialog,AlertDialogContent,AlertDialogHeader,AlertDialogTitle,Alert
 import type { LibraryItem } from '../model/types';
 import { PriceInput } from './PriceInput';
 import { FurnitureShape } from './FurnitureShape';
-export function AccountFurnitureDialog({item,isCustom,referencePrice,onOpenChange,onChanged,applyDefaultPrice,remove}:{applyDefaultPrice:(price:number|null)=>Promise<boolean>;item:LibraryItem;isCustom:boolean;referencePrice:number|null;onOpenChange:(v:boolean)=>void;onChanged:(next:LibraryItem|null)=>void;remove:(catalogId:string)=>Promise<boolean>}){
+import { FurnitureGeometryEditor } from './FurnitureGeometryEditor';
+export function AccountFurnitureDialog({item,isCustom,referencePrice,onOpenChange,onChanged,applyDefaultPrice,remove,saveGeometry,commitBusy=false,commitError='',retryPrice,saved=false}:{commitBusy?:boolean;commitError?:string;retryPrice?:()=>Promise<boolean>;saved?:boolean;saveGeometry?:(item:LibraryItem)=>Promise<boolean>;applyDefaultPrice:(price:number|null)=>Promise<boolean>;item:LibraryItem;isCustom:boolean;referencePrice:number|null;onOpenChange:(v:boolean)=>void;onChanged:(next:LibraryItem|null)=>void;remove:(catalogId:string)=>Promise<boolean>}){
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[confirming,setConfirming]=useState(false);
+  const working=busy||commitBusy;
+  const failure=commitError||error;
+  const retry=async()=>{
+    if(working||!retryPrice)return;
+    setBusy(true);setError('');
+    try { if(!await retryPrice())setError('未能保存，请重试。'); }
+    catch(cause){setError(cause instanceof Error?cause.message:'保存失败，请重试');}
+    finally{setBusy(false);}
+  };
   const applyPrice=async(price:number|null)=>{
-    if(busy)return;setBusy(true);setError('');
+    if(working||retryPrice)return;setBusy(true);setError('');
     try { if(await applyDefaultPrice(price))onChanged({...item,price}); else setError('未能保存，本次修改已保留，请重试。'); }
     catch(e){setError(e instanceof Error?e.message:'保存失败，请重试');}
     finally {setBusy(false);}
   };
   const drop=async()=>{
-    if(busy)return;setBusy(true);setError('');
+    if(working||retryPrice)return;setBusy(true);setError('');
     try { await remove(item.catalogId!);setConfirming(false);onChanged(null);onOpenChange(false); }
     catch(e){setError(e instanceof Error?e.message:'删除失败，请重试');setConfirming(false);}
     finally {setBusy(false);}
   };
   return <>
-    <Dialog open onOpenChange={v=>{if(!busy)onOpenChange(v);}}>
-      <DialogContent className="cms-detail-dialog">
+    <Dialog open onOpenChange={v=>{if(!working)onOpenChange(v);}}>
+      <DialogContent className="cms-detail-dialog" onEscapeKeyDown={event=>{if(working)event.preventDefault();}} onInteractOutside={event=>{if(working)event.preventDefault();}}>
         <DialogHeader>
           <DialogTitle>{item.name}</DialogTitle>
           <DialogDescription>{item.category} · {isCustom?'自定义家具':'内置家具'} · 画布按参考几何绘制，不是 3D 建模。</DialogDescription>
@@ -39,7 +49,7 @@ export function AccountFurnitureDialog({item,isCustom,referencePrice,onOpenChang
             </dl>
             {isCustom?<div className="cms-detail-price">
               <span className="cms-detail-label">账号默认单价 · 元 / 件</span>
-              <PriceInput key={String(item.price)} value={item.price??null} disabled={busy} label={item.name+'账号默认单价'} onApply={v=>void applyPrice(v)}/>
+              <PriceInput key={String(item.price)} value={item.price??null} disabled={working||!!retryPrice} label={item.name+'账号默认单价'} onApply={v=>void applyPrice(v)}/>
               <small>仅影响未单独调价的项目；项目内改价仍以项目为准。</small>
             </div>:<div className="cms-detail-price">
               <span className="cms-detail-label">当前账号单价</span>
@@ -48,10 +58,12 @@ export function AccountFurnitureDialog({item,isCustom,referencePrice,onOpenChang
             </div>}
           </div>
         </div>
-        {error&&<p role="alert" className="form-error">{error}</p>}
+        {isCustom&&saveGeometry&&<fieldset disabled={working||!!retryPrice} className="cost-edit-fields"><FurnitureGeometryEditor key={item.type+item.shape+item.w+item.d} item={item} save={saveGeometry} onSaved={onChanged}/></fieldset>}
+        {failure&&<div className="cost-save-error" role="alert"><span>{failure}</span>{retryPrice&&<Button variant="outline" disabled={working} onClick={()=>void retry()}>重试保存</Button>}</div>}
+        {isCustom&&<p className="cost-sync" role="status">{working?'正在保存…':saved&&!failure?'已保存并生效':'应用后自动保存'}</p>}
         <div className="cms-detail-actions">
-          {isCustom&&<Button type="button" variant="ghost" className="cms-detail-action text-destructive hover:bg-destructive/10 hover:text-destructive" disabled={busy} onClick={()=>setConfirming(true)}><Trash2 size={14}/>删除家具</Button>}
-          <Button type="button" className="cms-detail-action" disabled={busy} onClick={()=>onOpenChange(false)}>{busy?<><Loader2 size={14}/>处理中…</>:'完成'}</Button>
+          {isCustom&&<Button type="button" variant="ghost" className="cms-detail-action text-destructive hover:bg-destructive/10 hover:text-destructive" disabled={working||!!retryPrice} onClick={()=>setConfirming(true)}><Trash2 size={14}/>删除家具</Button>}
+          <Button type="button" className="cms-detail-action" disabled={working} onClick={()=>onOpenChange(false)}>{working?<><Loader2 size={14}/>处理中…</>:'完成'}</Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -62,8 +74,8 @@ export function AccountFurnitureDialog({item,isCustom,referencePrice,onOpenChang
           <AlertDialogDescription>账号家具库中的该款式会被移除；已放置到项目中的家具不受影响。</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={busy}>取消</AlertDialogCancel>
-          <AlertDialogAction disabled={busy} onClick={e=>{e.preventDefault();void drop();}}>删除家具</AlertDialogAction>
+          <AlertDialogCancel disabled={working}>取消</AlertDialogCancel>
+          <AlertDialogAction disabled={working} onClick={e=>{e.preventDefault();void drop();}}>删除家具</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

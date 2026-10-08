@@ -41,6 +41,8 @@ import type { Design, Selection } from "../model/types";
 import { PriceInput } from "./PriceInput";
 import { CostDefaultsContext, useCostDesign } from './CostDefaultsContext';
 import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
+import { EditorSelect } from './EditorSelect';
+import { formatMeters } from '../model/lengthUnits';
 export interface SelectionEditorHandle {
   update: (r: ScreenRect | null) => void;
 }
@@ -130,28 +132,28 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
       w && p.design.template === "blank" && w.kind === "partition";
     const fields = f
       ? [
-          ["w", "宽 / mm", f.w],
-          ["d", "深 / mm", f.d],
-          ["cx", "中心 X / mm", f.cx],
-          ["cy", "中心 Y / mm", f.cy],
+          ["w", "宽 / m", f.w],
+          ["d", "深 / m", f.d],
+          ["cx", "中心 X / m", f.cx],
+          ["cy", "中心 Y / m", f.cy],
           ["rot", "旋转 / °", f.rot],
         ]
       : w
         ? [
-            ["length", "长度 / mm", length(w)],
-            ["thickness", "墙厚 / mm", w.thickness],
+            ["length", "长度 / m", length(w)],
+            ["thickness", "墙厚 / m", w.thickness],
           ]
         : o
           ? [
-              ["width", "宽度 / mm", o.width],
-              ["offset", "沿墙位置 / mm", o.offset],
+              ["width", "宽度 / m", o.width],
+              ["offset", "沿墙位置 / m", o.offset],
               [
                 "height",
-                "高度 / mm",
+                "高度 / m",
                 o.height ?? (o.kind === "door" ? 2100 : 1600),
               ],
               ...(o.kind === "window"
-                ? [["sill", "窗台高 / mm", o.sill ?? 800]]
+                ? [["sill", "窗台高 / m", o.sill ?? 800]]
                 : []),
             ]
           : [];
@@ -234,10 +236,10 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
                 <Ruler size={15} />
                 <span>
                   {f
-                    ? `${f.w} × ${f.d}`
+                    ? `${formatMeters(f.w)} × ${formatMeters(f.d)} m`
                     : w
-                      ? `${Math.round(length(w))} mm`
-                      : `${o?.width} mm`}
+                      ? `${formatMeters(length(w))} m`
+                      : `${formatMeters(o?.width ?? 0)} m`}
                 </span>
                 <ChevronDown size={12} />
               </button>
@@ -296,46 +298,12 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </PopoverTrigger>
             <PopoverContent className="visual-editor-popover">
               <h3>房间材质</h3>
-              <label>
-                地面
-                <select
-                  value={r.mat}
-                  onChange={(e) =>
-                    p.change((d) => ({
-                      ...d,
-                      rooms: d.rooms.map((g) =>
-                        g.id === r.id ? { ...g, mat: e.target.value } : g,
-                      ),
-                    }))
-                  }
-                >
-                  {Object.entries(materials).map(([k, m]) => (
-                    <option key={k} value={k}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                墙面
-                <select
-                  value={r.wallMat || "paint"}
-                  onChange={(e) =>
-                    p.change((d) => ({
-                      ...d,
-                      rooms: d.rooms.map((g) =>
-                        g.id === r.id ? { ...g, wallMat: e.target.value } : g,
-                      ),
-                    }))
-                  }
-                >
-                  {Object.entries(wallMaterials).map(([k, m]) => (
-                    <option key={k} value={k}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <EditorSelect label="地面" value={r.mat}
+                options={Object.entries(materials).map(([value, m]) => ({ value, label: m.name }))}
+                onChange={value => p.change(d => ({ ...d, rooms: d.rooms.map(g => g.id === r.id ? { ...g, mat: value } : g) }))} />
+              <EditorSelect label="墙面" value={r.wallMat || 'paint'}
+                options={Object.entries(wallMaterials).map(([value, m]) => ({ value, label: m.name }))}
+                onChange={value => p.change(d => ({ ...d, rooms: d.rooms.map(g => g.id === r.id ? { ...g, wallMat: value } : g) }))} />
             </PopoverContent>
           </Popover>
         )}

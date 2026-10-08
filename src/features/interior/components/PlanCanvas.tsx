@@ -33,6 +33,7 @@ import { MaterialDefs } from "./Materials";
 import { selectionPoints, localWallPoint, type ScreenRect } from "../model/selectionAnchor";
 import { resolveWallPoint,validateWallSegment } from '../model/wallDrawing';
 import { useWallDrawing } from './useWallDrawing';
+import { WallHoverOverlay } from './WallHoverOverlay';
 export interface CanvasHandle {
   zoom: (k: number) => void;
   fit: () => void;
@@ -581,6 +582,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         if(tool==='wall')drawing.up(mm(e),e.pointerId,[e.clientX,e.clientY]);
         else finish();
       }}
+      onPointerLeave={() => drawing.clearHover()}
       onPointerCancel={(e) => {
         points.current.delete(e.pointerId);
         pinch.current = null;
@@ -755,7 +757,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         <MeasureLine key={m.id} a={m.a} b={m.b} scale={view.s} />
       ))}
       {tool==='wall' && drawing.draft && Math.hypot(drawing.draft.b[0]-drawing.draft.a[0],drawing.draft.b[1]-drawing.draft.a[1])>0 && <g data-export-hide="true" pointerEvents="none"><polygon points={wallPoly({id:'draft',...drawing.draft,thickness:design.thickness,kind:'partition'}).map(p=>p.join(',')).join(' ')} fill="var(--plan-selection-soft)" stroke="var(--plan-selection)" strokeWidth={1/view.s}/><MeasureLine a={drawing.draft.a} b={drawing.draft.b} scale={view.s}/></g>}
-      {tool==='wall' && drawing.candidate?.target && <g data-export-hide="true" pointerEvents="none"><polygon points={wallPoly(design.walls.find(w=>w.id===drawing.candidate?.target?.wallId)!).map(p=>p.join(',')).join(' ')} fill="var(--plan-selection-soft)" stroke="var(--plan-selection)" strokeWidth={2/view.s}/><circle cx={drawing.candidate.point[0]} cy={drawing.candidate.point[1]} r={6/view.s} fill="var(--plan-porcelain)" stroke="var(--plan-selection)" strokeWidth={2/view.s}/><text x={drawing.candidate.point[0]+12/view.s} y={drawing.candidate.point[1]-12/view.s} fontSize={12/view.s} fill="var(--plan-selection)">点击连接</text></g>}
+      {tool === 'wall' && <WallHoverOverlay walls={design.walls} candidate={drawing.candidate} scale={view.s} />}
       {draft && (
         <g data-export-hide="true">
           <MeasureLine a={draft.a} b={draft.b} scale={view.s} />

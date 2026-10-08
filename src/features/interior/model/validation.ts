@@ -1,4 +1,5 @@
-import { materials, library } from "../data/catalog";
+import { materials } from "../data/catalog";
+import { validFurnitureType, validFurnitureOutline } from './furnitureAppearance';
 import { referenceDesign } from "../data/templates";
 import { length } from "./geometry";
 import { validateProcurement } from "./materialProcurement";
@@ -100,7 +101,8 @@ export function validateDesign(value: unknown): Design {
         typeof item.name !== "string" ||
         item.name.length > 100 ||
         typeof item.category !== "string" ||
-        !library.some((l) => l.type === item.type) ||
+        !validFurnitureType(item.type) ||
+        !validFurnitureOutline(item.shape) ||
         !finite(item.w, 50, 20000) ||
         !finite(item.d, 50, 20000) ||
         !finite(item.height, 50, 8000) ||
@@ -117,7 +119,8 @@ export function validateDesign(value: unknown): Design {
   for (const f of v.furniture) {
     id(f.id);
     if (
-      !library.some((l) => l.type === f.type) ||
+      !validFurnitureType(f.type) ||
+      !validFurnitureOutline(f.shape) ||
       typeof f.name !== "string" ||
       f.name.length > 100 ||
       !finite(f.cx) ||
