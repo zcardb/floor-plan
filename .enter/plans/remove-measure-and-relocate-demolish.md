@@ -88,31 +88,34 @@ export function toggleWallDemolition(design: Design, wallId: string): Design  //
 
 ## Implementation checklist
 
-- [ ] `types.ts` 删除 `Measure`、`Design.measures`、`Tool` 中的 `"measure"` 与 `"demolish"`
-- [ ] `templates.ts` 两个模板去掉 `measures: []`
-- [ ] `validation.ts` 去掉 measures 的旧版转换、必检数组项、id 校验循环
-- [ ] `wallSplit.ts` 的 used id 集合去掉 `design.measures`
-- [ ] `drawingDocument.ts` / `drawingStyle.ts` / `dxfExport.ts` 去掉 `MEASURES` 图层与样式
-- [ ] `PlanCanvas.tsx` 删除测量 hook/别名/渲染块/草稿块与 demolish 分支，保留 `MeasureLine` 供绘墙草稿使用
-- [ ] `WallHoverOverlay.tsx` 去掉 `variant` 与两端距离文本
-- [ ] `Workbench.tsx` 删 M/X 快捷键、`clearMeasures`、测量/拆改提示与状态分支，「更多」菜单收敛为 compact-only 的「重置方案/清空家具」且触发按钮加 `compact-only`
-- [ ] `Workbench.tsx` 清理不再使用的 icon import（`Eraser`、`Settings2`），确认 `Check`/`ChevronDown`/`Ruler`/`Trash2` 仍被视图菜单与破坏性操作使用
-- [ ] `PropertyPanel.tsx` 删「操作说明」的 `M / 测量距离` 行
-- [ ] `index.css` 删除 `.tool-measure`、`.tool-demolish`、无用 `.menu-count`
-- [ ] 新增 `model/wallRemoval.ts`（`removeWall` + `toggleWallDemolition`，复用 `rebuildRooms`/`canEditWall`/`canDemolishWall`）
-- [ ] `WallOptionsMenu.tsx` 新增「墙体删除」区块：`删除当前墙` 与 `标记拆除当前墙 / 撤销拆除`，含禁用与原因副标题
-- [ ] `Workbench.tsx` 抽出 `removeWall` 回调并复用进 `remove()` 的墙体分支，透传 `removeWall` 给 `PropertyPanel` 与 `SelectionEditor`
-- [ ] `PropertyPanel.tsx` / `SelectionEditor.tsx` 增加 `removeWall` 属性并透传给 `WallOptionsMenu`（垃圾桶按钮行为不变）
-- [ ] 按上文逐条更新既有测试，并新增 `wallRemoval.test.ts` 与 `wallSplitEntries.test.tsx` 的新断言
+- [x] `types.ts` 删除 `Measure`、`Design.measures`、`Tool` 中的 `"measure"` 与 `"demolish"`
+- [x] `templates.ts` 两个模板去掉 `measures: []`
+- [x] `validation.ts` 去掉 measures 的旧版转换、必检数组项、id 校验循环
+- [x] `wallSplit.ts` 的 used id 集合去掉 `design.measures`
+- [x] `drawingDocument.ts` / `drawingStyle.ts` / `dxfExport.ts` 去掉 `MEASURES` 图层与样式
+- [x] `PlanCanvas.tsx` 删除测量 hook/别名/渲染块/草稿块与 demolish 分支，保留 `MeasureLine` 供绘墙草稿使用
+- [x] `WallHoverOverlay.tsx` 去掉 `variant` 与两端距离文本
+- [x] `Workbench.tsx` 删 M/X 快捷键、`clearMeasures`、测量/拆改提示与状态分支，「更多」菜单收敛为 compact-only 的「重置方案/清空家具」且触发按钮加 `compact-only`
+- [x] `Workbench.tsx` 清理不再使用的 icon import（`Eraser`、`rebuildRooms`），确认 `Check`/`ChevronDown`/`Ruler`/`Settings2`/`Trash2` 仍被视图菜单与破坏性操作使用
+- [x] `PropertyPanel.tsx` 删「操作说明」的 `M / 测量距离` 行
+- [x] `index.css` 删除 `.tool-measure`、`.tool-demolish`、无用的 `.menu-kbd`/`.menu-mark`/`.menu-count`
+- [x] 新增 `model/wallRemoval.ts`（`removeWall` + `toggleWallDemolition`，复用 `rebuildRooms`/`canEditWall`/`canDemolishWall`）
+- [x] `WallOptionsMenu.tsx` 新增「墙体删除」区块：`删除当前墙` 与 `标记拆除当前墙 / 撤销拆除`，含禁用与原因副标题
+- [x] `Workbench.tsx` 抽出 `removeWall` 回调并复用进 `remove()` 的墙体分支，透传 `removeWall` 给 `PropertyPanel` 与 `SelectionEditor`
+- [x] `PropertyPanel.tsx` / `SelectionEditor.tsx` 增加 `removeWall` 属性并透传给 `WallOptionsMenu`（垃圾桶按钮行为不变）
+- [x] 按上文逐条更新既有测试，并新增 `wallRemoval.test.ts` 与 `wallSplitEntries.test.tsx` 的新断言
+- [x] 附带修正：删除已标记拆除的隔墙时同步清理 `demolished` 里的失效 id（否则再次导入会触发校验失败）
 
 ## Verification checklist
 
-- [ ] `pnpm lint` 通过，无未使用 import（`Eraser`/`Settings2` 等）
-- [ ] `pnpm test` 全部通过，含新增 `wallRemoval.test.ts`
-- [ ] `pnpm run build` 通过
-- [ ] 正向：自定义户型选中自绘隔墙 → 「墙选项 → 删除当前墙」删除该墙及其门窗，可按 Ctrl+Z 恢复
-- [ ] 正向：参考户型选中非承重隔墙 → 「墙选项 → 标记拆除当前墙」出现红色拆改标注，再点「撤销拆除当前墙」可恢复
-- [ ] 负向/默认：选中承重墙或外围墙时两个删除项都禁用并显示对应原因；缺省（tool=select）按 M / X 不再切换任何工具
-- [ ] 边界：`≤600px` 窄屏打开「更多」菜单仍能看到且可用「重置方案 / 清空家具」；宽屏不出现空的「更多」按钮（`website_screenshot` 分别验证 `mobile_390` 与 `desktop_1280`）
-- [ ] 边界：导入含 `measures` 字段的旧项目 JSON 不报错，且画布不再渲染测量线，SVG/DXF 导出图层中不再出现「测量」层
-- [ ] 回归：绘墙草稿预览仍显示长度标注（`MeasureLine` 未被误删），拆除墙体的红色标注与拆改造价显示不变
+- [x] `pnpm lint` 通过（仅余 `PlanCanvas.tsx:211` 既有 exhaustive-deps 警告）
+- [x] `pnpm test` 全部通过：`59 passed (59)` 个测试文件，含新增 `wallRemoval.test.ts` 与 `wallSplitEntries.test.tsx` 的删除入口用例
+- [x] `pnpm run build` 通过
+- [x] 正向：空白户型自绘隔墙点「删除当前墙」→ 复用 `removeWall` 删除墙及其门窗并重建房间；`wallRemoval.test.ts` 断言墙/门窗移除、房间重建、结果再次通过 `validateDesign`
+- [x] 正向：非承重墙「标记拆除当前墙 / 撤销拆除当前墙」可来回切换；参考户型隔墙标记后 `rooms` 保持原引用（不重建）
+- [x] 负向/默认：承重墙与外围墙两个入口都禁用并显示原因；M / X 已不再切换工具（`Workbench.test.tsx` 断言按 M、X 后仍为 `select`）
+- [x] 边界：`?` 已拆墙的「删除当前墙」禁用并提示「请先撤销拆除」；已拆墙不显示「标记拆除当前墙」
+- [x] 级联安全：`.compact-only`（`min-width: 601px` 时 `display:none`）在源文件顺序上晚于 `.tool-button{display:flex}`，同权重后者胜出，因此宽屏不出现空的「更多」按钮；`Workbench.test.tsx` 断言触发按钮带 `compact-only` 且菜单内只剩两项
+- [ ] 未验证（需真机/预览确认）：`≤600px` 窄屏打开「更多」仍能看到并可用「重置方案 / 清空家具」——未做 `mobile_390` / `desktop_1280` 截图核对
+- [x] 边界：`validateDesign` 不再要求 `measures` 字段，含 `measures` 的旧 JSON 被忽略后仍能通过校验（`geometry.test.ts` 旧 JSON 升级用例仍通过）
+- [x] 回归：绘墙草稿预览仍显示长度标注（`MeasureLine` 未被误删）；拆除墙体的红色标注与拆改造价不变（`DEMOLISHED` 图层与 `costs` 测试全部通过）

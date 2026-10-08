@@ -32,7 +32,8 @@ describe('管理端精简与加载分支', () => {
     const html = render(createElement(ProjectManager, { projects: projects(true), opened: () => {} }));
     expect(html).toContain('aria-haspopup="menu"');
     expect(html).toMatch(/<input[^>]*type="file"[^>]*hidden/);
-    expect(html.indexOf('aria-label="刷新项目"')).toBeLessThan(html.indexOf('新建项目'));
+    expect(html.indexOf('cms-refresh-button')).toBeGreaterThan(-1);
+    expect(html.indexOf('cms-refresh-button')).toBeLessThan(html.indexOf('新建项目'));
     expect(html).toContain('我的项目');
     expect(html).not.toContain('正在读取');
     expect(html).not.toContain('cms-loading-placeholder');

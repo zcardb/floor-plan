@@ -75,6 +75,7 @@ import {
   type Tool,
 } from "../model/types";
 import { blankDesign, referenceDesign } from "../data/templates";
+import { library } from "../data/catalog";
 import { Library } from "./Library";
 import { PropertyPanel } from "./PropertyPanel";
 import { CostPanel } from "./CostPanel";
@@ -83,6 +84,7 @@ import { CustomFurnitureDialog } from "./CustomFurnitureDialog";
 import { useFloorCatalog } from "../cloud/useFloorCatalog";
 import { useWallCatalog } from "../cloud/useWallCatalog";
 import { useOpeningCatalog } from "../cloud/useOpeningCatalog";
+import { useFurnitureCatalog } from "../cloud/useFurnitureCatalog";
 import { SelectionEditor, type SelectionEditorHandle } from "./SelectionEditor";
 import { furnitureKey } from "../model/costs";
 import type { ScreenRect } from "../model/selectionAnchor";
@@ -215,14 +217,20 @@ export function Workbench(p: Props) {
   const floorCatalog = useFloorCatalog(), loadAccountFloors = floorCatalog.load;
   const wallCatalog = useWallCatalog(), loadAccountWalls = wallCatalog.load;
   const openingCatalog = useOpeningCatalog(), loadAccountOpenings = openingCatalog.load;
+  const furnitureCatalog = useFurnitureCatalog(), loadAccountFurniture = furnitureCatalog.load;
   const accountFloors = p.loggedIn ? floorCatalog.items : [];
   const accountWalls = p.loggedIn ? wallCatalog.items : [];
   const accountOpenings = p.loggedIn ? openingCatalog.items : [];
-  // 登录后读取账号地面 / 墙面 / 门窗库；新建弹窗关闭后刷新，让刚建的材料立即可选。
+  // 账号家具库（家具管理里新建的家具）并入左侧列表：已在本项目目录中的以项目版本为准。
+  const projectCatalog = d.customCatalog || [];
+  const accountFurniture = p.loggedIn
+    ? furnitureCatalog.items.filter((item) => !projectCatalog.some((i) => i.catalogId === item.catalogId))
+    : [];
+  // 登录后读取账号地面 / 墙面 / 门窗 / 家具库；新建弹窗关闭后刷新，让刚建的材料立即可选。
   useEffect(() => {
     if (!p.loggedIn || customOpen) return;
-    void loadAccountFloors(); void loadAccountWalls(); void loadAccountOpenings();
-  }, [p.loggedIn, customOpen, loadAccountFloors, loadAccountWalls, loadAccountOpenings]);
+    void loadAccountFurniture(); void loadAccountFloors(); void loadAccountWalls(); void loadAccountOpenings();
+  }, [p.loggedIn, customOpen, loadAccountFurniture, loadAccountFloors, loadAccountWalls, loadAccountOpenings]);
   const saveCustom = (item: LibraryItem) => {
     if (!p.loggedIn) return;
     change((d) => d.customCatalog?.some((i) => i.catalogId === item.catalogId)
@@ -306,8 +314,14 @@ export function Workbench(p: Props) {
         },
         d,
       );
+      // 账号库家具放进画布时登记进项目目录，报价与导出沿用它的名称与单价。
+      const entry = it.catalogId && !library.some((l) => l.catalogId === it.catalogId) ? it : null;
       change((d) => ({
         ...d,
+        customCatalog:
+          entry && !d.customCatalog?.some((i) => i.catalogId === entry.catalogId)
+            ? [...(d.customCatalog || []), entry]
+            : d.customCatalog,
         furniture:
           it.type === "rug" ? [f, ...d.furniture] : [...d.furniture, f],
       }));
@@ -740,7 +754,7 @@ export function Workbench(p: Props) {
             setDrawer(null);
           }}
           blank={d.template === "blank"}
-          customItems={d.customCatalog || []}
+          customItems={[...projectCatalog, ...accountFurniture]}
           onNew={p.loggedIn ? () => setCustomOpen(true) : undefined}
         />
       </aside>
