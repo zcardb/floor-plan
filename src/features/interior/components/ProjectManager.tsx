@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog';
+import { ProjectRenameDialog, ProjectDeleteDialog } from './ProjectDialogs';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { notify } from '@/lib/notify';
 import { createProject } from '../data/templates';
@@ -35,12 +35,11 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
     async (kind: 'open' | 'duplicate' | 'remove', row: ProjectSummary) => {
       if (kind === 'open') { if (await projects.open(row)) opened(); return; }
       if (kind === 'duplicate') { if (await projects.duplicate(row)) opened(); return; }
-      if (await projects.remove(row)) setDeleting(null);
+      return projects.remove(row);
     },
     (kind, row) => kind + ':' + row.id,
   );
   const submit = useAsyncAction(async () => {
-    if (rename) { if (await projects.rename(rename, name)) setRename(null); return; }
     const project = createProject(template, name);
     if (await projects.create(project, true)) { setCreating(false); notify.success('已创建项目「' + project.name + '」'); opened(); }
   });
@@ -70,7 +69,7 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
     const locked = !!row.system;
     return <>
       <EditorTooltip label={locked ? '系统默认方案不可重命名' : '重命名项目'} disabled={rowAction.pending || locked}>
-        <Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'重命名' + row.name} disabled={rowAction.pending || locked} onClick={() => { setRename(row); setName(row.name); }}><Pencil size={16} /></Button>
+        <Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'重命名' + row.name} disabled={rowAction.pending || locked} onClick={() => setRename(row)}><Pencil size={16} /></Button>
       </EditorTooltip>
       <EditorTooltip label="复制项目" disabled={rowAction.pending}>
         <Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'复制' + row.name} disabled={rowAction.pending} aria-busy={isPending('duplicate', row)} onClick={() => void rowAction.run('duplicate', row)}>{isPending('duplicate', row) ? <Loader2 className="animate-spin" size={16} /> : <Copy size={16} />}</Button>
@@ -132,27 +131,20 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
     })}</div>
     {projects.hasMore && <div className="project-list-footer"><Button variant="ghost" loading={projects.loading && !!list.length} disabled={projects.loading} onClick={() => void projects.loadMore()}>加载更多</Button></div>}
 
-    <Dialog open={creating || !!rename} onOpenChange={v => { if (!v && !submit.pending) { setCreating(false); setRename(null); } }}>
+    <Dialog open={creating} onOpenChange={v => { if (!v && !submit.pending) setCreating(false); }}>
       <DialogContent>
-        <DialogHeader><DialogTitle>{rename ? '重命名项目' : '新建项目'}</DialogTitle><DialogDescription>项目内容与单独调价互不影响。</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>新建项目</DialogTitle><DialogDescription>项目内容与单独调价互不影响。</DialogDescription></DialogHeader>
         <form className="cms-form" onSubmit={e => { e.preventDefault(); void submit.run(); }}>
           <fieldset className="contents" disabled={submit.pending}>
             <div className="cms-field"><Label htmlFor="project-name">项目名称</Label><Input id="project-name" required maxLength={100} value={name} onChange={e => setName(e.target.value)} /></div>
-            {!rename && <div className="cms-field"><Label htmlFor="project-template">户型模板</Label><Select value={template} onValueChange={v => setTemplate(v as typeof template)} disabled={submit.pending}><SelectTrigger id="project-template"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="blank">空白户型</SelectItem><SelectItem value="reference">参考户型</SelectItem></SelectContent></Select></div>}
+            <div className="cms-field"><Label htmlFor="project-template">户型模板</Label><Select value={template} onValueChange={v => setTemplate(v as typeof template)} disabled={submit.pending}><SelectTrigger id="project-template"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="blank">空白户型</SelectItem><SelectItem value="reference">参考户型</SelectItem></SelectContent></Select></div>
           </fieldset>
           <Button loading={submit.pending} disabled={!name.trim()}>{submit.pending ? '正在保存…' : '确认保存'}</Button>
         </form>
       </DialogContent>
     </Dialog>
 
-    <AlertDialog open={!!deleting} onOpenChange={v => { if (!v && !rowAction.pending) setDeleting(null); }}>
-      <AlertDialogContent className="confirm-dialog">
-        <AlertDialogHeader><AlertDialogTitle>删除「{deleting?.name}」？</AlertDialogTitle><AlertDialogDescription>不可撤销。请先下载需要保留的方案。</AlertDialogDescription></AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={rowAction.pending}>取消</AlertDialogCancel>
-          <Button variant="destructive" disabled={!deleting || rowAction.pending} loading={!!deleting && isPending('remove', deleting)} onClick={() => { if (deleting) void rowAction.run('remove', deleting); }}>删除项目</Button>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <ProjectRenameDialog project={rename} onClose={() => setRename(null)} onSubmit={projects.rename} />
+    <ProjectDeleteDialog project={deleting} onClose={() => setDeleting(null)} onConfirm={row => rowAction.run('remove', row)} />
   </>;
 }
