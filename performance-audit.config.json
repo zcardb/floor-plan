@@ -5,7 +5,7 @@
     "html": "index.html",
     "entry": "index.html",
     "kind": "app",
-    "initialDynamicImports": ["_browser-ponyfill-N2-l_27I.js"],
+    "initialDynamicImports": ["_browser-ponyfill-DFBoxAHC.js"],
     "deferredDynamicImports": [{"key":"src/features/interior/scene/Scene3D.tsx","trigger":"interaction","reason":"Only loaded when the user explicitly switches from the 2D workbench to 3D."}],
     "initialFonts": []
   }]

@@ -1383,6 +1383,30 @@
     font-size: 12px;
     margin-top: 7px;
   }
+  .confirm-dialog {
+    max-width: 420px !important;
+    padding: 26px !important;
+    gap: 22px !important;
+    border-radius: 16px !important;
+    border-color: hsl(var(--border)) !important;
+    background: hsl(var(--card));
+    box-shadow: var(--shadow-panel);
+  }
+  .confirm-dialog h2 {
+    font-size: 16px;
+    font-weight: 620;
+    line-height: 1.5;
+    text-align: left;
+  }
+  .confirm-dialog [id$="description"] {
+    font-size: 12.5px;
+    line-height: 1.75;
+    margin-top: 8px;
+    text-align: left;
+  }
+  .confirm-dialog footer {
+    gap: 10px;
+  }
   .project-controls {
     display: flex;
     align-items: center;

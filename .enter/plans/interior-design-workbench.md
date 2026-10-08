@@ -58,6 +58,12 @@
 ### 关键文件与复用
 修改：`src/features/interior/model/selectionAnchor.ts`、`model/selectionEdits.ts`、`components/PlanCanvas.tsx`、`components/SelectionEditor.tsx`、`components/PropertyPanel.tsx`、`components/Workbench.tsx`、`scene/Scene3D.tsx`、`src/index.css`。新增：`model/wallDrawing.ts`、聚焦绘墙hook、尺寸预览事务hook及对应测试；扩展 `model/selectionAnchor.test.ts` 与 `model/geometry.test.ts`。复用 `nearestOnWall`、`wallPoly`、`length`、`rebuildRooms`、`editSelection`、`useDesign.preview/commit`、现有Popover与语义tokens；绘墙／跟随修复不改数据表，账号成本与CMS按上述独立模块实施。
 
+## 本轮实施记录（2026-10-08）
+已接入游客限制、账号CMS／分页款式统计、独立账号成本RLS表与继承解析、固定风格自动创建任务、门窗自身范围、2D／3D局部墙锚点与连续绘墙hook。旧项目／家具记录未改写。新表RLS与所有者策略已SQL复查；提交函数已部署，真实登录生成未验证。33项测试、lint、类型及开发／生产构建通过。
+游客首页1280×720与390×844已检查；移动登录被旧CSS隐藏，修复后复查可见。选中态、CMS登录交互、双账号RLS、真实生成与绘墙操作仍未验证。严格app审计保留首屏JS超预算、初始ponyfill动态依赖与平台注入字体告警，不提高预算；浏览器性能与发布HTTP未验证。
+并行会话修改尺寸提交行为：当前SizeFields失焦／关闭提交，Workbench切对象flush；与本方案应用／取消事务不同，未勾选尺寸完成，需协调最新会话要求，不反复覆盖并行更改。
+用户新增两处心理学参考已阅读：采用Hick、渐进披露、Fitts、真实反馈和错误预防，避免假等待与诱导；case-studies具体详情页返回代理错误。账号成本已增加未保存离开确认。
+
 ## Implementation checklist
 - [ ] 游客仅显示登录账户入口，项目管理／自定义创建／账号库／全部成本控件与金额不渲染，默认项目编辑导出仍可用。
 - [ ] 会话恢复／登录进入CMS，打开项目回现有工作台，退出清理账号状态并恢复默认游客项目；旧本机数据保留。

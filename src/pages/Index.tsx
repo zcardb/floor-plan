@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useProjects } from '@/features/interior/cloud/useProjects';
 import { useAccountCosts } from '@/features/interior/cloud/useAccountCosts';
 import { Workbench } from '@/features/interior/components/Workbench';
@@ -9,12 +9,20 @@ import { createProject } from '@/features/interior/data/templates';
 import type { Design } from '@/features/interior/model/types';
 const Index=()=>{
   const projects=useProjects(),costs=useAccountCosts(projects.session?.user.id);
-  const [authOpen,setAuthOpen]=useState(false),[editingOwner,setEditingOwner]=useState<string|null>(null);
+  const [authOpen,setAuthOpen]=useState(false),[authIntent,setAuthIntent]=useState<'cloud'|null>(null),[editingOwner,setEditingOwner]=useState<string|null>(null);
+  const pendingCloud=useRef(false),guestSave=useRef(projects.saveGuestToCloud);
+  guestSave.current=projects.saveGuestToCloud;
   const owner=projects.session?.user.id, editing=owner&&editingOwner===owner;
   const manage=async()=>{if(await projects.save())setEditingOwner(null);};
-  const cloudSave=()=>{if(!owner||!projects.active)return;void projects.create({...projects.active,name:projects.active.name+' · 云端副本'},true);};
+  const login=()=>{setAuthIntent(null);setAuthOpen(true);};
+  const cloudSave=()=>{
+    if(!owner){pendingCloud.current=true;setAuthIntent('cloud');setAuthOpen(true);return;}
+    if(!projects.active)return;
+    void projects.create({...projects.active,name:projects.active.name+' · 云端副本'},true);
+  };
+  useEffect(()=>{if(owner&&pendingCloud.current){pendingCloud.current=false;void guestSave.current();}},[owner]);
   const importProject=(d:Design,name:string)=>{if(!owner)return;void projects.create({...createProject(d.template,name),state:d},true);};
   if(!projects.ready)return <div className="no-project" role="status"><h1>正在恢复工作室…</h1></div>;
-  return <CostDefaultsContext.Provider value={owner?costs.settings:{}}>{owner&&!editing?<AccountCMS key={owner} projects={projects} costs={costs} opened={()=>setEditingOwner(owner)}/>:projects.active?<Workbench key={(owner||'guest')+projects.active.id} project={projects.active} update={projects.update} status={projects.status} loggedIn={!!owner} email={projects.session?.user.email} projects={()=>void manage()} login={()=>setAuthOpen(true)} logout={()=>{setEditingOwner(null);void projects.signOut();}} save={()=>void projects.save()} cloudSave={cloudSave} importProject={importProject}/>:null}<AuthDialog open={authOpen} onOpenChange={setAuthOpen}/></CostDefaultsContext.Provider>;
+  return <CostDefaultsContext.Provider value={owner?costs.settings:{}}>{owner&&!editing?<AccountCMS key={owner} projects={projects} costs={costs} opened={()=>setEditingOwner(owner)}/>:projects.active?<Workbench key={(owner||'guest')+projects.active.id} project={projects.active} update={projects.update} status={projects.status} loggedIn={!!owner} email={projects.session?.user.email} projects={()=>void manage()} login={login} logout={()=>{setEditingOwner(null);void projects.signOut();}} save={()=>void projects.save()} cloudSave={cloudSave} importProject={importProject}/>:null}<AuthDialog open={authOpen} intent={authIntent} onOpenChange={v=>{setAuthOpen(v);if(!v)setAuthIntent(null);}}/></CostDefaultsContext.Provider>;
 };
 export default Index;

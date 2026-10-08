@@ -62,6 +62,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { useDesign } from "../model/useDesign";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { center, norm, pushOut, rebuildRooms } from "../model/geometry";
 import {
   uid,
