@@ -525,6 +525,7 @@ export function useProjects() {
     remove,
     rename,
     duplicate,
+    saveGuestToCloud,
     loadMore: () => loadList(true),
     reload: () => loadList(),
     signOut,
