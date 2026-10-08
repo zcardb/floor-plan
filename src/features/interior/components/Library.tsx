@@ -27,7 +27,7 @@ export function Library({
   setTool: (t: Tool) => void;
   blank: boolean;
   customItems?: LibraryItem[];
-  onNew: () => void;
+  onNew?: () => void;
 }) {
   const [category, setCategory] = useState("客厅"),
     [query, setQuery] = useState("");
@@ -40,10 +40,10 @@ export function Library({
         <span>构件与家具</span>
         <span className="mini-label">素材库</span>
       </div>
-      <button className="new-furniture-button" onClick={onNew}>
+      {onNew && <button className="new-furniture-button" onClick={onNew}>
         <Plus size={15} />
         新建家具 / 账号库
-      </button>
+      </button>}
       <div className="library-search">
         <Search size={15} />
         <input

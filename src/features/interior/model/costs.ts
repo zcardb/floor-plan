@@ -1,6 +1,7 @@
 import { library, materials } from "../data/catalog";
 import { area, length, perim } from "./geometry";
 import { projectProcurement } from "./materialProcurement";
+import { effectiveCostDesign, type AccountCostSettings } from './costDefaults';
 import type {
   CostSettings,
   Design,
@@ -51,7 +52,9 @@ export function priceOf(
   d: Design,
   group: PriceGroup,
   key: string,
+  defaults?: AccountCostSettings,
 ): number | null {
+  if (defaults) d = effectiveCostDesign(d, defaults);
   const override = (
     d.costSettings?.[group] as Record<string, number | null> | undefined
   )?.[key];
@@ -134,7 +137,8 @@ export function wallSurfaceArea(room: Room, d: Design): number {
   }
   return Math.max(0, (perim(room) * d.height) / 1000 - deduction);
 }
-export function calculateCosts(d: Design) {
+export function calculateCosts(d: Design, defaults?: AccountCostSettings) {
+  if (defaults) d = effectiveCostDesign(d, defaults);
   const soft: CostRow[] = [],
     hard: CostRow[] = [];
   const add = (

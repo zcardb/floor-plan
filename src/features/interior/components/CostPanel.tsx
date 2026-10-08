@@ -7,6 +7,9 @@ import {
   type CostRow,
 } from "../model/costs";
 import { uid, type Design } from "../model/types";
+import { useContext } from 'react';
+import { CostDefaultsContext, useCostDesign } from './CostDefaultsContext';
+import { priceSource, restorePrice } from '../model/costDefaults';
 import { PriceInput } from "./PriceInput";
 import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
 export function CostPanel({
@@ -18,7 +21,8 @@ export function CostPanel({
   change: (fn: (d: Design) => Design) => void;
   back: () => void;
 }) {
-  const c = useMemo(() => calculateCosts(design), [design]),
+  const effective = useCostDesign(design), defaults = useContext(CostDefaultsContext);
+  const c = useMemo(() => calculateCosts(effective), [effective]),
     [name, setName] = useState(""),
     [amount, setAmount] = useState(""),
     [error, setError] = useState("");
@@ -33,7 +37,7 @@ export function CostPanel({
         </div>
         <small>
           {r.quantity.toFixed(r.unit === "件" ? 0 : 2)} {r.unit} ·{" "}
-          {r.reference ? "参考单价" : "项目单价"} · 元/{r.unit}
+          {priceSource(design, defaults, r.group, r.key)} · 元/{r.unit}
         </small>
         <PriceInput
           key={r.group + r.key + String(r.price)}
@@ -41,6 +45,7 @@ export function CostPanel({
           label={r.name + "单价"}
           onApply={(v) => change((d) => setPrice(d, r.group, r.key, v))}
         />
+        {priceSource(design, defaults, r.group, r.key) === '项目覆盖' && <button className="back-link" onClick={() => change(d => restorePrice(d, r.group, r.key))}>恢复账号默认</button>}
         {r.group === "floorPrices" && (
           <MaterialProcurementEditor
             design={design}

@@ -3360,6 +3360,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      interior_account_cost_defaults: {
+        Row: {
+          owner_id: string
+          revision: number
+          settings: Json
+          updated_at: string
+        }
+        Insert: {
+          owner_id?: string
+          revision?: number
+          settings?: Json
+          updated_at?: string
+        }
+        Update: {
+          owner_id?: string
+          revision?: number
+          settings?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       interior_design_projects: {
         Row: {
           created_at: string

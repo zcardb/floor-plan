@@ -7,6 +7,11 @@ import { createProject } from "../data/templates";
 import { validateDesign } from "../model/validation";
 import { uid, type Design, type Project } from "../model/types";
 const KEY = "interior-guest-projects-v2";
+const DEMO_KEY = 'interior-guest-default-v1';
+function defaultGuest(): Project {
+  try { const raw = localStorage.getItem(DEMO_KEY); if (raw) { const p = JSON.parse(raw) as Project; return {...p, cloud:false, state:validateDesign(p.state)}; } } catch { /* Preserve legacy storage independently. */ }
+  return createProject('reference');
+}
 function initialProjects(): Project[] {
   try {
     const raw = localStorage.getItem(KEY);
@@ -34,7 +39,8 @@ export function useProjects() {
   const [guests, setGuests] = useState(initialProjects),
     [session, setSession] = useState<Session | null>(null),
     [cloud, setCloud] = useState<ProjectSummary[]>([]),
-    [active, setActive] = useState<Project | null>(() => guests[0] || null),
+    [active, setActive] = useState<Project | null>(defaultGuest),
+    [ready, setReady] = useState(false),
     [status, setStatus] = useState("本机已保存"),
     [loading, setLoading] = useState(false),
     [hasMore, setHasMore] = useState(false);
@@ -103,17 +109,18 @@ export function useProjects() {
         if (timer.current) clearTimeout(timer.current);
         dirty.current = false;
         setCloud([]);
-        if (activeRef.current?.cloud) {
-          setActive(guestsRef.current[0] || null);
-          setStatus("本机已保存");
-        }
+        setLoading(false);
+        const guest = defaultGuest(); activeRef.current = guest; setActive(guest);
+        setStatus('本机已保存');
       }
       sessionRef.current = s;
       setSession(s);
+      setReady(true);
       if (s) setTimeout(() => void loadListRef.current(), 0);
     });
     void supabase.auth.getSession().then(({ data, error }) => {
       if (error) toast.error("登录状态恢复失败");
+      setReady(true);
       if (data.session && !sessionRef.current) {
         sessionRef.current = data.session;
         setSession(data.session);
@@ -149,7 +156,10 @@ export function useProjects() {
     }
     const p = activeRef.current;
     if (!p) return true;
-    if (!p.cloud) return persist(guestsRef.current);
+    if (!p.cloud) {
+      if (!sessionRef.current) { try { localStorage.setItem(DEMO_KEY, JSON.stringify(p)); return true; } catch { toast.error('本机保存失败，请下载备份'); return false; } }
+      return persist(guestsRef.current);
+    }
     if (!dirty.current) return true;
     const s = sessionRef.current;
     if (!s) return false;
@@ -234,12 +244,15 @@ export function useProjects() {
         }
         if (timer.current) clearTimeout(timer.current);
         timer.current = setTimeout(() => void save(), 1000);
+      } else if (!sessionRef.current) {
+        try { localStorage.setItem(DEMO_KEY, JSON.stringify(next)); setStatus('本机已保存'); } catch { setStatus('本机保存失败'); }
       } else persist(guestsRef.current.map((r) => (r.id === p.id ? next : r)));
     },
     [persist, save],
   );
   const open = useCallback(
     async (p: ProjectSummary) => {
+      if (!sessionRef.current) return false;
       if (!(await save())) return false;
       const generation = ++epoch.current;
       if (timer.current) clearTimeout(timer.current);
@@ -303,6 +316,7 @@ export function useProjects() {
   );
   const create = useCallback(
     async (p: Project, toCloud = false) => {
+      if (!sessionRef.current) return false;
       const saved = await save();
       if (
         !saved &&
@@ -366,12 +380,7 @@ export function useProjects() {
   );
   const remove = useCallback(
     async (p: ProjectSummary) => {
-      if (
-        !window.confirm(
-          `删除「${p.name}」？此操作不可撤销，请先导出需要保留的方案。`,
-        )
-      )
-        return;
+      if (!sessionRef.current) return;
       if (!(await save())) return;
       const generation = epoch.current;
       if (p.cloud) {
@@ -461,6 +470,7 @@ export function useProjects() {
     cloud,
     active,
     session,
+    ready,
     status,
     loading,
     hasMore,

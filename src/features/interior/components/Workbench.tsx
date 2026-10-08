@@ -79,7 +79,6 @@ import { Library } from "./Library";
 import { PropertyPanel } from "./PropertyPanel";
 import { CostPanel } from "./CostPanel";
 import { CustomFurnitureDialog } from "./CustomFurnitureDialog";
-import { setPrice } from "../model/costs";
 import { SelectionEditor, type SelectionEditorHandle } from "./SelectionEditor";
 import { furnitureKey } from "../model/costs";
 import type { ScreenRect } from "../model/selectionAnchor";
@@ -170,19 +169,9 @@ export function Workbench(p: Props) {
   const [costOpen, setCostOpen] = useState(false),
     [customOpen, setCustomOpen] = useState(false);
   const saveCustom = (item: LibraryItem) => {
-    change((d) => {
-      if (d.customCatalog?.some((i) => i.catalogId === item.catalogId))
-        return d;
-      const next = { ...d, customCatalog: [...(d.customCatalog || []), item] };
-      return d.costSettings?.furniturePrices?.[item.catalogId!] !== undefined
-        ? next
-        : setPrice(
-            next,
-            "furniturePrices",
-            item.catalogId!,
-            item.price ?? null,
-          );
-    });
+    if (!p.loggedIn) return;
+    change((d) => d.customCatalog?.some((i) => i.catalogId === item.catalogId)
+      ? d : { ...d, customCatalog: [...(d.customCatalog || []), item] });
     toast.success("家具已加入当前项目目录");
   };
   const stage = useRef<HTMLElement>(null),
@@ -426,10 +415,9 @@ export function Workbench(p: Props) {
           <small>把想象，变成家的模样</small>
         </div>
         <span className="header-divider" />
-        <button className="project-title" onClick={p.projects}>
-          <span>{p.project.name}</span>
-          <ChevronDown size={14} />
-        </button>
+        {p.loggedIn ? <button className="project-title" onClick={p.projects}>
+          <span>{p.project.name}</span><ChevronDown size={14} />
+        </button> : <span className="project-title">参考户型</span>}
         <span className="save-indicator">
           <span
             className={
@@ -441,9 +429,9 @@ export function Workbench(p: Props) {
           {p.status}
         </span>
         <div className="header-spacer" />
-        <button className="header-plain" onClick={p.projects}>
+        {p.loggedIn ? <><button className="header-plain" onClick={p.projects}>
           <FolderOpen size={16} />
-          <span>我的项目</span>
+          <span>返回管理</span>
         </button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -467,7 +455,7 @@ export function Workbench(p: Props) {
               将当前项目另存到云端
             </DropdownMenuItem>
           </DropdownMenuContent>
-        </DropdownMenu>
+        </DropdownMenu></> : <button className="header-plain" onClick={p.login}><UserRound size={16} />登录</button>}
         <Button size="sm" className="download-button" onClick={exportImage}>
           <Download />
           <span>下载{view === "2d" ? "设计图" : "当前视角"}</span>
@@ -673,14 +661,14 @@ export function Workbench(p: Props) {
                 <ArrowDownToLine />
                 下载方案 JSON
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => file.current?.click()}>
+              {p.loggedIn && <><DropdownMenuItem onClick={() => file.current?.click()}>
                 <FolderOpen />
                 导入 JSON 为新项目
               </DropdownMenuItem>
               <DropdownMenuItem onClick={p.cloudSave}>
                 <Cloud />
                 另存云端项目
-              </DropdownMenuItem>
+              </DropdownMenuItem></>}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={clear}>
                 <Trash2 />
@@ -744,7 +732,7 @@ export function Workbench(p: Props) {
           }}
           blank={d.template === "blank"}
           customItems={d.customCatalog || []}
-          onNew={() => setCustomOpen(true)}
+          onNew={p.loggedIn ? () => setCustomOpen(true) : undefined}
         />
       </aside>
       <main className="stage" ref={stage}>
@@ -900,7 +888,8 @@ export function Workbench(p: Props) {
           duplicate={duplicate}
           remove={remove}
           close={() => setSelection(null)}
-          hidden={!!drawer || (view === "3d" && sceneOptions.mode === "walk")}
+          showCosts={p.loggedIn}
+          hidden={tool !== 'select' || !!drawer || (view === "3d" && sceneOptions.mode === "walk")}
           details={() => {
             setCostOpen(false);
             if (matchMedia("(max-width:1100px)").matches) setDrawer("panel");
@@ -922,7 +911,7 @@ export function Workbench(p: Props) {
           "property-panel " + (drawer === "panel" ? "drawer-open" : "")
         }
       >
-        {costOpen ? (
+        {p.loggedIn && costOpen ? (
           <CostPanel
             design={d}
             change={change}
@@ -930,14 +919,15 @@ export function Workbench(p: Props) {
           />
         ) : (
           <>
-            <button
+            {p.loggedIn && <button
               className="open-cost-manager"
               onClick={() => setCostOpen(true)}
             >
               <CircleDollarSign size={16} />
               软装 / 硬装成本
-            </button>
+            </button>}
             <PropertyPanel
+              showCosts={p.loggedIn}
               design={d}
               selection={selection}
               select={select}
@@ -986,7 +976,7 @@ export function Workbench(p: Props) {
         onChange={async (e) => {
           const f = e.target.files?.[0];
           e.target.value = "";
-          if (!f) return;
+          if (!f || !p.loggedIn) return;
           if (f.size > 5000000) {
             toast.error("文件不得超过 5 MB");
             return;
@@ -1000,7 +990,7 @@ export function Workbench(p: Props) {
           }
         }}
       />
-      <CustomFurnitureDialog
+      {p.loggedIn && <CustomFurnitureDialog
         open={customOpen}
         onOpenChange={setCustomOpen}
         loggedIn={p.loggedIn}
@@ -1008,7 +998,7 @@ export function Workbench(p: Props) {
         ownerKey={p.email || "guest"}
         onCreate={saveCustom}
         onImport={saveCustom}
-      />
+      />}
       <Dialog open={help} onOpenChange={setHelp}>
         <DialogContent>
           <DialogHeader>

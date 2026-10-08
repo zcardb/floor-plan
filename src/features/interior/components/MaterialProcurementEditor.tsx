@@ -7,6 +7,7 @@ import {
 import { materials } from "../data/catalog";
 import { priceOf, validPrice } from "../model/costs";
 import type { Design, MaterialProcurement } from "../model/types";
+import { useCostDesign } from './CostDefaultsContext';
 export function MaterialProcurementEditor({
   design,
   material,
@@ -16,16 +17,17 @@ export function MaterialProcurementEditor({
   material: string;
   change: (fn: (d: Design) => Design) => void;
 }) {
-  const saved = design.costSettings?.procurement?.[material],
+  const effective = useCostDesign(design);
+  const saved = effective.costSettings?.procurement?.[material],
     [expanded, setExpanded] = useState(false),
     [draft, setDraft] = useState<MaterialProcurement>(
       saved || defaultProcurement(material),
     ),
     [price, setPrice] = useState(
-      String(priceOf(design, "floorPrices", material) ?? ""),
+      String(priceOf(effective, "floorPrices", material) ?? ""),
     ),
     [error, setError] = useState("");
-  const p = projectProcurement(design, material);
+  const p = projectProcurement(effective, material);
   const field = (
     key: "length" | "width" | "waste" | "perBox",
     label: string,
@@ -69,7 +71,7 @@ export function MaterialProcurementEditor({
         onClick={() => {
           setExpanded(!expanded);
           setDraft(saved || defaultProcurement(material));
-          setPrice(String(priceOf(design, "floorPrices", material) ?? ""));
+          setPrice(String(priceOf(effective, "floorPrices", material) ?? ""));
         }}
       >
         规格 / 损耗 / 计价单位{expanded ? " −" : " ＋"}

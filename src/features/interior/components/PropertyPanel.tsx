@@ -23,6 +23,7 @@ import { PriceInput } from "./PriceInput";
 import { projectProcurement } from "../model/materialProcurement";
 import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
 import { editSelection } from "../model/selectionEdits";
+import { useCostDesign } from './CostDefaultsContext';
 import {
   area,
   bbox,
@@ -43,9 +44,11 @@ interface Props {
   duplicate: () => void;
   remove: () => void;
   rotate: () => void;
+  showCosts: boolean;
 }
 export function PropertyPanel({
-  design: d,
+  design,
+  showCosts,
   selection: s,
   select,
   change,
@@ -53,6 +56,7 @@ export function PropertyPanel({
   remove,
   rotate,
 }: Props) {
+  const d = useCostDesign(design);
   const [tab, setTab] = useState("overview");
   const f =
       s?.kind === "furniture" ? d.furniture.find((f) => f.id === s.id) : null,
@@ -121,10 +125,10 @@ export function PropertyPanel({
           <span className="material-swatch" style={{ background: m.color }} />
           <span>
             {m.name}
-            <small>
+            {showCosts && <small>
               ¥{priceOf(d, "floorPrices", key) ?? "未定价"} /{" "}
               {d.costSettings?.procurement?.[key]?.unit || "m²"}
-            </small>
+            </small>}
           </span>
         </button>
       ))}
@@ -211,7 +215,7 @@ export function PropertyPanel({
               />
             </label>
           </div>
-          <div className="furniture-price-field">
+          {showCosts && <div className="furniture-price-field">
             <h3 className="section-title">
               家具单价 <small>元 / 件 · 同款联动</small>
             </h3>
@@ -230,7 +234,7 @@ export function PropertyPanel({
             <p className="footnote">
               修改仅影响当前项目的同款家具，自动计入软装总成本。
             </p>
-          </div>
+          </div>}
           <div className="property-actions">
             <Button size="sm" variant="outline" onClick={rotate}>
               <RotateCw />
@@ -343,7 +347,7 @@ export function PropertyPanel({
               rooms: d.rooms.map((g) => (g.id === r.id ? { ...g, mat: v } : g)),
             })),
           )}
-          <div className="estimate-line">
+          {showCosts && <><div className="estimate-line">
             <span>本项目同材质采购合计</span>
             <b>
               ¥
@@ -359,7 +363,7 @@ export function PropertyPanel({
             design={d}
             material={r.mat}
             change={change}
-          />
+          /></>}
         </section>
         <section>
           <h3 className="section-title">
@@ -580,7 +584,7 @@ export function PropertyPanel({
       ) : (
         <>
           <section>
-            <div className="cost-summary">
+            {showCosts && <><div className="cost-summary">
               <small>整体成本 · 已录入费用</small>
               <strong>
                 ¥
@@ -602,6 +606,7 @@ export function PropertyPanel({
                 {costs.unpriced} 类费用未定价，可在成本管理中填写。
               </p>
             )}
+            </>}
             <div className="overview-top">
               <span>空间，恰到好处。</span>
               <LayoutGrid size={17} />
@@ -651,7 +656,7 @@ export function PropertyPanel({
             </div>
             <p className="footnote">按墙内净尺寸计算；* 飘窗不计入使用面积。</p>
           </section>
-          <section>
+          {showCosts && <section>
             <h3 className="section-title">
               地面采购估算<span className="soft-badge">含损耗 / 取整</span>
             </h3>
@@ -689,7 +694,7 @@ export function PropertyPanel({
               </strong>
             </div>
             <p className="footnote">仅包含地面材料，不含人工及其他装修费用。</p>
-          </section>
+          </section>}
           <div className="panel-note">
             <Info size={15} />
             <p>选择房间更换地面材质，选择家具调整尺寸，设计与估算实时同步。</p>

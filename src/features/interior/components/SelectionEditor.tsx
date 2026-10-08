@@ -36,6 +36,7 @@ import {
 import { placeEditor, type ScreenRect } from "../model/selectionAnchor";
 import type { Design, Selection } from "../model/types";
 import { PriceInput } from "./PriceInput";
+import { useCostDesign } from './CostDefaultsContext';
 import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
 export interface SelectionEditorHandle {
   update: (r: ScreenRect | null) => void;
@@ -52,6 +53,7 @@ interface Props {
   details: () => void;
   costs: () => void;
   hidden: boolean;
+  showCosts: boolean;
 }
 const colors = [
   "#efe6d8",
@@ -64,6 +66,7 @@ const colors = [
 ];
 export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
   function SelectionEditor(p, ref) {
+    const costDesign = useCostDesign(p.design);
     const el = useRef<HTMLDivElement>(null),
       [open, setOpen] = useState<string | null>(null),
       [draft, setDraft] = useState<Record<string, string>>({}),
@@ -206,7 +209,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         group: "floorPrices",
         key: r.mat,
         name: materials[r.mat].name,
-        unit: p.design.costSettings?.procurement?.[r.mat]?.unit || "m²",
+        unit: costDesign.costSettings?.procurement?.[r.mat]?.unit || "m²",
       };
     else if (o)
       price = {
@@ -406,7 +409,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </PopoverContent>
           </Popover>
         )}
-        {price && (
+        {p.showCosts && price && (
           <Popover
             open={open === "price"}
             onOpenChange={(v) => setPanel(v, "price")}
@@ -426,9 +429,9 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
                 key={
                   price.group +
                   price.key +
-                  priceOf(p.design, price.group, price.key)
+                  priceOf(costDesign, price.group, price.key)
                 }
-                value={priceOf(p.design, price.group, price.key)}
+                value={priceOf(costDesign, price.group, price.key)}
                 onApply={(v) => {
                   try {
                     p.change((d) => setPrice(d, price!.group, price!.key, v));
