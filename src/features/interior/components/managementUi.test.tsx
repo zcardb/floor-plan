@@ -19,7 +19,7 @@ describe('管理端精简与加载分支', () => {
     expect(html).not.toContain('save-indicator');
     expect(html).toContain('aria-label="我的账号"');
     expect(html).not.toContain('<span>我的账号</span>');
-    const positions = ['aria-label="返回项目管理"', 'aria-label="切换项目：我的项目"', 'aria-label="我的账号"', 'aria-label="下载设计图"'].map(text => html.indexOf(text));
+    const positions = ['aria-label="返回项目管理"', 'aria-label="切换项目：我的项目"', 'aria-label="下载设计图"', 'aria-label="我的账号"'].map(text => html.indexOf(text));
     expect(positions.every(pos => pos >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((a,b) => a-b));
   });

@@ -52,17 +52,18 @@ export function WorkbenchHeader(p: WorkbenchHeaderProps) {
       </DropdownMenu>
     </div>
     <div className="workspace-header-actions">
+      {p.view === '2d' && p.onExportDrawing ? <DropdownMenu>
+        <DropdownMenuTrigger asChild><Button className="workspace-download" aria-label="下载设计图"><Download /><span>下载设计图</span><ChevronDown size={14} /></Button></DropdownMenuTrigger>
+        <DropdownMenuContent align="end"><DropdownMenuItem onClick={p.onDownload}><Download />下载 2D 图片（PNG）</DropdownMenuItem><DrawingExportItems onExport={p.onExportDrawing} /></DropdownMenuContent>
+      </DropdownMenu> : <Button className="workspace-download" onClick={p.onDownload} aria-label={p.view === '2d' ? '下载设计图' : '下载当前视角'}><Download /><span>下载{p.view === '2d' ? '设计图' : '当前视角'}</span></Button>}
+      <span className="toolbar-divider" aria-hidden="true" />
       <DropdownMenu>
-        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="workspace-icon-button workspace-account-button" aria-label="我的账号" title="我的账号"><AccountAvatar email={p.email} size={32} /></Button></DropdownMenuTrigger>
+        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="workspace-icon-button workspace-account-button" aria-label="我的账号" title="我的账号"><AccountAvatar email={p.email} size={28} /></Button></DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuLabel className="account-menu-head"><AccountAvatar email={p.email} size={34} /><span><b>{p.email}</b><small>已登录 · 云端同步</small></span></DropdownMenuLabel>
           <DropdownMenuSeparator /><DropdownMenuItem onClick={p.onLogout}>退出登录</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      {p.view === '2d' && p.onExportDrawing ? <DropdownMenu>
-        <DropdownMenuTrigger asChild><Button className="workspace-download" aria-label="下载设计图"><Download /><span>下载设计图</span><ChevronDown size={14} /></Button></DropdownMenuTrigger>
-        <DropdownMenuContent align="end"><DropdownMenuItem onClick={p.onDownload}><Download />下载 2D 图片（PNG）</DropdownMenuItem><DrawingExportItems onExport={p.onExportDrawing} /></DropdownMenuContent>
-      </DropdownMenu> : <Button className="workspace-download" onClick={p.onDownload} aria-label={p.view === '2d' ? '下载设计图' : '下载当前视角'}><Download /><span>下载{p.view === '2d' ? '设计图' : '当前视角'}</span></Button>}
     </div>
   </header>;
 }
