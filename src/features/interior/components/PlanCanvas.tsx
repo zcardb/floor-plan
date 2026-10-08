@@ -34,6 +34,7 @@ import { selectionPoints, localWallPoint, type ScreenRect } from "../model/selec
 import { resolveWallPoint,validateWallSegment } from '../model/wallDrawing';
 import { useWallDrawing } from './useWallDrawing';
 import { WallHoverOverlay } from './WallHoverOverlay';
+import { formatMeters } from '../model/lengthUnits';
 export interface CanvasHandle {
   zoom: (k: number) => void;
   fit: () => void;
