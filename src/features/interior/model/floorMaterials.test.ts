@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { referenceDesign } from '../data/templates';
-import { builtinFloors, floorMaterialOf, floorMaterialsOf } from './floorMaterials';
+import { applyRoomFloor, builtinFloors, floorMaterialOf, floorMaterialsOf, pickableFloors } from './floorMaterials';
 import { validateDesign } from './validation';
 import { calculateCosts, priceOf } from './costs';
 import { defaultProcurement } from './materialProcurement';
@@ -49,5 +49,31 @@ describe('自定义地面材质', () => {
   it('采购默认尺寸取自定义方砖规格', () => {
     expect(defaultProcurement(tile.key, withFloors())).toMatchObject({ length: 600, width: 300 });
     expect(defaultProcurement(poured.key, withFloors())).toEqual({ unit: 'm²', waste: 5 });
+  });
+});
+
+describe('房间直接选择账号地面库', () => {
+  const concrete: CustomFloor = { key: 'custom-33333333-3333-4333-8333-333333333333', name: '混凝土浇筑', pattern: 'seamless', color: '#9a9a94', price: 50 };
+  it('账号库中未加入项目的地面追加在后，已加入的不重复', () => {
+    const list = pickableFloors(withFloors(), [tile, concrete, concrete]);
+    expect(list.map(f => f.key)).toEqual([...Object.keys(builtinFloors), tile.key, poured.key, concrete.key]);
+    expect(list.filter(f => f.fromAccount).map(f => f.key)).toEqual([concrete.key]);
+  });
+  it('账号库为空时只返回项目已有地面', () => {
+    expect(pickableFloors(referenceDesign(), []).every(f => !f.fromAccount)).toBe(true);
+  });
+  it('首次选择账号地面写入项目并应用，可保存往返；再次选择不重复追加', () => {
+    const d = referenceDesign(), room = d.rooms[0].id;
+    const once = applyRoomFloor(d, room, concrete.key, [concrete]);
+    expect(once.customFloors).toEqual([concrete]);
+    expect(once.rooms[0].mat).toBe(concrete.key);
+    expect(priceOf(once, 'floorPrices', concrete.key)).toBe(50);
+    expect(validateDesign(JSON.parse(JSON.stringify(once)))).toEqual(once);
+    const twice = applyRoomFloor(once, d.rooms[1].id, concrete.key, [concrete]);
+    expect(twice.customFloors).toHaveLength(1);
+    expect(applyRoomFloor(d, room, 'tile800', []).customFloors).toBeUndefined();
+  });
+  it('未知地面抛错', () => {
+    expect(() => applyRoomFloor(referenceDesign(), 'x', concrete.key, [])).toThrow();
   });
 });

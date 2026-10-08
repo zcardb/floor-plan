@@ -16,7 +16,7 @@ import {
   Ruler,
 } from "lucide-react";
 import { notify } from "@/lib/notify";
-import { floorMaterialOf, floorMaterialsOf } from "../model/floorMaterials";
+import { applyRoomFloor, floorMaterialOf, pickableFloors } from "../model/floorMaterials";
 import {
   furnitureKey,
   priceOf,
@@ -43,7 +43,7 @@ import {
   rebuildRooms,
   resizeBlank,
 } from "../model/geometry";
-import type { Design, Selection } from "../model/types";
+import type { CustomFloor, Design, Selection } from "../model/types";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 interface Props {
@@ -56,6 +56,8 @@ interface Props {
   rotate: () => void;
   showCosts: boolean;
   transaction: SizeTransaction;
+  /** 账号地面库；未加入项目的地面也可直接选择，选中后自动加入项目。 */
+  accountFloors?: CustomFloor[];
   splitWall?: (wallId: string) => void;
   mergeWall?: (wallId: string) => void;
   /** 切到成本页；成本页口径跟随当前选中对象。 */
@@ -73,6 +75,7 @@ export function PropertyPanel({
   splitWall,
   mergeWall,
   openCosts,
+  accountFloors = [],
 }: Props) {
   const d = useCostDesign(design);
   const confirm = useConfirm();
@@ -148,7 +151,7 @@ export function PropertyPanel({
   );
   const matGrid = (value: string, update: (v: string) => void) => (
     <div className="material-grid">
-      {Object.entries(floorMaterialsOf(d)).map(([key, m]) => (
+      {pickableFloors(d, accountFloors).map(({ key, material: m, fromAccount }) => (
         <button
           key={key}
           className={"material-card " + (key === value ? "active" : "")}
@@ -157,8 +160,9 @@ export function PropertyPanel({
           <span className="material-swatch" style={{ background: m.color }} />
           <span>
             {m.name}
+            {fromAccount && <em className="material-source">账号库</em>}
             {showCosts && <small>
-              ¥{priceOf(d, "floorPrices", key) ?? "未定价"} /{" "}
+              ¥{(fromAccount ? m.price : priceOf(d, "floorPrices", key)) ?? "未定价"} /{" "}
               {d.costSettings?.procurement?.[key]?.unit || "m²"}
             </small>}
           </span>
@@ -377,12 +381,13 @@ export function PropertyPanel({
         </section>
         <section>
           <h3 className="section-title">地面材质</h3>
-          {matGrid(r.mat, (v) =>
-            change((d) => ({
-              ...d,
-              rooms: d.rooms.map((g) => (g.id === r.id ? { ...g, mat: v } : g)),
-            })),
-          )}
+          {matGrid(r.mat, (v) => {
+            try {
+              change((d) => applyRoomFloor(d, r.id, v, accountFloors));
+            } catch (e) {
+              notify.fail(e instanceof Error ? e.message : "地面材质设置失败");
+            }
+          })}
           {showCosts && (
             <EditorTooltip label="本间成本" description="查看这间房的硬装与软装费用明细">
               <button className="room-cost-link" onClick={openCosts}>

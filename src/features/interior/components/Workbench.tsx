@@ -92,6 +92,7 @@ import { PropertyPanel } from "./PropertyPanel";
 import { CostPanel } from "./CostPanel";
 import { PanelModeTabs } from "./PanelModeTabs";
 import { CustomFurnitureDialog } from "./CustomFurnitureDialog";
+import { useFloorCatalog } from "../cloud/useFloorCatalog";
 import { SelectionEditor, type SelectionEditorHandle } from "./SelectionEditor";
 import { furnitureKey } from "../model/costs";
 import type { ScreenRect } from "../model/selectionAnchor";
@@ -226,6 +227,12 @@ export function Workbench(p: Props) {
   };
   const [panelMode, setPanelMode] = useState<"props" | "cost">("props"),
     [customOpen, setCustomOpen] = useState(false);
+  const floorCatalog = useFloorCatalog(), loadAccountFloors = floorCatalog.load;
+  const accountFloors = p.loggedIn ? floorCatalog.items : [];
+  // 登录后读取账号地面库；新建家具弹窗关闭后刷新，让刚建的地面立即出现在房间材质里。
+  useEffect(() => {
+    if (p.loggedIn && !customOpen) void loadAccountFloors();
+  }, [p.loggedIn, customOpen, loadAccountFloors]);
   const saveCustom = (item: LibraryItem) => {
     if (!p.loggedIn) return;
     change((d) => d.customCatalog?.some((i) => i.catalogId === item.catalogId)
@@ -1123,6 +1130,7 @@ export function Workbench(p: Props) {
           remove={remove}
           close={() => setSelection(null)}
           transaction={sizeTransaction} showCosts={p.loggedIn}
+          accountFloors={accountFloors}
           hidden={tool !== 'select' || !!drawer || (view === "3d" && sceneOptions.mode === "walk")}
           details={() => {
             setPanelMode("props");
@@ -1168,6 +1176,7 @@ export function Workbench(p: Props) {
               splitWall={view === '2d' && tool === 'select' ? openWallSplit : undefined}
               mergeWall={view === '2d' && tool === 'select' ? id => void cancelWallSplit(id) : undefined}
               transaction={sizeTransaction} showCosts={p.loggedIn}
+              accountFloors={accountFloors}
               design={d}
               selection={selection}
               select={select}

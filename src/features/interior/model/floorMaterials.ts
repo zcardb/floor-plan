@@ -56,6 +56,35 @@ export function floorMaterialOf(d: Pick<Design, "customFloors">, key: string): F
   return custom ? customFloorMaterial(custom) : builtinFloors[key] || builtinFloors.wood;
 }
 
+export interface PickableFloor {
+  key: string;
+  material: FloorMaterial;
+  /** 来自账号地面库、尚未加入当前项目；选择时会自动加入。 */
+  fromAccount: boolean;
+}
+
+/** 房间可选地面：项目已有（内置 + 项目自定义）在前，账号库中尚未加入项目的追加在后。 */
+export function pickableFloors(d: Pick<Design, "customFloors">, accountFloors: CustomFloor[]): PickableFloor[] {
+  const own = floorMaterialsOf(d);
+  const seen = new Set(Object.keys(own));
+  const extra = accountFloors.filter((f) => !seen.has(f.key) && !!seen.add(f.key));
+  return [
+    ...Object.entries(own).map(([key, material]) => ({ key, material, fromAccount: false })),
+    ...extra.map((f) => ({ key: f.key, material: customFloorMaterial(f), fromAccount: true })),
+  ];
+}
+
+/** 给房间设置地面；账号库地面首次使用时一并写入项目 customFloors，保证一次撤销即可还原。 */
+export function applyRoomFloor(d: Design, roomId: string, key: string, accountFloors: CustomFloor[]): Design {
+  let next = d;
+  if (!isFloorKey(d, key)) {
+    const floor = accountFloors.find((f) => f.key === key);
+    if (!floor) throw new Error("地面材质不存在，请刷新后重试");
+    next = { ...d, customFloors: [...(d.customFloors || []), floor] };
+  }
+  return { ...next, rooms: next.rooms.map((r) => (r.id === roomId ? { ...r, mat: key } : r)) };
+}
+
 export const isFloorKey = (d: Pick<Design, "customFloors">, key: string) =>
   key in builtinFloors || !!d.customFloors?.some((f) => f.key === key);
 

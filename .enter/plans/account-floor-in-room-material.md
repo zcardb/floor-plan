@@ -20,15 +20,15 @@
 5. 不改数据库结构、不改账号库/项目已有数据；内置材质与已导入地面行为不变。
 
 ## Implementation checklist
-- [ ] `floorMaterials.ts` 新增 `pickableFloors`，项目内已有的 key 不重复出现
-- [ ] `floorMaterials.ts` 新增 `applyRoomFloor`，账号地面首次选择时写入 `customFloors` 并设置房间 `mat`，已存在时只改 `mat`
-- [ ] `Workbench.tsx` 登录后加载账号地面，自定义家具弹窗关闭后刷新；未登录传 `[]`
-- [ ] `PropertyPanel.tsx` 地面材质网格显示账号库地面并带「账号库」标签，点击走 `applyRoomFloor`
-- [ ] `SelectionEditor.tsx` 「材质 → 地面」下拉包含账号库地面，选择走 `applyRoomFloor`
+- [x] `floorMaterials.ts` 新增 `pickableFloors`，项目内已有的 key 不重复出现
+- [x] `floorMaterials.ts` 新增 `applyRoomFloor`，账号地面首次选择时写入 `customFloors` 并设置房间 `mat`，已存在时只改 `mat`
+- [x] `Workbench.tsx` 登录后加载账号地面，自定义家具弹窗关闭后刷新；未登录传 `[]`
+- [x] `PropertyPanel.tsx` 地面材质网格显示账号库地面并带「账号库」标签，点击走 `applyRoomFloor`
+- [x] `SelectionEditor.tsx` 「材质 → 地面」下拉包含账号库地面，选择走 `applyRoomFloor`
 
 ## Verification checklist
-- [ ] 单测：`pickableFloors` 对已导入 / 未导入 / 空账号库三种情况输出正确
-- [ ] 单测：`applyRoomFloor` 首次选择账号地面后 `customFloors` 含该地面且房间 `mat` 正确；再次选择不重复追加；未知 key 抛错
-- [ ] 单测：应用后的 design 通过 `validateDesign`（保存/重开不丢失）
-- [ ] 手动：选中「院子」，右侧出现「混凝土浇筑 · 账号库」，点击后房间变为浇筑效果，成本按 ¥50/m² 计算，撤销一次恢复原材质
-- [ ] 运行 `pnpm vitest run src/features/interior`、`pnpm lint`、`pnpm run build`
+- [x] 单测：`pickableFloors` 对已导入 / 未导入 / 空账号库三种情况输出正确
+- [x] 单测：`applyRoomFloor` 首次选择账号地面后 `customFloors` 含该地面且房间 `mat` 正确；再次选择不重复追加；未知 key 抛错
+- [x] 单测：应用后的 design 通过 `validateDesign`（保存/重开不丢失）
+- [ ] （待你实测）手动：选中「院子」，右侧出现「混凝土浇筑 · 账号库」，点击后房间变为浇筑效果，成本按 ¥50/m² 计算，撤销一次恢复原材质
+- [x] 运行 `pnpm vitest run src/features/interior`、`pnpm lint`、`pnpm run build`

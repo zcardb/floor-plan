@@ -17,6 +17,7 @@ vi.mock('react', async original => ({
 vi.mock('@/components/ui/confirm-dialog', () => ({ useConfirm: () => state.confirm }));
 vi.mock('../cloud/useProjects', () => ({ isSaveProblem: () => false }));
 vi.mock('./CustomFurnitureDialog', () => ({ CustomFurnitureDialog: () => null }));
+vi.mock('../cloud/useFloorCatalog', () => ({ useFloorCatalog: () => ({ items: [], loading: false, error: '', load: async () => {}, save: async () => {} }) }));
 vi.mock('../model/useDesign', () => ({ useDesign: () => ({
   design: state.design, current: { get current() { return state.design; } }, change: state.change, commit: state.commit, preview: vi.fn(), undo: vi.fn(), redo: vi.fn(),
   counts: { undo: 0, redo: 0 }, sizeTransaction: { flush: vi.fn(), cancel: state.cancel },

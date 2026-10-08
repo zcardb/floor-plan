@@ -1467,6 +1467,17 @@
     font-size: 8px;
     margin-top: 2px;
   }
+  .material-source {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 0 4px;
+    border-radius: 3px;
+    background: hsl(var(--primary) / 0.1);
+    color: hsl(var(--primary));
+    font-size: 8px;
+    font-style: normal;
+    line-height: 13px;
+  }
   .estimate-line {
     display: flex;
     justify-content: space-between;

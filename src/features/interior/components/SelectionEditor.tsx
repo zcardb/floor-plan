@@ -25,7 +25,7 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover";
-import { floorMaterialOf, floorMaterialsOf } from "../model/floorMaterials";
+import { applyRoomFloor, floorMaterialOf, pickableFloors } from "../model/floorMaterials";
 import { FURNITURE_COLORS } from "../data/palette";
 import { WallOptionsMenu } from './WallOptionsMenu';
 import { canEditWall, canResizeWall, openingIsLocked, wallKindName } from '../model/wallPolicy';
@@ -43,7 +43,7 @@ import {
 import { placeEditor, type ScreenRect } from "../model/selectionAnchor";
 import { selectionCost } from "../model/costBreakdown";
 import { yuan } from "../model/money";
-import type { Design, Selection } from "../model/types";
+import type { CustomFloor, Design, Selection } from "../model/types";
 import { PriceInput } from "./PriceInput";
 import { CostDefaultsContext, useCostDesign } from './CostDefaultsContext';
 import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
@@ -71,6 +71,8 @@ interface Props {
   hidden: boolean;
   showCosts: boolean;
   transaction: SizeTransaction;
+  /** 账号地面库；未加入项目的地面也可直接选择，选中后自动加入项目。 */
+  accountFloors?: CustomFloor[];
   splitWall?: (wallId: string) => void;
   mergeWall?: (wallId: string) => void;
 }
@@ -335,8 +337,8 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             <PopoverContent className="visual-editor-popover">
               <h3>房间材质</h3>
               <EditorSelect label="地面" value={r.mat}
-                options={Object.entries(floorMaterialsOf(p.design)).map(([value, m]) => ({ value, label: m.name }))}
-                onChange={value => p.change(d => ({ ...d, rooms: d.rooms.map(g => g.id === r.id ? { ...g, mat: value } : g) }))} />
+                options={pickableFloors(p.design, p.accountFloors || []).map(({ key, material, fromAccount }) => ({ value: key, label: fromAccount ? `${material.name} · 账号库` : material.name }))}
+                onChange={value => p.change(d => applyRoomFloor(d, r.id, value, p.accountFloors || []))} />
               <EditorSelect label="墙面" value={r.wallMat || 'paint'}
                 options={Object.entries(wallMaterials).map(([value, m]) => ({ value, label: m.name }))}
                 onChange={value => p.change(d => ({ ...d, rooms: d.rooms.map(g => g.id === r.id ? { ...g, wallMat: value } : g) }))} />
