@@ -16,8 +16,9 @@ import {
   nearestOnWall,
   norm,
   roomPath,
-  snapMove,
 } from "../model/geometry";
+import { snapFurniture, sameGuides, type AlignmentGuide } from '../model/furnitureAlignment';
+import { AlignmentGuides } from './AlignmentGuides';
 import {
   uid,
   type Design,
@@ -112,6 +113,8 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       view: typeof view;
       center: Point;
     } | null>(null);
+  const [guides, setGuides] = useState<AlignmentGuide[]>([]),
+    showGuides = (next: AlignmentGuide[]) => setGuides(prev => sameGuides(prev, next) ? prev : next);
   const mouseDown = useRef<(() => void) | null>(null);
   const wallClick = useRef<{id:string;fraction:number}|null>(null);
   const wallDrawing = useWallDrawing(tool === 'wall', current, view.s, layers.snap, commit, finishTool);
@@ -280,6 +283,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
   const finish = (cancel = false) => {
     const dr = drag.current;
     drag.current = null;
+    showGuides([]);
     if (!dr) return;
     if (cancel) {
       preview(dr.before);
@@ -323,6 +327,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     if (!supportsPointerCompletion(tool)) return;
     wallDrawing.clear();
     drag.current = null;
+    showGuides([]);
     mouseDown.current = null;
     pinch.current = null;
     for (const id of points.current.keys()) {
@@ -530,14 +535,11 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           f = next.furniture.find((f) => f.id === dr.id),
           wall = next.walls.find((w) => w.id === dr.id);
         if (f) {
-          if (dr.kind === "move")
-            [f.cx, f.cy] = snapMove(
-              f,
-              [p[0] - dr.offset![0], p[1] - dr.offset![1]],
-              next,
-              layers.snap,
-              10 / view.s,
-            );
+          if (dr.kind === "move") {
+            const snapped = snapFurniture(f, [p[0] - dr.offset![0], p[1] - dr.offset![1]], next, layers.snap, 8 / view.s);
+            [f.cx, f.cy] = snapped.point;
+            showGuides(snapped.guides);
+          }
           if (dr.kind === "rot") {
             const a =
               (Math.atan2(p[1] - f.cy, p[0] - f.cx) * 180) / Math.PI + 90;
@@ -764,6 +766,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       {layers.dims && <PerimeterDimensions layout={dimensionLayout} onSelect={tool === 'select' ? onDimensionSelect : undefined} selected={selectedDimension} />}
       {tool==='wall' && wallDrawing.draft && Math.hypot(wallDrawing.draft.b[0]-wallDrawing.draft.a[0],wallDrawing.draft.b[1]-wallDrawing.draft.a[1])>0 && <g data-export-hide="true" pointerEvents="none"><polygon points={connectedWallPoly({id:'draft',...wallDrawing.draft,thickness:design.thickness,kind:'partition'},design.walls,design.demolished).map(p=>p.join(',')).join(' ')} fill="var(--plan-selection-soft)" stroke="var(--plan-selection)" strokeWidth={1/view.s}/><MeasureLine a={wallDrawing.draft.a} b={wallDrawing.draft.b} scale={view.s}/></g>}
       {tool === 'wall' && <WallHoverOverlay walls={design.walls} demolished={design.demolished} candidate={wallDrawing.hover} connection={wallDrawing.candidate} scale={view.s} />}
+      <AlignmentGuides guides={guides} scale={view.s} />
       {selection?.kind === 'opening' && <OpeningDistances design={design} openingId={selection.id} scale={view.s} />}
       {selection && (
         <g data-export-hide="true" className="selection-overlay">

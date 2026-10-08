@@ -122,7 +122,7 @@ describe("户型几何与输入保护", () => {
     };
     expect(validateDesign(old).version).toBe(2);
   });
-  it("关闭贴墙吸附仍保留10mm网格", () => {
+  it("关闭贴墙吸附仍保留50mm网格", () => {
     const d = blankDesign(),
       f = {
         id: "f",
@@ -135,7 +135,8 @@ describe("户型几何与输入保护", () => {
         rot: 0,
         color: "#d8b88a",
       };
-    expect(snapMove(f, [151, 162], d, false)).toEqual([150, 160]);
+    expect(snapMove(f, [151, 162], d, false)).toEqual([150, 150]);
+    expect(snapMove(f, [176, 124], d, false)).toEqual([200, 100]);
     expect(length(d.walls[0])).toBe(6240);
   });
 });

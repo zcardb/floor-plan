@@ -21,17 +21,17 @@
 4. `components/PlanCanvas.tsx`：家具移动改用 `snapFurniture`，维护 `guides` 状态并在结束/取消/缩放时清空。
 
 ## Implementation checklist
-- [ ] `geometry.ts` 新增 `FURNITURE_STEP = 50`，`snapMove` 网格取整改为 50mm
-- [ ] 抽出导出的 `wallSnapCandidates`，墙体吸附结果为精确值
-- [ ] 新建 `model/furnitureAlignment.ts`（`AlignmentGuide`、`snapFurniture`，排除自身，`aabb` 处理旋转）
-- [ ] 每方向取更近候选；未命中 50mm 取整；`snap=false` 无对齐线
-- [ ] 对齐线 `from/to` 覆盖所有共线家具与拖动家具
-- [ ] 新建 `components/AlignmentGuides.tsx`（`--plan-selection`、`data-export-hide`、`pointerEvents="none"`）
-- [ ] `PlanCanvas.tsx` 家具移动使用 `snapFurniture`，容差 `8 / view.s`，维护 `guides`
-- [ ] 松手、取消、双指缩放、`completeTool` 时清除对齐线
+- [x] `geometry.ts` 新增 `FURNITURE_STEP = 50`，`snapMove` 网格取整改为 50mm
+- [x] 抽出导出的 `wallSnapCandidates`，墙体吸附结果为精确值
+- [x] 新建 `model/furnitureAlignment.ts`（`AlignmentGuide`、`snapFurniture`，排除自身，`aabb` 处理旋转）
+- [x] 每方向取更近候选；未命中 50mm 取整；`snap=false` 无对齐线
+- [x] 对齐线 `from/to` 覆盖所有共线家具与拖动家具
+- [x] 新建 `components/AlignmentGuides.tsx`（`--plan-selection`、`data-export-hide`、`pointerEvents="none"`）
+- [x] `PlanCanvas.tsx` 家具移动使用 `snapFurniture`，容差 `8 / view.s`，维护 `guides`
+- [x] 松手、取消、双指缩放、`completeTool` 时清除对齐线
 
 ## Verification checklist
-- [ ] `geometry.test.ts`：`snapMove(f,[151,162],d,false)` → `[150,150]`；`[176,124]` → `[200,100]`
-- [ ] `furnitureAlignment.test.ts`：中线吸附+guide；超出容差 50mm 取整无 guide；`snap=false`；不与自身对齐；旋转 90°；墙更近选墙；三件共线覆盖
-- [ ] `PlanCanvas.test.tsx`：拖近时出现 `[data-alignment-guide]`，松手后消失
-- [ ] `pnpm vitest run src/features/interior`、`pnpm lint`、`pnpm run build` 通过
+- [x] `geometry.test.ts`：`snapMove(f,[151,162],d,false)` → `[150,150]`；`[176,124]` → `[200,100]`
+- [x] `furnitureAlignment.test.ts`：中线吸附+guide；超出容差 50mm 取整无 guide；`snap=false`；不与自身对齐；旋转 90°；墙更近选墙；三件共线覆盖
+- [x] `PlanCanvas.test.tsx`：拖近时出现 `[data-alignment-guide]`，松手后消失
+- [x] `pnpm vitest run src/features/interior`、`pnpm lint`、`pnpm run build` 通过
