@@ -93,8 +93,9 @@ function gapTaker(clusters: SymbolCluster[], found: FoundOpening[]): Take {
       return Math.min(hi, end) - Math.max(lo, start) >= width * 0.5 && hi - lo <= width * 1.5 + 200 &&
         depth <= Math.max(width * 1.2, g.thickness + 1200) &&
         c.points.some(p => {
-          const t = dot(p, g.u);
-          return t >= start - ALONG_SLACK && t <= end + ALONG_SLACK && Math.abs(dot(p, g.n) - g.c) <= g.thickness / 2 + FACE_SLACK;
+          // 凸窗框贴着洞口两侧的墙面起步，沿墙方向放宽到半个墙厚。
+          const t = dot(p, g.u), slack = g.thickness / 2 + ALONG_SLACK;
+          return t >= start - slack && t <= end + slack && Math.abs(dot(p, g.n) - g.c) <= g.thickness / 2 + FACE_SLACK;
         });
     });
     if (!touching.length) return false;
