@@ -114,7 +114,7 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
     <div className="cms-project-grid">{list.map(row => {
       const working = busyRow === row.id;
       return <article className={'cms-card' + (working ? ' is-busy' : '')} key={row.id} aria-busy={working}>
-        <EditorTooltip label={`打开 ${row.name}`} disabled={rowAction.pending}>
+        <EditorTooltip label={row.name} disabled={rowAction.pending}>
           <button type="button" className="cms-card-open" aria-label={'打开项目 ' + row.name} disabled={rowAction.pending} onClick={() => void rowAction.run('open', row)} />
         </EditorTooltip>
         {working ? <Loader2 className="animate-spin" size={30} /> : <LayoutTemplate size={30} />}

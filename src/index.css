@@ -226,7 +226,8 @@
   .cms-card.is-busy { opacity:.6; pointer-events:none; }
   .cms-card-open { position:absolute; inset:0; z-index:1; cursor:pointer; border-radius:inherit; }
   .cms-card-open:focus-visible { outline:2px solid hsl(var(--ring)); outline-offset:2px; }
-  .cms-card h2 { font-size:16px; font-weight:600; margin:14px 0 8px; }
+  /* 标题最多两行，超出省略；固定两行高度，卡片尺寸不随名称长短变化。完整名称见悬浮提示。 */
+  .cms-card h2 { font-size:16px; font-weight:600; margin:14px 0 8px; line-height:1.5; height:3em; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; overflow-wrap:anywhere; }
   .cms-card-actions { position:relative; z-index:2; display:flex; gap:6px; align-items:center; margin-top:20px; }
   .cms-empty { display:grid; justify-items:center; gap:14px; padding:80px 20px; color:hsl(var(--muted-foreground)); }
   .cms-form { display:grid; gap:20px; }
@@ -360,10 +361,10 @@
   .workspace-save-status { flex:none; display:flex; align-items:center; gap:6px; font-size:10px; color:hsl(var(--muted-foreground)); white-space:nowrap; }
   .workspace-save-status.is-error { color:hsl(var(--destructive)); }
   .cms-heading-actions { display:flex; align-items:center; gap:10px; flex:none; }
-  .cms-refresh-button { width:36px; min-height:36px; padding:0; border-radius:9px; color:hsl(var(--muted-foreground)); }
+  .cms-refresh-button { width:auto; min-height:36px; padding:0 12px; gap:6px; border-radius:9px; color:hsl(var(--muted-foreground)); }
   .cms-create-button { min-height:36px; padding:0 16px; border-radius:9px; font-weight:600; }
   @media(max-width:700px) {
-    .cms-refresh-button { width:44px; min-height:44px; }
+    .cms-refresh-button { width:auto; min-height:44px; }
     .cms-create-button,.cost-new { min-height:44px; }
     .cms-search,.cost-search { min-height:44px; }
     .cms-filter-bar button { min-height:36px; }
