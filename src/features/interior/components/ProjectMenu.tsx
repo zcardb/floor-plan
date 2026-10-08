@@ -58,7 +58,7 @@ export function ProjectMenu(p: Props) {
           <span>{name}</span>{pending ? <Loader2 className="animate-spin" size={14} /> : <ChevronDown size={14} />}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="project-menu">
+      <DropdownMenuContent align="start" className="project-menu" onCloseAutoFocus={event => { if (renaming || deleting) event.preventDefault(); }}>
         {p.loggedIn && <>
           <DropdownMenuItem disabled={!!pending} onSelect={p.onBack}><ArrowLeft />返回项目管理</DropdownMenuItem>
           <DropdownMenuSeparator />

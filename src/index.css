@@ -3410,6 +3410,22 @@ button.room-cost-row:hover {
 .project-menu-check { display:flex; color:hsl(var(--primary)); }
 .project-menu-sentinel { height:1px; }
 .project-menu-loading { display:flex; justify-content:center; padding:8px 0; color:hsl(var(--muted-foreground)); }
+/* 行内操作：日期位预留操作宽度，悬停/聚焦时原位替换，不发生布局跳动（Progressive Disclosure）。 */
+.project-menu-row { position:relative; }
+.project-menu-row.is-editable .project-menu-date { min-width:58px; justify-content:flex-end; transition:opacity .15s ease; }
+.project-menu-actions { position:absolute; top:50%; right:38px; display:flex; gap:2px; transform:translateY(-50%); opacity:0; pointer-events:none; transition:opacity .15s ease; }
+.project-menu-row:hover .project-menu-actions,.project-menu-row:focus-within .project-menu-actions { opacity:1; pointer-events:auto; }
+.project-menu-row.is-editable:hover .project-menu-date,.project-menu-row.is-editable:focus-within .project-menu-date { opacity:0; }
+.project-menu-row:hover>.project-menu-option { background:hsl(var(--accent)); color:hsl(var(--accent-foreground)); }
+.project-menu-action { width:28px; height:28px; min-height:28px; padding:0; justify-content:center; color:hsl(var(--muted-foreground)); }
+.project-menu-action svg { width:15px; height:15px; }
+.project-menu-action:focus { background:hsl(var(--card)); color:hsl(var(--foreground)); box-shadow:0 0 0 1px hsl(var(--border)); }
+.project-menu-action.is-danger:focus { background:hsl(var(--destructive) / 0.1); color:hsl(var(--destructive)); box-shadow:0 0 0 1px hsl(var(--destructive) / 0.3); }
+@media (hover: none) {
+  .project-menu-actions { opacity:1; pointer-events:auto; }
+  .project-menu-row.is-editable .project-menu-date { opacity:0; }
+}
+.field-counter { justify-self:end; font-size:11px; color:hsl(var(--muted-foreground)); font-variant-numeric:tabular-nums; }
 /* 右侧：导出按钮与账号 */
 .export-button { height:32px; padding:0 10px 0 12px; gap:6px; font-size:12px; font-weight:600; border-color:hsl(var(--primary) / 0.5); color:hsl(var(--primary)); background:hsl(var(--card)); }
 .export-button:hover,.export-button[data-state="open"] { background:hsl(var(--primary) / 0.08); border-color:hsl(var(--primary)); color:hsl(var(--primary)); }

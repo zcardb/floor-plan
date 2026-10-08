@@ -13,6 +13,7 @@ vi.mock('react', async original => ({
   useEffect: (effect: () => unknown) => { state.effects.push(effect); },
 }));
 import { ProjectMenu, LoadMoreSentinel } from './ProjectMenu';
+import { ProjectDeleteDialog, ProjectRenameDialog } from './ProjectDialogs';
 import { AccountMenu } from './AccountMenu';
 import { AccountAvatar } from './AccountAvatar';
 import { ExportMenu } from './ExportMenu';
@@ -33,17 +34,19 @@ function text(tree: ReactNode): string {
   if (Array.isArray(tree)) return tree.map(text).join('');
   return isValidElement<{ children?: ReactNode }>(tree) ? text(tree.props.children) : '';
 }
-const row = (id: string, name: string): ProjectSummary => ({ id, name, updatedAt: '2026-10-08T08:00:00Z', revision: 0, cloud: true });
+const row = (id: string, name: string, system = false): ProjectSummary => ({ id, name, updatedAt: '2026-10-08T08:00:00Z', revision: 0, cloud: true, system });
 const current = row('a', '三室两厅两卫'), other = row('b', 'Home');
 function menu(overrides: Partial<Parameters<typeof ProjectMenu>[0]> = {}) {
   state.cursor = 0;
   const props = {
     project: current, loggedIn: true, projectList: [current, other], hasMore: false, listLoading: false,
-    onOpen: vi.fn(async () => true), onLoadMore: vi.fn(), onBack: vi.fn(), ...overrides,
+    onOpen: vi.fn(async () => true), onLoadMore: vi.fn(), onBack: vi.fn(),
+    onRename: vi.fn(async () => true), onRemove: vi.fn(async () => true), ...overrides,
   };
   return { props, tree: nodes(ProjectMenu(props)) };
 }
-const items = (tree: Node[]) => tree.filter(n => n.type === DropdownMenuItem);
+const items = (tree: Node[]) => tree.filter(n => n.type === DropdownMenuItem && n.props.className !== 'project-menu-action' && n.props.className !== 'project-menu-action is-danger');
+const actions = (tree: Node[]) => tree.filter(n => n.type === DropdownMenuItem && String(n.props.className).startsWith('project-menu-action'));
 beforeEach(() => { state.values = []; state.cursor = 0; state.refs = []; state.effects = []; });
 
 describe('ProjectMenu', () => {
@@ -89,6 +92,25 @@ describe('ProjectMenu', () => {
     expect(labels[0]).toContain('参考户型');
     expect(labels).not.toContain('保存到云端');
     expect(labels).not.toContain('返回项目管理');
+    expect(actions(tree)).toHaveLength(0);
+  });
+  it('每行提供重命名与删除，系统默认方案不提供；点击后打开对应弹窗', () => {
+    const { tree } = menu({ projectList: [current, other, row('s', '默认方案', true)] });
+    const labels = actions(tree).map(n => n.props['aria-label']);
+    expect(labels).toEqual(['重命名三室两厅两卫', '删除三室两厅两卫', '重命名Home', '删除Home']);
+    expect(actions(tree)[1].props.className).toContain('is-danger');
+    (actions(tree)[2].props.onSelect as () => void)();
+    expect(state.values[1]).toBe(other);
+    (actions(tree)[1].props.onSelect as () => void)();
+    expect(state.values[2]).toBe(current);
+    const after = menu().tree;
+    expect(after.find(n => n.type === ProjectRenameDialog)!.props.project).toBe(other);
+    const del = after.find(n => n.type === ProjectDeleteDialog)!;
+    expect(del.props).toMatchObject({ project: current, current: true });
+  });
+  it('切换项目进行中时行内操作禁用', () => {
+    state.values[0] = 'b';
+    expect(actions(menu().tree).every(n => n.props.disabled === true)).toBe(true);
   });
 });
 
