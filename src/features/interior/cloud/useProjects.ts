@@ -45,6 +45,7 @@ export function useProjects() {
     [ready, setReady] = useState(false),
     [status, setStatus] = useState("本机已保存"),
     [loading, setLoading] = useState(false),
+    [listReady, setListReady] = useState(false),
     [hasMore, setHasMore] = useState(false);
   const sessionRef = useRef(session),
     activeRef = useRef(active),
@@ -76,13 +77,22 @@ export function useProjects() {
       const generation = epoch.current;
       setLoading(true);
       const start = more ? cloud.length : 0;
-      const { data, error } = await supabase
-        .from("interior_design_projects")
-        .select("id,name,updated_at,revision")
-        .order("updated_at", { ascending: false })
-        .range(start, start + 19);
+      let result;
+      try {
+        result = await supabase
+          .from("interior_design_projects")
+          .select("id,name,updated_at,revision")
+          .order("updated_at", { ascending: false })
+          .range(start, start + 19);
+      } catch (cause) {
+        if (generation !== epoch.current) return;
+        setLoading(false); setListReady(true);
+        toast.error("云端项目读取失败：" + (cause instanceof Error ? cause.message : "请重试"));
+        return;
+      }
       if (generation !== epoch.current) return;
-      setLoading(false);
+      const { data, error } = result;
+      setLoading(false); setListReady(true);
       if (error) {
         toast.error("云端项目读取失败：" + error.message);
         return;
@@ -111,6 +121,7 @@ export function useProjects() {
         if (timer.current) clearTimeout(timer.current);
         dirty.current = false;
         setCloud([]);
+        setListReady(false);
         setLoading(false);
         const guest = defaultGuest(); activeRef.current = guest; setActive(guest);
         setStatus('本机已保存');
@@ -522,6 +533,7 @@ export function useProjects() {
     ready,
     status,
     loading,
+    listReady,
     hasMore,
     update,
     save,

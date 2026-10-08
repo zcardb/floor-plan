@@ -9,6 +9,7 @@ import { Popover,PopoverContent,PopoverTrigger } from '@/components/ui/popover';
 import { Select,SelectContent,SelectItem,SelectTrigger,SelectValue } from '@/components/ui/select';
 import { Tabs,TabsContent,TabsList,TabsTrigger } from '@/components/ui/tabs';
 import { categories } from '../data/catalog';
+import { newFurnitureCategory } from '../model/newFurnitureCategory';
 import { FURNITURE_COLORS } from '../data/palette';
 import { uid,type LibraryItem } from '../model/types';
 import { validPrice } from '../model/costs';
@@ -17,10 +18,10 @@ import { useFurnitureImage } from '../cloud/useFurnitureImage';
 import { useFurnitureCatalog } from '../cloud/useFurnitureCatalog';
 import { FurnitureShape } from './FurnitureShape';
 import { furnitureTypes, resolvedFurnitureType, appearanceDimensions, needsParameterOnly, type FurnitureOutline } from '../model/furnitureAppearance';
-type Props = { open:boolean; onOpenChange:(v:boolean)=>void; loggedIn:boolean; login:()=>void; onCreate:(i:LibraryItem)=>void; onImport:(i:LibraryItem)=>void; ownerKey:string; accountOnly?:boolean };
+type Props = { open:boolean; onOpenChange:(v:boolean)=>void; loggedIn:boolean; login:()=>void; onCreate:(i:LibraryItem)=>void; onImport:(i:LibraryItem)=>void; ownerKey:string; accountOnly?:boolean; initialCategory?:string };
 const tabTrigger = 'gap-[5px] rounded px-2.5 py-1.5 text-[11px] max-[700px]:px-[7px] max-[700px]:text-[10px]';
-export function CustomFurnitureDialog({open,onOpenChange,loggedIn,login,onCreate,onImport,ownerKey,accountOnly=false}:Props){
-  const [name,setName]=useState(''),[category,setCategory]=useState('客厅'),[w,setW]=useState('1.8'),[d,setD]=useState('0.8'),[h,setH]=useState('0.8'),[price,setPrice]=useState(''),[color,setColor]=useState('#b7c4b0'),[account,setAccount]=useState(accountOnly),[error,setError]=useState(''),[saving,setSaving]=useState(false),[tab,setTab]=useState('create'),[pending,setPending]=useState<LibraryItem|null>(null),[colorOpen,setColorOpen]=useState(false);
+export function CustomFurnitureDialog({open,onOpenChange,loggedIn,login,onCreate,onImport,ownerKey,accountOnly=false,initialCategory='客厅'}:Props){
+  const [name,setName]=useState(''),[category,setCategory]=useState(()=>newFurnitureCategory(initialCategory)),[w,setW]=useState('1.8'),[d,setD]=useState('0.8'),[h,setH]=useState('0.8'),[price,setPrice]=useState(''),[color,setColor]=useState('#b7c4b0'),[account,setAccount]=useState(accountOnly),[error,setError]=useState(''),[saving,setSaving]=useState(false),[tab,setTab]=useState('create'),[pending,setPending]=useState<LibraryItem|null>(null),[colorOpen,setColorOpen]=useState(false);
   const ai=useFurnitureImage(),catalog=useFurnitureCatalog(),cancel=ai.cancel,reset=catalog.reset;
   const epoch=useRef(0),lock=useRef(false),id=useRef(uid()),pendingRef=useRef<LibraryItem|null>(null),latest=useRef({open,ownerKey}); latest.current={open,ownerKey};
   useEffect(()=>{const generation=epoch;epoch.current++;lock.current=false;pendingRef.current=null;setPending(null);setSaving(false);setError('');cancel();reset();id.current=uid();return()=>{generation.current++;};},[open,ownerKey,cancel,reset]);

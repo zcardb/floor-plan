@@ -9,6 +9,7 @@ export function useFurnitureCatalog() {
   const reset = useCallback(() => { epoch.current++; offset.current=0; setItems([]); setCount(0); setCounts({}); setError(''); setLoading(false); }, []);
   const load = useCallback(async (more=false) => {
     const run=++epoch.current; setLoading(true); setError('');
+    try {
     const {data:{session}} = await supabase.auth.getSession();
     if (run !== epoch.current) return;
     if (!session) { reset(); return; }
@@ -22,6 +23,10 @@ export function useFurnitureCatalog() {
     if(page.error || stats instanceof Error){setError(page.error?.message || (stats as Error).message);return;}
     const mapped=(page.data||[]).map(r=>({catalogId:r.catalog_id,name:r.name,category:r.category,type:r.type,shape:r.shape as LibraryItem['shape'],w:Number(r.width),d:Number(r.depth),height:Number(r.height),color:r.color,price:r.price===null?null:Number(r.price),imageUrl:r.image_url||undefined}));
     offset.current=start+mapped.length; setItems(old=>more?[...old,...mapped]:mapped); setCount(page.count||0); setCounts(Object.fromEntries(stats)); setHasMore(offset.current<(page.count||0));
+    } catch(cause) {
+      if(run!==epoch.current)return;
+      setLoading(false);setError(cause instanceof Error?cause.message:'家具读取失败，请重试');
+    }
   },[reset]);
   const save=useCallback(async(item:LibraryItem)=>{
     if(!validFurnitureType(item.type)||!validFurnitureOutline(item.shape))throw new Error('参考类型或外形无效');

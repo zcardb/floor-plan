@@ -43,7 +43,7 @@ export function AccountFurnitureLibrary({catalog,defaults,saveDefaults,onDirty,o
     </button>;
   };
   return <>
-    <div className="cms-heading"><div><h1>账号家具库</h1><p>{total} 款家具 · 内置 {library.length} 款 + 自定义 {catalog.count} 款（款式数，不是项目摆放件数）</p></div><Button disabled={commit.busy||!!commit.pending} onClick={onNew}><Plus/>新建家具</Button></div>
+    <div className="cms-heading"><div><h1>账号家具库</h1><p>{total} 款家具 · 内置 {library.length} 款 + 自定义 {catalog.count} 款（款式数，不是项目摆放件数）</p></div><Button disabled={commit.busy||!!commit.pending} onClick={()=>onNew(category)}><Plus/>新建家具</Button></div>
     <div className="cms-toolbar" aria-busy={catalog.loading}>
       <div className="cms-search">{catalog.loading?<Loader2 className="animate-spin" size={15} aria-label="加载家具"/>:<Search size={15}/>}<input aria-label="搜索家具" placeholder="搜索家具、家电…" value={query} onChange={e=>setQuery(e.target.value)}/></div>
       <CmsFilterBar chips={chips} value={category} onChange={setCategory}/>

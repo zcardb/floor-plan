@@ -2508,22 +2508,7 @@
   flex-wrap: wrap;
   gap: 5px;
 }
-.price-entry input {
-  flex: 1;
-  min-width: 0;
-  width: 100px;
-  padding: 7px 9px;
-  border: 1px solid hsl(var(--border));
-  border-radius: 5px;
-  background: hsl(var(--background));
-  font-size: 11px;
-}
-.price-entry > button {
-  padding: 7px 9px;
-  border-radius: 5px;
-  background: hsl(var(--secondary));
-  font-size: 10px;
-}
+.price-entry .price-control { flex:1; min-width:0; width:100px; }
 .price-entry small {
   flex-basis: 100%;
   color: hsl(var(--destructive));

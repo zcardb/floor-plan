@@ -1,6 +1,7 @@
 import { useEffect,useRef,useState } from 'react';
 import { length } from '../model/geometry';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { meterDraft, sizeDraftToModel } from '../model/lengthUnits';
 import type { Design,Selection } from '../model/types';
 import type { SizeTransaction } from '../model/sizeTransaction';
@@ -31,9 +32,9 @@ export function SizeFields({design,selection,transaction,close}:{design:Design;s
   const wall=selection?.kind==='wall'?design.walls.find(w=>w.id===selection.id):null;
   const locked=wall&&(design.template!=='blank'||wall.kind!=='partition');
   if(locked)return <p className="visual-locked">原始建筑结构已锁定，不能修改尺寸。</p>;
-  return <div onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cancel();}}}><div className="visual-size-fields">{fields.current.map(([key,label])=><label key={key}>{label}<Input className="editor-control" aria-label={label} type="number" step={key==='rot'?1:0.001} value={draft[key]??''} onChange={e=>{
+  return <div onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cancel();}}}><div className="visual-size-fields">{fields.current.map(([key,label])=><Label key={key}>{label}<Input className="editor-control" aria-label={label} type="number" step={key==='rot'?1:0.001} value={draft[key]??''} onChange={e=>{
     if(!token.current||!transaction.isActive(token.current))token.current=transaction.begin(selection);
     const next={...draft,[key]:e.target.value};setDraft(next);
     try{transaction.update(token.current,sizeDraftToModel(next));setError('');}catch(err){setError(err instanceof Error?err.message:'尺寸无效');}
-  }} onBlur={()=>settle()} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();e.currentTarget.blur();}}}/></label>)}</div>{error&&<p className="form-error" role="alert">{error}</p>}<p className="muted-note">改动即时生效</p></div>;
+  }} onBlur={()=>settle()} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();e.currentTarget.blur();}}}/></Label>)}</div>{error&&<p className="form-error" role="alert">{error}</p>}<p className="muted-note">改动即时生效</p></div>;
 }

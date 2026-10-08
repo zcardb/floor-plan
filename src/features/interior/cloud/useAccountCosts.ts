@@ -12,12 +12,16 @@ export function useAccountCosts(owner?: string) {
     revision.current = null; setSettings({}); setError(''); setSaving(false); busy.current = false;
     if (!owner) { setLoading(false); return; }
     setLoading(true);
-    void supabase.from('interior_account_cost_defaults').select('settings,revision').eq('owner_id', owner).maybeSingle().then(({data,error}) => {
+    void Promise.resolve(supabase.from('interior_account_cost_defaults').select('settings,revision').eq('owner_id', owner).maybeSingle()).then(({data,error}) => {
       if (run !== epoch.current) return;
       setLoading(false);
       if (error) { setError(error.message); return; }
       revision.current = data?.revision ?? null;
       setSettings((data?.settings || {}) as AccountCostSettings);
+    }).catch(cause => {
+      if (run !== epoch.current) return;
+      setLoading(false);
+      setError(cause instanceof Error ? cause.message : '账号成本读取失败，请重试');
     });
     return () => { generation.current++; };
   }, [owner]);
