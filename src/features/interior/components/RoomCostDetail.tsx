@@ -73,7 +73,7 @@ export function RoomCostDetail({
           share={share}
         />
         <p className="footnote">
-          地面按面积占比分摊，共墙上的门窗在相邻房间之间平分；拆改、新建与人工属于全屋公共项，不计入本间。
+          地面按面积占比分摊，屋面按坡度换算斜面面积、吊顶按本间面积计入，共墙上的门窗在相邻房间之间平分；拆改、新建与人工属于全屋公共项，不计入本间。
         </p>
       </section>
       <section>

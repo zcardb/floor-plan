@@ -5,8 +5,8 @@ import { referenceDesign } from "../data/templates";
 import { length } from "./geometry";
 import { validateProcurement } from "./materialProcurement";
 import { normalizeFurniture, validPrice } from "./costs";
-import { isWallKey, validCustomOpening, validCustomWall } from "./hardMaterials";
-import type { Design } from "./types";
+import { isSurfaceKey, isWallKey, ROOF_SLOPE_MAX, validCustomOpening, validCustomWall } from "./hardMaterials";
+import type { Design, Room } from "./types";
 const fail = () => {
   throw new Error("方案格式不正确或数据超出允许范围");
 };
@@ -94,6 +94,8 @@ export function validateDesign(value: unknown): Design {
   };
   customList(v.customWalls, validCustomWall);
   customList(v.customOpenings, validCustomOpening);
+  customList(v.customRoofs, validCustomWall);
+  customList(v.customCeilings, validCustomWall);
   for (const r of v.rooms) {
     id(r.id);
     if (
@@ -235,6 +237,8 @@ export function validateDesign(value: unknown): Design {
       "wallPrices",
       "furniturePrices",
       "openingPrices",
+      "roofPrices",
+      "ceilingPrices",
       "constructionPrices",
     ] as const) {
       const prices = v.costSettings[group];
@@ -271,6 +275,17 @@ export function validateDesign(value: unknown): Design {
   }
   return structuredClone({
     ...v,
+    rooms: v.rooms.map((r) => normalizeRoomSurfaces(v, r)),
     furniture: v.furniture.map(normalizeFurniture),
   });
+}
+/** 屋面 / 吊顶为纯计价字段：未知材料清除，坡度截断到 0–60°。 */
+function normalizeRoomSurfaces(d: Design, r: Room): Room {
+  const next = { ...r };
+  if (next.roofMat !== undefined && (typeof next.roofMat !== "string" || !isSurfaceKey(d, "roof", next.roofMat))) delete next.roofMat;
+  if (next.ceilingMat !== undefined && (typeof next.ceilingMat !== "string" || !isSurfaceKey(d, "ceiling", next.ceilingMat))) delete next.ceilingMat;
+  if (!next.roofMat) { delete next.roofSlope; delete next.ceilingMat; }
+  else if (next.roofSlope !== undefined)
+    next.roofSlope = typeof next.roofSlope === "number" && Number.isFinite(next.roofSlope) ? Math.min(ROOF_SLOPE_MAX, Math.max(0, next.roofSlope)) : 0;
+  return next;
 }

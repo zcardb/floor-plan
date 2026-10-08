@@ -32,6 +32,12 @@ export interface Room {
   mat: string;
   counted?: boolean;
   wallMat?: string;
+  /** 屋面材料 key；为空表示无屋面，不计费。 */
+  roofMat?: string;
+  /** 屋面坡度（°，0–60），0 为平顶。 */
+  roofSlope?: number;
+  /** 吊顶材料 key；为空表示原顶，不计费。 */
+  ceilingMat?: string;
 }
 export interface Furniture {
   id: string;
@@ -62,6 +68,8 @@ export interface CostSettings {
   furniturePrices?: Record<string, number | null>;
   /** key 为 door / window 或自定义门窗款式 key。 */
   openingPrices?: Record<string, number | null>;
+  roofPrices?: Record<string, number | null>;
+  ceilingPrices?: Record<string, number | null>;
   constructionPrices?: Partial<Record<"build" | "demolish", number | null>>;
   labor?: { id: string; name: string; amount: number }[];
 }
@@ -85,8 +93,10 @@ export interface Design {
   customFloors?: CustomFloor[];
   customWalls?: CustomWall[];
   customOpenings?: CustomOpening[];
+  customRoofs?: CustomWall[];
+  customCeilings?: CustomWall[];
 }
-/** 自定义墙面材料，单价按 m²。 */
+/** 自定义墙面 / 屋面 / 吊顶材料（名称 + 颜色），单价按 m²。 */
 export interface CustomWall {
   key: string;
   name: string;

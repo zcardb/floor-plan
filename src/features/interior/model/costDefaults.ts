@@ -1,6 +1,6 @@
 import type { CostSettings, Design } from './types';
 export type AccountCostSettings = Omit<CostSettings, 'labor'>;
-export const priceGroups = ['floorPrices','wallPrices','furniturePrices','openingPrices','constructionPrices'] as const;
+export const priceGroups = ['floorPrices','wallPrices','furniturePrices','openingPrices','roofPrices','ceilingPrices','constructionPrices'] as const;
 export function effectiveCostDesign(d: Design, defaults: AccountCostSettings = {}): Design {
   const settings: CostSettings = { ...defaults, ...d.costSettings, labor: d.costSettings?.labor };
   for (const group of priceGroups) settings[group] = { ...defaults[group], ...d.costSettings?.[group] };

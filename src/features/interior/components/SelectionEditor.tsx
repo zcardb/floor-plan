@@ -19,7 +19,6 @@ import {
   LockKeyhole,
   GripVertical,
   DoorOpen,
-  Shapes,
 } from "lucide-react";
 import {
   Popover,
@@ -45,11 +44,11 @@ import { selectionCost } from "../model/costBreakdown";
 import { yuan } from "../model/money";
 import type { CustomFloor, CustomOpening, CustomWall, Design, Selection } from "../model/types";
 import { applyRoomWall, openingName, openingPriceKey, pickableWalls } from "../model/hardMaterials";
-import { OpeningVariantSelect } from "./OpeningVariantSelect";
 import { PriceInput } from "./PriceInput";
 import { CostDefaultsContext, useCostDesign } from './CostDefaultsContext';
 import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
 import { EditorSelect } from './EditorSelect';
+import { RoomSurfaceFields } from './RoomSurfaceFields';
 import { formatMeters } from '../model/lengthUnits';
 import { Button } from '@/components/ui/button';
 import { EditorTooltip } from '@/components/ui/editor-tooltip';
@@ -78,6 +77,9 @@ interface Props {
   /** 账号墙面库、门窗库；选用后自动加入项目。 */
   accountWalls?: CustomWall[];
   accountOpenings?: CustomOpening[];
+  /** 账号屋面库、吊顶库；选用后自动加入项目。 */
+  accountRoofs?: CustomWall[];
+  accountCeilings?: CustomWall[];
   splitWall?: (wallId: string) => void;
   mergeWall?: (wallId: string) => void;
   /** 删除墙体（与属性面板的「删除隔墙」共用同一实现）。 */
@@ -296,7 +298,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
                   此项目创建时锁定了结构尺寸，复制该项目后副本可自由调整。
                 </p>
               ) : (
-                <SizeFields design={p.design} selection={p.selection} transaction={p.transaction} close={()=>setOpen(null)}/>
+                <SizeFields key={p.selection?.id} design={p.design} selection={p.selection} transaction={p.transaction} close={()=>setOpen(null)}/>
               )}
             </PopoverContent>
           </Popover>
@@ -348,15 +350,10 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
               <EditorSelect label="墙面" value={r.wallMat || 'paint'}
                 options={pickableWalls(p.design, p.accountWalls || []).map(({ key, name, fromAccount }) => ({ value: key, label: fromAccount ? `${name} · 账号库` : name }))}
                 onChange={value => p.change(d => applyRoomWall(d, r.id, value, p.accountWalls || []))} />
+              <RoomSurfaceFields design={p.design} room={r} change={p.change} accountRoofs={p.accountRoofs || []} accountCeilings={p.accountCeilings || []} />
             </PopoverContent>
           </Popover>
         )}
-        {o && <Popover open={open === 'variant'} onOpenChange={value => setPanel(value, 'variant')}>
-          <EditorTooltip label="门窗款式">
-            <PopoverTrigger asChild><Button type="button" variant="ghost" size="sm" className="visual-door-direction" aria-label="切换门窗款式"><Shapes size={15} />款式<ChevronDown size={12} /></Button></PopoverTrigger>
-          </EditorTooltip>
-          <PopoverContent className="visual-editor-popover"><h3>门窗款式</h3><OpeningVariantSelect design={p.design} opening={o} accountOpenings={p.accountOpenings} change={p.change} disabled={openingIsLocked(p.design, o.wallId)} /></PopoverContent>
-        </Popover>}
         {o?.kind === 'door' && <Popover open={open === 'direction'} onOpenChange={value => setPanel(value, 'direction')}>
           <EditorTooltip label="门开向">
             <PopoverTrigger asChild><Button type="button" variant="ghost" size="sm" className="visual-door-direction" aria-label="调整门开向"><DoorOpen size={15} />开向<ChevronDown size={12} /></Button></PopoverTrigger>

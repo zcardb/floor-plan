@@ -3381,6 +3381,36 @@ export type Database = {
         }
         Relationships: []
       }
+      interior_ceiling_catalog: {
+        Row: {
+          ceiling_key: string
+          color: string
+          created_at: string
+          id: string
+          name: string
+          owner_id: string
+          price: number | null
+        }
+        Insert: {
+          ceiling_key: string
+          color: string
+          created_at?: string
+          id?: string
+          name: string
+          owner_id?: string
+          price?: number | null
+        }
+        Update: {
+          ceiling_key?: string
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          owner_id?: string
+          price?: number | null
+        }
+        Relationships: []
+      }
       interior_design_projects: {
         Row: {
           created_at: string
@@ -3609,6 +3639,36 @@ export type Database = {
           owner_id?: string
           price?: number | null
           width?: number
+        }
+        Relationships: []
+      }
+      interior_roof_catalog: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+          owner_id: string
+          price: number | null
+          roof_key: string
+        }
+        Insert: {
+          color: string
+          created_at?: string
+          id?: string
+          name: string
+          owner_id?: string
+          price?: number | null
+          roof_key: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          owner_id?: string
+          price?: number | null
+          roof_key?: string
         }
         Relationships: []
       }

@@ -20,6 +20,7 @@ vi.mock('./CustomFurnitureDialog', () => ({ CustomFurnitureDialog: () => null })
 vi.mock('../cloud/useFloorCatalog', () => ({ useFloorCatalog: () => ({ items: [], loading: false, error: '', load: async () => {}, save: async () => {} }) }));
 vi.mock('../cloud/useWallCatalog', () => ({ useWallCatalog: () => ({ items: [], loading: false, error: '', load: async () => {}, save: async () => {} }) }));
 vi.mock('../cloud/useOpeningCatalog', () => ({ useOpeningCatalog: () => ({ items: [], loading: false, error: '', load: async () => {}, save: async () => {} }) }));
+vi.mock('../cloud/useSurfaceCatalogs', () => ({ useRoofCatalog: () => ({ items: [], loading: false, error: '', load: async () => {}, save: async () => {} }), useCeilingCatalog: () => ({ items: [], loading: false, error: '', load: async () => {}, save: async () => {} }) }));
 vi.mock('../cloud/useFurnitureCatalog', () => ({ useFurnitureCatalog: () => ({ items: state.furniture, loading: false, error: '', hasMore: false, count: state.furniture.length, counts: {}, load: async () => {}, save: async () => {}, remove: async () => {}, reset: () => {} }) }));
 vi.mock('../model/useDesign', () => ({ useDesign: () => ({
   design: state.design, current: { get current() { return state.design; } }, change: state.change, commit: state.commit, preview: vi.fn(), undo: vi.fn(), redo: vi.fn(),

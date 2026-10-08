@@ -11,13 +11,15 @@ import type {
   Point,
   Room,
 } from "./types";
-import { openingName, openingPriceKey, wallMaterialOf } from "./hardMaterials";
+import { openingName, openingPriceKey, roofSurfaceArea, surfaceMaterialOf, wallMaterialOf } from "./hardMaterials";
 export { wallMaterials } from "./hardMaterials";
 export type PriceGroup =
   | "floorPrices"
   | "wallPrices"
   | "furniturePrices"
   | "openingPrices"
+  | "roofPrices"
+  | "ceilingPrices"
   | "constructionPrices";
 export interface CostRow {
   key: string;
@@ -64,6 +66,10 @@ export function priceOf(
     return d.customWalls?.find((w) => w.key === key)?.price ?? null;
   if (group === "openingPrices")
     return d.customOpenings?.find((o) => o.key === key)?.price ?? null;
+  if (group === "roofPrices")
+    return d.customRoofs?.find((o) => o.key === key)?.price ?? null;
+  if (group === "ceilingPrices")
+    return d.customCeilings?.find((o) => o.key === key)?.price ?? null;
   return null;
 }
 export function setPrice(
@@ -216,6 +222,10 @@ export function calculateCosts(d: Design, defaults?: AccountCostSettings) {
         "m²",
       );
     }
+    if (r.roofMat)
+      add(hard, "roofPrices", r.roofMat, surfaceMaterialOf(d, "roof", r.roofMat)?.name || "屋面", roofSurfaceArea(r), "m²");
+    if (r.roofMat && r.ceilingMat)
+      add(hard, "ceilingPrices", r.ceilingMat, surfaceMaterialOf(d, "ceiling", r.ceilingMat)?.name || "吊顶", area(r), "m²");
   }
   for (const o of d.openings) {
     if (d.demolished.includes(o.wallId)) continue;

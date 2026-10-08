@@ -38,7 +38,7 @@ describe('家具外观和成本分类',()=>{
   });
   it('硬装与软装筛选隔离且保留家电',()=>{
     const entries=accountCostEntries([item],{});
-    expect(filterCostEntries(entries,'全部','','硬装').every(e=>['地面','墙面','门窗'].includes(e.category))).toBe(true);
+    expect(filterCostEntries(entries,'全部','','硬装').every(e=>['地面','墙面','门窗','屋面','吊顶'].includes(e.category))).toBe(true);
     expect(filterCostEntries(entries,'家电','','软装').length).toBeGreaterThan(0);
     expect(filterCostEntries(entries,'全部','火炉','硬装')).toEqual([]);
     expect(filterCostEntries(entries,'全部','火炉','软装')).toHaveLength(1);

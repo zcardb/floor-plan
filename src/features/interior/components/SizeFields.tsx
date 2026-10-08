@@ -19,13 +19,19 @@ export function SizeFields({design,selection,transaction,close}:{design:Design;s
   const token=useRef<symbol|null>(null),invalid=useRef(false),edited=useRef(new Set<string>());
   invalid.current=!!error;
   const draftFromDesign=()=>Object.fromEntries(sizeFields(design,selection).map(([key,,value])=>[key,key==='rot'?String(value):meterDraft(value)]));
-  // 输入即生效：失焦或弹窗关闭时把预览合并成一步撤销；非法输入则放弃本次预览。
+  const [resync,setResync]=useState(0);
+  // 未在本表单改过的字段跟随模型实时刷新（如加宽后自动平移的位置、另一处表单或拖拽的改动）。
+  useEffect(()=>{
+    const latest=Object.fromEntries(sizeFields(design,selection).map(([key,,value])=>[key,key==='rot'?String(value):meterDraft(value)]));
+    setDraft(prev=>{const next={...prev};let changed=false;for(const [key,value] of Object.entries(latest))if(!edited.current.has(key)&&next[key]!==value){next[key]=value;changed=true;}return changed?next:prev;});
+  },[design,selection,resync]);
+  // 输入即生效：失焦或弹窗关闭时把预览合并成一步撤销；非法输入则放弃本次预览并回显当前值。
   const settle=(silent=false)=>{
     const t=token.current;
     token.current=null;
     edited.current.clear();
     if(!t)return;
-    if(invalid.current)transaction.cancel(t);
+    if(invalid.current){transaction.cancel(t);if(!silent)setResync(n=>n+1);}
     else if(!transaction.apply(t)&&!silent&&transaction.isActive(t))setError('尺寸编辑已结束，请重新打开');
   };
   const settleRef=useRef(settle);

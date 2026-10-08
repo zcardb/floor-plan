@@ -1,0 +1,25 @@
+create table if not exists public.interior_roof_catalog (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null default auth.uid(),
+  roof_key text not null check (roof_key ~* '^custom-[0-9a-f-]{36}$'),
+  name text not null check (char_length(name) between 1 and 100),
+  color text not null check (color ~* '^#[0-9a-f]{6}$'),
+  price numeric check (price >= 0 and price <= 100000000),
+  created_at timestamptz not null default now(),
+  unique (owner_id, roof_key)
+);
+alter table public.interior_roof_catalog enable row level security;
+create policy interior_roof_catalog_own on public.interior_roof_catalog for all using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
+
+create table if not exists public.interior_ceiling_catalog (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null default auth.uid(),
+  ceiling_key text not null check (ceiling_key ~* '^custom-[0-9a-f-]{36}$'),
+  name text not null check (char_length(name) between 1 and 100),
+  color text not null check (color ~* '^#[0-9a-f]{6}$'),
+  price numeric check (price >= 0 and price <= 100000000),
+  created_at timestamptz not null default now(),
+  unique (owner_id, ceiling_key)
+);
+alter table public.interior_ceiling_catalog enable row level security;
+create policy interior_ceiling_catalog_own on public.interior_ceiling_catalog for all using (auth.uid() = owner_id) with check (auth.uid() = owner_id);

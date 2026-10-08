@@ -20,18 +20,18 @@ import { AccountFurnitureDialog } from './AccountFurnitureDialog';
 import { useAccountCostCommit } from './useAccountCostCommit';
 
 type Props = {
-  catalog: ReturnType<typeof useFurnitureCatalog>; floors?: CustomFloor[]; walls?: CustomWall[]; openings?: CustomOpening[];
+  catalog: ReturnType<typeof useFurnitureCatalog>; floors?: CustomFloor[]; walls?: CustomWall[]; openings?: CustomOpening[]; roofs?: CustomWall[]; ceilings?: CustomWall[];
   defaults: AccountCostSettings; saveDefaults: (settings: AccountCostSettings) => Promise<boolean>; saving?: boolean; saveError?: string;
   onDirty: (dirty: boolean) => void; onNew: (category: string) => void; loadError?: string; reload?: () => void;
 };
 const sizeOf = (entry: CostEntry) => entry.furniture ? ` · ${formatMeters(entry.furniture.w)} × ${formatMeters(entry.furniture.d)} m` : entry.opening ? ` · ${formatMeters(entry.opening.width)} × ${formatMeters(entry.opening.height)} m` : '';
 
-/** 账号家具库：家具与地面、墙面、门窗统一管理，并在这里设置账号默认单价。 */
-export function AccountFurnitureLibrary({ catalog, floors = [], walls = [], openings = [], defaults, saveDefaults, saving = false, saveError = '', onDirty, onNew, loadError = '', reload }: Props) {
+/** 账号家具库：家具与地面、墙面、门窗、屋面、吊顶统一管理，并在这里设置账号默认单价。 */
+export function AccountFurnitureLibrary({ catalog, floors = [], walls = [], openings = [], roofs = [], ceilings = [], defaults, saveDefaults, saving = false, saveError = '', onDirty, onNew, loadError = '', reload }: Props) {
   const [category, setCategory] = useState('全部'), [query, setQuery] = useState(''), [editing, setEditing] = useState<CostEntry | null>(null), [detail, setDetail] = useState<LibraryItem | null>(null);
   const commit = useAccountCostCommit({ settings: defaults, save: saveDefaults, onDirty });
-  const design: Design = { ...referenceDesign(), customCatalog: catalog.items, customFloors: floors, customWalls: walls, customOpenings: openings, costSettings: commit.settings };
-  const entries = accountCostEntries(catalog.items, commit.settings, floors, walls, openings);
+  const design: Design = { ...referenceDesign(), customCatalog: catalog.items, customFloors: floors, customWalls: walls, customOpenings: openings, customRoofs: roofs, customCeilings: ceilings, costSettings: commit.settings };
+  const entries = accountCostEntries(catalog.items, commit.settings, floors, walls, openings, { roofs, ceilings });
   const visible = filterCostEntries(entries, category, query);
   const blocks = [...materialCostCategories, ...categories].map(title => ({ title, entries: visible.filter(entry => entry.category === title) })).filter(block => block.entries.length);
   const groups: { major: CostMajor; icon: typeof Layers; names: string[] }[] = [{ major: '硬装', icon: Layers, names: materialCostCategories }, { major: '软装', icon: Armchair, names: categories }];
@@ -45,7 +45,7 @@ export function AccountFurnitureLibrary({ catalog, floors = [], walls = [], open
   const customIds = new Set(catalog.items.map(item => item.catalogId));
   return <div className="account-cost-page">
     <header className="cms-heading cost-heading">
-      <div><span className="cost-eyebrow">工作室素材库</span><h1>账号家具库</h1><p>家具、地面、墙面与门窗都在这里管理，设好单价后各项目直接沿用。</p></div>
+      <div><span className="cost-eyebrow">工作室素材库</span><h1>账号家具库</h1><p>家具、地面、墙面、门窗、屋面与吊顶都在这里管理，设好单价后各项目直接沿用。</p></div>
     </header>
     <div className="cost-controls">
       <div className="cost-toolbar">
