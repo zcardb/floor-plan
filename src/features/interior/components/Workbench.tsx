@@ -420,7 +420,7 @@ export function Workbench(p: Props) {
     tool === "wall"
       ? "点击起点与转角连续绘墙 · 可拖动起段 · 双击 / 右键 / Enter 完成 · Esc 取消草稿"
       : tool === "measure"
-        ? "点击两点或拖动测量 · Shift 锁定方向 · 双击 / 右键 / Esc 结束 · 测量线可在顶部「测量」菜单中清除"
+        ? "点击两点或拖动测量 · Shift 锁定方向 · 双击 / 右键 / Esc 结束 · 测量线可在顶部「更多」菜单中清除"
         : tool === "demolish"
           ? "点击非承重墙标记拆除，再次点击恢复"
           : tool === "door" || tool === "window"
@@ -526,19 +526,26 @@ export function Workbench(p: Props) {
                 <SquareDashed size={16} />
               </ToolButton>
             )}
+            {d.template === "blank" && (
+              <>
+                <ToolButton label="门" active={tool === "door"} onClick={() => setTool("door")}>
+                  <DoorOpen size={16} />
+                </ToolButton>
+                <ToolButton label="窗" active={tool === "window"} onClick={() => setTool("window")}>
+                  <ScanLine size={16} />
+                </ToolButton>
+              </>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   className={
-                    "tool-button " + (tool === "measure" ? "active" : "")
+                    "tool-button " + (tool === "measure" || tool === "demolish" ? "active" : "")
                   }
-                  aria-label="测量"
+                  aria-label="更多"
                 >
-                  <Ruler size={16} />
-                  <span>测量</span>
-                  {d.measures.length > 0 && (
-                    <span className="tool-count">{d.measures.length}</span>
-                  )}
+                  <Settings2 size={16} />
+                  <span>更多</span>
                   <ChevronDown size={12} />
                 </button>
               </DropdownMenuTrigger>
@@ -564,35 +571,18 @@ export function Workbench(p: Props) {
                     <span className="menu-count">{d.measures.length}</span>
                   )}
                 </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="tool-button">
-                  <Settings2 size={16} />
-                  <span>结构</span>
-                  <ChevronDown size={12} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                {d.template === "blank" && (
-                  <>
-                    <DropdownMenuItem onClick={() => setTool("door")}>
-                      <DoorOpen />
-                      添加门
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setTool("window")}>
-                      <ScanLine />
-                      添加窗
-                    </DropdownMenuItem>
-                  </>
-                )}
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="danger-item"
-                  onClick={() => setTool("demolish")}
+                  onSelect={() => setTool("demolish")}
                 >
                   <Trash2 />
                   拆改非承重墙
+                  {tool === "demolish" ? (
+                    <Check size={13} className="menu-mark" />
+                  ) : (
+                    <kbd className="menu-kbd">X</kbd>
+                  )}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -1089,7 +1079,7 @@ export function Workbench(p: Props) {
               <div>
                 <strong>布置空间</strong>
                 <p>
-                  点击或拖入家具，选中后调整尺寸与材质。测量线可在顶部「测量」菜单中一键清除。点击
+                  点击或拖入家具，选中后调整尺寸与材质。测量线可在顶部「更多」菜单中一键清除。点击
                   3D 预览，走进你的设计。
                 </p>
               </div>
