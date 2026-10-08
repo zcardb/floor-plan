@@ -22,6 +22,7 @@ import { newFurnitureCategory } from '../model/newFurnitureCategory';
 import { AccountFurnitureLibrary } from './AccountFurnitureLibrary';
 import { AccountCostManager } from './AccountCostManager';
 import { CustomFurnitureDialog } from './CustomFurnitureDialog';
+import { CustomFloorForm } from './CustomFloorForm';
 import { AccountCMS } from './AccountCMS';
 import type { useFurnitureCatalog } from '../cloud/useFurnitureCatalog';
 import type { useProjects } from '../cloud/useProjects';
@@ -81,5 +82,18 @@ describe('新建家具默认分类', () => {
     expect(nodes(render(() => CustomFurnitureDialog({ ...props, initialCategory: '卧室' }))).some(node => node.props.value === '卧室')).toBe(true);
     fresh();
     expect(nodes(render(() => CustomFurnitureDialog({ ...props, initialCategory: '餐厨' }))).some(node => node.props.value === '餐厨')).toBe(true);
+  });
+  it('选择“地面”分类时切换为地面表单，整体浇筑不显示尺寸', () => {
+    const props = { open: true, onOpenChange: vi.fn(), loggedIn: true, login: vi.fn(), onCreate: vi.fn(), onImport: vi.fn(), onCreateFloor: vi.fn(), ownerKey: 'owner' };
+    const tree = nodes(render(() => CustomFurnitureDialog(props)));
+    (tree.find(node => node.props.value === '客厅' && typeof node.props.onValueChange === 'function')!.props.onValueChange as (value: string) => void)('地面');
+    expect(nodes(render(() => CustomFurnitureDialog(props))).some(node => node.type === CustomFloorForm)).toBe(true);
+    fresh();
+    const formProps = { categoryField: null, accountOnly: false, onCancel: vi.fn(), onSave: vi.fn() };
+    let form = nodes(render(() => CustomFloorForm(formProps)));
+    expect(form.some(node => node.props.id === 'floor-length')).toBe(true);
+    (form.find(node => node.props.value === 'tile' && typeof node.props.onValueChange === 'function')!.props.onValueChange as (value: string) => void)('seamless');
+    form = nodes(render(() => CustomFloorForm(formProps)));
+    expect(form.some(node => node.props.id === 'floor-length')).toBe(false);
   });
 });

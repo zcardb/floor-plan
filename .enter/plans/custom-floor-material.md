@@ -45,22 +45,22 @@
    - 删除自定义地面不在本次范围内。
 
 ## Implementation checklist
-- [ ] `types.ts` 新增 `FloorPattern`、`CustomFloor`、`Design.customFloors`
-- [ ] `model/floorMaterials.ts` 提供 `floorMaterialsOf` / `floorMaterialOf`，未知 key 回退不崩溃
-- [ ] 新建弹窗分类含“地面”，选中后显示地面字段，整体浇筑隐藏尺寸
-- [ ] 地面创建不调用 AI 生成
-- [ ] `Workbench.saveCustomFloor` 写入 `customFloors` 并去重
-- [ ] 迁移创建 `interior_floor_catalog`，同时开启 RLS + 本人策略
-- [ ] `useFloorCatalog` 保存/读取；账号库标签页可导入地面
-- [ ] SelectionEditor、PropertyPanel 的地面选项包含自定义地面
-- [ ] 平面图 `MaterialDefs` 与 3D 地面按 pattern 渲染自定义地面
-- [ ] costs / CostItemVisual / MaterialProcurementEditor 使用合并材质
-- [ ] validation 接受自定义地面 key，拒绝非法 customFloors
+- [x] `types.ts` 新增 `FloorPattern`、`CustomFloor`、`Design.customFloors`
+- [x] `model/floorMaterials.ts` 提供 `floorMaterialsOf` / `floorMaterialOf`，未知 key 回退不崩溃
+- [x] 新建弹窗分类含“地面”，选中后显示地面字段，整体浇筑隐藏尺寸
+- [x] 地面创建不调用 AI 生成
+- [x] `Workbench.saveCustomFloor` 写入 `customFloors` 并去重
+- [x] 迁移创建 `interior_floor_catalog`，同时开启 RLS + 本人策略
+- [x] `useFloorCatalog` 保存/读取；账号库标签页可导入地面
+- [x] SelectionEditor、PropertyPanel 的地面选项包含自定义地面
+- [x] 平面图 `MaterialDefs` 与 3D 地面按 pattern 渲染自定义地面
+- [x] costs / CostItemVisual / MaterialProcurementEditor 使用合并材质
+- [x] validation 接受自定义地面 key，拒绝非法 customFloors
 
 ## Verification checklist
-- [ ] 单测：`floorMaterialsOf` 合并内置+自定义；未知 key 回退
-- [ ] 单测：validation 接受合法 customFloors 与引用它的房间；拒绝非法 pattern/颜色/尺寸、引用不存在 key 的房间
-- [ ] 单测：选“地面”分类时弹窗渲染铺贴样式字段，选“整体浇筑”时无尺寸输入
-- [ ] 单测：房间使用自定义地面时 `priceOf`/成本行名称正确
-- [ ] 不含 customFloors 的旧项目导入、渲染、成本结果不变
-- [ ] 运行 `pnpm vitest run src/features/interior`、`pnpm lint`、`pnpm run build`
+- [x] 单测：`floorMaterialsOf` 合并内置+自定义；未知 key 回退
+- [x] 单测：validation 接受合法 customFloors 与引用它的房间；拒绝非法 pattern/颜色/尺寸、引用不存在 key 的房间
+- [x] 单测：选“地面”分类时弹窗渲染铺贴样式字段，选“整体浇筑”时无尺寸输入
+- [x] 单测：房间使用自定义地面时 `priceOf`/成本行名称正确
+- [x] 不含 customFloors 的旧项目导入、渲染、成本结果不变
+- [x] 运行 `pnpm vitest run src/features/interior`、`pnpm lint`、`pnpm run build`
