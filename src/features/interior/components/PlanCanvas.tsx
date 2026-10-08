@@ -35,6 +35,7 @@ import { resolveWallPoint,validateWallSegment } from '../model/wallDrawing';
 import { useWallDrawing } from './useWallDrawing';
 import { WallHoverOverlay } from './WallHoverOverlay';
 import { formatMeters } from '../model/lengthUnits';
+import { isCompletionClick, supportsPointerCompletion } from '../model/toolCompletion';
 export interface CanvasHandle {
   zoom: (k: number) => void;
   fit: () => void;
@@ -54,7 +55,7 @@ interface Props {
   onScale: (s: number) => void;
   onCoord: (p: Point) => void;
   onAnchor: (r: ScreenRect | null) => void;
-  finishWall: () => void;
+  finishTool: () => void;
 }
 interface Drag {
   pid: number;
@@ -82,7 +83,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     onScale,
     onCoord,
     onAnchor,
-    finishWall,
+    finishTool,
   },
   ref,
 ) {
@@ -102,8 +103,9 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       view: typeof view;
       center: Point;
     } | null>(null);
+  const mouseDown = useRef<(() => void) | null>(null);
   const wallClick = useRef<{id:string;fraction:number}|null>(null);
-  const drawing = useWallDrawing(tool==='wall',current,view.s,layers.snap,commit,finishWall);
+  const drawing = useWallDrawing(tool==='wall',current,view.s,layers.snap,commit,finishTool);
   useEffect(() => {
     const el = svg.current;
     if (!el) return;
@@ -325,6 +327,27 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       } else setDraft(null);
     }
   };
+  const completeTool = () => {
+    if (!supportsPointerCompletion(tool)) return;
+    drawing.clear();
+    measureStart.current = null;
+    drag.current = null;
+    mouseDown.current = null;
+    pinch.current = null;
+    for (const id of points.current.keys()) {
+      if (svg.current?.hasPointerCapture(id)) svg.current.releasePointerCapture(id);
+    }
+    points.current.clear();
+    setDraft(null);
+    finishTool();
+  };
+  useEffect(() => {
+    if (tool === 'measure') return;
+    measureStart.current = null;
+    setDraft(null);
+    if (drag.current?.kind === 'measure') drag.current = null;
+    mouseDown.current = null;
+  }, [tool]);
   return (
     <svg
       ref={svg}
@@ -346,6 +369,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       }}
       onPointerDown={(e) => {
         if (e.button) return;
+        const begin = () => {
         closePanels();
         const p = mm(e),
           el = e.target as SVGElement;
@@ -466,6 +490,28 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           base.room =
             el.closest("[data-room]")?.getAttribute("data-room") || undefined;
         drag.current = base;
+        };
+        // MouseEvent.detail contains the native double-click count; PointerEvent.detail does not.
+        if (e.pointerType === 'mouse' && supportsPointerCompletion(tool)) mouseDown.current = begin;
+        else begin();
+      }}
+      onMouseDown={(e) => {
+        const begin = mouseDown.current;
+        mouseDown.current = null;
+        if (isCompletionClick(tool, e.button, e.detail)) {
+          e.preventDefault();
+          completeTool();
+        } else if (e.button === 0) begin?.();
+      }}
+      onDoubleClick={(e) => {
+        if (!supportsPointerCompletion(tool)) return;
+        e.preventDefault();
+        completeTool();
+      }}
+      onContextMenu={(e) => {
+        if (!supportsPointerCompletion(tool)) return;
+        e.preventDefault();
+        completeTool();
       }}
       onPointerMove={(e) => {
         if (points.current.has(e.pointerId))
@@ -758,7 +804,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         <MeasureLine key={m.id} a={m.a} b={m.b} scale={view.s} />
       ))}
       {tool==='wall' && drawing.draft && Math.hypot(drawing.draft.b[0]-drawing.draft.a[0],drawing.draft.b[1]-drawing.draft.a[1])>0 && <g data-export-hide="true" pointerEvents="none"><polygon points={wallPoly({id:'draft',...drawing.draft,thickness:design.thickness,kind:'partition'}).map(p=>p.join(',')).join(' ')} fill="var(--plan-selection-soft)" stroke="var(--plan-selection)" strokeWidth={1/view.s}/><MeasureLine a={drawing.draft.a} b={drawing.draft.b} scale={view.s}/></g>}
-      {tool === 'wall' && <WallHoverOverlay walls={design.walls} candidate={drawing.candidate} scale={view.s} />}
+      {tool === 'wall' && <WallHoverOverlay walls={design.walls} candidate={drawing.hover} connection={drawing.candidate} scale={view.s} />}
       {draft && (
         <g data-export-hide="true">
           <MeasureLine a={draft.a} b={draft.b} scale={view.s} />

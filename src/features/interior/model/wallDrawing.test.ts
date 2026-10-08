@@ -1,6 +1,8 @@
 import {it,expect} from 'vitest';
 import {blankDesign} from '../data/templates';
-import {resolveWallPoint,validateWallSegment} from './wallDrawing';
+import {resolveWallPoint,resolveWallHover,validateWallSegment} from './wallDrawing';
+it('悬停测距独立投影，不受起笔轴向或连接吸附开关影响',()=>{const d=fixture();const raw:[number,number]=[1950,1800];expect(resolveWallHover(raw,d,0.1).point).toEqual([2000,1800]);expect(resolveWallPoint(raw,d,0.1,true,[500,1000]).point).toEqual([2000,1000]);expect(resolveWallPoint(raw,d,0.1,false,[500,1000]).target).toBeUndefined();expect(resolveWallHover(raw,d,0.1).target?.wallId).toBe('v');expect(resolveWallHover([1000,1800],d,0.1).target).toBeUndefined();expect(resolveWallHover(raw,{...d,demolished:['v']},0.1).target).toBeUndefined();});
+it('悬停接近端点仍使用鼠标投影，不因端点优先冻结读数',()=>{expect(resolveWallHover([1950,50],fixture(),0.1).point).toEqual([2000,50]);});
 const fixture=()=>({...blankDesign(),walls:[{id:'v',a:[2000,0] as [number,number],b:[2000,3000] as [number,number],thickness:240,kind:'partition' as const}]});
 it('轴向约束先执行，T形吸附最终坐标准确',()=>{const d=fixture();expect(resolveWallPoint([1950,1050],d,0.1,true,[500,1000])).toEqual({point:[2000,1000],target:{wallId:'v',kind:'intersection'}});expect(resolveWallPoint([1600,1050],d,0.1,true,[500,1000]).target).toBeUndefined();});
 it('关闭吸附、排除自身、缩放阈值一致',()=>{const d=fixture();expect(resolveWallPoint([1950,1000],d,0.1,false,[500,1000]).point).toEqual([1950,1000]);expect(resolveWallPoint([1950,1000],d,0.1,true,[500,1000],'v').target).toBeUndefined();expect(resolveWallPoint([1800,0],d,0.1,true).target).toBeDefined();expect(resolveWallPoint([1700,0],d,0.1,true).target).toBeUndefined();});

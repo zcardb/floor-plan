@@ -417,9 +417,9 @@ export function Workbench(p: Props) {
   };
   const tip =
     tool === "wall"
-      ? "点击起点与转角连续绘墙 · 可拖动起段 · Enter 完成 / Esc 取消草稿"
+      ? "点击起点与转角连续绘墙 · 可拖动起段 · 双击 / 右键 / Enter 完成 · Esc 取消草稿"
       : tool === "measure"
-        ? "点击两点或拖动测量 · Shift 锁定方向 · Esc 结束测量 · 测量线可在顶部「测量」菜单中清除"
+        ? "点击两点或拖动测量 · Shift 锁定方向 · 双击 / 右键 / Esc 结束 · 测量线可在顶部「测量」菜单中清除"
         : tool === "demolish"
           ? "点击非承重墙标记拆除，再次点击恢复"
           : tool === "door" || tool === "window"
@@ -836,7 +836,7 @@ export function Workbench(p: Props) {
             onScale={setScale}
             onCoord={onCoord}
             onAnchor={onAnchor}
-            finishWall={()=>setTool('select')}
+            finishTool={()=>setTool('select')}
           />
         ) : Scene ? (
           <Scene

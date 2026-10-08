@@ -32,7 +32,7 @@ describe('编辑控件与米制 UI',()=>{
   });
   it('素材库尺寸摘要统一米制',()=>{
     const html=render(createElement(Library,{add:()=>{},setTool:()=>{},blank:true}));
-    expect(html).toContain('2.4 × 0.9 m');
+    expect(html).toContain('2.40 × 0.90 m');
     expect(html).not.toContain(' mm');
   });
   it('单价保留禁用和空值语义',()=>{

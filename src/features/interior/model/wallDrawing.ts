@@ -21,6 +21,11 @@ export function resolveWallPoint(raw:Point,d:Design,scale:number,snap:boolean,st
   candidates.sort((a,b)=>a.kind===b.kind?a.distance-b.distance:a.kind==='endpoint'?-1:1);
   const found=candidates[0];return found?{point:[...found.point],target:{wallId:found.wallId,kind:found.kind}}:{point};
 }
+export function resolveWallHover(raw:Point,d:Design,scale:number):WallSnap {
+  const result=resolveWallPoint(raw,d,scale,true);
+  const wall=result.target&&d.walls.find(w=>w.id===result.target?.wallId);
+  return wall?{...result,point:nearestOnWall(raw,wall).point}:{point:[...raw]};
+}
 export function validateWallSegment(d:Design,a:Point,b:Point,exclude?:string){
   const candidate={a,b},L=length(candidate as Design['walls'][number]);
   if(L<100)throw new Error('墙段长度至少为0.1 m');

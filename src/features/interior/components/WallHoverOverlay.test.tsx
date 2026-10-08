@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { Point, Wall } from '../model/types';
 import { blankDesign } from '../data/templates';
-import { resolveWallPoint, type WallSnap } from '../model/wallDrawing';
+import { resolveWallPoint, resolveWallHover, type WallSnap } from '../model/wallDrawing';
 import { WallHoverOverlay } from './WallHoverOverlay';
 
 const vertical: Wall = { id: 'wall', a: [0, 0], b: [0, 6000], thickness: 240, kind: 'partition' };
@@ -13,14 +13,14 @@ const render = (snap: WallSnap | null, wall = vertical, scale = 0.1) => renderTo
 describe('绘墙悬停沿墙距离', () => {
   it('显示较近端到悬停点的米制距离并保留连接提示', () => {
     const html = render(candidate([0, 3000]));
-    expect(html).toContain('距近端 3 米');
+    expect(html).toContain('距近端 3.00 米');
     expect(html).toContain('点击连接');
     expect(render(candidate([0, 1250]))).toContain('距近端 1.25 米');
-    expect(render(candidate([0, 1251]))).toContain('距近端 1.251 米');
+    expect(render(candidate([0, 1251]))).toContain('距近端 1.25 米');
   });
   it('选择较近墙端，两端和墙段外投影均显示零', () => {
     for (const [y, meters] of [[0, 0], [6000, 0], [-100, 0], [6100, 0], [4000, 2], [5000, 1]]) {
-      expect(render(candidate([0, y]))).toContain(`距近端 ${meters} 米`);
+      expect(render(candidate([0, y]))).toContain(`距近端 ${meters.toFixed(2)} 米`);
     }
   });
   it('水平、斜墙和反向墙均取较近端距离', () => {
@@ -29,7 +29,7 @@ describe('绘墙悬停沿墙距离', () => {
       { wall: { ...vertical, b: [3000, 4000] }, point: [1500, 2000], meters: 2.5 },
       { wall: { ...vertical, a: [0, 6000], b: [0, 0] }, point: [0, 2000], meters: 2 },
     ];
-    for (const { wall, point, meters } of fixtures) expect(render(candidate(point), wall)).toContain(`距近端 ${meters} 米`);
+    for (const { wall, point, meters } of fixtures) expect(render(candidate(point), wall)).toContain(`距近端 ${meters.toFixed(2)} 米`);
   });
   it('无候选、无目标或目标被移除时无提示', () => {
     expect(render(null)).toBe('');
@@ -38,15 +38,15 @@ describe('绘墙悬停沿墙距离', () => {
   });
   it('基于实际吸附点显示距离，关闭吸附及拆除墙时无提示', () => {
     const design = { ...blankDesign(), walls: [vertical] };
-    expect(render(resolveWallPoint([100, 3000], design, 0.1, true))).toContain('距近端 3 米');
+    expect(render(resolveWallPoint([100, 3000], design, 0.1, true))).toContain('距近端 3.00 米');
     expect(render(resolveWallPoint([100, 3000], design, 0.1, false))).toBe('');
     expect(render(resolveWallPoint([100, 3000], { ...design, demolished: ['wall'] }, 0.1, true))).toBe('');
-    expect(render(resolveWallPoint([100, 3050], design, 0.1, true, [-3000, 3000]))).toContain('距近端 3 米');
+    expect(render(resolveWallPoint([100, 3050], design, 0.1, true, [-3000, 3000]))).toContain('距近端 3.00 米');
   });
   it('缩放不改变距离，提示不阻挡指针且不进入导出', () => {
     for (const scale of [0.012, 0.1, 1]) {
       const html = render(candidate([0, 3000]), vertical, scale);
-      expect(html).toContain('距近端 3 米');
+      expect(html).toContain('距近端 3.00 米');
       expect(html).toContain(`font-size="${12 / scale}"`);
       expect(html).toContain('pointer-events="none"');
       expect(html).toContain('data-export-hide="true"');

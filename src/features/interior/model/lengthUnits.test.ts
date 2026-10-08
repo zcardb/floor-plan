@@ -5,9 +5,11 @@ import { createProject } from '../data/templates';
 
 describe('米制 UI / 毫米模型边界', () => {
   it('统一显示，保留输入精度', () => {
-    expect(formatMeters(1800)).toBe('1.8');
+    expect(formatMeters(1800)).toBe('1.80');
     expect(formatMeters(240)).toBe('0.24');
-    expect(formatMeters(1)).toBe('0.001');
+    expect(formatMeters(1)).toBe('0.00');
+    expect(formatMeters(1251)).toBe('1.25');
+    expect(formatMeters(1256)).toBe('1.26');
     expect(meterDraft(1234.567)).toBe('1.234567');
     expect(toMeters(50)).toBe(0.05);
     expect(toMillimeters(2.4)).toBe(2400);
