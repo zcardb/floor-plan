@@ -11,6 +11,13 @@ const candidate = (point: Point): WallSnap => ({ point, target: { wallId: 'wall'
 const render = (snap: WallSnap | null, wall = vertical, scale = 0.1) => renderToStaticMarkup(createElement(WallHoverOverlay, { walls: [wall], candidate: snap, scale }));
 
 describe('绘墙悬停沿墙距离', () => {
+  it('测量变体显示两端距离，贴端显示零且不显示连接提示', () => {
+    for (const [point, start, end] of [[[0, 2000], '2.00', '4.00'], [[0, 3000], '3.00', '3.00'], [[0, 0], '0.00', '6.00']] as [Point, string, string][]) {
+      const html = renderToStaticMarkup(createElement(WallHoverOverlay, { walls: [vertical], candidate: candidate(point), scale: 0.1, variant: 'measure' }));
+      expect(html).toContain(`距起端 ${start} 米`); expect(html).toContain(`距末端 ${end} 米`);
+      expect(html).not.toContain('点击连接');
+    }
+  });
   it('显示较近端到悬停点的米制距离并保留连接提示', () => {
     const html = render(candidate([0, 3000]));
     expect(html).toContain('距近端 3.00 米');

@@ -13,8 +13,8 @@ describe('外围尺寸SVG', () => {
   it('显示四边真实米数、墙厚、斜刻度且不抢占墙体鼠标事件', () => {
     const svg = markup();
     expect(svg).toContain('pointer-events="none"');
-    expect(svg.match(/data-dimension-axis="x"/g)).toHaveLength(2);
-    expect(svg.match(/data-dimension-axis="y"/g)).toHaveLength(2);
+    expect(svg.match(/data-dimension-axis="x"/g)).toHaveLength(4);
+    expect(svg.match(/data-dimension-axis="y"/g)).toHaveLength(4);
     expect(svg).toContain('data-dimension-length="240"');
     expect(svg).toContain('0.24 m');
     expect(svg).toContain('<path');

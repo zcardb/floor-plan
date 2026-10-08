@@ -16,7 +16,6 @@ import {
   rebuildRooms,
   roomPath,
   snapMove,
-  snapPoint,
 } from "../model/geometry";
 import {
   uid,
@@ -32,6 +31,8 @@ import { MaterialDefs } from "./Materials";
 import { selectionPoints, localWallPoint, type ScreenRect } from "../model/selectionAnchor";
 import { resolveWallPoint,validateWallSegment } from '../model/wallDrawing';
 import { useWallDrawing } from './useWallDrawing';
+import { useSegmentDrawing } from './useSegmentDrawing';
+import { OpeningDistances } from './OpeningDistances';
 import { connectedWallPoly } from '../model/wallConnections';
 import { WallHoverOverlay } from './WallHoverOverlay';
 import { formatMeters } from '../model/lengthUnits';
@@ -99,8 +100,6 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     vr = useRef(view);
   vr.current = view;
   const [size, setSize] = useState({ w: 800, h: 700 }),
-    [draft, setDraft] = useState<{ a: Point; b: Point } | null>(null),
-    measureStart = useRef<Point | null>(null),
     drag = useRef<Drag | null>(null),
     points = useRef(new Map<number, Point>()),
     pinch = useRef<{
@@ -110,13 +109,18 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     } | null>(null);
   const mouseDown = useRef<(() => void) | null>(null);
   const wallClick = useRef<{id:string;fraction:number}|null>(null);
-  const drawing = useWallDrawing(tool==='wall',current,view.s,layers.snap,commit,finishTool);
+  const wallDrawing = useWallDrawing(tool === 'wall', current, view.s, layers.snap, commit, finishTool);
+  const measurement = useSegmentDrawing(tool === 'measure', current, view.s, layers.snap, (d, a, b) => {
+    if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 100) throw new Error('测量线长度至少为0.1 m');
+    commit({ ...d, measures: [...d.measures, { id: uid(), a, b }] });
+  }, finishTool);
+  const drawing = tool === 'measure' ? measurement : wallDrawing;
   const wallPolygons = useMemo(() => {
-    const walls = drawing.draft && length(drawing.draft as Design['walls'][number]) >= 100
-      ? [...design.walls, { id: 'draft', ...drawing.draft, thickness: design.thickness, kind: 'partition' as const }]
+    const walls = wallDrawing.draft && length(wallDrawing.draft as Design['walls'][number]) >= 100
+      ? [...design.walls, { id: 'draft', ...wallDrawing.draft, thickness: design.thickness, kind: 'partition' as const }]
       : design.walls;
     return new Map(design.walls.map(w => [w.id, connectedWallPoly(w, walls, design.demolished)]));
-  }, [design.walls, design.demolished, design.thickness, drawing.draft]);
+  }, [design.walls, design.demolished, design.thickness, wallDrawing.draft]);
   useEffect(() => {
     const el = svg.current;
     if (!el) return;
@@ -291,7 +295,6 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     if (!dr) return;
     if (cancel) {
       preview(dr.before);
-      setDraft(null);
       return;
     }
     const d = current.current;
@@ -317,34 +320,10 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       if (!dr.moved) select(dr.room ? { kind: "room", id: dr.room } : null);
       return;
     }
-    if ((dr.kind === "wall" || dr.kind === "measure") && draft) {
-      if (
-        dr.moved &&
-        Math.hypot(draft.b[0] - draft.a[0], draft.b[1] - draft.a[1]) > 50
-      ) {
-        if (dr.kind === "wall") {
-          const w = {
-            id: uid(),
-            a: draft.a,
-            b: draft.b,
-            thickness: d.thickness,
-            kind: "partition" as const,
-          };
-          commit(rebuildRooms({ ...d, walls: [...d.walls, w] }));
-          select({ kind: "wall", id: w.id });
-        } else
-          commit({ ...d, measures: [...d.measures, { id: uid(), ...draft }] });
-        measureStart.current = null;
-        setDraft(null);
-      } else if (dr.kind === "measure") {
-        measureStart.current = draft.a;
-      } else setDraft(null);
-    }
   };
   const completeTool = () => {
     if (!supportsPointerCompletion(tool)) return;
     drawing.clear();
-    measureStart.current = null;
     drag.current = null;
     mouseDown.current = null;
     pinch.current = null;
@@ -352,16 +331,9 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       if (svg.current?.hasPointerCapture(id)) svg.current.releasePointerCapture(id);
     }
     points.current.clear();
-    setDraft(null);
     finishTool();
   };
-  useEffect(() => {
-    if (tool === 'measure') return;
-    measureStart.current = null;
-    setDraft(null);
-    if (drag.current?.kind === 'measure') drag.current = null;
-    mouseDown.current = null;
-  }, [tool]);
+  useEffect(() => { mouseDown.current = null; }, [tool]);
   return (
     <svg
       ref={svg}
@@ -421,28 +393,11 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           wallToggle(wid);
           return;
         }
-        if(tool==='wall'){
-          if(design.template!=='blank')return;
-          select(null);drawing.down(p,e.pointerId,[e.clientX,e.clientY]);return;
+        if (tool === 'wall' || tool === 'measure') {
+          if (tool === 'wall' && design.template !== 'blank') return;
+          select(null); drawing.down(p, e.pointerId, [e.clientX, e.clientY]); return;
         }
-        if (tool === "measure") {
-          const q = snapPoint(p, design);
-          if (tool === "measure" && measureStart.current) {
-            commit({
-              ...design,
-              measures: [
-                ...design.measures,
-                { id: uid(), a: measureStart.current, b: q },
-              ],
-            });
-            measureStart.current = null;
-            setDraft(null);
-            return;
-          }
-          setDraft({ a: q, b: q });
-          base.start = q;
-          base.kind = tool;
-        } else if ((tool === "door" || tool === "window") && wid) {
+        if ((tool === "door" || tool === "window") && wid) {
           const wall = design.walls.find((w) => w.id === wid)!;
           if (wall.kind === "bearing") {
             toast.error("承重墙不可新增开口");
@@ -552,13 +507,9 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         }
         const p = mm(e);
         onCoord(p);
-        if(tool==='wall'){drawing.move(p);return;}
+        if (tool === 'wall' || tool === 'measure') { drawing.move(p); return; }
         const dr = drag.current;
-        if (!dr) {
-          if (tool === "measure" && measureStart.current)
-            setDraft({ a: measureStart.current, b: snapPoint(p, design) });
-          return;
-        }
+        if (!dr) return;
         if (dr.pid !== e.pointerId) return;
         if (Math.hypot(e.clientX - dr.screen[0], e.clientY - dr.screen[1]) > 5)
           dr.moved = true;
@@ -569,16 +520,6 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
             x: dr.view!.x - (e.clientX - dr.screen[0]) / dr.view!.s,
             y: dr.view!.y - (e.clientY - dr.screen[1]) / dr.view!.s,
           });
-          return;
-        }
-        if (dr.kind === "measure" || dr.kind === "wall") {
-          let q = snapPoint(p, design, 12 / view.s);
-          if (dr.kind === "wall" || e.shiftKey)
-            q =
-              Math.abs(q[0] - dr.start[0]) > Math.abs(q[1] - dr.start[1])
-                ? [q[0], dr.start[1]]
-                : [dr.start[0], q[1]];
-          setDraft({ a: dr.start, b: q });
           return;
         }
         if (dr.kind === 'openingmove') {
@@ -648,7 +589,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           if (points.current.size < 2) pinch.current = null;
           return;
         }
-        if(tool==='wall')drawing.up(mm(e),e.pointerId,[e.clientX,e.clientY]);
+        if (tool === 'wall' || tool === 'measure') drawing.up(mm(e), e.pointerId, [e.clientX, e.clientY]);
         else finish();
       }}
       onPointerLeave={() => drawing.clearHover()}
@@ -827,11 +768,13 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       ))}
       {tool==='wall' && drawing.draft && Math.hypot(drawing.draft.b[0]-drawing.draft.a[0],drawing.draft.b[1]-drawing.draft.a[1])>0 && <g data-export-hide="true" pointerEvents="none"><polygon points={connectedWallPoly({id:'draft',...drawing.draft,thickness:design.thickness,kind:'partition'},design.walls,design.demolished).map(p=>p.join(',')).join(' ')} fill="var(--plan-selection-soft)" stroke="var(--plan-selection)" strokeWidth={1/view.s}/><MeasureLine a={drawing.draft.a} b={drawing.draft.b} scale={view.s}/></g>}
       {tool === 'wall' && <WallHoverOverlay walls={design.walls} demolished={design.demolished} candidate={drawing.hover} connection={drawing.candidate} scale={view.s} />}
-      {draft && (
-        <g data-export-hide="true">
-          <MeasureLine a={draft.a} b={draft.b} scale={view.s} />
+      {tool === 'measure' && <WallHoverOverlay walls={design.walls} demolished={design.demolished} candidate={drawing.hover} scale={view.s} variant="measure" />}
+      {tool === 'measure' && drawing.draft && (
+        <g data-export-hide="true" pointerEvents="none">
+          <MeasureLine a={drawing.draft.a} b={drawing.draft.b} scale={view.s} />
         </g>
       )}
+      {selection?.kind === 'opening' && <OpeningDistances design={design} openingId={selection.id} scale={view.s} />}
       {selection && (
         <g data-export-hide="true" className="selection-overlay">
           {selection.kind === "room" &&

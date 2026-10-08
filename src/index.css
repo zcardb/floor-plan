@@ -2426,6 +2426,17 @@
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
+.rotation-controls { min-width: 0; grid-column: 1 / -1; }
+.rotation-control-row { display: flex; align-items: flex-end; gap: 8px; }
+.rotation-control-row > button { flex: 0 0 auto; }
+.rotation-angle-field { display: grid; gap: 5px; min-width: 0; flex: 1; font-size: 10px; color: hsl(var(--muted-foreground)); }
+.visual-editor-popover .rotation-angle-field { margin-bottom: 0; }
+.rotation-angle-input { position: relative; display: block; }
+.rotation-angle-input input { padding-right: 26px; }
+.rotation-angle-unit { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: hsl(var(--muted-foreground)); }
+.rotation-controls-compact { flex: 0 0 auto; }
+.rotation-controls-compact .rotation-angle-field { flex: 0 0 76px; }
+.rotation-controls-compact .rotation-control-row { align-items: center; }
 .visual-form-actions {
   display: flex;
   justify-content: flex-end;

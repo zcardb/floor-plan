@@ -15,17 +15,18 @@ describe('自动外围尺寸几何', () => {
   it('画出竖墙后产生实际两侧坐标和240mm墙厚，横墙生成Y分段', () => {
     const d = fixture();
     d.walls.push(wall('partition', [3000, 0], [3000, 4000]));
-    expect(lengths(d)).toEqual([120, 120, 2760, 240, 2760, 120, 120]);
+    expect(lengths(d)).toEqual([240, 2760, 240, 2760, 240]);
     d.walls.push(wall('horizontal', [0, 2000], [6000, 2000], 200));
-    expect(lengths(d, 'vertical')).toEqual([120, 120, 1780, 200, 1780, 120, 120]);
+    expect(lengths(d, 'vertical')).toEqual([240, 1780, 200, 1780, 240]);
   });
   it('移动、缩短、取消、删除、拆除与恢复均由当前墙数组决定', () => {
     const before = fixture();
     before.walls.push(wall('partition', [3000, 0], [3000, 4000]));
     const next = { ...before, walls: before.walls.map(w => w.id === 'partition' ? wall(w.id, [2000, 700], [2000, 3000]) : w) };
-    expect(lengths(next)).toEqual([120, 120, 1760, 240, 3760, 120, 120]);
-    expect(perimeterDimensions(next)!.vertical.some(s => s.end === 700)).toBe(true);
-    expect(lengths(before)).toEqual([120, 120, 2760, 240, 2760, 120, 120]);
+    expect(lengths(next)).toEqual([240, 5760, 240]);
+    const connected = { ...before, walls: before.walls.map(w => w.id === 'partition' ? wall(w.id, [2000, 0], [2000, 4000]) : w) };
+    expect(lengths(connected)).toEqual([240, 1760, 240, 3760, 240]);
+    expect(lengths(before)).toEqual([240, 2760, 240, 2760, 240]);
     expect(lengths({ ...next, demolished: ['partition'] })).toEqual(lengths(fixture()));
     expect(lengths({ ...next, walls: next.walls.filter(w => w.id !== 'partition') })).toEqual(lengths(fixture()));
     expect(lengths(JSON.parse(JSON.stringify(before)))).toEqual(lengths(before));
@@ -57,7 +58,7 @@ describe('自动外围尺寸几何', () => {
     expect(Object.values(planDrawingBounds(d, true)).every(Number.isFinite)).toBe(true);
   });
   it('短段分配不同文字行，保留真实长度且不修改设计', () => {
-    const d = { ...fixture(), walls: [wall('one', [0, 0], [1000, 0]), wall('two', [10, 0], [1010, 0])] };
+    const d = { ...fixture(), walls: [wall('one', [0, 0], [1000, 0]), wall('two', [1010, 0], [2010, 0])] };
     const before = JSON.stringify(d);
     const layout = perimeterDimensions(d)!;
     expect(layout.horizontal.some(s => s.end - s.start === 10)).toBe(true);
