@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Popover,PopoverContent,PopoverTrigger } from '@/components/ui/popover';
 import { Select,SelectContent,SelectItem,SelectTrigger,SelectValue } from '@/components/ui/select';
 import { Tabs,TabsContent,TabsList,TabsTrigger } from '@/components/ui/tabs';
-import { categories,library } from '../data/catalog';
+import { categories } from '../data/catalog';
 import { FURNITURE_COLORS } from '../data/palette';
 import { uid,type LibraryItem } from '../model/types';
 import { validPrice } from '../model/costs';
@@ -18,11 +18,11 @@ import { FurnitureShape } from './FurnitureShape';
 type Props = { open:boolean; onOpenChange:(v:boolean)=>void; loggedIn:boolean; login:()=>void; onCreate:(i:LibraryItem)=>void; onImport:(i:LibraryItem)=>void; ownerKey:string; accountOnly?:boolean };
 const tabTrigger = 'gap-[5px] rounded px-2.5 py-1.5 text-[11px] max-[700px]:px-[7px] max-[700px]:text-[10px]';
 export function CustomFurnitureDialog({open,onOpenChange,loggedIn,login,onCreate,onImport,ownerKey,accountOnly=false}:Props){
-  const [name,setName]=useState(''),[category,setCategory]=useState('客厅'),[type,setType]=useState('sofa'),[w,setW]=useState('1800'),[d,setD]=useState('800'),[h,setH]=useState('800'),[price,setPrice]=useState(''),[color,setColor]=useState('#b7c4b0'),[account,setAccount]=useState(accountOnly),[error,setError]=useState(''),[saving,setSaving]=useState(false),[tab,setTab]=useState('create'),[pending,setPending]=useState<LibraryItem|null>(null),[colorOpen,setColorOpen]=useState(false);
+  const [name,setName]=useState(''),[category,setCategory]=useState('客厅'),[w,setW]=useState('1800'),[d,setD]=useState('800'),[h,setH]=useState('800'),[price,setPrice]=useState(''),[color,setColor]=useState('#b7c4b0'),[account,setAccount]=useState(accountOnly),[error,setError]=useState(''),[saving,setSaving]=useState(false),[tab,setTab]=useState('create'),[pending,setPending]=useState<LibraryItem|null>(null),[colorOpen,setColorOpen]=useState(false);
   const ai=useFurnitureImage(),catalog=useFurnitureCatalog(),cancel=ai.cancel,reset=catalog.reset;
   const epoch=useRef(0),lock=useRef(false),id=useRef(uid()),pendingRef=useRef<LibraryItem|null>(null),latest=useRef({open,ownerKey}); latest.current={open,ownerKey};
   useEffect(()=>{const generation=epoch;epoch.current++;lock.current=false;pendingRef.current=null;setPending(null);setSaving(false);setError('');cancel();reset();id.current=uid();return()=>{generation.current++;};},[open,ownerKey,cancel,reset]);
-  const types=[...new Map(library.map(l=>[l.type,l])).values()];
+  const type='sofa';
   const finish=async(item:LibraryItem,run:number)=>{
     if(run!==epoch.current||!latest.current.open)return;
     setSaving(true);
@@ -66,13 +66,6 @@ export function CustomFurnitureDialog({open,onOpenChange,loggedIn,login,onCreate
             <SelectContent>{categories.map(c=><SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
           </Select>
         </div>
-        <div className="custom-field">
-          <Label htmlFor="furniture-type">参考模型</Label>
-          <Select value={type} onValueChange={setType} disabled={locked}>
-            <SelectTrigger id="furniture-type" className="h-9 text-xs"><SelectValue/></SelectTrigger>
-            <SelectContent>{types.map(i=><SelectItem key={i.type} value={i.type}>{i.name}</SelectItem>)}</SelectContent>
-          </Select>
-        </div>
         <div className="custom-dimensions">{dimensions.map(([label,fieldId,value,setter])=><div className="custom-field" key={fieldId}><Label htmlFor={fieldId}>{label}</Label><Input id={fieldId} type="number" value={value} disabled={locked} onChange={e=>setter(e.target.value)}/></div>)}</div>
         <div className="custom-field">
           <Label htmlFor="furniture-price">价格 / 元每件</Label>
@@ -102,7 +95,7 @@ export function CustomFurnitureDialog({open,onOpenChange,loggedIn,login,onCreate
     {!accountOnly&&<div className="account-catalog-option"><Checkbox id="furniture-account" checked={account} disabled={locked} onCheckedChange={v=>setAccount(v===true)}/><Label htmlFor="furniture-account" className="text-[11px]">同时添加到账号家具库</Label></div>}
     {error&&<p className="form-error" role="alert">{error}</p>}
     {pending&&!ai.busy&&!saving&&<div className="visual-form-actions">{!pending.imageUrl&&<Button type="button" variant="outline" onClick={()=>void create(true)}>仅保存家具参数</Button>}<Button type="button" variant="ghost" onClick={()=>{pendingRef.current=null;setPending(null);cancel();id.current=uid();}}>返回修改参数</Button></div>}
-    <div className="visual-form-actions"><Button type="button" variant="ghost" onClick={()=>onOpenChange(false)}>取消</Button><Button disabled={ai.busy||saving}><Plus/>{saving?'正在保存…':pending?.imageUrl?'重试保存（不重新生成）':pending?'重试生成并创建':'创建家具'}</Button></div>
+    <div className="visual-form-actions"><Button type="button" variant="ghost" onClick={()=>onOpenChange(false)}>取消</Button><Button type="submit" disabled={ai.busy||saving}><Plus/>{saving?'正在保存…':pending?.imageUrl?'重试保存（不重新生成）':pending?'重试生成并创建':'创建家具'}</Button></div>
   </form>;
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="custom-furniture-dialog"><DialogHeader><DialogTitle>新建你的家具</DialogTitle><DialogDescription>{accountOnly?'保存到账号家具库，可在各项目中使用。':'默认保存当前项目，可选同时加入账号库。'}创建时自动生成统一俯视外观图；画布仍使用参考几何，不是3D建模。</DialogDescription></DialogHeader>
   {accountOnly?createForm:<Tabs value={tab} onValueChange={next=>{setTab(next);if(next==='account')void catalog.load();}}><TabsList className="project-tabs"><TabsTrigger value="create" className={tabTrigger}><Plus size={14}/>新建家具</TabsTrigger><TabsTrigger value="account" className={tabTrigger}><Cloud size={14}/>账号家具库</TabsTrigger></TabsList><TabsContent value="create">{createForm}</TabsContent><TabsContent value="account">{accountPanel}</TabsContent></Tabs>}

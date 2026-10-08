@@ -2511,6 +2511,11 @@
   overflow-y: auto;
   padding: 26px !important;
 }
+.custom-furniture-dialog .visual-form-actions button[type="submit"],
+.custom-furniture-dialog .visual-form-actions button[type="submit"]:hover {
+  background: hsl(var(--primary) / 0.9);
+  color: hsl(var(--primary-foreground));
+}
 .custom-furniture-layout {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2761,6 +2766,23 @@
 .danger-item:focus {
   color: hsl(var(--destructive));
   background: hsl(var(--destructive) / 0.1);
+}
+.danger-actions .tool-button {
+  color: hsl(var(--destructive));
+}
+.danger-actions .tool-button:hover:not(:disabled) {
+  background: hsl(var(--destructive) / 0.1);
+}
+/* 破坏性操作：宽屏常驻顶部工具栏，窄屏收进「文件」菜单，避免工具栏溢出且不产生双入口 */
+@media (max-width: 600px) {
+  .danger-actions {
+    display: none;
+  }
+}
+@media (min-width: 601px) {
+  .compact-only {
+    display: none;
+  }
 }
 .tool-button .tool-count {
   min-width: 15px;

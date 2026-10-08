@@ -485,9 +485,6 @@ export function Workbench(p: Props) {
             ) : (
               <DropdownMenuItem onClick={p.login}>登录 / 注册</DropdownMenuItem>
             )}
-            <DropdownMenuItem onClick={p.cloudSave}>
-              将当前项目另存到云端
-            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         <Button size="sm" className="download-button" onClick={exportImage}>
@@ -771,21 +768,22 @@ export function Workbench(p: Props) {
                 <ArrowDownToLine />
                 下载方案 JSON
               </DropdownMenuItem>
-              {p.loggedIn && <><DropdownMenuItem onClick={() => file.current?.click()}>
-                <FolderOpen />
-                导入 JSON 为新项目
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={p.cloudSave}>
-                <Cloud />
-                另存云端项目
-              </DropdownMenuItem></>}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="danger-item" onClick={resetDesign}>
+              {p.loggedIn && (
+                <DropdownMenuItem onClick={() => file.current?.click()}>
+                  <FolderOpen />
+                  导入 JSON 为新项目
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator className="compact-only" />
+              <DropdownMenuItem
+                className="danger-item compact-only"
+                onClick={resetDesign}
+              >
                 <RotateCcw />
                 重置当前方案
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="danger-item"
+                className="danger-item compact-only"
                 onClick={clearFurniture}
               >
                 <Trash2 />
@@ -1130,7 +1128,7 @@ export function Workbench(p: Props) {
                 <strong>保存你的创作</strong>
                 <p>
                   直接下载 2D 图与当前 3D 视角，导出 JSON
-                  备份；登录可另存多个云端项目。
+                  备份；登录后项目自动保存到云端，可在项目管理中管理多个方案。
                 </p>
               </div>
             </li>
