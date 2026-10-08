@@ -131,9 +131,7 @@
   .account-avatar[data-tone="3"] { background:linear-gradient(140deg,hsl(var(--avatar-3-from)),hsl(var(--avatar-3-to))); }
   .account-avatar[data-tone="4"] { background:linear-gradient(140deg,hsl(var(--avatar-4-from)),hsl(var(--avatar-4-to))); }
   .account-avatar[data-tone="5"] { background:linear-gradient(140deg,hsl(var(--avatar-5-from)),hsl(var(--avatar-5-to))); }
-  .account-avatar[data-tone="guest"] { background:hsl(var(--secondary)); color:hsl(var(--muted-foreground)); box-shadow:none; }
   .account-avatar-fallback { background:transparent !important; color:hsl(var(--avatar-ink)) !important; font-weight:650; letter-spacing:.4px; }
-  .account-avatar[data-tone="guest"] .account-avatar-fallback { color:hsl(var(--muted-foreground)) !important; }
   .account-menu-head { display:flex; align-items:center; gap:10px; padding:9px 10px; }
   .account-menu-head>span { display:grid; gap:2px; min-width:0; }
   .account-menu-head b { font-size:12.5px; font-weight:600; color:hsl(var(--foreground)); overflow-wrap:anywhere; }
