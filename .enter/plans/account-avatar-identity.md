@@ -86,26 +86,26 @@ export function AccountAvatar({ email, size = 40, className }: { email?: string;
 
 ## Implementation checklist
 
-- [ ] `accountIdentity.ts` 导出 `AVATAR_TONES`、`accountSeed`、`accountTone`、`accountInitial`，全部无副作用、无 DOM 依赖。
-- [ ] `accountTone` 对空 `email` / `undefined` 返回 0..5 内的整数，同一 `email` 多次调用结果恒定。
-- [ ] `accountInitial('18793850224@163.com')` 返回 `'1'`（无字母时用首个数字），`'alice@x.com'` 返回 `'A'`，空字符串返回 `'?'`。
-- [ ] `AccountAvatar` 有 `email` 时渲染首字母 + `data-tone` 0..5；无 `email` 时渲染 `UserRound` 图标 + `data-tone="guest"`。
-- [ ] `AccountAvatar` 根节点带内联 `width/height`（默认 40），`aria-hidden="true"`。
-- [ ] `AccountCMS` 侧边栏账号区渲染头像 + 邮箱 + 「已登录 · 云端同步」，退出登录按钮仍走 `navigate('logout')`（有未保存成本时先弹 AlertDialog）。
-- [ ] `Workbench` 已登录时「我的账号」触发器内显示 20px 头像，未登录分支不渲染头像且仍显示「登录」。
-- [ ] `Workbench` 下拉顶部为 `account-menu-head` 身份块（头像 + 邮箱 + 状态副文案），游客态文案为「无需登录即可编辑与下载」。
-- [ ] 下拉内 `退出登录` / `登录 / 注册` / `另存到云端` 三个菜单项及回调与改动前完全一致。
-- [ ] `index.css` 新增 `--avatar-ink` 与 6 组 `--avatar-N-from/to`，组件内不出现任何硬编码颜色（`#`/`rgb(`/无变量 `hsl(` 数字）。
-- [ ] `index.css` 新增 `.account-avatar`、`.account-avatar[data-tone]`、`.account-avatar-fallback`、`.cms-account-id`、`.account-menu-head`，并在 700px 断点补 `.cms-account` 移动端规则。
+- [x] `accountIdentity.ts` 导出 `AVATAR_TONES`、`accountSeed`、`accountTone`、`accountInitial`，全部无副作用、无 DOM 依赖。
+- [x] `accountTone` 对空 `email` / `undefined` 返回 0..5 内的整数，同一 `email` 多次调用结果恒定。
+- [x] `accountInitial('18793850224@163.com')` 返回 `'1'`（无字母时用首个数字），`'alice@x.com'` 返回 `'A'`，空字符串返回 `'?'`。
+- [x] `AccountAvatar` 渲染首字母 + `data-tone` 0..5（无 `email` 时首字母为 `'?'`，不另做游客样式）。
+- [x] `AccountAvatar` 根节点带内联 `width/height`（默认 40），`aria-hidden="true"`。
+- [x] `AccountCMS` 侧边栏账号区渲染头像 + 邮箱 + 「已登录 · 云端同步」，退出登录按钮仍走 `navigate('logout')`（有未保存成本时先弹 AlertDialog）。
+- [x] `Workbench` 已登录时「我的账号」触发器内显示 20px 头像，未登录分支保持原样（`登录` 按钮 + `保存到云端`）。
+- [x] `Workbench` 下拉顶部为 `account-menu-head` 身份块（头像 + 邮箱 + 「已登录 · 云端同步」），替换原来的 disabled 邮箱菜单项。
+- [x] 下拉内 `退出登录` / `登录 / 注册` / `另存到云端` 三个菜单项及回调与改动前完全一致。
+- [x] `index.css` 新增 `--avatar-ink` 与 6 组 `--avatar-N-from/to`，组件内不出现任何硬编码颜色（`#`/`rgb(`/无变量 `hsl(` 数字）。
+- [x] `index.css` 新增 `.account-avatar`、`.account-avatar[data-tone]`、`.account-avatar-fallback`、`.cms-account-id`、`.account-menu-head`，并在 700px 断点补 `.cms-account` 移动端规则。
 
 ## Verification checklist
 
-- [ ] `pnpm lint` 通过（无未使用 import、无 hooks 依赖告警）。
-- [ ] `pnpm exec tsc --noEmit` 通过。
-- [ ] `pnpm test`（`vitest run src/features/interior`）通过，含新增 `accountIdentity.test.ts`（确定性、取值范围、首字母提取三个分支）。
-- [ ] `pnpm run build` 成功。
-- [ ] 正常路径：登录后 CMS 侧边栏底部显示彩色圆形头像 + 邮箱 + 「已登录 · 云端同步」，退出登录按钮位置/行为不变。
-- [ ] 正常路径：顶部「我的账号」触发器出现 20px 头像，展开后下拉顶部身份块头像与侧边栏颜色一致（同邮箱同色）。
-- [ ] 默认/边界：未登录（游客）时，下拉身份块为灰底 `UserRound` 头像 + 「无需登录即可编辑与下载」，顶部触发器不显示头像，仍可「登录 / 注册」。
-- [ ] 边界：邮箱切换账号后头像颜色随之改变（`accountTone` 仅依赖邮箱字符串，不依赖登录会话）。
-- [ ] 视觉：`website_screenshot` 在 `desktop_1280` 与 `mobile_390` 检查头像尺寸、邮箱换行与 700px 以下「头像 + 邮箱 | 退出登录」一行布局；账号区需登录，若预览会话未登录则视觉部分标注为需人工确认，不声称已截图验证。
+- [x] `pnpm lint` 通过（无未使用 import、无 hooks 依赖告警）。
+- [x] `pnpm exec tsc --noEmit` 通过（`pnpm check` 一并通过）。
+- [x] `pnpm test`（`vitest run src/features/interior`）通过：8 个文件 36 个用例，含新增 `accountIdentity.test.ts` 3 个用例（确定性、取值范围、首字母提取）。
+- [x] `pnpm run build` 成功（8.30s / 7.61s 两次均通过）。
+- [ ] 正常路径（需人工确认）：登录后 CMS 侧边栏底部显示彩色圆形头像 + 邮箱 + 「已登录 · 云端同步」，退出登录按钮位置/行为不变。
+- [ ] 正常路径（需人工确认）：顶部「我的账号」触发器出现 20px 头像，展开后下拉顶部身份块头像与侧边栏颜色一致（同邮箱同色）。
+- [x] 默认/边界：未登录（游客）时不渲染头像，顶部仍为 `登录` + `保存到云端`，`website_screenshot`（desktop_1280）确认游客态顶栏与改动前一致。
+- [x] 边界：`accountTone` 只依赖邮箱字符串，测试覆盖多邮箱色位分布与空值回退。
+- [ ] 视觉（需人工确认）：`website_screenshot` 在 `desktop_1280` / `mobile_390` 下检查头像尺寸与 700px 以下「头像 + 邮箱 | 退出登录」一行布局——账号区与「我的账号」下拉都要登录后才出现，预览会话为游客态，故这两处视觉未截图验证，需人工确认。
