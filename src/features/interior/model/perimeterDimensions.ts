@@ -4,9 +4,11 @@ import { connectedWallPoly } from './wallConnections';
 import { formatMeters } from './lengthUnits';
 import { dimensionSettings } from './dimensionSettings';
 import type { Design, Point } from './types';
+import { dimensionBinding, type DimensionBinding } from './dimensionBinding';
 
 export interface DimensionSegment {
   start: number; end: number; fontSize: number; lane: number;
+  binding?: DimensionBinding;
 }
 export interface DimensionChain {
   horizontal: boolean; at: number; sourceAt: number; outward: -1 | 1;
@@ -97,7 +99,9 @@ export function perimeterDimensions(d: Pick<Design, 'walls' | 'demolished' | 'di
       const edgeIntervals = scanIntervals(rings, side.horizontal, side.edge - side.outward * 0.02);
       if (edgeIntervals.length > 1) { values = [lo, hi, ...edgeIntervals.flat()]; sourceAt = side.edge; }
     }
-    const chain = { ...side, sourceAt, segments: segments(values) };
+    const chain = { ...side, sourceAt, segments: segments(values).map(segment => ({ ...segment,
+      binding: dimensionBinding(walls, side.horizontal, segment.start, segment.end, sourceAt),
+    })) };
     chains.push(chain);
     const reach = Math.max(0, ...chain.segments.map(s => s.lane)) * laneSpacing + 480;
     chains.push({ horizontal: side.horizontal, outward: side.outward, sourceAt: side.edge,

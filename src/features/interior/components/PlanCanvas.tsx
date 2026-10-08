@@ -36,7 +36,8 @@ import { OpeningDistances } from './OpeningDistances';
 import { connectedWallPoly } from '../model/wallConnections';
 import { WallHoverOverlay } from './WallHoverOverlay';
 import { formatMeters } from '../model/lengthUnits';
-import { perimeterDimensions, planDrawingBounds } from '../model/perimeterDimensions';
+import { perimeterDimensions, planDrawingBounds, type DimensionSegment } from '../model/perimeterDimensions';
+import type { DimensionBinding } from '../model/dimensionBinding';
 import { PerimeterDimensions } from './PerimeterDimensions';
 import { doorOrientation } from '../model/doorOrientation';
 import { dragOpening } from '../model/openingDrag';
@@ -61,6 +62,8 @@ interface Props {
   onCoord: (p: Point) => void;
   onAnchor: (r: ScreenRect | null) => void;
   finishTool: () => void;
+  onDimensionSelect?: (segment: DimensionSegment) => void;
+  selectedDimension?: DimensionBinding;
 }
 interface Drag {
   pid: number;
@@ -89,6 +92,8 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     onCoord,
     onAnchor,
     finishTool,
+    onDimensionSelect,
+    selectedDimension,
   },
   ref,
 ) {
