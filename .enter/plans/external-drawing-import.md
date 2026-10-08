@@ -29,16 +29,16 @@
 5. `components/ProjectManager.tsx`：入口改成单项「导入 DXF 图纸」；`kind === 'dxf'` 时打开预览弹窗。
 
 ## Implementation checklist
-- [ ] `dxfSource.ts`：LINE/POLYLINE/ARC/INSERT 解析和单位识别
-- [ ] `recognize.ts`：双线配对成墙、单线墙兜底、端点吸附
-- [ ] `recognize.ts`：门窗识别、Y 轴翻转、房间、外墙/隔墙区分，生成合法的 Design
-- [ ] `designImport.ts`：返回联合类型，删除 FOREIGN_DRAWING_ERROR
-- [ ] `DxfImportDialog.tsx` 和 `index.css` 样式
-- [ ] `ProjectManager.tsx`：入口只保留 DXF，dxf 分支打开弹窗
+- [x] `dxfSource.ts`：LINE/POLYLINE/ARC/INSERT 解析和单位识别
+- [x] `recognize.ts`：双线配对成墙、单线墙兜底、端点吸附
+- [x] `recognize.ts`：门窗识别、Y 轴翻转、房间、外墙/隔墙区分，生成合法的 Design
+- [x] `designImport.ts`：返回联合类型，删除 FOREIGN_DRAWING_ERROR
+- [x] `DxfImportDialog.tsx` 和 `index.css` 样式
+- [x] `ProjectManager.tsx`：入口只保留 DXF，dxf 分支打开弹窗
 
 ## Verification checklist
-- [ ] 往返用例仍通过；外部 DXF 返回 `kind: 'dxf'`
-- [ ] `recognize.test.ts`：双线矩形加一道隔墙 → 5 面墙、厚度 240、2 个房间
-- [ ] 门块落在墙缺口里 → 生成 1 个门，宽度约等于缺口宽度
-- [ ] 改单位后尺寸按比例变化；墙图层全部忽略时报错
-- [ ] `pnpm vitest run src/features/interior` 和 `pnpm run build` 都通过
+- [x] 往返用例仍通过；外部 DXF 返回 `kind: 'dxf'`
+- [x] `recognize.test.ts`：双线矩形加一道隔墙 → 5 面墙、厚度 240、2 个房间
+- [x] 门块落在墙缺口里 → 生成 1 个门，宽度约等于缺口宽度
+- [x] 改单位后尺寸按比例变化；墙图层全部忽略时报错
+- [x] `pnpm vitest run src/features/interior` 和 `pnpm run build` 都通过（弹窗界面未在浏览器中截图验证：预览环境未能加载）

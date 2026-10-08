@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blankDesign } from '../../data/templates';
+import { blankDesign, referenceDesign } from '../../data/templates';
 import { createExportDocument } from '../drawingDocument';
 import { serializeDxf } from '../dxfExport';
 import { area, length } from '../geometry';
@@ -107,5 +107,13 @@ describe('外部 DXF 识别', () => {
     const { design, stats } = recognizeDxf(source.segments as DxfSegment[], { unit: source.unit, roles });
     expect(stats).toEqual({ walls: 5, doors: 1, windows: 1, rooms: 2 });
     expect(design.openings.map(o => o.width).sort((a, b) => a - b)).toEqual([900, 1200]);
+  });
+  it('复杂户型：整面窗的阳台墙、凸窗、墙角门洞都能识别，被墙围合的房间全部找到', () => {
+    const source = readDxfSource(serializeDxf(createExportDocument(referenceDesign())));
+    const { design, stats, warnings } = recognizeDxf(source.segments, { unit: source.unit, roles: guessRoles(source.layers.map(l => l.name)) });
+    expect(stats).toEqual({ walls: 22, doors: 8, windows: 8, rooms: 8 });
+    expect(warnings).toEqual([]);
+    // 客厅、餐厅、过道在原方案里没有墙分隔，识别为一个开敞空间。
+    expect(design.rooms.map(r => Math.round(area(r))).sort((a, b) => b - a)).toEqual([40, 12, 11, 9, 5, 3, 3, 3]);
   });
 });
