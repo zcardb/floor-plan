@@ -11,12 +11,14 @@ import {
   DoorOpen,
   ScanLine,
   SquareDashed,
+  BrickWall,
 } from "lucide-react";
 import { categories, library } from "../data/catalog";
 import { formatMeters } from '../model/lengthUnits';
 import { FurnitureShape } from "./FurnitureShape";
 import type { LibraryItem, Tool } from "../model/types";
-const icons = [BedDouble, Armchair, UtensilsCrossed, Bath, Monitor, BookOpen];
+const libraryCategories = [...categories, '硬装'];
+const categoryIcons: Record<string, typeof Armchair> = { 卧室: BedDouble, 客厅: Armchair, 餐厨: UtensilsCrossed, 卫浴: Bath, 家电: Monitor, 书房: BookOpen, 硬装: BrickWall };
 export function Library({
   add,
   setTool,
@@ -33,7 +35,7 @@ export function Library({
   const [category, setCategory] = useState("客厅"),
     [query, setQuery] = useState("");
   const items = [...customItems, ...library].filter((i) =>
-    query ? i.name.includes(query) : i.category === category,
+    query ? i.name.includes(query) : (i.type === 'stairs' ? '硬装' : i.category) === category,
   );
   return (
     <>
@@ -49,15 +51,15 @@ export function Library({
         <Search size={15} />
         <input
           aria-label="搜索家具"
-          placeholder="搜索家具、家电…"
+          placeholder="搜索家具、家电、硬装…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
         <kbd>/</kbd>
       </div>
       <div className="library-categories">
-        {categories.map((c, i) => {
-          const Icon = icons[i];
+        {libraryCategories.map((c) => {
+          const Icon = categoryIcons[c];
           return (
             <button
               key={c}
@@ -73,7 +75,7 @@ export function Library({
           );
         })}
       </div>
-      {blank && (
+      {blank && (category === '硬装' || !!query && ['墙体', '门', '窗'].some(name => name.includes(query))) && (
         <div className="structural-items">
           <button onClick={() => setTool("wall")}>
             <SquareDashed size={18} />
@@ -88,7 +90,7 @@ export function Library({
         </div>
       )}
       <div className="library-subheading">
-        {query ? "搜索结果" : category + "家具"}
+        {query ? "搜索结果" : category === '硬装' ? '硬装构件' : category + "家具"}
         <span>{items.length} 件</span>
       </div>
       <div className="library-grid">

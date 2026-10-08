@@ -65,6 +65,36 @@ describe('PlanCanvas 自动尺寸接线', () => {
       .toEqual([expect.objectContaining({ start: 0, end: 6000 })]);
   });
 });
+describe('PlanCanvas 墙端点连接事件链', () => {
+  function endpointHarness() {
+    const h = harness();
+    h.design.openings = [];
+    h.design.walls = [{ id: 'wall', a: [0, 30], b: [1000, 30], thickness: 200, kind: 'partition' }, { id: 'target', a: [2000, 0], b: [2000, 1000], thickness: 200, kind: 'partition' }];
+    hooks.refs = [];
+    h.handlers = h.component.render({ ...h.props, selection: { kind: 'wall', id: 'wall' } }, null).props;
+    return h;
+  }
+  it('拖动端点靠近错位目标精确吸附，释放只提交一次且保留原快照', () => {
+    const h = endpointHarness();
+    h.handlers.onPointerDown!(event(1000, 30, 1, 'data-handle', 'b'));
+    h.handlers.onPointerMove!(event(1950, 40));
+    expect(h.preview.mock.calls[0][0].walls[0].b).toEqual([2000, 0]);
+    expect(h.preview.mock.calls[0][0].walls[1]).toEqual(h.design.walls[1]);
+    h.handlers.onPointerUp!(event(1950, 40));
+    h.handlers.onPointerUp!(event(1950, 40));
+    expect(h.commit).toHaveBeenCalledTimes(1);
+    expect(h.commit.mock.calls[0][0].walls[0].b).toEqual([2000, 0]);
+    expect(h.commit.mock.calls[0][1]).toEqual(h.design);
+  });
+  it('取消连接恢复未吸附的原始坐标', () => {
+    const h = endpointHarness();
+    h.handlers.onPointerDown!(event(1000, 30, 1, 'data-handle', 'b'));
+    h.handlers.onPointerMove!(event(1950, 40));
+    h.handlers.onPointerCancel!(event(1950, 40));
+    expect(h.preview).toHaveBeenLastCalledWith(h.design);
+    expect(h.commit).not.toHaveBeenCalled();
+  });
+});
 describe('PlanCanvas 门窗事件链', () => {
   it.each(['door', 'window'] as const)('%s 选中、预览、释放只提交一次原始快照', kind => {
     const h = harness(kind);

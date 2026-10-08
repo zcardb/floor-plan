@@ -1,4 +1,5 @@
 import polygonClipping from "polygon-clipping";
+import { connectedWallPoly } from './wallConnections';
 import {
   uid,
   type Design,
@@ -137,7 +138,7 @@ export function rebuildRooms(d: Design): Design {
   const polygons = cuts.length
     ? polygonClipping.difference(
         [rect(0, 0, d.width, d.depth)],
-        ...cuts.map((w) => [wallPoly(w, 1)]),
+        ...cuts.map((w) => [connectedWallPoly(w, d.walls, d.demolished)]),
       )
     : [[rect(0, 0, d.width, d.depth)]];
   const used = new Set<string>();

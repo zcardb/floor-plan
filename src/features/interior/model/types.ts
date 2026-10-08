@@ -78,6 +78,7 @@ export interface Design {
   furniture: Furniture[];
   demolished: string[];
   measures: Measure[];
+  dimensionSettings?: { visible?: boolean; top?: number; bottom?: number; left?: number; right?: number };
   costSettings?: CostSettings;
   customCatalog?: LibraryItem[];
 }

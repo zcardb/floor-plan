@@ -9,8 +9,9 @@ export function resolveWallPoint(raw:Point,d:Design,scale:number,snap:boolean,st
   for(const w of d.walls){
     if(w.id===exclude||d.demolished.includes(w.id))continue;
     const accept=(p:Point,kind:'endpoint'|'intersection')=>{
-      if(start&&((horizontal&&Math.abs(p[1]-start[1])>0.01)||(!horizontal&&Math.abs(p[0]-start[0])>0.01)))return;
-      const distance=Math.hypot(p[0]-point[0],p[1]-point[1]);
+      if(kind==='intersection'&&start&&((horizontal&&Math.abs(p[1]-start[1])>0.01)||(!horizontal&&Math.abs(p[0]-start[0])>0.01)))return;
+      const reference=kind==='endpoint'?raw:point;
+      const distance=Math.hypot(p[0]-reference[0],p[1]-reference[1]);
       if(distance<=tolerance+(kind==='intersection'?w.thickness/2:0))candidates.push({point:p,wallId:w.id,kind,distance});
     };
     accept(w.a,'endpoint');accept(w.b,'endpoint');

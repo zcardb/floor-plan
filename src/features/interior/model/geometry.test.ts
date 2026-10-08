@@ -43,6 +43,17 @@ describe("户型几何与输入保护", () => {
     });
     expect(unfinished.rooms).toHaveLength(1);
   });
+  it('连接轮廓闭合形成房间，保存往返不改中心线', () => {
+    const base = blankDesign();
+    const points: [number, number][] = [[1000, 1000], [3000, 1000], [3000, 3000], [1000, 3000]];
+    const walls = points.map((a, i) => ({ id: `closed-${i}`, a, b: points[(i + 1) % 4], thickness: 200, kind: 'partition' as const }));
+    const design = rebuildRooms({ ...base, walls: [...base.walls, ...walls] });
+    expect(design.rooms).toHaveLength(2);
+    expect(design.rooms.some(r => Math.abs(area(r) - 3.24) < 0.001)).toBe(true);
+    const restored = validateDesign(JSON.parse(JSON.stringify(design)));
+    expect(restored.walls).toEqual(design.walls);
+    expect(rebuildRooms(restored).rooms).toHaveLength(2);
+  });
   it("房间拆分保留原房间ID且不产生重复ID", () => {
     const d = blankDesign(),
       s = rebuildRooms({

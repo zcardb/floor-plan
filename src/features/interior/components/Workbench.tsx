@@ -161,7 +161,7 @@ export function Workbench(p: Props) {
     if (coordLabel.current)
       coordLabel.current.textContent = `X ${formatMeters(p[0])}  /  Y ${formatMeters(p[1])} m`;
   }, []);
-  const [layers, setLayers] = useState<Layers>({
+  const [layerState, setLayers] = useState<Layers>({
       grid: false,
       dims: true,
       labels: true,
@@ -175,6 +175,7 @@ export function Workbench(p: Props) {
       hour: 10,
       mode: "orbit",
     });
+  const layers: Layers = { ...layerState, dims: d.dimensionSettings?.visible ?? true };
   const [costOpen, setCostOpen] = useState(false),
     [customOpen, setCustomOpen] = useState(false);
   const saveCustom = (item: LibraryItem) => {
@@ -677,7 +678,8 @@ export function Workbench(p: Props) {
                   key={key}
                   onSelect={(e) => {
                     e.preventDefault();
-                    setLayers((l) => ({ ...l, [key]: !l[key] }));
+                    if (key === 'dims') change(d => ({ ...d, dimensionSettings: { ...d.dimensionSettings, visible: !(d.dimensionSettings?.visible ?? true) } }));
+                    else setLayers((l) => ({ ...l, [key]: !l[key] }));
                   }}
                 >
                   <span

@@ -142,7 +142,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
     const fields = f
       ? [
           ["w", "宽 / m", f.w],
-          ["d", "深 / m", f.d],
+          ["d", f.type === 'stairs' ? "长 / m" : "深 / m", f.d],
           ["cx", "中心 X / m", f.cx],
           ["cy", "中心 Y / m", f.cy],
           ["rot", "旋转 / °", f.rot],

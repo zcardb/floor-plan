@@ -1,4 +1,5 @@
-import { wallPoly, length } from "./geometry";
+import { length } from "./geometry";
+import { connectedWallPoly } from './wallConnections';
 import { doorSwingPoints } from './doorOrientation';
 import type { Design, Point, Selection } from "./types";
 export interface ScreenRect {
@@ -28,7 +29,7 @@ export function selectionPoints(d: Design, s: Selection): Point[] {
     return d.rooms.find((r) => r.id === s.id)?.rings[0] || [];
   if (s.kind === "wall") {
     const w = d.walls.find((w) => w.id === s.id);
-    return w ? wallPoly(w) : [];
+    return w ? connectedWallPoly(w, d.walls, d.demolished) : [];
   }
   const o = d.openings.find((o) => o.id === s.id),
     w = d.walls.find((w) => w.id === o?.wallId);

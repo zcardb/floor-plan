@@ -29,6 +29,7 @@ import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
 import { editSelection } from "../model/selectionEdits";
 import { useCostDesign } from './CostDefaultsContext';
 import { SizeFields } from './SizeFields';
+import { DimensionSettings } from './DimensionSettings';
 import type { SizeTransaction } from '../model/sizeTransaction';
 import {
   area,
@@ -207,7 +208,7 @@ export function PropertyPanel({
               input(
                 [
                   "宽度 / m",
-                  "深度 / m",
+                  f.type === 'stairs' ? "长度 / m" : "深度 / m",
                   "中心 X / m",
                   "中心 Y / m",
                   "旋转 / °",
@@ -565,6 +566,7 @@ export function PropertyPanel({
               )}
             </div>
           </section>
+          <DimensionSettings design={design} change={change} />
           <section>
             <h3 className="section-title">操作说明</h3>
             <div className="shortcut-list">

@@ -17,7 +17,6 @@ import {
   roomPath,
   snapMove,
   snapPoint,
-  wallPoly,
 } from "../model/geometry";
 import {
   uid,
@@ -33,6 +32,7 @@ import { MaterialDefs } from "./Materials";
 import { selectionPoints, localWallPoint, type ScreenRect } from "../model/selectionAnchor";
 import { resolveWallPoint,validateWallSegment } from '../model/wallDrawing';
 import { useWallDrawing } from './useWallDrawing';
+import { connectedWallPoly } from '../model/wallConnections';
 import { WallHoverOverlay } from './WallHoverOverlay';
 import { formatMeters } from '../model/lengthUnits';
 import { perimeterDimensions, planDrawingBounds } from '../model/perimeterDimensions';
@@ -94,7 +94,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
   const svg = useRef<SVGSVGElement>(null),
     current = useRef(design);
   current.current = design;
-  const dimensionLayout = useMemo(() => perimeterDimensions({ walls: design.walls, demolished: design.demolished }), [design.walls, design.demolished]);
+  const dimensionLayout = useMemo(() => perimeterDimensions({ walls: design.walls, demolished: design.demolished, dimensionSettings: design.dimensionSettings }), [design.walls, design.demolished, design.dimensionSettings]);
   const [view, setView] = useState({ x: -2000, y: -2000, s: 0.05 }),
     vr = useRef(view);
   vr.current = view;
@@ -111,6 +111,12 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
   const mouseDown = useRef<(() => void) | null>(null);
   const wallClick = useRef<{id:string;fraction:number}|null>(null);
   const drawing = useWallDrawing(tool==='wall',current,view.s,layers.snap,commit,finishTool);
+  const wallPolygons = useMemo(() => {
+    const walls = drawing.draft && length(drawing.draft as Design['walls'][number]) >= 100
+      ? [...design.walls, { id: 'draft', ...drawing.draft, thickness: design.thickness, kind: 'partition' as const }]
+      : design.walls;
+    return new Map(design.walls.map(w => [w.id, connectedWallPoly(w, walls, design.demolished)]));
+  }, [design.walls, design.demolished, design.thickness, drawing.draft]);
   useEffect(() => {
     const el = svg.current;
     if (!el) return;
@@ -707,7 +713,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         <polygon
           key={w.id}
           data-wall={w.id}
-          points={wallPoly(w)
+          points={wallPolygons.get(w.id)!
             .map((p) => p.join(","))
             .join(" ")}
           fill={
@@ -819,8 +825,8 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       {design.measures.map((m) => (
         <MeasureLine key={m.id} a={m.a} b={m.b} scale={view.s} />
       ))}
-      {tool==='wall' && drawing.draft && Math.hypot(drawing.draft.b[0]-drawing.draft.a[0],drawing.draft.b[1]-drawing.draft.a[1])>0 && <g data-export-hide="true" pointerEvents="none"><polygon points={wallPoly({id:'draft',...drawing.draft,thickness:design.thickness,kind:'partition'}).map(p=>p.join(',')).join(' ')} fill="var(--plan-selection-soft)" stroke="var(--plan-selection)" strokeWidth={1/view.s}/><MeasureLine a={drawing.draft.a} b={drawing.draft.b} scale={view.s}/></g>}
-      {tool === 'wall' && <WallHoverOverlay walls={design.walls} candidate={drawing.hover} connection={drawing.candidate} scale={view.s} />}
+      {tool==='wall' && drawing.draft && Math.hypot(drawing.draft.b[0]-drawing.draft.a[0],drawing.draft.b[1]-drawing.draft.a[1])>0 && <g data-export-hide="true" pointerEvents="none"><polygon points={connectedWallPoly({id:'draft',...drawing.draft,thickness:design.thickness,kind:'partition'},design.walls,design.demolished).map(p=>p.join(',')).join(' ')} fill="var(--plan-selection-soft)" stroke="var(--plan-selection)" strokeWidth={1/view.s}/><MeasureLine a={drawing.draft.a} b={drawing.draft.b} scale={view.s}/></g>}
+      {tool === 'wall' && <WallHoverOverlay walls={design.walls} demolished={design.demolished} candidate={drawing.hover} connection={drawing.candidate} scale={view.s} />}
       {draft && (
         <g data-export-hide="true">
           <MeasureLine a={draft.a} b={draft.b} scale={view.s} />
@@ -898,7 +904,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
               .map((w) => (
                 <g key={w.id}>
                   <polygon
-                    points={wallPoly(w)
+                    points={wallPolygons.get(w.id)!
                       .map((p) => p.join(","))
                       .join(" ")}
                     fill="none"

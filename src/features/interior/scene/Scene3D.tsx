@@ -32,6 +32,7 @@ import type {
 } from "../model/types";
 import { buildFurniture, disposeMaterials, mat } from "./furniture";
 import { openingDimensions } from "../model/costs";
+import { connectedWallPoly, wallSectionPolygons } from '../model/wallConnections';
 import type { ScreenRect } from "../model/selectionAnchor";
 export interface SceneHandle {
   shot: () => void;
@@ -765,15 +766,18 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
             .filter((o) => o.wallId === w.id)
             .sort((a, b) => a.offset - b.offset),
           color = w.color || "#eee9de";
+        const footprint = connectedWallPoly(w, d.walls, d.demolished);
         const part = (start: number, end: number, y: number, h: number) => {
-          if (end - start < 0.001) return;
-          const t = (start + end) / 2 / L,
-            x = w.a[0] / 1000 + ((w.b[0] - w.a[0]) / 1000) * t,
-            z = w.a[1] / 1000 + ((w.b[1] - w.a[1]) / 1000) * t;
-          const o = addBox(end - start, h, w.thickness / 1000, x, y, z, color);
-          if (o) {
-            o.rotation.y = angle;
-            o.userData.wall = w.id;
+          if (end - start < 0.001 || h < 0.001) return;
+          for (const polygon of wallSectionPolygons(w, footprint, start * 1000, end * 1000)) {
+            const shape = new THREE.Shape(polygon.map(p => new THREE.Vector2(p[0] / 1000, -p[1] / 1000)));
+            const geometry = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false, steps: 1 });
+            geometry.rotateX(-Math.PI / 2);
+            const mesh = new THREE.Mesh(geometry, mat(color));
+            mesh.position.y = y;
+            mesh.castShadow = mesh.receiveShadow = true;
+            mesh.userData.wall = w.id;
+            r.arch.add(mesh);
           }
         };
         let cursor = 0;

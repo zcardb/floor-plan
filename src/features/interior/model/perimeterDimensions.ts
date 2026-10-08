@@ -1,5 +1,7 @@
 import { bbox, length, wallPoly } from './geometry';
+import { connectedWallPoly } from './wallConnections';
 import { formatMeters } from './lengthUnits';
+import { dimensionSettings } from './dimensionSettings';
 import type { Design, Point } from './types';
 
 export interface DimensionSegment {
@@ -41,13 +43,13 @@ function segments(values: number[]): DimensionSegment[] {
   });
 }
 
-export function perimeterDimensions(d: Pick<Design, 'walls' | 'demolished'>): PerimeterLayout | null {
+export function perimeterDimensions(d: Pick<Design, 'walls' | 'demolished' | 'dimensionSettings'>): PerimeterLayout | null {
   const demolished = new Set(d.demolished);
   const walls = d.walls.filter(w => !demolished.has(w.id) &&
     [...w.a, ...w.b, w.thickness].every(Number.isFinite) && w.thickness > 0 && length(w) > tolerance);
   if (!walls.length) return null;
   const polygons = walls.map(w => wallPoly(w));
-  const outer = bbox(polygons.flat());
+  const outer = bbox(walls.flatMap(w => connectedWallPoly(w, walls, d.demolished)));
   const xs = [outer.x, outer.x2];
   const ys = [outer.y, outer.y2];
   walls.forEach((wall, index) => {
@@ -56,8 +58,9 @@ export function perimeterDimensions(d: Pick<Design, 'walls' | 'demolished'>): Pe
   });
   const horizontal = segments(xs);
   const vertical = segments(ys);
-  const top = outer.y - 650, bottom = outer.y2 + 750;
-  const left = outer.x - 800, right = outer.x2 + 900;
+  const settings = dimensionSettings(d);
+  const top = outer.y - settings.top, bottom = outer.y2 + settings.bottom;
+  const left = outer.x - settings.left, right = outer.x2 + settings.right;
   const horizontalReach = Math.max(0, ...horizontal.map(s => s.lane)) * laneSpacing + 270;
   const verticalReach = Math.max(0, ...vertical.map(s => s.lane)) * laneSpacing + 270;
   return { horizontal, vertical, top, bottom, left, right,
@@ -67,7 +70,7 @@ export function perimeterDimensions(d: Pick<Design, 'walls' | 'demolished'>): Pe
 
 export function planDrawingBounds(d: Design, dimensions: boolean) {
   const walls = d.walls.filter(w => [...w.a, ...w.b, w.thickness].every(Number.isFinite) && w.thickness > 0 && length(w) > tolerance);
-  const points: Point[] = [...walls.flatMap(w => wallPoly(w)), ...d.rooms.flatMap(r => r.rings.flat())];
+  const points: Point[] = [...walls.flatMap(w => connectedWallPoly(w, walls, d.demolished)), ...d.rooms.flatMap(r => r.rings.flat())];
   const layout = dimensions ? perimeterDimensions(d) : null;
   if (layout) points.push([layout.bounds.x, layout.bounds.y], [layout.bounds.x2, layout.bounds.y2]);
   const valid = points.filter(p => p.every(Number.isFinite));
