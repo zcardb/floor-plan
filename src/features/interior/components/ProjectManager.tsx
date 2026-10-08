@@ -44,17 +44,25 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
   const refreshing = projects.loading && !rowAction.pending;
 
   const rowActions = (row: ProjectSummary) => <>
-    <Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'重命名' + row.name} disabled={rowAction.pending} onClick={() => { setRename(row); setName(row.name); }}><Pencil size={16} /></Button>
-    {row.cloud && <Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'复制' + row.name} disabled={rowAction.pending} aria-busy={isPending('duplicate', row)} onClick={() => void rowAction.run('duplicate', row)}>{isPending('duplicate', row) ? <Loader2 className="animate-spin" size={16} /> : <Copy size={16} />}</Button>}
-    <Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'删除' + row.name} disabled={rowAction.pending} onClick={() => setDeleting(row)}><Trash2 size={16} /></Button>
+    <EditorTooltip label="重命名项目" description={`修改「${row.name}」的名称`} disabled={rowAction.pending}>
+      <Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'重命名' + row.name} disabled={rowAction.pending} onClick={() => { setRename(row); setName(row.name); }}><Pencil size={16} /></Button>
+    </EditorTooltip>
+    {row.cloud && <EditorTooltip label="复制项目" description={`用「${row.name}」的当前内容再建一个方案`} disabled={rowAction.pending}><Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'复制' + row.name} disabled={rowAction.pending} aria-busy={isPending('duplicate', row)} onClick={() => void rowAction.run('duplicate', row)}>{isPending('duplicate', row) ? <Loader2 className="animate-spin" size={16} /> : <Copy size={16} />}</Button></EditorTooltip>}
+    <EditorTooltip label="删除项目" description={`永久删除「${row.name}」，不可撤销`} disabled={rowAction.pending}>
+      <Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'删除' + row.name} disabled={rowAction.pending} onClick={() => setDeleting(row)}><Trash2 size={16} /></Button>
+    </EditorTooltip>
   </>;
 
   return <>
     <div className="cms-heading">
       <div><h1>项目管理</h1><p>把每个空间的灵感，保存成独立方案。</p></div>
       <div className="cms-heading-actions">
-        <Button variant="ghost" size="icon" className="cms-refresh-button" aria-label="刷新项目" title="刷新项目" disabled={projects.loading} aria-busy={refreshing} onClick={() => void projects.reload()}><RefreshCw className={refreshing ? 'animate-spin' : ''} /></Button>
-        <Button className="cms-create-button" disabled={rowAction.pending} onClick={() => { setName(''); setCreating(true); }}><Plus />新建项目</Button>
+        <EditorTooltip label="刷新项目" description="重新从云端拉取项目列表" disabled={projects.loading}>
+          <Button variant="ghost" size="icon" className="cms-refresh-button" aria-label="刷新项目" disabled={projects.loading} aria-busy={refreshing} onClick={() => void projects.reload()}><RefreshCw className={refreshing ? 'animate-spin' : ''} /></Button>
+        </EditorTooltip>
+        <EditorTooltip label="新建项目" description="选择户型模板，创建一个新方案" disabled={rowAction.pending}>
+          <Button className="cms-create-button" disabled={rowAction.pending} onClick={() => { setName(''); setCreating(true); }}><Plus />新建项目</Button>
+        </EditorTooltip>
       </div>
     </div>
     {projects.listError && <LoadError title="云端项目读取失败" message={projects.listError} retrying={projects.loading} onRetry={() => void projects.reload()} />}
@@ -63,14 +71,16 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
     <div className="cms-project-grid">{list.map(row => {
       const working = busyRow === row.id;
       return <article className={'cms-card' + (working ? ' is-busy' : '')} key={row.id} aria-busy={working}>
-        <button type="button" className="cms-card-open" aria-label={'打开项目 ' + row.name} disabled={rowAction.pending} onClick={() => void rowAction.run('open', row)} />
+        <EditorTooltip label={`打开 ${row.name}`} description="打开这个方案继续编辑" disabled={rowAction.pending}>
+          <button type="button" className="cms-card-open" aria-label={'打开项目 ' + row.name} disabled={rowAction.pending} onClick={() => void rowAction.run('open', row)} />
+        </EditorTooltip>
         {working ? <Loader2 className="animate-spin" size={30} /> : <LayoutTemplate size={30} />}
         <h2>{row.name}</h2>
         <p>{isPending('remove', row) ? '正在删除…' : isPending('duplicate', row) ? '正在复制…' : new Date(row.updatedAt).toLocaleDateString('zh-CN')}</p>
         <div className="cms-card-actions">{rowActions(row)}</div>
       </article>;
     })}</div>
-    {projects.hasMore && <div className="project-list-footer"><Button variant="ghost" loading={projects.loading && !!list.length} disabled={projects.loading} onClick={() => void projects.loadMore()}>加载更多</Button></div>}
+    {projects.hasMore && <div className="project-list-footer"><EditorTooltip label="加载更多" description="继续加载下一批项目"><Button variant="ghost" loading={projects.loading && !!list.length} disabled={projects.loading} onClick={() => void projects.loadMore()}>加载更多</Button></EditorTooltip></div>}
 
     <Dialog open={creating || !!rename} onOpenChange={v => { if (!v && !submit.pending) { setCreating(false); setRename(null); } }}>
       <DialogContent>
@@ -80,7 +90,9 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
             <div className="cms-field"><Label htmlFor="project-name">项目名称</Label><Input id="project-name" required maxLength={100} value={name} onChange={e => setName(e.target.value)} /></div>
             {!rename && <div className="cms-field"><Label htmlFor="project-template">户型模板</Label><Select value={template} onValueChange={v => setTemplate(v as typeof template)} disabled={submit.pending}><SelectTrigger id="project-template"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="blank">空白户型</SelectItem><SelectItem value="reference">参考户型</SelectItem></SelectContent></Select></div>}
           </fieldset>
-          <Button loading={submit.pending} disabled={!name.trim()}>{submit.pending ? '正在保存…' : '确认保存'}</Button>
+          <EditorTooltip label="确认保存" description={rename ? '应用新的项目名称' : '按选择的模板创建项目'} disabled={submit.pending || !name.trim()}>
+            <Button loading={submit.pending} disabled={!name.trim()}>{submit.pending ? '正在保存…' : '确认保存'}</Button>
+          </EditorTooltip>
         </form>
       </DialogContent>
     </Dialog>
