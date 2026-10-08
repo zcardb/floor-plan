@@ -6,6 +6,7 @@ export interface Wall {
   b: Point;
   thickness: number;
   kind: WallKind;
+  color?: string;
 }
 export interface Opening {
   id: string;
@@ -14,6 +15,8 @@ export interface Opening {
   offset: number;
   width: number;
   open?: boolean;
+  height?: number;
+  sill?: number;
 }
 export interface Room {
   id: string;
@@ -21,6 +24,7 @@ export interface Room {
   rings: Point[][];
   mat: string;
   counted?: boolean;
+  wallMat?: string;
 }
 export interface Furniture {
   id: string;
@@ -32,6 +36,15 @@ export interface Furniture {
   d: number;
   rot: number;
   color: string;
+  catalogId?: string;
+}
+export interface CostSettings {
+  floorPrices?: Record<string, number | null>;
+  wallPrices?: Record<string, number | null>;
+  furniturePrices?: Record<string, number | null>;
+  openingPrices?: Partial<Record<"door" | "window", number | null>>;
+  constructionPrices?: Partial<Record<"build" | "demolish", number | null>>;
+  labor?: { id: string; name: string; amount: number }[];
 }
 export interface Measure {
   id: string;
@@ -51,6 +64,7 @@ export interface Design {
   furniture: Furniture[];
   demolished: string[];
   measures: Measure[];
+  costSettings?: CostSettings;
 }
 export interface Project {
   id: string;
@@ -80,6 +94,7 @@ export interface Material {
   color: string;
 }
 export interface LibraryItem {
+  catalogId?: string;
   type: string;
   name: string;
   w: number;

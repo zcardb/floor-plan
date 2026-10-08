@@ -13,6 +13,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { materials } from "../data/catalog";
+import { calculateCosts, furnitureKey, priceOf, setPrice } from "../model/costs";
+import { PriceInput } from './PriceInput';
+import { editSelection } from "../model/selectionEdits";
 import {
   area,
   bbox,
@@ -49,6 +52,7 @@ export function PropertyPanel({
     r = s?.kind === "room" ? d.rooms.find((r) => r.id === s.id) : null,
     w = s?.kind === "wall" ? d.walls.find((w) => w.id === s.id) : null,
     o = s?.kind === "opening" ? d.openings.find((o) => o.id === s.id) : null;
+  const applyEdit = (values:Record<string,number>)=>{try{change(d=>editSelection(d,s,values));}catch(e){toast.error(e instanceof Error?e.message:'尺寸无效');}};
   const input = (
     label: string,
     value: number,
@@ -56,7 +60,7 @@ export function PropertyPanel({
     min = -100000,
     max = 100000,
   ) => (
-    <label className="property-field">
+    <label className="property-field" key={label}>
       {label}
       <input
         type="number"
@@ -104,7 +108,7 @@ export function PropertyPanel({
           <span className="material-swatch" style={{ background: m.color }} />
           <span>
             {m.name}
-            <small>¥{m.price} / m²</small>
+            <small>¥{priceOf(d, "floorPrices", key) ?? "未定价"} / m²</small>
           </span>
         </button>
       ))}
@@ -116,11 +120,13 @@ export function PropertyPanel({
       返回方案总览
     </button>
   );
+  const costs = calculateCosts(d);
   const total = d.rooms
       .filter((r) => r.counted !== false)
       .reduce((a, r) => a + area(r), 0),
     cost = d.rooms.reduce(
-      (sum, r) => sum + area(r) * materials[r.mat].price * 1.05,
+      (sum, r) =>
+        sum + area(r) * (priceOf(d, "floorPrices", r.mat) ?? 0) * 1.05,
       0,
     );
   if (f)
@@ -162,15 +168,7 @@ export function PropertyPanel({
                   "旋转 / °",
                 ][i],
                 f[key],
-                (v) =>
-                  change((d) => ({
-                    ...d,
-                    furniture: d.furniture.map((g) =>
-                      g.id === f.id
-                        ? { ...g, [key]: key === "rot" ? norm(v) : v }
-                        : g,
-                    ),
-                  })),
+                (v) => applyEdit({[key]:v}),
                 key === "w" || key === "d" ? 50 : -100000,
                 key === "w" || key === "d" ? 20000 : 100000,
               ),
@@ -191,6 +189,7 @@ export function PropertyPanel({
               />
             </label>
           </div>
+          <div className="furniture-price-field"><h3 className="section-title">家具单价 <small>元 / 件 · 同款联动</small></h3><PriceInput key={furnitureKey(f)+priceOf(d,'furniturePrices',furnitureKey(f))} value={priceOf(d,'furniturePrices',furnitureKey(f))} label={f.name+'单价'} onApply={v=>change(d=>setPrice(d,'furniturePrices',furnitureKey(f),v))}/><p className="footnote">修改仅影响当前项目的同款家具，自动计入软装总成本。</p></div>
           <div className="property-actions">
             <Button size="sm" variant="outline" onClick={rotate}>
               <RotateCw />
@@ -308,7 +307,7 @@ export function PropertyPanel({
             <b>
               ¥
               {Math.round(
-                area(r) * materials[r.mat].price * 1.05,
+                area(r) * (priceOf(d, "floorPrices", r.mat) ?? 0) * 1.05,
               ).toLocaleString()}
             </b>
           </div>
@@ -357,48 +356,14 @@ export function PropertyPanel({
             {input(
               "长度 / mm",
               length(w),
-              (v) =>
-                change((d) => {
-                  const wall = d.walls.find((g) => g.id === w.id)!,
-                    L = length(wall),
-                    next = {
-                      ...wall,
-                      b: [
-                        wall.a[0] + ((wall.b[0] - wall.a[0]) * v) / L,
-                        wall.a[1] + ((wall.b[1] - wall.a[1]) * v) / L,
-                      ] as [number, number],
-                    };
-                  if (!editable) return d;
-                  if (
-                    d.openings.some(
-                      (o) => o.wallId === w.id && o.offset + o.width / 2 > v,
-                    )
-                  ) {
-                    toast.error("墙体缩短后无法容纳已有门窗");
-                    return d;
-                  }
-                  return rebuildRooms({
-                    ...d,
-                    walls: d.walls.map((g) => (g.id === w.id ? next : g)),
-                  });
-                }),
+              (v) => applyEdit({length:v}),
               100,
               50000,
             )}
             {input(
               "墙厚 / mm",
               w.thickness,
-              (v) =>
-                change((d) =>
-                  editable
-                    ? rebuildRooms({
-                        ...d,
-                        walls: d.walls.map((g) =>
-                          g.id === w.id ? { ...g, thickness: v } : g,
-                        ),
-                      })
-                    : d,
-                ),
+              (v) => applyEdit({thickness:v}),
               50,
               1000,
             )}
@@ -423,28 +388,7 @@ export function PropertyPanel({
     );
   }
   if (o) {
-    const wall = d.walls.find((w) => w.id === o.wallId)!;
-    const upd = (key: "offset" | "width", v: number) =>
-      change((d) => {
-        const next = { ...o, [key]: v };
-        if (
-          next.offset - next.width / 2 < 0 ||
-          next.offset + next.width / 2 > length(wall) ||
-          d.openings.some(
-            (g) =>
-              g.id !== o.id &&
-              g.wallId === o.wallId &&
-              Math.abs(g.offset - next.offset) < (g.width + next.width) / 2,
-          )
-        ) {
-          toast.error("开口超出墙段范围或与其它门窗重叠");
-          return d;
-        }
-        return {
-          ...d,
-          openings: d.openings.map((g) => (g.id === o.id ? next : g)),
-        };
-      });
+    const upd = (key: 'offset'|'width',v:number)=>applyEdit({[key]:v});
     return (
       <>
         <div className="panel-heading">
@@ -587,6 +531,7 @@ export function PropertyPanel({
       ) : (
         <>
           <section>
+            <div className="cost-summary"><small>整体成本 · 已录入费用</small><strong>¥{costs.total.toLocaleString('zh-CN',{maximumFractionDigits:2})}</strong><div><span>软装 ¥{Math.round(costs.softTotal).toLocaleString()}</span><span>硬装 ¥{Math.round(costs.hardTotal).toLocaleString()}</span></div></div>{costs.unpriced>0&&<p className="cost-warning">{costs.unpriced} 类费用未定价，可在成本管理中填写。</p>}
             <div className="overview-top">
               <span>空间，恰到好处。</span>
               <LayoutGrid size={17} />
@@ -653,7 +598,12 @@ export function PropertyPanel({
                         {m.name}
                         <small>{a.toFixed(1)} m²</small>
                       </span>
-                      <b>¥{Math.round(a * m.price * 1.05).toLocaleString()}</b>
+                      <b>
+                        ¥
+                        {Math.round(
+                          a * (priceOf(d, "floorPrices", key) ?? 0) * 1.05,
+                        ).toLocaleString()}
+                      </b>
                     </div>
                   )
                 );

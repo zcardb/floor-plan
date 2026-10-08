@@ -30,6 +30,7 @@ import {
 } from "../model/types";
 import { FurnitureShape } from "./FurnitureShape";
 import { MaterialDefs } from "./Materials";
+import { selectionPoints, type ScreenRect } from "../model/selectionAnchor";
 export interface CanvasHandle {
   zoom: (k: number) => void;
   fit: () => void;
@@ -48,6 +49,7 @@ interface Props {
   closePanels: () => void;
   onScale: (s: number) => void;
   onCoord: (p: Point) => void;
+  onAnchor: (r: ScreenRect | null) => void;
 }
 interface Drag {
   pid: number;
@@ -74,6 +76,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     closePanels,
     onScale,
     onCoord,
+    onAnchor,
   },
   ref,
 ) {
@@ -93,6 +96,34 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       view: typeof view;
       center: Point;
     } | null>(null);
+  useEffect(() => {
+    const el = svg.current;
+    if (!el) return;
+    const matrix = el.getScreenCTM(),
+      bounds = el.getBoundingClientRect(),
+      pts = selectionPoints(design, selection);
+    if (
+      !matrix ||
+      !pts.length ||
+      (selection?.kind === "furniture" && !layers.furn)
+    ) {
+      onAnchor(null);
+      return;
+    }
+    const projected = pts.map(([x, y]) => {
+      const p = el.createSVGPoint();
+      p.x = x;
+      p.y = y;
+      const q = p.matrixTransform(matrix);
+      return [q.x - bounds.left, q.y - bounds.top];
+    });
+    onAnchor({
+      left: Math.min(...projected.map((p) => p[0])),
+      top: Math.min(...projected.map((p) => p[1])),
+      right: Math.max(...projected.map((p) => p[0])),
+      bottom: Math.max(...projected.map((p) => p[1])),
+    });
+  }, [design, selection, view, size, onAnchor, layers.furn]);
   const fit = () => {
     const el = svg.current;
     if (!el) return;
@@ -419,7 +450,8 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         drag.current = base;
       }}
       onPointerMove={(e) => {
-        if (points.current.has(e.pointerId)) points.current.set(e.pointerId, [e.clientX, e.clientY]);
+        if (points.current.has(e.pointerId))
+          points.current.set(e.pointerId, [e.clientX, e.clientY]);
         if (pinch.current && points.current.size >= 2) {
           const [a, b] = [...points.current.values()],
             pin = pinch.current,
@@ -602,10 +634,11 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
               : w.kind === "bearing"
                 ? layers.bearing
                   ? "var(--plan-bearing)"
-                  : "var(--plan-ink)"
-                : w.kind === "exterior"
-                  ? "var(--plan-exterior)"
-                  : "var(--plan-wall)"
+                  : w.color || "var(--plan-ink)"
+                : w.color ||
+                  (w.kind === "exterior"
+                    ? "var(--plan-exterior)"
+                    : "var(--plan-wall)")
           }
           stroke={
             design.demolished.includes(w.id) ? "var(--plan-selection)" : "none"

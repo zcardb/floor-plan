@@ -1,6 +1,7 @@
 import { materials, library } from "../data/catalog";
 import { referenceDesign } from "../data/templates";
 import { length } from "./geometry";
+import { normalizeFurniture, validPrice, wallMaterials } from "./costs";
 import type { Design } from "./types";
 const fail = () => {
   throw new Error("方案格式不正确或数据超出允许范围");
@@ -116,7 +117,16 @@ export function validateDesign(value: unknown): Design {
   }
   for (let i = 0; i < v.openings.length; i++) {
     const a = v.openings[i];
-    if (v.openings.slice(i + 1).some(b => b.wallId === a.wallId && Math.abs(b.offset - a.offset) < (a.width + b.width) / 2)) fail();
+    if (
+      v.openings
+        .slice(i + 1)
+        .some(
+          (b) =>
+            b.wallId === a.wallId &&
+            Math.abs(b.offset - a.offset) < (a.width + b.width) / 2,
+        )
+    )
+      fail();
   }
   for (const m of v.measures) {
     id(m.id);
@@ -126,5 +136,70 @@ export function validateDesign(value: unknown): Design {
     const w = v.walls.find((w) => w.id === s);
     if (!w || !["partition", "low"].includes(w.kind)) fail();
   }
-  return structuredClone(v);
+  for (const w of v.walls)
+    if (w.color !== undefined && !/^#[0-9a-f]{6}$/i.test(w.color)) fail();
+  for (const r of v.rooms)
+    if (
+      r.wallMat !== undefined &&
+      !Object.prototype.hasOwnProperty.call(wallMaterials, r.wallMat)
+    )
+      fail();
+  for (const o of v.openings)
+    if (
+      (o.height !== undefined && !finite(o.height, 100, 8000)) ||
+      (o.sill !== undefined && !finite(o.sill, 0, 8000))
+    )
+      fail();
+  for (const f of v.furniture)
+    if (
+      f.catalogId !== undefined &&
+      (typeof f.catalogId !== "string" || f.catalogId.length > 250)
+    )
+      fail();
+  if (v.costSettings) {
+    if (typeof v.costSettings !== "object" || Array.isArray(v.costSettings))
+      fail();
+    for (const group of [
+      "floorPrices",
+      "wallPrices",
+      "furniturePrices",
+      "openingPrices",
+      "constructionPrices",
+    ] as const) {
+      const prices = v.costSettings[group];
+      if (prices !== undefined) {
+        if (
+          !prices ||
+          typeof prices !== "object" ||
+          Array.isArray(prices) ||
+          Object.keys(prices).length > 2500
+        )
+          fail();
+        for (const [key, price] of Object.entries(prices)) {
+          if (key.length > 250 || (price !== null && !validPrice(price)))
+            fail();
+        }
+      }
+    }
+    if (v.costSettings.labor !== undefined) {
+      if (
+        !Array.isArray(v.costSettings.labor) ||
+        v.costSettings.labor.length > 500
+      )
+        fail();
+      for (const item of v.costSettings.labor) {
+        if (
+          typeof item.id !== "string" ||
+          typeof item.name !== "string" ||
+          item.name.length > 100 ||
+          !validPrice(item.amount)
+        )
+          fail();
+      }
+    }
+  }
+  return structuredClone({
+    ...v,
+    furniture: v.furniture.map(normalizeFurniture),
+  });
 }

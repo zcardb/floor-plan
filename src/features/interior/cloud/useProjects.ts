@@ -182,7 +182,10 @@ export function useProjects() {
       const next = {
         ...activeRef.current!,
         revision: data.revision,
-        updatedAt: version === editVersion.current ? (data.updated_at || "") : activeRef.current!.updatedAt,
+        updatedAt:
+          version === editVersion.current
+            ? data.updated_at || ""
+            : activeRef.current!.updatedAt,
       };
       activeRef.current = next;
       setActive(next);
@@ -301,8 +304,20 @@ export function useProjects() {
   const create = useCallback(
     async (p: Project, toCloud = false) => {
       const saved = await save();
-      if (!saved && !(dirty.current && window.confirm('当前云端项目保存失败。将当前设计另存为新项目以保留更改？'))) return false;
-      if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+      if (
+        !saved &&
+        !(
+          dirty.current &&
+          window.confirm(
+            "当前云端项目保存失败。将当前设计另存为新项目以保留更改？",
+          )
+        )
+      )
+        return false;
+      if (timer.current) {
+        clearTimeout(timer.current);
+        timer.current = null;
+      }
       const generation = epoch.current;
       const next = {
         ...p,

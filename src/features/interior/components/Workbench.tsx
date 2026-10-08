@@ -5,6 +5,7 @@ import {
   Check,
   ChevronDown,
   Cloud,
+  CircleDollarSign,
   Copy,
   DoorOpen,
   Download,
@@ -76,6 +77,10 @@ import { blankDesign, referenceDesign } from "../data/templates";
 import { validateDesign } from "../model/validation";
 import { Library } from "./Library";
 import { PropertyPanel } from "./PropertyPanel";
+import { CostPanel } from "./CostPanel";
+import { SelectionEditor, type SelectionEditorHandle } from "./SelectionEditor";
+import { furnitureKey } from "../model/costs";
+import type { ScreenRect } from "../model/selectionAnchor";
 import { PlanCanvas, type CanvasHandle } from "./PlanCanvas";
 import type { Scene3D, SceneHandle, SceneOptions } from "../scene/Scene3D";
 type SceneComponent = typeof Scene3D;
@@ -143,7 +148,8 @@ export function Workbench(p: Props) {
     [scale, setScale] = useState(0.05);
   const coordLabel = useRef<HTMLSpanElement>(null);
   const onCoord = useCallback((p: Point) => {
-    if (coordLabel.current) coordLabel.current.textContent = `X ${Math.round(p[0])}  /  Y ${Math.round(p[1])} mm`;
+    if (coordLabel.current)
+      coordLabel.current.textContent = `X ${Math.round(p[0])}  /  Y ${Math.round(p[1])} mm`;
   }, []);
   const [layers, setLayers] = useState<Layers>({
       grid: false,
@@ -159,6 +165,13 @@ export function Workbench(p: Props) {
       hour: 10,
       mode: "orbit",
     });
+  const [costOpen, setCostOpen] = useState(false);
+  const stage = useRef<HTMLElement>(null),
+    editor = useRef<SelectionEditorHandle>(null);
+  const onAnchor = useCallback(
+    (r: ScreenRect | null) => editor.current?.update(r),
+    [],
+  );
   const canvas = useRef<CanvasHandle>(null),
     scene = useRef<SceneHandle>(null),
     file = useRef<HTMLInputElement>(null),
@@ -171,7 +184,7 @@ export function Workbench(p: Props) {
   );
   const select = useCallback((s: Selection) => {
       setSelection(s);
-      if (s?.kind === 'room') scene.current?.room(s.id);
+      if (s?.kind === "room") scene.current?.room(s.id);
     }, []),
     closePanels = useCallback(() => setDrawer(null), []);
   const toggleView = async (next: "2d" | "3d") => {
@@ -204,6 +217,7 @@ export function Workbench(p: Props) {
       const f = pushOut(
         {
           ...it,
+          catalogId: it.catalogId || `${it.type}:${it.name}`,
           id: uid(),
           cx: Math.round(p[0] / 10) * 10,
           cy: Math.round(p[1] / 10) * 10,
@@ -239,7 +253,13 @@ export function Workbench(p: Props) {
     if (selection?.kind !== "furniture") return;
     const f = d.furniture.find((f) => f.id === selection.id);
     if (!f) return;
-    const next = { ...f, id: uid(), cx: f.cx + 200, cy: f.cy + 200 };
+    const next = {
+      ...f,
+      catalogId: furnitureKey(f),
+      id: uid(),
+      cx: f.cx + 200,
+      cy: f.cy + 200,
+    };
     change((d) => ({ ...d, furniture: [...d.furniture, next] }));
     setSelection({ kind: "furniture", id: next.id });
   }, [d, selection, change]);
@@ -356,14 +376,6 @@ export function Workbench(p: Props) {
       setSelection(null);
     }
   };
-  const f =
-      selection?.kind === "furniture"
-        ? d.furniture.find((f) => f.id === selection.id)
-        : null,
-    r =
-      selection?.kind === "room"
-        ? d.rooms.find((r) => r.id === selection.id)
-        : null;
   const tip =
     tool === "wall"
       ? "拖动绘制隔墙 · 水平 / 垂直吸附 · 闭合空间自动生成房间"
@@ -621,13 +633,22 @@ export function Workbench(p: Props) {
                 {view === "2d" ? "下载 2D 图片" : "下载当前 3D 视角"}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={p.save}>
-                <Save />立即保存当前项目
+                <Save />
+                立即保存当前项目
               </DropdownMenuItem>
-              <DropdownMenuItem disabled={view !== '2d'} onClick={() => canvas.current?.ratio(60)}>
-                <Ruler />显示比例 1:60
+              <DropdownMenuItem
+                disabled={view !== "2d"}
+                onClick={() => canvas.current?.ratio(60)}
+              >
+                <Ruler />
+                显示比例 1:60
               </DropdownMenuItem>
-              <DropdownMenuItem disabled={view !== '2d'} onClick={() => canvas.current?.ratio(100)}>
-                <Ruler />显示比例 1:100
+              <DropdownMenuItem
+                disabled={view !== "2d"}
+                onClick={() => canvas.current?.ratio(100)}
+              >
+                <Ruler />
+                显示比例 1:100
               </DropdownMenuItem>
               <DropdownMenuItem onClick={exportJson}>
                 <ArrowDownToLine />
@@ -705,7 +726,7 @@ export function Workbench(p: Props) {
           blank={d.template === "blank"}
         />
       </aside>
-      <main className="stage">
+      <main className="stage" ref={stage}>
         <div className="stage-topline">
           <div className="canvas-context">
             <span className="context-dot" />
@@ -745,6 +766,7 @@ export function Workbench(p: Props) {
             closePanels={closePanels}
             onScale={setScale}
             onCoord={onCoord}
+            onAnchor={onAnchor}
           />
         ) : Scene ? (
           <Scene
@@ -760,6 +782,7 @@ export function Workbench(p: Props) {
               setView("2d");
               toast.error("设备无法启动 3D，请继续使用 2D 编辑");
             }}
+            onAnchor={onAnchor}
             exitWalk={() => setSceneOptions((o) => ({ ...o, mode: "orbit" }))}
           />
         ) : (
@@ -845,40 +868,29 @@ export function Workbench(p: Props) {
             <Maximize2 size={15} />
           </button>
         </div>
-        {(f ||
-          r ||
-          selection?.kind === "wall" ||
-          selection?.kind === "opening") && (
-          <div className="selection-toolbar">
-            <span>
-              {f?.name ||
-                r?.name ||
-                (selection?.kind === "wall" ? "墙体" : "门窗")}
-            </span>
-            {f && (
-              <>
-                <button title="旋转 90°" onClick={() => rotate()}>
-                  <RotateCw size={16} />
-                </button>
-                <button title="复制" onClick={duplicate}>
-                  <Copy size={16} />
-                </button>
-                <button title="删除" onClick={remove}>
-                  <Trash2 size={16} />
-                </button>
-              </>
-            )}
-            <button
-              className="mobile-properties"
-              onClick={() => setDrawer("panel")}
-            >
-              属性
-            </button>
-            <button title="完成选择" onClick={() => setSelection(null)}>
-              <Check size={16} />
-            </button>
-          </div>
-        )}
+        <SelectionEditor
+          key={`${selection?.kind}:${selection?.id}`}
+          ref={editor}
+          design={d}
+          selection={selection}
+          stage={stage}
+          change={change}
+          rotate={() => rotate()}
+          duplicate={duplicate}
+          remove={remove}
+          close={() => setSelection(null)}
+          hidden={!!drawer || (view === "3d" && sceneOptions.mode === "walk")}
+          details={() => {
+            setCostOpen(false);
+            if (matchMedia("(max-width:1100px)").matches) setDrawer("panel");
+            else setHidePanel(false);
+          }}
+          costs={() => {
+            setCostOpen(true);
+            if (matchMedia("(max-width:1100px)").matches) setDrawer("panel");
+            else setHidePanel(false);
+          }}
+        />
         <button className="mobile-library" onClick={() => togglePane("lib")}>
           <Armchair size={19} />
           家具库
@@ -889,15 +901,32 @@ export function Workbench(p: Props) {
           "property-panel " + (drawer === "panel" ? "drawer-open" : "")
         }
       >
-        <PropertyPanel
-          design={d}
-          selection={selection}
-          select={select}
-          change={change}
-          duplicate={duplicate}
-          remove={remove}
-          rotate={() => rotate()}
-        />
+        {costOpen ? (
+          <CostPanel
+            design={d}
+            change={change}
+            back={() => setCostOpen(false)}
+          />
+        ) : (
+          <>
+            <button
+              className="open-cost-manager"
+              onClick={() => setCostOpen(true)}
+            >
+              <CircleDollarSign size={16} />
+              软装 / 硬装成本
+            </button>
+            <PropertyPanel
+              design={d}
+              selection={selection}
+              select={select}
+              change={change}
+              duplicate={duplicate}
+              remove={remove}
+              rotate={() => rotate()}
+            />
+          </>
+        )}
       </aside>
       {drawer && (
         <button
@@ -919,7 +948,9 @@ export function Workbench(p: Props) {
                   : "结构编辑"}
           </b>
         </span>
-        <span className="status-coordinates" ref={coordLabel}>X 0 / Y 0 mm</span>
+        <span className="status-coordinates" ref={coordLabel}>
+          X 0 / Y 0 mm
+        </span>
         <span className="status-tip">{tip}</span>
         <span className="status-safe">
           <ShieldCheck size={13} />

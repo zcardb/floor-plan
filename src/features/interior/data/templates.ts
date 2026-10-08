@@ -1,4 +1,5 @@
 import { library } from "./catalog";
+import { normalizeFurniture } from '../model/costs';
 import { outerWalls, rect } from "../model/geometry";
 import {
   uid,
@@ -161,7 +162,7 @@ export function defaultFurniture(): Furniture[] {
     f("armchair", "休闲椅", 11180, 7520, 750, 750),
     f("armchair", "休闲椅", 11180, 8880, 750, 750, 180),
     f("plant", "绿植", 11550, 10250, 500, 500),
-  ];
+  ].map(normalizeFurniture);
 }
 export function referenceDesign(): Design {
   const data: [string, string, Point[], string, boolean?][] = [

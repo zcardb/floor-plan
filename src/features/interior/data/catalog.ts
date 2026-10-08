@@ -104,6 +104,7 @@ const groups: [string, [string, string, number, number, string][]][] = [
 ];
 export const library: LibraryItem[] = groups.flatMap(([category, items]) =>
   items.map(([type, name, w, d, color]) => ({
+    catalogId: `${type}:${name}`,
     category,
     type,
     name,

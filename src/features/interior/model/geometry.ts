@@ -181,6 +181,7 @@ export function rebuildRooms(d: Design): Design {
         next.id = previous.r.id;
         next.name = previous.r.name;
         next.mat = previous.r.mat;
+        next.wallMat = previous.r.wallMat;
       }
       return next;
     });

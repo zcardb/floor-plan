@@ -30,6 +30,8 @@ import type {
   Selection,
 } from "../model/types";
 import { buildFurniture, disposeMaterials, mat } from "./furniture";
+import { openingDimensions } from "../model/costs";
+import type { ScreenRect } from "../model/selectionAnchor";
 export interface SceneHandle {
   shot: () => void;
   top: () => void;
@@ -54,6 +56,7 @@ interface Props {
   add: (it: LibraryItem, p: Point) => void;
   onError: () => void;
   exitWalk: () => void;
+  onAnchor: (r: ScreenRect | null) => void;
 }
 interface Runtime {
   renderer: THREE.WebGLRenderer;
@@ -84,7 +87,8 @@ function clear(g: THREE.Group) {
     if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) {
       o.geometry.dispose();
       const materials = Array.isArray(o.material) ? o.material : [o.material];
-      for (const material of materials) if (material.userData.transient) material.dispose();
+      for (const material of materials)
+        if (material.userData.transient) material.dispose();
     }
     if (o instanceof CSS2DObject) o.element.remove();
   });
@@ -317,6 +321,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
             !object.userData.fid &&
             !object.userData.room &&
             !object.userData.door &&
+            !object.userData.wall &&
             object.parent !== scene
           )
             object = object.parent;
@@ -448,7 +453,9 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
               ? { kind: "furniture", id: hit.object.userData.fid }
               : hit?.object.userData.room
                 ? { kind: "room", id: hit.object.userData.room }
-                : null,
+                : hit?.object.userData.wall
+                  ? { kind: "wall", id: hit.object.userData.wall }
+                  : null,
           );
         }
       };
@@ -555,6 +562,50 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
               door.group.rotation.y) *
             Math.min(1, dt * 8);
         r.helper?.update();
+        const selected = latest.current.selection;
+        const objects =
+          selected?.kind === "furniture"
+            ? furn.children.filter((o) => o.userData.fid === selected.id)
+            : selected?.kind === "wall"
+              ? arch.children.filter((o) => o.userData.wall === selected.id)
+              : selected?.kind === "room"
+                ? arch.children.filter((o) => o.userData.room === selected.id)
+                : selected?.kind === "opening"
+                  ? arch.children.filter((o) => o.userData.door === selected.id)
+                  : [];
+        if (
+          objects.length &&
+          !(selected?.kind === "furniture" && !latest.current.layers.furn)
+        ) {
+          scene.updateMatrixWorld(true);
+          camera.updateMatrixWorld(true);
+          const box = new THREE.Box3();
+          for (const object of objects)
+            box.union(new THREE.Box3().setFromObject(object));
+          const pts = [];
+          for (const x of [box.min.x, box.max.x])
+            for (const y of [box.min.y, box.max.y])
+              for (const z of [box.min.z, box.max.z]) {
+                const v = new THREE.Vector3(x, y, z).project(camera);
+                if (v.z >= -1 && v.z <= 1) pts.push(v);
+              }
+          if (pts.length)
+            latest.current.onAnchor({
+              left: Math.min(
+                ...pts.map((v) => ((v.x + 1) / 2) * el.clientWidth),
+              ),
+              right: Math.max(
+                ...pts.map((v) => ((v.x + 1) / 2) * el.clientWidth),
+              ),
+              top: Math.min(
+                ...pts.map((v) => ((1 - v.y) / 2) * el.clientHeight),
+              ),
+              bottom: Math.max(
+                ...pts.map((v) => ((1 - v.y) / 2) * el.clientHeight),
+              ),
+            });
+          else latest.current.onAnchor(null);
+        } else latest.current.onAnchor(null);
         renderer.render(scene, camera);
         labels.render(scene, camera);
       };
@@ -683,7 +734,10 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         label.textContent = room.name + " " + area(room).toFixed(1) + "m²";
         const lo = new CSS2DObject(label);
         lo.position.set(p[0] / 1000, H + 0.15, p[1] / 1000);
-        lo.visible = latest.current.layers.labels && latest.current.options.mode === 'orbit' && room.counted !== false;
+        lo.visible =
+          latest.current.layers.labels &&
+          latest.current.options.mode === "orbit" &&
+          room.counted !== false;
         r.labelGroup.add(lo);
         if (props.options.night) {
           const light = new THREE.PointLight("#ffddb0", 12, 9, 2);
@@ -697,22 +751,26 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
           openings = d.openings
             .filter((o) => o.wallId === w.id)
             .sort((a, b) => a.offset - b.offset),
-          color = "#eee9de";
+          color = w.color || "#eee9de";
         const part = (start: number, end: number, y: number, h: number) => {
           if (end - start < 0.001) return;
           const t = (start + end) / 2 / L,
             x = w.a[0] / 1000 + ((w.b[0] - w.a[0]) / 1000) * t,
             z = w.a[1] / 1000 + ((w.b[1] - w.a[1]) / 1000) * t;
           const o = addBox(end - start, h, w.thickness / 1000, x, y, z, color);
-          if (o) o.rotation.y = angle;
+          if (o) {
+            o.rotation.y = angle;
+            o.userData.wall = w.id;
+          }
         };
         let cursor = 0;
         for (const o of openings) {
           const a = (o.offset - o.width / 2) / 1000,
             b = (o.offset + o.width / 2) / 1000;
           part(cursor, a, 0, H);
-          const sill = o.kind === "window" ? 0.8 : 0,
-            head = o.kind === "window" ? 2.4 : 2.1;
+          const dims = openingDimensions(o, d),
+            sill = dims.sill / 1000,
+            head = (dims.sill + dims.height) / 1000;
           if (sill) part(a, b, 0, Math.min(sill, H));
           if (H > head) part(a, b, head, H - head);
           const t = o.offset / 1000 / L,
@@ -751,10 +809,10 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
             );
             pivot.rotation.y = angle + Math.PI / 2;
             const leaf = new THREE.Mesh(
-              new THREE.BoxGeometry(ww, Math.min(H, 2.05), 0.04),
+              new THREE.BoxGeometry(ww, Math.min(H, dims.height / 1000), 0.04),
               mat("#bc9a74"),
             );
-            leaf.position.set(ww / 2, Math.min(H, 2.05) / 2, 0);
+            leaf.position.set(ww / 2, Math.min(H, dims.height / 1000) / 2, 0);
             leaf.castShadow = true;
             pivot.add(leaf);
             pivot.userData.door = o.id;

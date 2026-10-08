@@ -99,7 +99,7 @@ describe("户型几何与输入保护", () => {
   });
   it("JSON往返与旧参考JSON升级", () => {
     const d = referenceDesign();
-    expect(validateDesign(JSON.parse(JSON.stringify(d)))).toEqual(d);
+    expect(validateDesign(JSON.parse(JSON.stringify(d)))).toEqual(validateDesign(d));
     const old = {
       furniture: d.furniture,
       rooms: Object.fromEntries(
