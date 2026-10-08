@@ -22,14 +22,19 @@
 - `src/features/interior/components/WallHoverOverlay.test.tsx`、`src/features/interior/model/wallDrawing.test.ts`：既有测距/吸附测试；新增针对事件完成与悬停状态的聚焦测试。
 - 复用 `model/geometry.ts` 的 `nearestOnWall`、`length`、`wallPoly`，`model/lengthUnits.ts` 的 `formatMeters`，`model/wallDrawing.ts` 的 `resolveWallPoint`、`validateWallSegment`，保留既有门窗/重叠墙校验。
 
+## 执行记录
+已实现独立 `resolveWallHover`、hover 状态与连接文案条件；`finishTool` 清理墙链、测量起点、草稿及指针后退出。鼠标 pointerdown 保存开始动作，原生 mousedown 的 detail 决定执行首下或跳过第二下并完成，触控仍沿用原 pointer 路径。右键阻止菜单并直接完成；底部说明已更新。
+
+验证：专项 13 项、全量 114 项通过；`pnpm check`、预览构建、生产构建通过。桌面截图刷新后画布正常，但仍是参考户型选择模式，不视为绘墙验收证据。实际双击/右键、触控及完整清理链尚未浏览器验证：Chromium 多个现有版本均启动 SIGTRAP，Firefox 缺少应用目录；构建审计缺少 parse5，浏览器性能和部署 HTTP 未验证。日志中的 Hooks 顺序/HMR 错误发生于新增 hook 与跨文件编辑期间，刷新截图未重现；不为该瞬态日志改写业务逻辑。生产构建保留原有大包、Browserslist、依赖 use-client 告警。
+
 ## Implementation checklist
-- [ ] `useWallDrawing.move` 使用原始鼠标点更新独立悬停目标，实际连接 candidate 仍使用原轴向与吸附参数。
-- [ ] 提示从原始鼠标的墙上投影点计算近端距离，起笔前后均更新，关闭吸附不禁用测距。
-- [ ] 「点击连接」仅在悬停点与实际连接候选一致时显示；离墙、完成、切换工具后无残留提示。
-- [ ] `PlanCanvas` 与 `Workbench` 一致改用 `finishTool`，结束测量清除 measureStart/draft/drag，结束绘墙复用 clear，不提交未确认草稿。
-- [ ] 画布双击第二次按下/抬起不触发额外提交或起笔，双击后退出选择模式。
-- [ ] 绘墙/测量右键仅清理退出并阻止菜单，其他工具右键行为保持不变。
-- [ ] 底部说明包含双击/右键结束；保留现有绘墙完成按钮与键盘操作。
+- [x] `useWallDrawing.move` 使用原始鼠标点更新独立悬停目标，实际连接 candidate 仍使用原轴向与吸附参数。
+- [x] 提示从原始鼠标的墙上投影点计算近端距离，起笔前后均更新，关闭吸附不禁用测距。
+- [x] 「点击连接」仅在悬停点与实际连接候选一致时显示；离墙、完成、切换工具后无残留提示。
+- [x] `PlanCanvas` 与 `Workbench` 一致改用 `finishTool`，结束测量清除 measureStart/draft/drag，结束绘墙复用 clear，不提交未确认草稿。
+- [x] 画布双击第二次按下/抬起不触发额外提交或起笔，双击后退出选择模式（已接入事件保护，浏览器验证待完成）。
+- [x] 绘墙/测量右键仅清理退出并阻止菜单，其他工具右键行为保持不变。
+- [x] 底部说明包含双击/右键结束；保留现有绘墙完成按钮与键盘操作。
 
 ## Verification checklist
 - [ ] 正向：6 米墙在 1 米、3 米、4 米位置分别显示近端 1、3、2 米，连续移动实时变化；起笔前后及关闭吸附时均能测距。

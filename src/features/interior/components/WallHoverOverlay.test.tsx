@@ -43,6 +43,19 @@ describe('绘墙悬停沿墙距离', () => {
     expect(render(resolveWallPoint([100, 3000], { ...design, demolished: ['wall'] }, 0.1, true))).toBe('');
     expect(render(resolveWallPoint([100, 3050], design, 0.1, true, [-3000, 3000]))).toContain('距近端 3.00 米');
   });
+  it('起笔后和关闭吸附仍跟随原始鼠标测距，不误导点击连接', () => {
+    const design = { ...blankDesign(), walls: [vertical] };
+    const raw: Point = [100, 4000];
+    const hover = resolveWallHover(raw, design, 0.1);
+    for (const connection of [resolveWallPoint(raw, design, 0.1, true, [-3000, 3000]), resolveWallPoint(raw, design, 0.1, false)]) {
+      const html = renderToStaticMarkup(createElement(WallHoverOverlay, { walls: [vertical], candidate: hover, connection, scale: 0.1 }));
+      expect(html).toContain('距近端 2.00 米');
+      expect(html).not.toContain('点击连接');
+    }
+    for (const y of [1000, 3000, 4000]) {
+      expect(render(resolveWallHover([100, y], design, 0.1))).toContain(`距近端 ${(Math.min(y, 6000-y)/1000).toFixed(2)} 米`);
+    }
+  });
   it('缩放不改变距离，提示不阻挡指针且不进入导出', () => {
     for (const scale of [0.012, 0.1, 1]) {
       const html = render(candidate([0, 3000]), vertical, scale);
