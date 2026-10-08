@@ -2,6 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { formatMeters } from '../model/lengthUnits';
 import { DrawingExportItems } from './DrawingExportItems';
 import type { DrawingFormat } from '../model/drawingExport';
+import { DimensionEditDialog } from './DimensionEditDialog';
+import { dimensionEditPolicy, editDimensionWalls } from '../model/dimensionWallEdit';
+import type { DimensionBinding } from '../model/dimensionBinding';
+import type { DimensionSegment } from '../model/perimeterDimensions';
 import {
   Armchair,
   ArrowDownToLine,
@@ -178,6 +182,18 @@ export function Workbench(p: Props) {
       mode: "orbit",
     });
   const layers: Layers = { ...layerState, dims: d.dimensionSettings?.visible ?? true };
+  const [dimensionEdit, setDimensionEdit] = useState<{ binding: DimensionBinding; before: Design } | null>(null);
+  const dimensionValid = dimensionEdit && view === '2d' && tool === 'select' && layers.dims &&
+    d === dimensionEdit.before;
+  useEffect(() => { if (dimensionEdit && !dimensionValid) setDimensionEdit(null); }, [dimensionEdit, dimensionValid]);
+  const openDimension = (segment: DimensionSegment) => {
+    sizeTransaction.cancel();
+    const before = model.current.current;
+    const policy = dimensionEditPolicy(before, segment.binding);
+    if (policy.reason || !segment.binding) { toast.info(policy.reason || '此尺寸仅供查看'); return; }
+    setSelection(null);
+    setDimensionEdit({ binding: segment.binding, before });
+  };
   const [costOpen, setCostOpen] = useState(false),
     [customOpen, setCustomOpen] = useState(false);
   const saveCustom = (item: LibraryItem) => {
@@ -844,6 +860,8 @@ export function Workbench(p: Props) {
             onCoord={onCoord}
             onAnchor={onAnchor}
             finishTool={()=>setTool('select')}
+            onDimensionSelect={openDimension}
+            selectedDimension={dimensionValid ? dimensionEdit.binding : undefined}
           />
         ) : Scene ? (
           <Scene
@@ -945,6 +963,14 @@ export function Workbench(p: Props) {
             <Maximize2 size={15} />
           </button>
         </div>
+        {dimensionValid && <DimensionEditDialog design={dimensionEdit.before} binding={dimensionEdit.binding}
+          onClose={() => setDimensionEdit(null)} onApply={(millimeters, fixed) => {
+            const current = model.current.current;
+            if (current !== dimensionEdit.before) throw new Error('设计已变化，请重新选择标注');
+            const next = editDimensionWalls(current, dimensionEdit.binding, millimeters, fixed);
+            setDimensionEdit(null);
+            if (next !== current) commit(next, current);
+          }} />}
         <SelectionEditor
           key={`${selection?.kind}:${selection?.id}`}
           ref={editor}

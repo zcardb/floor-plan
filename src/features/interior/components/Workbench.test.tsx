@@ -2,7 +2,7 @@ import { isValidElement, type ReactElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Design, Project } from '../model/types';
 
-const state = vi.hoisted(() => ({ values: [] as unknown[], cursor: 0, effects: [] as (() => unknown)[], design: null as Design | null, change: vi.fn() }));
+const state = vi.hoisted(() => ({ values: [] as unknown[], cursor: 0, effects: [] as (() => unknown)[], design: null as Design | null, change: vi.fn(), commit: vi.fn(), cancel: vi.fn() }));
 vi.mock('react', async original => ({
   ...await original<typeof import('react')>(),
   useState: (initial: unknown) => {
@@ -17,11 +17,15 @@ vi.mock('react', async original => ({
 vi.mock('@/components/ui/confirm-dialog', () => ({ useConfirm: () => vi.fn() }));
 vi.mock('./CustomFurnitureDialog', () => ({ CustomFurnitureDialog: () => null }));
 vi.mock('../model/useDesign', () => ({ useDesign: () => ({
-  design: state.design, change: state.change, commit: vi.fn(), preview: vi.fn(), undo: vi.fn(), redo: vi.fn(),
-  counts: { undo: 0, redo: 0 }, sizeTransaction: { flush: vi.fn(), cancel: vi.fn() },
+  design: state.design, current: { current: state.design }, change: state.change, commit: state.commit, preview: vi.fn(), undo: vi.fn(), redo: vi.fn(),
+  counts: { undo: 0, redo: 0 }, sizeTransaction: { flush: vi.fn(), cancel: state.cancel },
 }) }));
 import { Workbench } from './Workbench';
 import { blankDesign, referenceDesign } from '../data/templates';
+import { PlanCanvas } from './PlanCanvas';
+import { DimensionEditDialog } from './DimensionEditDialog';
+import { perimeterDimensions } from '../model/perimeterDimensions';
+import type { DimensionSegment } from '../model/perimeterDimensions';
 
 type Node = ReactElement<Record<string, unknown>>;
 function nodes(tree: ReactNode): Node[] {
@@ -48,7 +52,37 @@ function tools(tree: Node[]) {
   const group = tree.find(node => node.props.className === 'tool-group')!;
   return nodes(group);
 }
-beforeEach(() => { state.values = []; state.cursor = 0; state.effects = []; state.design = blankDesign(); state.change.mockReset(); });
+beforeEach(() => { state.values = []; state.cursor = 0; state.effects = []; state.design = blankDesign(); state.change.mockReset(); state.commit.mockReset(); state.cancel.mockReset(); });
+describe('尺寸驱动墙体提交链', () => {
+  const open = () => {
+    const d = blankDesign(); d.walls.push({ id: 'partition', a: [3000, 0], b: [3000, d.depth], thickness: 240, kind: 'partition' });
+    state.design = d;
+    const segment = perimeterDimensions(d)!.chains.flatMap(c => c.segments).find(s => s.binding?.startWalls.includes('partition') && s.binding.endWalls.includes('outer-1'))!;
+    const canvas = render().find(n => n.type === PlanCanvas)!;
+    (canvas.props.onDimensionSelect as (s: DimensionSegment) => void)(segment);
+    return d;
+  };
+  it('点选后只生成草稿，应用只commit一次整组快照，取消没有历史', () => {
+    const before = open();
+    expect(state.cancel).toHaveBeenCalledOnce(); expect(state.commit).not.toHaveBeenCalled();
+    const dialog = render().find(n => n.type === DimensionEditDialog)!;
+    (dialog.props.onApply as (n:number,side:string) => void)(2200, 'end');
+    expect(state.commit).toHaveBeenCalledOnce(); expect(state.commit.mock.calls[0][1]).toBe(before);
+    expect(render().some(n => n.type === DimensionEditDialog)).toBe(false);
+    state.values = []; state.commit.mockClear(); open();
+    (render().find(n => n.type === DimensionEditDialog)!.props.onClose as () => void)();
+    expect(state.commit).not.toHaveBeenCalled();
+  });
+  it('设计改变或切换工具后对话框不再渲染，相同值不提交', () => {
+    const before = open(), segment = perimeterDimensions(before)!.chains.flatMap(c => c.segments).find(s => s.binding?.startWalls.includes('partition') && s.binding.endWalls.includes('outer-1'))!;
+    (render().find(n => n.type === DimensionEditDialog)!.props.onApply as (n:number,side:string)=>void)(segment.end - segment.start, 'end');
+    expect(state.commit).not.toHaveBeenCalled();
+    state.values = []; open(); state.design = { ...state.design! };
+    expect(render().some(n => n.type === DimensionEditDialog)).toBe(false);
+    state.values = []; open(); state.values[1] = 'wall';
+    expect(render().some(n => n.type === DimensionEditDialog)).toBe(false);
+  });
+});
 describe('2D 常用工具与更多菜单', () => {
   it('直接展示选择、绘墙、门、窗，并切换对应画布工具及选中态', () => {
     expect(tools(render()).filter(node => node.props.label).map(node => node.props.label)).toEqual(['选择', '绘墙', '门', '窗']);

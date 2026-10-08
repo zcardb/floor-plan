@@ -243,6 +243,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       clone.setAttribute("width", "3200");
       clone.setAttribute("height", String(Math.round((3200 * h) / w)));
       clone.querySelectorAll("[data-export-hide]").forEach((e) => e.remove());
+      clone.querySelectorAll('.dimension-selected').forEach(e => e.classList.remove('dimension-selected'));
       const vars = getComputedStyle(document.documentElement);
       let text = new XMLSerializer().serializeToString(clone);
       text = text.replace(/var\((--[\w-]+)\)/g, (_, key) =>
@@ -767,7 +768,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
               </g>
             );
           })}
-      {layers.dims && <PerimeterDimensions layout={dimensionLayout} />}
+      {layers.dims && <PerimeterDimensions layout={dimensionLayout} onSelect={tool === 'select' ? onDimensionSelect : undefined} selected={selectedDimension} />}
       {design.measures.map((m) => (
         <MeasureLine key={m.id} a={m.a} b={m.b} scale={view.s} />
       ))}

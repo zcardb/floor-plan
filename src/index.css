@@ -871,6 +871,12 @@
     stroke: none;
     font-variant-numeric: tabular-nums;
   }
+  .dimension-hit rect { fill: transparent; stroke: none; }
+  .dimension-hit.editable { cursor: pointer; }
+  .dimension-hit.readonly { cursor: help; }
+  .dimension-hit.editable:hover rect, .dimension-hit.editable:focus rect { fill: hsl(var(--primary) / 0.12); }
+  .dimension-selected { fill: hsl(var(--primary)); font-weight: 600; }
+  .dimension-edit-dialog { max-width: min(420px, calc(100vw - 32px)); }
   .selection-overlay [data-handle] {
     cursor: pointer;
   }
