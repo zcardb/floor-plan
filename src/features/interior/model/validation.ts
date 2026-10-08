@@ -1,0 +1,130 @@
+import { materials, library } from "../data/catalog";
+import { referenceDesign } from "../data/templates";
+import { length } from "./geometry";
+import type { Design } from "./types";
+const fail = () => {
+  throw new Error("方案格式不正确或数据超出允许范围");
+};
+const finite = (v: unknown, min = -100000, max = 100000) =>
+  typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
+const point = (v: unknown) =>
+  Array.isArray(v) && v.length === 2 && v.every((n) => finite(n));
+export function validateDesign(value: unknown): Design {
+  if (!value || typeof value !== "object") return fail();
+  const v = value as Design;
+  if (v.version !== 2) {
+    const legacy = value as {
+      furniture?: unknown[];
+      rooms?: Record<string, { name: string; mat: string }>;
+      demolished?: string[];
+      measures?: { a: { x: number; y: number }; b: { x: number; y: number } }[];
+    };
+    if (!Array.isArray(legacy.furniture)) return fail();
+    const base = referenceDesign();
+    return validateDesign({
+      ...base,
+      furniture: legacy.furniture,
+      rooms: base.rooms.map((r) => ({ ...r, ...legacy.rooms?.[r.id] })),
+      demolished: legacy.demolished || [],
+      measures: (legacy.measures || []).map((m, i) => ({
+        id: "m" + i,
+        a: [m.a.x, m.a.y],
+        b: [m.b.x, m.b.y],
+      })),
+    });
+  }
+  if (
+    !["blank", "reference"].includes(v.template) ||
+    !finite(v.width, 500, 50000) ||
+    !finite(v.depth, 500, 50000) ||
+    !finite(v.thickness, 50, 1000) ||
+    !finite(v.height, 1000, 8000)
+  )
+    return fail();
+  for (const k of [
+    "walls",
+    "rooms",
+    "openings",
+    "furniture",
+    "demolished",
+    "measures",
+  ] as const)
+    if (!Array.isArray(v[k]) || v[k].length > 2000) return fail();
+  if (!v.rooms.length || !v.walls.length) return fail();
+  const ids = new Set<string>();
+  const id = (s: string) => {
+    if (typeof s !== "string" || !s.length || s.length > 100 || ids.has(s))
+      fail();
+    ids.add(s);
+  };
+  for (const w of v.walls) {
+    id(w.id);
+    if (
+      !point(w.a) ||
+      !point(w.b) ||
+      !finite(w.thickness, 50, 1000) ||
+      length(w) < 50 ||
+      !["bearing", "exterior", "partition", "low"].includes(w.kind)
+    )
+      fail();
+  }
+  for (const r of v.rooms) {
+    id(r.id);
+    if (
+      typeof r.name !== "string" ||
+      r.name.length > 100 ||
+      !materials[r.mat] ||
+      !Array.isArray(r.rings) ||
+      !r.rings.length ||
+      r.rings.some(
+        (p) =>
+          !Array.isArray(p) ||
+          p.length < 3 ||
+          p.length > 1000 ||
+          !p.every(point),
+      )
+    )
+      fail();
+  }
+  for (const f of v.furniture) {
+    id(f.id);
+    if (
+      !library.some((l) => l.type === f.type) ||
+      typeof f.name !== "string" ||
+      f.name.length > 100 ||
+      !finite(f.cx) ||
+      !finite(f.cy) ||
+      !finite(f.w, 50, 20000) ||
+      !finite(f.d, 50, 20000) ||
+      !finite(f.rot, -36000, 36000) ||
+      !/^#[0-9a-f]{6}$/i.test(f.color)
+    )
+      fail();
+  }
+  for (const o of v.openings) {
+    id(o.id);
+    const w = v.walls.find((w) => w.id === o.wallId);
+    if (
+      !w ||
+      !["door", "window"].includes(o.kind) ||
+      !finite(o.width, 100, 10000) ||
+      !finite(o.offset, 0) ||
+      o.offset - o.width / 2 < -0.01 ||
+      o.offset + o.width / 2 > length(w) + 0.01
+    )
+      fail();
+  }
+  for (let i = 0; i < v.openings.length; i++) {
+    const a = v.openings[i];
+    if (v.openings.slice(i + 1).some(b => b.wallId === a.wallId && Math.abs(b.offset - a.offset) < (a.width + b.width) / 2)) fail();
+  }
+  for (const m of v.measures) {
+    id(m.id);
+    if (!point(m.a) || !point(m.b)) fail();
+  }
+  for (const s of v.demolished) {
+    const w = v.walls.find((w) => w.id === s);
+    if (!w || !["partition", "low"].includes(w.kind)) fail();
+  }
+  return structuredClone(v);
+}

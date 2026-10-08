@@ -1,0 +1,12 @@
+{
+  "base": "/",
+  "routes": [{
+    "url": "/",
+    "html": "index.html",
+    "entry": "index.html",
+    "kind": "app",
+    "initialDynamicImports": ["_browser-ponyfill-DzRvWcJS.js"],
+    "deferredDynamicImports": [{"key":"src/features/interior/scene/Scene3D.tsx","trigger":"interaction","reason":"Only loaded when the user explicitly switches from the 2D workbench to 3D."}],
+    "initialFonts": []
+  }]
+}

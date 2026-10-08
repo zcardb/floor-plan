@@ -1,0 +1,35 @@
+{
+  "base": "/",
+  "budgets": {
+    "initialJsBrotli": 153600,
+    "initialJsRaw": 512000,
+    "initialCssBrotli": 30720,
+    "initialFontRaw": 102400,
+    "initialFontCount": 2,
+    "lcpImageRaw": 256000
+  },
+  "routes": [
+    {
+      "url": "/",
+      "html": "index.html",
+      "entry": "index.html",
+      "kind": "public",
+      "initialDynamicImports": [],
+      "deferredDynamicImports": [
+        {
+          "key": "src/pages/About.tsx",
+          "trigger": "navigation",
+          "reason": "Loaded after navigating away from home"
+        }
+      ],
+      "initialFonts": [],
+      "lcpImage": "/img/hero.webp"
+    }
+  ],
+  "ignoredHtml": [
+    {
+      "file": "404.html",
+      "reason": "Platform fallback checked separately"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "enter-vite-react-performance-audit",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test audit-vite-build.test.mjs"
+  },
+  "dependencies": {
+    "parse5": "7.3.0"
+  }
+}
