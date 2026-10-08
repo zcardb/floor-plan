@@ -1,4 +1,5 @@
 import { Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import type { Design } from '../model/types';
 import { setPrice,type PriceGroup } from '../model/costs';
 import { PriceInput } from './PriceInput';
@@ -15,7 +16,7 @@ export function AccountCostDialog({group,entryKey,name,groupTitle,unit,design,ch
         <p className="footnote">留空并应用表示账号明确未定价，不会继续套用内置参考价。</p>
         {group==='floorPrices'&&<MaterialProcurementEditor design={{...design,rooms:[]}} material={entryKey} change={change}/>}
       </div>
-      <div className="cms-detail-actions"><button className="cms-primary-action" onClick={done}>完成</button></div>
+      <div className="cms-detail-actions"><Button type="button" className="cms-detail-action" onClick={done}>完成</Button></div>
     </DialogContent>
   </Dialog>;
 }

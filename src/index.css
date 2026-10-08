@@ -119,10 +119,13 @@
   .cms-sidebar nav { display:grid; gap:8px; }
   .cms-sidebar nav button { display:flex; align-items:center; gap:12px; padding:14px; border-radius:10px; text-align:left; }
   .cms-sidebar nav button.active { background:hsl(var(--accent)); color:hsl(var(--accent-foreground)); font-weight:600; }
-  .cms-account { margin-top:auto; display:flex; align-items:center; padding-top:16px; border-top:1px solid hsl(var(--border)); }
-  .cms-account-trigger { display:flex; padding:0; border-radius:50%; }
+  .cms-account { margin-top:auto; display:flex; align-items:center; padding-top:16px; }
+  .cms-account-trigger { display:flex; align-items:center; gap:10px; padding:0; min-width:0; max-width:100%; border-radius:10px; text-align:left; }
   .cms-account-trigger .account-avatar { transition:box-shadow .2s ease; }
   .cms-account-trigger:hover .account-avatar { box-shadow:0 0 0 3px hsl(var(--accent)),var(--shadow-float); }
+  .cms-account-name { display:flex; align-items:baseline; min-width:0; font-size:12.5px; font-weight:600; color:hsl(var(--foreground)); }
+  .cms-account-name b { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+  .cms-account-name span { flex:0 0 auto; white-space:nowrap; }
   .account-avatar { display:flex; align-items:center; justify-content:center; border-radius:50%; overflow:hidden; box-shadow:var(--shadow-float); }
   .account-avatar[data-tone="0"] { background:linear-gradient(140deg,hsl(var(--avatar-0-from)),hsl(var(--avatar-0-to))); }
   .account-avatar[data-tone="1"] { background:linear-gradient(140deg,hsl(var(--avatar-1-from)),hsl(var(--avatar-1-to))); }

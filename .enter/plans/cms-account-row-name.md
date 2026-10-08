@@ -69,22 +69,22 @@ const nameHead=at<0?email:email.slice(0,at),nameTail=at<0?'':email.slice(at);
 
 ## Implementation checklist
 
-- [ ] `AccountCMS.tsx` 新增 `email` / `at` / `nameHead` / `nameTail` 派生（`indexOf('@')` + `slice`，不用 `split`，避免多 `@` 时丢尾段）。
-- [ ] `.cms-account` 的 trigger 按钮渲染 40px `AccountAvatar` + `.cms-account-name`（`<b>{nameHead}</b><span>{nameTail}</span>`），`aria-label={`账号菜单：${email}`}`。
-- [ ] Popover 结构、`PopoverContent className="account-popover" side="top" align="start" sideOffset={10}`、面板三块内容与退出登录 `onClick`（先 `setAccountOpen(false)` 再 `navigate('logout')`）逐字不变。
-- [ ] `index.css` 第 122 行 `.cms-account` 删除 `border-top`，保留 `margin-top:auto; display:flex; align-items:center; padding-top:16px`。
-- [ ] `.cms-account-trigger` 增加 `align-items:center; gap:10px; min-width:0; max-width:100%; text-align:left`，`border-radius` 由 `50%` 改 `10px`。
-- [ ] 新增 `.cms-account-name` / `.cms-account-name b` / `.cms-account-name span` 三条规则，只用现有语义令牌，无 `#` / `rgb(` / 无变量 `hsl(` 数字。
-- [ ] `@media(max-width:700px)` 与 `Workbench.tsx` / `AccountAvatar.tsx` / `accountIdentity*` / auth 代码零改动。
+- [x] `AccountCMS.tsx` 新增 `email` / `at` / `nameHead` / `nameTail` 派生（`indexOf('@')` + `slice`，不用 `split`，避免多 `@` 时丢尾段）。
+- [x] `.cms-account` 的 trigger 按钮渲染 40px `AccountAvatar` + `.cms-account-name`（`<b>{nameHead}</b><span>{nameTail}</span>`），`aria-label={`账号菜单：${email}`}`。
+- [x] Popover 结构、`PopoverContent className="account-popover" side="top" align="start" sideOffset={10}`、面板三块内容与退出登录 `onClick`（先 `setAccountOpen(false)` 再 `navigate('logout')`）逐字不变。
+- [x] `index.css` 第 122 行 `.cms-account` 删除 `border-top`，保留 `margin-top:auto; display:flex; align-items:center; padding-top:16px`。
+- [x] `.cms-account-trigger` 增加 `align-items:center; gap:10px; min-width:0; max-width:100%; text-align:left`，`border-radius` 由 `50%` 改 `10px`。
+- [x] 新增 `.cms-account-name` / `.cms-account-name b` / `.cms-account-name span` 三条规则，只用现有语义令牌，无 `#` / `rgb(` / 无变量 `hsl(` 数字。
+- [x] `@media(max-width:700px)` 与 `Workbench.tsx` / `AccountAvatar.tsx` / `accountIdentity*` / auth 代码零改动。
 
 ## Verification checklist
 
-- [ ] `pnpm lint` 通过（无未使用 import；`LogOut`、`AccountAvatar` 仍被使用）。
-- [ ] `pnpm exec tsc --noEmit` 通过（新增派生变量无隐式 `any` / 无未使用变量）。
-- [ ] `pnpm test` 通过（`vitest run src/features/interior`，含既有 `accountIdentity.test.ts`；本轮不新增 model 函数，不新增用例）。
-- [ ] `pnpm run build` 成功。
-- [ ] `git diff --stat` 只包含 `AccountCMS.tsx`、`index.css` 两个文件。
-- [ ] 层叠验证（构建产物或 DevTools）：`.account-popover` 仍在非 layer 区且晚于 Tailwind 工具类；`.cms-account-name` 位于 `@layer components` 内、早于非 layer 规则。
+- [x] `pnpm lint` 通过（无未使用 import；`LogOut`、`AccountAvatar` 仍被使用）。
+- [x] `pnpm exec tsc --noEmit` 通过（新增派生变量无隐式 `any` / 无未使用变量）。
+- [x] `pnpm test` 通过（`vitest run src/features/interior`，含既有 `accountIdentity.test.ts`；本轮不新增 model 函数，不新增用例）。
+- [x] `pnpm run build` 成功。
+- [x] `git diff --stat` 中我的改动只落在 `AccountCMS.tsx`（3 行）与 `index.css`（7 行）；`CustomFurnitureDialog.tsx` / `ProjectManager.tsx` 的改动来自并发的另一个会话，与本轮无关。
+- [x] 层叠验证（构建产物或 DevTools）：`.account-popover` 仍在非 layer 区且晚于 Tailwind 工具类；`.cms-account-name` 位于 `@layer components` 内、早于非 layer 规则。
 - [ ] 正常路径（预览已登录会话 + `website_screenshot`，`desktop_1280`）：CMS 侧栏底部只有「彩色圆形头像 + 邮箱」，**上方没有分隔线**；短邮箱（能放下时）完整显示、无省略号。
 - [ ] 边界（`desktop_1280`，同一个已登录会话）：用 `18793850224@163.com` 这类长邮箱确认渲染为 `187938xxx…@163.com`，`@` 与域名完整、省略号出现在用户名尾部、不换行、不溢出 220px 侧栏（侧栏内容宽 184px，头像 40 + gap 10 = 名称可用 ≈134px）。
 - [ ] 边界（`mobile_390`）：≤700px 侧栏变为顶部条 + 三列 nav，账号行仍是头像 + 名称、单行不换行、不挤压 nav。

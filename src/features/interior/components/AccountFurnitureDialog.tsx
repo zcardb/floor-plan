@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Info,Loader2,Trash2 } from 'lucide-react';
 import { Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { AlertDialog,AlertDialogContent,AlertDialogHeader,AlertDialogTitle,AlertDialogDescription,AlertDialogFooter,AlertDialogCancel,AlertDialogAction } from '@/components/ui/alert-dialog';
 import type { LibraryItem } from '../model/types';
 import { PriceInput } from './PriceInput';
@@ -49,8 +50,8 @@ export function AccountFurnitureDialog({item,isCustom,referencePrice,onOpenChang
         </div>
         {error&&<p role="alert" className="form-error">{error}</p>}
         <div className="cms-detail-actions">
-          {isCustom&&<button className="cms-danger-link" disabled={busy} onClick={()=>setConfirming(true)}><Trash2 size={14}/>删除家具</button>}
-          <button className="cms-primary-action" disabled={busy} onClick={()=>onOpenChange(false)}>{busy?<><Loader2 size={14}/>处理中…</>:'完成'}</button>
+          {isCustom&&<Button type="button" variant="ghost" className="cms-detail-action text-destructive hover:bg-destructive/10 hover:text-destructive" disabled={busy} onClick={()=>setConfirming(true)}><Trash2 size={14}/>删除家具</Button>}
+          <Button type="button" className="cms-detail-action" disabled={busy} onClick={()=>onOpenChange(false)}>{busy?<><Loader2 size={14}/>处理中…</>:'完成'}</Button>
         </div>
       </DialogContent>
     </Dialog>
