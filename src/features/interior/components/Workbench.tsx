@@ -6,6 +6,8 @@ import { ProjectMenu, type ProjectNavigation } from './ProjectMenu';
 import { AccountMenu } from './AccountMenu';
 import { DimensionEditDialog } from './DimensionEditDialog';
 import { WallSplitDialog } from './WallSplitDialog';
+import { CompassRose } from './CompassRose';
+import { northAngle } from '../model/northAngle';
 import { splitWall as splitWallModel } from '../model/wallSplit';
 import { removeWall as removeWallModel } from '../model/wallRemoval';
 import { mergeWall as mergeWallModel, wallMergeGroup } from '../model/wallMerge';
@@ -966,6 +968,7 @@ export function Workbench(p: Props) {
             </span>
           </div>
         )}
+        {view === "2d" && <CompassRose angle={northAngle(d)} />}
         {view === "2d" && (
           <div className="scale-bar">
             <span>1 m</span>

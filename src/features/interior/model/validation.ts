@@ -50,6 +50,7 @@ export function validateDesign(value: unknown): Design {
     if (!Array.isArray(v[k]) || v[k].length > 2000) return fail();
   if (!v.rooms.length || !v.walls.length) return fail();
   if (v.structureUnlocked !== undefined && typeof v.structureUnlocked !== 'boolean') return fail();
+  if (v.northAngle !== undefined && !finite(v.northAngle, 0, 360)) return fail();
   if (v.dimensionSettings !== undefined) {
     const settings = v.dimensionSettings;
     if (!settings || typeof settings !== 'object' || Array.isArray(settings) ||

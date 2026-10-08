@@ -19,6 +19,7 @@ interface Props {
 
 /** 项目行操作：项目管理卡片与工作台项目下拉共用同一套图标按钮。系统默认方案禁用重命名与删除。 */
 export function ProjectRowActions({ row, disabled, onRename, onDelete, onDuplicate, duplicating }: Props) {
+  if (row.builtin) return null;
   const locked = !!row.system;
   return <>
     <EditorTooltip label={locked ? '系统默认方案不可重命名' : '重命名项目'} disabled={disabled || locked}>

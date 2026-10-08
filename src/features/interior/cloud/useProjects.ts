@@ -7,7 +7,9 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { validateDesign } from "../model/validation";
 import { nextGuestEditCount } from "../model/templateState";
 import { uid, type Design, type Project } from "../model/types";
-import { GUEST_DEFAULT_KEY, purgeRecoveryCopies, readGuestDefault, readGuests, writeGuests } from "./guestStore";
+import { purgeRecoveryCopies, readGuestDefault, readGuests, writeGuests, writeGuestDefault } from "./guestStore";
+import { TEMPLATE_PRESETS, presetById } from '../data/templates';
+import { builtinProject, isBuiltinId, isPresetId } from '../data/templatePresets';
 export type SaveStatusKind = "saved" | "saving" | "dirty" | "error" | "conflict";
 export interface SaveStatus {
   kind: SaveStatusKind;
@@ -46,13 +48,15 @@ export interface ProjectSummary {
   cloud?: boolean;
   /** 系统自带的本机默认方案：不可重命名、不可删除，只能复制。 */
   system?: boolean;
+  builtin?: boolean;
+  templateId?: string;
 }
 export function useProjects() {
   const confirm = useConfirm();
   const [guests, setGuests] = useState(readGuests),
     [session, setSession] = useState<Session | null>(null),
     [cloud, setCloud] = useState<ProjectSummary[]>([]),
-    [active, setActive] = useState<Project | null>(readGuestDefault),
+    [active, setActive] = useState<Project | null>(() => readGuestDefault()),
     [ready, setReady] = useState(false),
     [status, setStatus] = useState<SaveStatus>(STATUS.local),
     [listError, setListError] = useState(""),
@@ -187,9 +191,9 @@ export function useProjects() {
       return true;
     }
     const p = activeRef.current;
-    if (!p) return true;
+    if (!p || p.builtin || isBuiltinId(p.id)) return true;
     if (!p.cloud) {
-      if (!sessionRef.current) { try { localStorage.setItem(GUEST_DEFAULT_KEY, JSON.stringify(p)); return true; } catch (cause) { notify.error('本机保存失败，请下载备份', cause); return false; } }
+      if (!sessionRef.current) { const result = writeGuestDefault(p); if (!result.ok) { setStatus(STATUS.localFailed); notify.fail('本机保存失败，请下载备份'); } return result.ok; }
       return persist(guestsRef.current);
     }
     if (!dirty.current) return true;
@@ -255,7 +259,7 @@ export function useProjects() {
   const update = useCallback(
     (design: Design) => {
       const p = activeRef.current;
-      if (!p) return;
+      if (!p || p.builtin || isBuiltinId(p.id)) return;
       const next = { ...p, state: design, updatedAt: new Date().toISOString() };
       activeRef.current = next;
       setActive(next);
@@ -268,15 +272,25 @@ export function useProjects() {
       } else if (!sessionRef.current) {
         // 回到初始模版（重置方案、一路撤销回起点）计数归零，顶部提示条随之消失。
         setGuestEdits((n) => nextGuestEditCount(n, design));
-        try { localStorage.setItem(GUEST_DEFAULT_KEY, JSON.stringify(next)); setStatus(STATUS.local); } catch { setStatus(STATUS.localFailed); }
+        setStatus(writeGuestDefault(next).ok ? STATUS.local : STATUS.localFailed);
       } else persist(guestsRef.current.map((r) => (r.id === p.id ? next : r)));
     },
     [persist, save],
   );
   const open = useCallback(
     async (p: ProjectSummary) => {
-      if (!sessionRef.current) return false;
       if (!(await save())) return false;
+      const templateId = p.templateId ?? (isBuiltinId(p.id) ? p.id.slice('builtin-template:'.length) : undefined);
+      if (templateId && isPresetId(templateId)) {
+        const preset = presetById(templateId)!;
+        const next = sessionRef.current ? builtinProject(preset) : readGuestDefault(templateId);
+        if (!sessionRef.current && !writeGuestDefault(next).ok) { setStatus(STATUS.localFailed); return false; }
+        epoch.current++; dirty.current = false;
+        activeRef.current = next; setActive(next); setGuestEdits(0);
+        setStatus(sessionRef.current ? { kind: 'saved', label: '内置模板 · 只读' } : STATUS.local);
+        return true;
+      }
+      if (!sessionRef.current) return false;
       const generation = ++epoch.current;
       if (timer.current) clearTimeout(timer.current);
       dirty.current = false;
@@ -349,6 +363,7 @@ export function useProjects() {
         cloud: toCloud,
         // 复制/新建/导入出来的项目都属于「用户新建」：必须三操作齐全，不能继承来源的系统标记。
         system: false,
+        builtin: false,
       };
       if (toCloud) {
         if (!sessionRef.current) {
@@ -390,7 +405,7 @@ export function useProjects() {
   );
   const saveGuestToCloud = useCallback(async (): Promise<boolean> => {
     const p = activeRef.current;
-    if (!sessionRef.current || !p || p.cloud) return false;
+    if (!sessionRef.current || !p || p.cloud || p.builtin) return false;
     const next: Project = {
       ...p,
       id: uid(),
@@ -432,7 +447,7 @@ export function useProjects() {
   }, []);
   const remove = useCallback(
     async (p: ProjectSummary) => {
-      if (!sessionRef.current) return false;
+      if (!sessionRef.current || p.builtin || isBuiltinId(p.id) || p.system) return false;
       // 只有删掉正在编辑的项目才需要先落盘；删别的项目不该被当前项目的保存状态拦住。
       if (activeRef.current?.id === p.id && !(await save())) {
         notify.fail("当前项目还有未保存的改动，已取消删除");
@@ -474,7 +489,7 @@ export function useProjects() {
   );
   const rename = useCallback(
     async (p: ProjectSummary, name: string) => {
-      if(!sessionRef.current)return false;
+      if(!sessionRef.current || p.builtin || isBuiltinId(p.id) || p.system)return false;
       const generation=epoch.current;
       name = name.trim();
       if (!name || name.length > 100) { notify.fail("项目名称需为 1～100 个字符"); return false; }
@@ -523,6 +538,7 @@ export function useProjects() {
   );
   const duplicate = useCallback(
     async (p: ProjectSummary) => {
+      if (p.builtin || isBuiltinId(p.id)) return false;
       if (!(await open(p))) return false;
       const current = activeRef.current;
       if (!current) return false;
@@ -560,6 +576,7 @@ export function useProjects() {
   return {
     guests,
     cloud,
+    builtins: TEMPLATE_PRESETS.map(p => ({ id: 'builtin-template:' + p.id, name: p.name, revision: 0, updatedAt: '', builtin: true, templateId: p.id })),
     active,
     session,
     ready,
