@@ -9,8 +9,6 @@ import {
 export interface EditorTooltipProps {
   /** 动作名 */
   label: string;
-  /** 可选的一句解释，说明这个操作到底做什么 */
-  description?: string;
   /** 可选快捷键，渲染为 kbd */
   shortcut?: string;
   side?: React.ComponentProps<typeof TooltipContent>["side"];
@@ -20,15 +18,14 @@ export interface EditorTooltipProps {
 }
 
 /**
- * 编辑器统一悬浮提示：鼠标悬浮、键盘聚焦、触屏长按都会显示「动作名 + 快捷键 + 一句解释」。
+ * 编辑器统一悬浮提示：鼠标悬浮、键盘聚焦、触屏长按都会显示「动作名 + 快捷键」。
  *
  * 正常态用 asChild 直接挂在按钮上，不新增包裹层，不影响
  * `.tool-group > button`、`.visual-selection-editor > button` 等既有样式；
- * 仅禁用态加一层 span，让用户也能看到「这是什么、为什么点不了」。
+ * 仅禁用态加一层 span，让禁用按钮也能显示提示。
  */
 export function EditorTooltip({
   label,
-  description,
   shortcut,
   side = "bottom",
   disabled = false,
@@ -45,7 +42,6 @@ export function EditorTooltip({
             <span>{label}</span>
             {shortcut && <kbd>{shortcut}</kbd>}
           </span>
-          {description && <small className="tool-tooltip-note">{description}</small>}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

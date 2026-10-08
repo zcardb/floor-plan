@@ -17,7 +17,8 @@ describe('承重墙标记策略', () => {
     expect(calculateCosts(next)).toEqual(calculateCosts(before));
     expect(rebuildRooms(next).rooms).toEqual(before.rooms);
     const layers = { grid: false, dims: true, labels: true, furn: true, bearing: true, snap: true };
-    expect(createDrawingDocument(next, layers)).toEqual(createDrawingDocument(before, layers));
+    const geometry = (d: typeof before) => { const doc = createDrawingDocument(d, layers); return { ...doc, entities: doc.entities.map(({ group: _group, ...e }) => e) }; };
+    expect(geometry(next)).toEqual(geometry(before));
     expect(canEditWall(next, next.walls[next.walls.length - 1]!)).toBe(false);
     expect(canDemolishWall(next.walls[next.walls.length - 1]!)).toBe(false);
     expect(setWallBearing(next, partition.id, true)).toBe(next);

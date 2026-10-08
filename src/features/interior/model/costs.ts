@@ -11,11 +11,8 @@ import type {
   Point,
   Room,
 } from "./types";
-export const wallMaterials = {
-  paint: { name: "乳胶漆", color: "#eee9de" },
-  wallpaper: { name: "墙纸", color: "#e1d4be" },
-  walltile: { name: "墙砖", color: "#c7d0cc" },
-};
+import { openingName, openingPriceKey, wallMaterialOf } from "./hardMaterials";
+export { wallMaterials } from "./hardMaterials";
 export type PriceGroup =
   | "floorPrices"
   | "wallPrices"
@@ -63,6 +60,10 @@ export function priceOf(
   if (group === "floorPrices") return isFloorKey(d, key) ? floorMaterialOf(d, key).price : null;
   if (group === "furniturePrices")
     return d.customCatalog?.find((i) => i.catalogId === key)?.price ?? null;
+  if (group === "wallPrices")
+    return d.customWalls?.find((w) => w.key === key)?.price ?? null;
+  if (group === "openingPrices")
+    return d.customOpenings?.find((o) => o.key === key)?.price ?? null;
   return null;
 }
 export function setPrice(
@@ -210,7 +211,7 @@ export function calculateCosts(d: Design, defaults?: AccountCostSettings) {
         hard,
         "wallPrices",
         key,
-        wallMaterials[key as keyof typeof wallMaterials]?.name || "墙面材料",
+        wallMaterialOf(d, key).name,
         wallSurfaceArea(r, d),
         "m²",
       );
@@ -221,8 +222,8 @@ export function calculateCosts(d: Design, defaults?: AccountCostSettings) {
     add(
       hard,
       "openingPrices",
-      o.kind,
-      o.kind === "door" ? "门" : "窗",
+      openingPriceKey(o),
+      openingName(d, o),
       openingDimensions(o, d).area,
       "m²",
     );

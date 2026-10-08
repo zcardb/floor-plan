@@ -55,7 +55,7 @@ export function RoomCostDetail({
   return (
     <>
       <div className="panel-heading">
-        <EditorTooltip label="返回全屋成本" description="回到全屋所有房间的费用汇总">
+        <EditorTooltip label="返回全屋成本">
           <button className="back-link" onClick={back}>
             <ArrowLeft size={13} />
             全屋成本

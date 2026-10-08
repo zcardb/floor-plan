@@ -27,7 +27,7 @@ export function RoomCostList({
         const room = design.rooms.find((r) => r.id === rc.roomId);
         if (!room) return null;
         return (
-          <EditorTooltip key={rc.roomId} label={room.name} description="点击查看这间房的成本明细">
+          <EditorTooltip key={rc.roomId} label={room.name}>
             <button
               className="room-cost-row"
               onClick={() => select({ kind: "room", id: rc.roomId })}

@@ -42,11 +42,11 @@ export function Library({
     <>
       <div className="panel-heading">
         <span>构件与家具</span>
-        <EditorTooltip label="素材库" description="点击或拖入画布即可添加，尺寸按真实比例绘制">
+        <EditorTooltip label="素材库">
           <span className="mini-label">素材库</span>
         </EditorTooltip>
       </div>
-      {onNew && <EditorTooltip label="新建家具 / 账号库" description="上传图片或填写尺寸，创建自己的家具款式">
+      {onNew && <EditorTooltip label="新建家具 / 账号库">
         <button className="new-furniture-button" onClick={onNew}>
           <Plus size={15} />
           新建家具 / 账号库
@@ -66,7 +66,7 @@ export function Library({
         {libraryCategories.map((c) => {
           const Icon = categoryIcons[c];
           return (
-            <EditorTooltip key={c} label={c} description={`只看「${c}」分类的构件与家具`}>
+            <EditorTooltip key={c} label={c}>
               <button
                 className={c === category && !query ? "active" : ""}
                 onClick={() => {
@@ -83,24 +83,32 @@ export function Library({
       </div>
       {blank && (category === '硬装' || !!query && ['墙体', '门', '窗'].some(name => name.includes(query))) && (
         <div className="structural-items">
-          <EditorTooltip label="墙体" description="绘制隔墙工具">
+          <EditorTooltip label="墙体">
             <button onClick={() => setTool("wall")}>
               <SquareDashed size={18} />
               墙体
             </button>
           </EditorTooltip>
-          <EditorTooltip label="门" description="点击墙体放置门洞口">
+          <EditorTooltip label="门">
             <button onClick={() => setTool("door")}>
               <DoorOpen size={18} />门
             </button>
           </EditorTooltip>
-          <EditorTooltip label="窗" description="点击墙体放置窗洞口">
+          <EditorTooltip label="窗">
             <button onClick={() => setTool("window")}>
               <ScanLine size={18} />窗
             </button>
           </EditorTooltip>
         </div>
       )}
+      <div className="library-tip">
+        <Plus size={14} />
+        <p>
+          点击添加，或拖入画布。
+          <br />
+          所有家具均按真实尺寸绘制。
+        </p>
+      </div>
       <div className="library-subheading">
         {query ? "搜索结果" : category === '硬装' ? '硬装构件' : category + "家具"}
         <span>{items.length} 件</span>
@@ -110,7 +118,6 @@ export function Library({
           <EditorTooltip
             key={it.name + i}
             label={it.name}
-            description={`点击或拖入画布添加 · ${formatMeters(it.w)} × ${formatMeters(it.d)} m`}
           >
             <button
               className="library-item"
@@ -134,9 +141,6 @@ export function Library({
                     <FurnitureShape f={it} />
                   </svg>
                 )}
-                <span className="item-add">
-                  <Plus size={12} />
-                </span>
               </span>
               <b>{it.name}</b>
               <small>
@@ -149,14 +153,6 @@ export function Library({
       {!items.length && (
         <div className="empty-small">没有找到家具，试试其他关键词。</div>
       )}
-      <div className="library-tip">
-        <Plus size={14} />
-        <p>
-          点击添加，或拖入画布。
-          <br />
-          所有家具均按真实尺寸绘制。
-        </p>
-      </div>
     </>
   );
 }

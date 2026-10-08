@@ -26,7 +26,7 @@ export function PanelModeTabs({
     ).length;
   return (
     <div className="panel-mode-tabs" role="tablist" aria-label="右侧面板模式">
-      <EditorTooltip label="属性" description="查看和修改选中对象的尺寸、材质与位置">
+      <EditorTooltip label="属性">
         <button
           role="tab"
           aria-selected={mode === "props"}
@@ -39,11 +39,6 @@ export function PanelModeTabs({
       </EditorTooltip>
       <EditorTooltip
         label="成本"
-        description={
-          unpriced > 0
-            ? `全屋已录入费用合计；还有 ${unpriced} 类费用未定价`
-            : "全屋已录入费用合计，可按房间查看明细"
-        }
       >
         <button
           role="tab"

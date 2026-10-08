@@ -19,6 +19,7 @@ import {
   LockKeyhole,
   GripVertical,
   DoorOpen,
+  Shapes,
 } from "lucide-react";
 import {
   Popover,
@@ -37,13 +38,14 @@ import {
   furnitureKey,
   priceOf,
   setPrice,
-  wallMaterials,
   type PriceGroup,
 } from "../model/costs";
 import { placeEditor, type ScreenRect } from "../model/selectionAnchor";
 import { selectionCost } from "../model/costBreakdown";
 import { yuan } from "../model/money";
-import type { CustomFloor, Design, Selection } from "../model/types";
+import type { CustomFloor, CustomOpening, CustomWall, Design, Selection } from "../model/types";
+import { applyRoomWall, openingName, openingPriceKey, pickableWalls } from "../model/hardMaterials";
+import { OpeningVariantSelect } from "./OpeningVariantSelect";
 import { PriceInput } from "./PriceInput";
 import { CostDefaultsContext, useCostDesign } from './CostDefaultsContext';
 import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
@@ -73,6 +75,9 @@ interface Props {
   transaction: SizeTransaction;
   /** 账号地面库；未加入项目的地面也可直接选择，选中后自动加入项目。 */
   accountFloors?: CustomFloor[];
+  /** 账号墙面库、门窗库；选用后自动加入项目。 */
+  accountWalls?: CustomWall[];
+  accountOpenings?: CustomOpening[];
   splitWall?: (wallId: string) => void;
   mergeWall?: (wallId: string) => void;
 }
@@ -219,8 +224,8 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
     else if (o)
       price = {
         group: "openingPrices",
-        key: o.kind,
-        name: o.kind === "door" ? "门" : "窗",
+        key: openingPriceKey(o),
+        name: openingName(p.design, o),
         unit: "m²",
       };
     else if (w)
@@ -246,13 +251,13 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         onPointerDown={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
-        <EditorTooltip label="拖动工具条" description="按住拖到合适位置，也可聚焦后用方向键移动">
+        <EditorTooltip label="拖动工具条">
           <Button type="button" variant="ghost" size="icon" className="visual-editor-drag-handle" aria-label="拖动编辑工具条" {...editorDrag.handlers}><GripVertical size={15} /></Button>
         </EditorTooltip>
         <span className="visual-object-name">
           {f?.name ||
             r?.name ||
-            (w ? wallKindName(w) : o?.kind === "door" ? "门" : "窗")}
+            (w ? wallKindName(w) : o ? openingName(p.design, o) : "")}
         </span>
         {fields.length > 0 && (
           <Popover
@@ -261,7 +266,6 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           >
             <EditorTooltip
               label="尺寸与位置"
-              description={f ? "修改宽、深、中心坐标与旋转角度" : w ? "修改墙体长度与墙厚" : "修改宽度、高度与沿墙位置"}
             >
               <PopoverTrigger asChild>
                 <button className="visual-size-trigger" aria-label="调整尺寸与位置">
@@ -297,7 +301,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         )}
         {w && <WallOptionsMenu design={p.design} wall={w} change={p.change} splitWall={p.splitWall} mergeWall={p.mergeWall} />}
         {(f || w) && (
-          <EditorTooltip label="常用颜色" description="点击圆点直接替换当前对象颜色，调色板可自定义">
+          <EditorTooltip label="常用颜色">
             <div className="visual-colors" role="group" aria-label="常用颜色">
               {colors.map((c) => (
                 <button
@@ -325,7 +329,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             open={open === "material"}
             onOpenChange={(v) => setPanel(v, "material")}
           >
-            <EditorTooltip label="房间材质" description="分别设置这间房的地面与墙面材质">
+            <EditorTooltip label="房间材质">
               <PopoverTrigger asChild>
                 <button aria-label="房间材质">
                   <Palette size={15} />
@@ -340,13 +344,19 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
                 options={pickableFloors(p.design, p.accountFloors || []).map(({ key, material, fromAccount }) => ({ value: key, label: fromAccount ? `${material.name} · 账号库` : material.name }))}
                 onChange={value => p.change(d => applyRoomFloor(d, r.id, value, p.accountFloors || []))} />
               <EditorSelect label="墙面" value={r.wallMat || 'paint'}
-                options={Object.entries(wallMaterials).map(([value, m]) => ({ value, label: m.name }))}
-                onChange={value => p.change(d => ({ ...d, rooms: d.rooms.map(g => g.id === r.id ? { ...g, wallMat: value } : g) }))} />
+                options={pickableWalls(p.design, p.accountWalls || []).map(({ key, name, fromAccount }) => ({ value: key, label: fromAccount ? `${name} · 账号库` : name }))}
+                onChange={value => p.change(d => applyRoomWall(d, r.id, value, p.accountWalls || []))} />
             </PopoverContent>
           </Popover>
         )}
+        {o && <Popover open={open === 'variant'} onOpenChange={value => setPanel(value, 'variant')}>
+          <EditorTooltip label="门窗款式">
+            <PopoverTrigger asChild><Button type="button" variant="ghost" size="sm" className="visual-door-direction" aria-label="切换门窗款式"><Shapes size={15} />款式<ChevronDown size={12} /></Button></PopoverTrigger>
+          </EditorTooltip>
+          <PopoverContent className="visual-editor-popover"><h3>门窗款式</h3><OpeningVariantSelect design={p.design} opening={o} accountOpenings={p.accountOpenings} change={p.change} disabled={openingIsLocked(p.design, o.wallId)} /></PopoverContent>
+        </Popover>}
         {o?.kind === 'door' && <Popover open={open === 'direction'} onOpenChange={value => setPanel(value, 'direction')}>
-          <EditorTooltip label="门开向" description="设置门铰链在哪一侧、门扇朝哪边开">
+          <EditorTooltip label="门开向">
             <PopoverTrigger asChild><Button type="button" variant="ghost" size="sm" className="visual-door-direction" aria-label="调整门开向"><DoorOpen size={15} />开向<ChevronDown size={12} /></Button></PopoverTrigger>
           </EditorTooltip>
           <PopoverContent className="visual-editor-popover"><h3>门开向</h3><DoorOrientationControls door={o} onChange={patch => p.change(d => changeDoorOrientation(d, o.id, patch))} /></PopoverContent>
@@ -358,7 +368,6 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           >
             <EditorTooltip
               label={r ? "本间成本 · 调整单价" : "调整单价"}
-              description={`当前 ${costLabel}；修改会同步到本项目所有同款 / 同材质对象`}
             >
               <PopoverTrigger asChild>
                 <button
@@ -403,12 +412,12 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         )}
         {f && (
           <>
-            <EditorTooltip label="旋转 90°" description="顺时针旋转，Shift + R 逆时针" shortcut="R">
+            <EditorTooltip label="旋转 90°" shortcut="R">
               <button type="button" aria-label="旋转 90°" onClick={p.rotate}>
                 <RotateCw size={15} />
               </button>
             </EditorTooltip>
-            <EditorTooltip label="复制对象" description="在旁边复制一件同款家具" shortcut="Ctrl D">
+            <EditorTooltip label="复制对象" shortcut="Ctrl D">
               <button type="button" aria-label="复制对象" onClick={p.duplicate}>
                 <Copy size={15} />
               </button>
@@ -418,7 +427,6 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         {(f || (o && !openingIsLocked(p.design, o.wallId)) || editableWall) && (
           <EditorTooltip
             label="删除对象"
-            description={f ? "移除这件家具，可撤销" : w ? "删除这面隔墙及墙上门窗，可撤销" : "删除这个门窗洞口，可撤销"}
             shortcut="Delete"
           >
             <button type="button" aria-label="删除对象" onClick={p.remove}>
@@ -426,12 +434,12 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </button>
           </EditorTooltip>
         )}
-        <EditorTooltip label="详细属性" description="在右侧面板打开完整参数">
+        <EditorTooltip label="详细属性">
           <button type="button" aria-label="详细属性" onClick={p.details}>
             <Settings2 size={16} />
           </button>
         </EditorTooltip>
-        <EditorTooltip label="取消选择" description="关闭这条工具条" shortcut="Esc">
+        <EditorTooltip label="取消选择" shortcut="Esc">
           <button type="button" aria-label="取消选择" onClick={p.close}>
             <X size={15} />
           </button>

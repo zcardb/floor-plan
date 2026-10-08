@@ -14,3 +14,7 @@ export function accountInitial(email?: string): string {
     local.match(/[a-z]/i) ?? local.match(/[0-9]/) ?? value.match(/[a-z0-9]/i);
   return match ? match[0].toUpperCase() : '?';
 }
+/** Accounts have no nickname field; the display name is the email local part. */
+export function accountName(email?: string): string {
+  return (email ?? '').split('@')[0] || '我的账号';
+}

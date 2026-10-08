@@ -4,11 +4,11 @@ import {
   openingDimensions,
   openingRoomOverlap,
   priceOf,
-  wallMaterials,
   wallSurfaceArea,
   type PriceGroup,
 } from "./costs";
 import { floorMaterialOf } from "./floorMaterials";
+import { openingName, openingPriceKey, wallMaterialOf } from "./hardMaterials";
 import { area, inRoom } from "./geometry";
 import type { Design, Opening, Selection } from "./types";
 
@@ -118,7 +118,7 @@ export function costBreakdown(d: Design): CostBreakdown {
     byId.get(r.id)?.hard.push({
       group: "wallPrices",
       key,
-      label: wallMaterials[key as keyof typeof wallMaterials]?.name || "墙面材料",
+      label: wallMaterialOf(d, key).name,
       note: "已扣除门窗",
       quantity: fix(surface),
       unit: "m²",
@@ -129,13 +129,13 @@ export function costBreakdown(d: Design): CostBreakdown {
   // 门窗：贴到几间房就在几间之间平分；贴不到房间的留在公共项。
   for (const o of d.openings) {
     if (d.demolished.includes(o.wallId)) continue;
-    const price = priceOf(d, "openingPrices", o.kind),
+    const price = priceOf(d, "openingPrices", openingPriceKey(o)),
       netArea = openingDimensions(o, d).area,
       targets = d.rooms.filter((r) => openingRoomOverlap(r, o, d) > 1);
     const part = (share: number): CostPart => ({
       group: "openingPrices",
-      key: o.kind,
-      label: o.kind === "door" ? "门" : "窗",
+      key: openingPriceKey(o),
+      label: openingName(d, o),
       note: targets.length > 1 ? `邻间平分 · 共 ${targets.length} 间` : undefined,
       quantity: fix(netArea * share),
       unit: "m²",
@@ -246,10 +246,10 @@ export function selectionCost(
   if (s.kind === "opening") {
     const o: Opening | undefined = d.openings.find((o) => o.id === s.id);
     if (!o) return null;
-    const price = priceOf(d, "openingPrices", o.kind),
+    const price = priceOf(d, "openingPrices", openingPriceKey(o)),
       netArea = openingDimensions(o, d).area;
     return {
-      label: o.kind === "door" ? "门" : "窗",
+      label: openingName(d, o),
       amount: price === null ? null : fix(netArea * price),
       unit: "m² × 元",
     };

@@ -85,7 +85,7 @@ export function MaterialProcurementEditor({
           <small>未填写规格，暂按面积计价</small>
         )}
       </div>
-      <EditorTooltip label="采购规格" description="填写单片尺寸、损耗率与计价单位，用于估算采购数量">
+      <EditorTooltip label="采购规格">
         <Button type="button" variant="link" size="sm"
           className="editor-procurement-toggle"
           onClick={() => {

@@ -4,7 +4,8 @@ import { validFurnitureType, validFurnitureOutline } from './furnitureAppearance
 import { referenceDesign } from "../data/templates";
 import { length } from "./geometry";
 import { validateProcurement } from "./materialProcurement";
-import { normalizeFurniture, validPrice, wallMaterials } from "./costs";
+import { normalizeFurniture, validPrice } from "./costs";
+import { isWallKey, validCustomOpening, validCustomWall } from "./hardMaterials";
 import type { Design } from "./types";
 const fail = () => {
   throw new Error("方案格式不正确或数据超出允许范围");
@@ -89,6 +90,17 @@ export function validateDesign(value: unknown): Design {
       keys.add(floor.key);
     }
   }
+  const customList = (list: unknown, valid: (item: unknown) => boolean) => {
+    if (list === undefined) return;
+    if (!Array.isArray(list) || list.length > 500) fail();
+    const keys = new Set<string>();
+    for (const item of list as { key: string }[]) {
+      if (!valid(item) || keys.has(item.key)) fail();
+      keys.add(item.key);
+    }
+  };
+  customList(v.customWalls, validCustomWall);
+  customList(v.customOpenings, validCustomOpening);
   for (const r of v.rooms) {
     id(r.id);
     if (
@@ -192,13 +204,15 @@ export function validateDesign(value: unknown): Design {
   for (const r of v.rooms)
     if (
       r.wallMat !== undefined &&
-      !Object.prototype.hasOwnProperty.call(wallMaterials, r.wallMat)
+      (typeof r.wallMat !== "string" || !isWallKey(v, r.wallMat))
     )
       fail();
   for (const o of v.openings)
     if (
       (o.height !== undefined && !finite(o.height, 100, 8000)) ||
-      (o.sill !== undefined && !finite(o.sill, 0, 8000))
+      (o.sill !== undefined && !finite(o.sill, 0, 8000)) ||
+      (o.variant !== undefined &&
+        !v.customOpenings?.some((c) => c.key === o.variant && c.kind === o.kind))
     )
       fail();
   for (const f of v.furniture)

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Info,Loader2,Trash2 } from 'lucide-react';
+import { Loader2,Trash2 } from 'lucide-react';
 import { Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { AlertDialog,AlertDialogContent,AlertDialogHeader,AlertDialogTitle,AlertDialogDescription,AlertDialogFooter,AlertDialogCancel,AlertDialogAction } from '@/components/ui/alert-dialog';
@@ -51,20 +51,16 @@ export function AccountFurnitureDialog({item,isCustom,referencePrice,onOpenChang
               <div><dt>参考尺寸</dt><dd>{formatMeters(item.w)} × {formatMeters(item.d)}{item.height?` × ${formatMeters(item.height)}`:''} m</dd></div>
               <div><dt>来源</dt><dd>{isCustom?'自定义':'内置'}</dd></div>
             </dl>
-            {isCustom?<div className="cms-detail-price">
+            <div className="cms-detail-price">
               <span className="cms-detail-label">账号默认单价 · 元 / 件</span>
-              <PriceInput key={String(item.price)} value={item.price??null} disabled={working||!!retryPrice} label={item.name+'账号默认单价'} onApply={applyPrice}/>
+              <PriceInput key={String(item.price)} value={item.price??referencePrice??null} disabled={working||!!retryPrice} label={item.name+'账号默认单价'} onApply={applyPrice}/>
               <small>仅影响未单独调价的项目；项目内改价仍以项目为准。</small>
-            </div>:<div className="cms-detail-price">
-              <span className="cms-detail-label">当前账号单价</span>
-              <strong>{referencePrice===null?'未定价':`¥${referencePrice}`}</strong>
-              <small className="cms-detail-hint"><Info size={13}/>内置家具的单价请在「成本管理」对应家具分类中设置。</small>
-            </div>}
+            </div>
           </div>
         </div>
         {isCustom&&saveGeometry&&<fieldset disabled={busy||commitBusy||!!retryPrice} className="cost-edit-fields"><FurnitureGeometryEditor key={item.type+item.shape+item.w+item.d} item={item} save={saveGeometry} onSaved={onChanged} onWorkChange={setEditorPhase}/></fieldset>}
         {failure&&<div className="cost-save-error" role="alert"><span>{failure}</span>{retryPrice&&<Button variant="outline" disabled={working} onClick={()=>void retry()}>重试保存</Button>}</div>}
-        {isCustom&&<p className="cost-sync" role="status">{editorPhase==='generating'?'正在生成，原图尚未替换':working?'正在保存…':saved&&!failure?'已保存并生效':'价格应用后自动保存；新图片需手动保存'}</p>}
+        <p className="cost-sync" role="status">{editorPhase==='generating'?'正在生成，原图尚未替换':working?'正在保存…':saved&&!failure?'已保存并生效':isCustom?'价格应用后自动保存；新图片需手动保存':'价格应用后自动保存'}</p>
         <div className="cms-detail-actions">
           {isCustom&&<Button type="button" variant="ghost" className="cms-detail-action text-destructive hover:bg-destructive/10 hover:text-destructive" disabled={working||!!retryPrice} onClick={()=>setConfirming(true)}><Trash2 size={14}/>删除家具</Button>}
           <Button type="button" className="cms-detail-action" disabled={closeLocked} onClick={()=>onOpenChange(false)}>{closeLocked?<><Loader2 size={14}/>处理中…</>:editorPhase==='generating'?'取消生成并关闭':'完成'}</Button>

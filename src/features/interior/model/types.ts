@@ -22,6 +22,8 @@ export interface Opening {
   swingSide?: -1 | 1;
   height?: number;
   sill?: number;
+  /** 自定义门窗款式 key（见 Design.customOpenings）；为空时是标准门/窗。 */
+  variant?: string;
 }
 export interface Room {
   id: string;
@@ -58,7 +60,8 @@ export interface CostSettings {
   procurement?: Record<string, MaterialProcurement>;
   wallPrices?: Record<string, number | null>;
   furniturePrices?: Record<string, number | null>;
-  openingPrices?: Partial<Record<"door" | "window", number | null>>;
+  /** key 为 door / window 或自定义门窗款式 key。 */
+  openingPrices?: Record<string, number | null>;
   constructionPrices?: Partial<Record<"build" | "demolish", number | null>>;
   labor?: { id: string; name: string; amount: number }[];
 }
@@ -86,6 +89,24 @@ export interface Design {
   costSettings?: CostSettings;
   customCatalog?: LibraryItem[];
   customFloors?: CustomFloor[];
+  customWalls?: CustomWall[];
+  customOpenings?: CustomOpening[];
+}
+/** 自定义墙面材料，单价按 m²。 */
+export interface CustomWall {
+  key: string;
+  name: string;
+  color: string;
+  price: number | null;
+}
+/** 自定义门窗款式，单价按开口面积 m²。 */
+export interface CustomOpening {
+  key: string;
+  name: string;
+  kind: "door" | "window";
+  width: number;
+  height: number;
+  price: number | null;
 }
 export type FloorPattern = "plank" | "tile" | "seamless";
 export interface CustomFloor {

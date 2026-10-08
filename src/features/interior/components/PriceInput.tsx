@@ -69,7 +69,6 @@ export function PriceInput({
       />
       <EditorTooltip
         label="应用"
-        description="把输入框里的数值写入单价，并计入成本"
         disabled={disabled || busy}
       >
         <Button type="button" variant="secondary" size="sm" className="editor-action" disabled={disabled || busy} onClick={() => void apply()}>{busy ? '应用中…' : '应用'}</Button>

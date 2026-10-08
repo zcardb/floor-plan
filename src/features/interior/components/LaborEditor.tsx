@@ -33,7 +33,7 @@ export function LaborEditor({
         <div className="labor-item" key={item.id}>
           <div>
             <b>{item.name}</b>
-            <EditorTooltip label="删除费用" description={`移除人工费「${item.name}」`}>
+            <EditorTooltip label="删除费用">
               <button
                 type="button"
                 aria-label={`删除人工费 ${item.name}`}
@@ -90,7 +90,7 @@ export function LaborEditor({
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
         />
-        <EditorTooltip label="添加人工" description="按总价录入一项施工 / 人工费用，计入全屋公共项">
+        <EditorTooltip label="添加人工">
           <button>
             <Plus size={14} />
             添加人工

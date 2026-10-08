@@ -59,7 +59,6 @@ export function CostHero({
             {(priced ?? 0) < total && onToggleUnpriced && (
               <EditorTooltip
                 label={onlyUnpriced ? "显示全部" : "只看未定价"}
-                description={onlyUnpriced ? "恢复显示所有费用项" : "只列出还没填写单价的费用项"}
               >
                 <button
                   className={onlyUnpriced ? "active" : ""}

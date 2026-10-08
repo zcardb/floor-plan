@@ -6,7 +6,6 @@ import { WorkbenchHeader } from './WorkbenchHeader';
 import { ManagementLoading } from './ManagementLoading';
 import { ProjectManager } from './ProjectManager';
 import { AccountFurnitureLibrary } from './AccountFurnitureLibrary';
-import { AccountCostManager } from './AccountCostManager';
 import type { useProjects } from '../cloud/useProjects';
 import type { useFurnitureCatalog } from '../cloud/useFurnitureCatalog';
 
@@ -74,8 +73,9 @@ describe('管理端精简与加载分支', () => {
     expect(failed).toContain('重试');
     expect(failed).not.toContain('还没有设计项目');
   });
-  it('成本页账号家具读取使用搜索框原位反馈并保留价格列表', () => {
-    const html = render(createElement(AccountCostManager, { settings: {}, save: async () => true, saving: false, error: '', items: [], onDirty: () => {}, onNew: () => {}, hasMore: false, loading: true, catalogError: '', loadMore: () => {}, reload: () => {} }));
+  it('家具管理采用成本版式：搜索框原位反馈、硬装软装两行与价格卡片', () => {
+    const catalog = { items: [], count: 0, counts: {}, loading: true, error: '', hasMore: false } as unknown as ReturnType<typeof useFurnitureCatalog>;
+    const html = render(createElement(AccountFurnitureLibrary, { catalog, defaults: {}, saveDefaults: async () => true, onDirty: () => {}, onNew: () => {} }));
     expect(html).toContain('aria-busy="true"');
     expect(html).toContain('cms-item-card--cost');
     expect(html).not.toContain('cost-list-row');

@@ -2,6 +2,9 @@ import { AlignedDimension, BlockFlags, DxfWriter, LWPolylineFlags, TextHorizonta
 import type { DxfBlock } from '@tarikjabiri/dxf';
 import type { DrawingDocument, DrawingEntity } from './drawingDocument';
 import type { Point } from './types';
+import { PAYLOAD_MARKER } from './designPayload';
+/** Max characters per DXF 999 comment line (well under common reader line limits). */
+export const DXF_COMMENT_CHUNK = 2000;
 const cad = ([x,y]:Point) => point3d(x,-y,0);
 const degrees = (radians:number) => ((-radians*180/Math.PI)%360+360)%360;
 
@@ -23,7 +26,12 @@ class DisplayBlockDimension extends AlignedDimension {
     this.dimensionType |= 32;
   }
 }
-export function serializeDxf(document:DrawingDocument):string{
+/** Leading 999 comment lines: marker, chunk count, then the base64 payload in chunks. */
+function payloadComments(payload:string){
+  const chunks=payload.match(new RegExp(`.{1,${DXF_COMMENT_CHUNK}}`,'g'))||[];
+  return [`${PAYLOAD_MARKER} ${chunks.length}`,...chunks].map(line=>`999\n${line}\n`).join('');
+}
+export function serializeDxf(document:DrawingDocument,payload?:string):string{
   const writer=new DxfWriter();writer.setUnits(Units.Millimeters);
   writer.setVariable('$MEASUREMENT',{70:1});writer.setVariable('$DWGCODEPAGE',{3:'UTF-8'});
   writer.setVariable('$EXTMIN',{10:document.bounds.x,20:-document.bounds.y2,30:0});
@@ -39,5 +47,5 @@ export function serializeDxf(document:DrawingDocument):string{
       definitionPoint:cad(dim.lineSecond),middlePoint:cad(dim.label),styleName:'STUDIO_METERS',
       ActualMeasurement:dim.measurement,rotation:((-dim.rotation)%360+360)%360}));
   });
-  return writer.stringify();
+  return (payload?payloadComments(payload):'')+writer.stringify();
 }

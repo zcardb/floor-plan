@@ -3576,6 +3576,72 @@ export type Database = {
         }
         Relationships: []
       }
+      interior_opening_catalog: {
+        Row: {
+          created_at: string
+          height: number
+          id: string
+          kind: string
+          name: string
+          opening_key: string
+          owner_id: string
+          price: number | null
+          width: number
+        }
+        Insert: {
+          created_at?: string
+          height: number
+          id?: string
+          kind: string
+          name: string
+          opening_key: string
+          owner_id?: string
+          price?: number | null
+          width: number
+        }
+        Update: {
+          created_at?: string
+          height?: number
+          id?: string
+          kind?: string
+          name?: string
+          opening_key?: string
+          owner_id?: string
+          price?: number | null
+          width?: number
+        }
+        Relationships: []
+      }
+      interior_wall_catalog: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+          owner_id: string
+          price: number | null
+          wall_key: string
+        }
+        Insert: {
+          color: string
+          created_at?: string
+          id?: string
+          name: string
+          owner_id?: string
+          price?: number | null
+          wall_key: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          owner_id?: string
+          price?: number | null
+          wall_key?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

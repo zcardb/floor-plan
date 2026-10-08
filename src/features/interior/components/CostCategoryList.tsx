@@ -54,7 +54,7 @@ export function CostCategoryList({
         const expanded = onlyUnpriced || open.has(cat.id);
         return (
           <div className={"cost-category" + (expanded ? " is-open" : "")} key={cat.id}>
-            <EditorTooltip label={cat.label} description={expanded ? "收起这一类费用" : "展开查看并填写这一类费用的单价"}>
+            <EditorTooltip label={cat.label}>
               <button
                 className="cost-category-head"
                 aria-expanded={expanded}

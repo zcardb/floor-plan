@@ -48,3 +48,17 @@ describe('硬装分类入口',()=>{
     expect(tree.some(n=>n.props.className==='structural-items')).toBe(false);
   });
 });
+describe('家具库引导提示',()=>{
+  it('提示位于列表标题上方，卡片不再输出 + 徽标且整卡仍可添加',()=>{
+    const h=harness();
+    const tree=h.render();
+    const tip=tree.findIndex(n=>n.props.className==='library-tip');
+    const subheading=tree.findIndex(n=>n.props.className==='library-subheading');
+    expect(tip).toBeGreaterThan(-1);
+    expect(tip).toBeLessThan(subheading);
+    expect(tree.some(n=>n.props.className==='item-add')).toBe(false);
+    const card=tree.find(n=>n.props['aria-label']==='添加三人沙发')!;
+    (card.props.onClick as ()=>void)();
+    expect(h.add).toHaveBeenCalledWith(expect.objectContaining({name:'三人沙发'}));
+  });
+});

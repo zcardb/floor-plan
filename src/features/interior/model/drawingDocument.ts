@@ -6,12 +6,26 @@ import { dimensionLabelOffset, perimeterDimensions } from './perimeterDimensions
 import { formatMeters } from './lengthUnits';
 import type { Design, Layers, Point } from './types';
 import { furnitureDrawing } from './furnitureDrawing';
+import { isBearingWall, wallKindName } from './wallPolicy';
 
 export type DrawingLayer = 'WALLS' | 'DEMOLISHED' | 'ROOMS' | 'OPENINGS' | 'FURNITURE' | 'ROOM_LABELS' | 'DIMENSIONS' | 'MEASURES';
-export type DrawingEntity =
+/** Object grouping for vector exports (SVG/PDF). DXF geometry ignores it. */
+export interface DrawingGroup { id: string; name: string }
+export type DrawingEntity = (
   | { kind: 'polyline'; points: Point[]; closed: boolean; layer: DrawingLayer }
   | { kind: 'arc'; center: Point; radius: number; start: number; end: number; clockwise: boolean; layer: DrawingLayer }
-  | { kind: 'text'; point: Point; height: number; rotation: number; text: string; layer: DrawingLayer };
+  | { kind: 'text'; point: Point; height: number; rotation: number; text: string; layer: DrawingLayer }
+) & { group?: DrawingGroup };
+export const DRAWING_LAYERS: DrawingLayer[] = ['WALLS', 'DEMOLISHED', 'ROOMS', 'OPENINGS', 'FURNITURE', 'ROOM_LABELS', 'DIMENSIONS', 'MEASURES'];
+export const DRAWING_LAYER_NAMES: Record<DrawingLayer, string> = {
+  WALLS: '墙体', DEMOLISHED: '拆除墙体', ROOMS: '房间', OPENINGS: '门窗', FURNITURE: '家具',
+  ROOM_LABELS: '房间名称', DIMENSIONS: '尺寸标注', MEASURES: '测量',
+};
+const ALL_LAYERS: Layers = { grid: false, dims: true, labels: true, furn: true, bearing: false, snap: false };
+/** Exports always contain every layer, independent of canvas visibility toggles. */
+export function createExportDocument(d: Design): DrawingDocument {
+  return createDrawingDocument({ ...d, dimensionSettings: { ...d.dimensionSettings, visible: true } }, ALL_LAYERS);
+}
 export interface DrawingDimension {
   first: Point; second: Point; lineFirst: Point; lineSecond: Point;
   label: Point; height: number; rotation: number; text: string; measurement: number;
@@ -48,17 +62,18 @@ export function createDrawingDocument(d: Design, layers: Layers): DrawingDocumen
     const demolished = d.demolished.includes(wall.id);
     const polygon = connectedWallPoly(wall, valid, d.demolished);
     const openings = demolished ? [] : d.openings.filter(o => o.wallId === wall.id).sort((a, b) => a.offset - b.offset);
+    const group = { id: wall.id, name: demolished ? '拆除墙体' : isBearingWall(wall) ? '承重墙' : wallKindName(wall) };
     let pos = 0;
     for (const o of openings) {
       for (const points of wallSectionPolygons(wall, polygon, pos, o.offset - o.width / 2))
-        entities.push({ kind: 'polyline', closed: true, points, layer: 'WALLS' });
+        entities.push({ kind: 'polyline', closed: true, points, layer: 'WALLS', group });
       pos = o.offset + o.width / 2;
     }
     for (const points of wallSectionPolygons(wall, polygon, pos, length(wall)))
-      entities.push({ kind: 'polyline', closed: true, points, layer: demolished ? 'DEMOLISHED' : 'WALLS' });
+      entities.push({ kind: 'polyline', closed: true, points, layer: demolished ? 'DEMOLISHED' : 'WALLS', group });
   }
   for (const r of d.rooms) {
-    for (const ring of r.rings) entities.push({ kind: 'polyline', closed: true, points: ring, layer: 'ROOMS' });
+    for (const ring of r.rings) entities.push({ kind: 'polyline', closed: true, points: ring, layer: 'ROOMS', group: { id: r.id, name: r.name } });
     if (layers.labels && r.counted !== false) {
       const p = center(r);
       entities.push({ kind: 'text', point: p, height: 220, rotation: 0, text: r.name, layer: 'ROOM_LABELS' },
@@ -71,17 +86,21 @@ export function createDrawingDocument(d: Design, layers: Layers): DrawingDocumen
     const L = length(wall), ux = (wall.b[0] - wall.a[0]) / L, uy = (wall.b[1] - wall.a[1]) / L;
     const p: Point = [wall.a[0] + ux * o.offset, wall.a[1] + uy * o.offset];
     const local = (x: number, y: number): Point => [p[0] + ux * x - uy * y, p[1] + uy * x + ux * y];
+    const group = { id: o.id, name: o.kind === 'window' ? '窗' : '门' };
     if (o.kind === 'window') {
-      entities.push({ kind: 'polyline', closed: true, layer: 'OPENINGS', points: [local(-o.width / 2, -wall.thickness / 2), local(o.width / 2, -wall.thickness / 2), local(o.width / 2, wall.thickness / 2), local(-o.width / 2, wall.thickness / 2)] },
-        drawingLine(local(-o.width / 2, 0), local(o.width / 2, 0), 'OPENINGS'));
+      entities.push({ kind: 'polyline', closed: true, layer: 'OPENINGS', group, points: [local(-o.width / 2, -wall.thickness / 2), local(o.width / 2, -wall.thickness / 2), local(o.width / 2, wall.thickness / 2), local(-o.width / 2, wall.thickness / 2)] },
+        { ...drawingLine(local(-o.width / 2, 0), local(o.width / 2, 0), 'OPENINGS'), group });
     } else {
       const { mirrorX, mirrorY } = doorOrientation(o), hinge = local(-o.width / 2 * mirrorX, 0);
       const a = local(-o.width / 2 * mirrorX, -o.width * mirrorY), b = local(o.width / 2 * mirrorX, 0);
-      entities.push(drawingLine(hinge, a, 'OPENINGS'), { kind: 'arc', layer: 'OPENINGS', center: hinge, radius: o.width,
+      entities.push({ ...drawingLine(hinge, a, 'OPENINGS'), group }, { kind: 'arc', layer: 'OPENINGS', group, center: hinge, radius: o.width,
         start: Math.atan2(a[1] - hinge[1], a[0] - hinge[0]), end: Math.atan2(b[1] - hinge[1], b[0] - hinge[0]), clockwise: mirrorX * mirrorY > 0 });
     }
   }
-  if (layers.furn) for (const f of d.furniture) entities.push(...furnitureDrawing(f));
+  if (layers.furn) for (const f of d.furniture) {
+    const group = { id: f.id, name: f.name };
+    entities.push(...furnitureDrawing(f).map(e => ({ ...e, group })));
+  }
   const layout = layers.dims && dimensionSettings(d).visible ? perimeterDimensions(d) : null;
   if (layout) for (const chain of layout.chains) for (const segment of chain.segments) {
     const at = chain.at, source = chain.sourceAt, center = (segment.start + segment.end) / 2;

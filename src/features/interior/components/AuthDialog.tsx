@@ -142,7 +142,6 @@ export function AuthDialog({
         </form>
         <EditorTooltip
           label={signup ? "切换到登录" : "切换到注册"}
-          description={signup ? "已有账号时直接登录" : "用邮箱注册一个新账号"}
           disabled={busy}
         >
           <button
@@ -158,7 +157,7 @@ export function AuthDialog({
             {signup ? "已有账号？前往登录" : "还没有账号？注册一个"}
           </button>
         </EditorTooltip>
-        <EditorTooltip label="暂不登录" description="关闭窗口，以游客身份继续设计，可下载但不会云端保存">
+        <EditorTooltip label="暂不登录">
           <button className="muted-note" onClick={() => onOpenChange(false)}>
             暂不登录，继续游客设计
           </button>

@@ -9,7 +9,7 @@ export function ColorPickerField({ label, value, onChange, disabled }: { label: 
   return <div className="custom-color-field">
     <span>{label}</span>
     <Popover open={open} onOpenChange={setOpen}>
-      <EditorTooltip label={label} description="点开选择常用色，或自定义任意颜色" disabled={disabled}>
+      <EditorTooltip label={label} disabled={disabled}>
         <PopoverTrigger asChild>
           <Button type="button" variant="outline" className="furniture-color-trigger" disabled={disabled} aria-label={label}>
             <span className="furniture-color-swatch" style={{ background: value }} aria-hidden="true" />{value.toUpperCase()}

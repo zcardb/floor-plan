@@ -44,7 +44,7 @@ export function CostRowEditor({
         }
       />
       {source === "项目覆盖" && (
-        <EditorTooltip label="恢复账号默认" description="丢弃本项目单独设置的单价，改用账号默认价">
+        <EditorTooltip label="恢复账号默认">
           <button
             className="back-link"
             onClick={() => {

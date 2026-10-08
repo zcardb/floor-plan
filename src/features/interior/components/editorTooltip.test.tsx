@@ -4,7 +4,7 @@ import { EditorTooltip } from '@/components/ui/editor-tooltip';
 
 describe('EditorTooltip', () => {
   it('正常态直接挂在按钮上，不新增包裹层，也不输出原生 title', () => {
-    const html = renderToStaticMarkup(<EditorTooltip label="旋转 90°" shortcut="R" description="顺时针旋转"><button type="button" aria-label="旋转 90°">R</button></EditorTooltip>);
+    const html = renderToStaticMarkup(<EditorTooltip label="旋转 90°" shortcut="R"><button type="button" aria-label="旋转 90°">R</button></EditorTooltip>);
     expect(html.startsWith('<button')).toBe(true);
     expect(html).toContain('aria-label="旋转 90°"');
     expect(html).not.toContain('title=');

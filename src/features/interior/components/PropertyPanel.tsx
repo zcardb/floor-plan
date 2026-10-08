@@ -43,7 +43,9 @@ import {
   rebuildRooms,
   resizeBlank,
 } from "../model/geometry";
-import type { CustomFloor, Design, Selection } from "../model/types";
+import type { CustomFloor, CustomOpening, CustomWall, Design, Selection } from "../model/types";
+import { openingName } from "../model/hardMaterials";
+import { OpeningVariantSelect } from "./OpeningVariantSelect";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 interface Props {
@@ -58,6 +60,9 @@ interface Props {
   transaction: SizeTransaction;
   /** 账号地面库；未加入项目的地面也可直接选择，选中后自动加入项目。 */
   accountFloors?: CustomFloor[];
+  accountOpenings?: CustomOpening[];
+  /** 墙面在房间材质工具条中选择，这里只接收以保持与工具条一致的属性。 */
+  accountWalls?: CustomWall[];
   splitWall?: (wallId: string) => void;
   mergeWall?: (wallId: string) => void;
   /** 切到成本页；成本页口径跟随当前选中对象。 */
@@ -76,6 +81,7 @@ export function PropertyPanel({
   mergeWall,
   openCosts,
   accountFloors = [],
+  accountOpenings = [],
 }: Props) {
   const d = useCostDesign(design);
   const confirm = useConfirm();
@@ -171,7 +177,7 @@ export function PropertyPanel({
     </div>
   );
   const back = (
-    <EditorTooltip label="返回方案总览" description="取消选中，回到整个户型的统计视图">
+    <EditorTooltip label="返回方案总览">
       <button className="back-link" onClick={() => select(null)}>
         <ArrowLeft size={14} />
         返回方案总览
@@ -272,19 +278,19 @@ export function PropertyPanel({
             </p>
           </div>}
           <div className="property-actions">
-            <EditorTooltip label="复制" description="在旁边复制一件同款家具">
+            <EditorTooltip label="复制">
               <Button size="sm" variant="outline" onClick={duplicate}>
                 <Copy />
                 复制
               </Button>
             </EditorTooltip>
-            <EditorTooltip label="删除" description="移除这件家具，可撤销">
+            <EditorTooltip label="删除">
               <Button size="sm" variant="outline" onClick={remove}>
                 <Trash2 />
                 删除
               </Button>
             </EditorTooltip>
-            <EditorTooltip label="置顶" description="让这件家具盖在其他家具之上显示">
+            <EditorTooltip label="置顶">
               <Button
                 size="sm"
                 variant="ghost"
@@ -299,7 +305,7 @@ export function PropertyPanel({
                 置顶
               </Button>
             </EditorTooltip>
-            <EditorTooltip label="置底" description="让这件家具被其他家具盖住显示">
+            <EditorTooltip label="置底">
               <Button
                 size="sm"
                 variant="ghost"
@@ -389,7 +395,7 @@ export function PropertyPanel({
             }
           })}
           {showCosts && (
-            <EditorTooltip label="本间成本" description="查看这间房的硬装与软装费用明细">
+            <EditorTooltip label="本间成本">
               <button className="room-cost-link" onClick={openCosts}>
                 <span>本间成本</span>
                 <b>
@@ -444,7 +450,7 @@ export function PropertyPanel({
           {design.demolished.includes(w.id) && <p className="muted-note">请先撤销拆除，再分割墙段。</p>}
           <SizeFields key={w.id} design={design} selection={s} transaction={transaction}/>
           {editable && (
-            <EditorTooltip label="删除隔墙" description="删除这面隔墙及墙上门窗，可撤销">
+            <EditorTooltip label="删除隔墙">
               <Button variant="outline" size="sm" onClick={remove}>
                 <Trash2 />
                 删除隔墙
@@ -468,15 +474,15 @@ export function PropertyPanel({
     return (
       <>
         <div className="panel-heading">
-          <span>{o.kind === "door" ? "门" : "窗"}属性</span>
+          <span>{openingName(design, o)}属性</span>
         </div>
         <section>
           {back}
+          <OpeningVariantSelect design={design} opening={o} accountOpenings={accountOpenings} change={change} disabled={openingIsLocked(design, o.wallId)} />
           <SizeFields key={o.id} design={design} selection={s} transaction={transaction}/>
           {o.kind === 'door' && <DoorOrientationControls door={o} onChange={patch => change(d => changeDoorOrientation(d, o.id, patch))} />}
           <EditorTooltip
             label="删除开口"
-            description={openingIsLocked(design, o.wallId) ? "承重墙上的门窗洞口不可删除" : "删除这个门窗洞口，可撤销"}
             disabled={openingIsLocked(design, o.wallId)}
           >
             <Button variant="outline" size="sm" disabled={openingIsLocked(design, o.wallId)} onClick={remove}>
@@ -491,7 +497,7 @@ export function PropertyPanel({
   return (
     <>
       <div className="panel-tabs">
-        <EditorTooltip label="方案总览" description="总面积、各房间面积与费用概览">
+        <EditorTooltip label="方案总览">
           <button
             className={tab === "overview" ? "active" : ""}
             onClick={() => setTab("overview")}
@@ -499,7 +505,7 @@ export function PropertyPanel({
             方案总览
           </button>
         </EditorTooltip>
-        <EditorTooltip label="户型设置" description="户型净尺寸、层高、尺寸标注与快捷键说明">
+        <EditorTooltip label="户型设置">
           <button
             className={tab === "settings" ? "active" : ""}
             onClick={() => setTab("settings")}
