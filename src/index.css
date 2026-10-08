@@ -862,7 +862,8 @@
     stroke-width: 1;
     vector-effect: non-scaling-stroke;
   }
-  .dimension > * {
+  .dimension line,
+  .dimension path {
     vector-effect: non-scaling-stroke;
   }
   .dimension-text {

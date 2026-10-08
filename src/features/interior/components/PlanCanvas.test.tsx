@@ -13,12 +13,15 @@ vi.mock('react', async importOriginal => {
       return ref;
     },
     useState: (value: unknown) => [value, vi.fn()],
+    useMemo: (compute: () => unknown) => compute(),
     useEffect: vi.fn(),
     useImperativeHandle: vi.fn(),
   };
 });
 vi.mock('./useWallDrawing', () => ({ useWallDrawing: () => ({ clear: vi.fn(), clearHover: vi.fn(), down: vi.fn(), move: vi.fn(), up: vi.fn() }) }));
 import { PlanCanvas } from './PlanCanvas';
+import { PerimeterDimensions } from './PerimeterDimensions';
+import { Children, isValidElement } from 'react';
 
 type CanvasProps = React.ComponentProps<typeof PlanCanvas>;
 type Handlers = Pick<React.SVGProps<SVGSVGElement>, 'onPointerDown' | 'onPointerMove' | 'onPointerUp' | 'onPointerCancel'>;
@@ -39,12 +42,28 @@ function harness(kind: Opening['kind'] = 'door', tool: Tool = 'select') {
   // Execute the forwardRef render with deterministic hooks and SVG coordinate conversion.
   // This tests actual event handlers without adding a DOM test dependency.
   const component = PlanCanvas as unknown as { render: (props: CanvasProps, ref: null) => ReactElement<Handlers> };
-  return { handlers: component.render(props, null).props, design, preview, commit, finishTool, select };
+  return { handlers: component.render(props, null).props, design, preview, commit, finishTool, select, props, component };
 }
 beforeEach(() => {
   hooks.refs = [];
   hooks.svg = { setPointerCapture: vi.fn(), getScreenCTM: () => ({ inverse: () => ({}) }),
     createSVGPoint: () => ({ x: 0, y: 0, matrixTransform() { return { x: this.x, y: this.y }; } }) };
+});
+describe('PlanCanvas 自动尺寸接线', () => {
+  it('尺寸开关控制真实派生层，不因为当前画墙工具而强制显示', () => {
+    const h = harness();
+    const renderDimensions = (enabled: boolean, tool: Tool) => {
+      hooks.refs = [];
+      const tree = h.component.render({ ...h.props, tool, layers: { ...h.props.layers, dims: enabled } }, null);
+      const children = (tree.props as React.SVGProps<SVGSVGElement>).children;
+      return Children.toArray(children).filter(child => isValidElement(child) && child.type === PerimeterDimensions);
+    };
+    expect(renderDimensions(false, 'wall')).toHaveLength(0);
+    const shown = renderDimensions(true, 'select');
+    expect(shown).toHaveLength(1);
+    expect((shown[0] as ReactElement<{ layout: { horizontal: { start: number; end: number }[] } }>).props.layout.horizontal)
+      .toEqual([expect.objectContaining({ start: 0, end: 6000 })]);
+  });
 });
 describe('PlanCanvas 门窗事件链', () => {
   it.each(['door', 'window'] as const)('%s 选中、预览、释放只提交一次原始快照', kind => {

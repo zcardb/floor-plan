@@ -2,13 +2,13 @@ import {
   forwardRef,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import { toast } from "sonner";
 import {
   area,
-  bbox,
   center,
   length,
   nearestOnWall,
@@ -35,6 +35,8 @@ import { resolveWallPoint,validateWallSegment } from '../model/wallDrawing';
 import { useWallDrawing } from './useWallDrawing';
 import { WallHoverOverlay } from './WallHoverOverlay';
 import { formatMeters } from '../model/lengthUnits';
+import { perimeterDimensions, planDrawingBounds } from '../model/perimeterDimensions';
+import { PerimeterDimensions } from './PerimeterDimensions';
 import { doorOrientation } from '../model/doorOrientation';
 import { dragOpening } from '../model/openingDrag';
 import { isCompletionClick, supportsPointerCompletion } from '../model/toolCompletion';
@@ -92,6 +94,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
   const svg = useRef<SVGSVGElement>(null),
     current = useRef(design);
   current.current = design;
+  const dimensionLayout = useMemo(() => perimeterDimensions({ walls: design.walls, demolished: design.demolished }), [design.walls, design.demolished]);
   const [view, setView] = useState({ x: -2000, y: -2000, s: 0.05 }),
     vr = useRef(view);
   vr.current = view;
@@ -148,10 +151,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     const el = svg.current;
     if (!el) return;
     const d = current.current,
-      bb = bbox([
-        ...d.walls.flatMap((w) => [w.a, w.b]),
-        ...d.rooms.flatMap((r) => r.rings[0]),
-      ]);
+      bb = planDrawingBounds(d, layers.dims);
     const margin = 1400,
       w = bb.x2 - bb.x + margin * 2,
       h = bb.y2 - bb.y + margin * 2,
@@ -220,7 +220,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     exportImage: () => {
       const clone = svg.current!.cloneNode(true) as SVGSVGElement,
         d = current.current,
-        b = bbox(d.walls.flatMap((w) => wallPoly(w))),
+        b = planDrawingBounds(d, layers.dims),
         m = 1200,
         w = b.x2 - b.x + m * 2,
         h = b.y2 - b.y + m * 2;
@@ -815,7 +815,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
               </g>
             );
           })}
-      {layers.dims && <Dimensions design={design} />}
+      {layers.dims && <PerimeterDimensions layout={dimensionLayout} />}
       {design.measures.map((m) => (
         <MeasureLine key={m.id} a={m.a} b={m.b} scale={view.s} />
       ))}
@@ -949,91 +949,6 @@ function MeasureLine({ a, b, scale }: { a: Point; b: Point; scale: number }) {
       >
         {formatMeters(Math.hypot(a[0] - b[0], a[1] - b[1]))} m
       </text>
-    </g>
-  );
-}
-function Dimensions({ design: d }: { design: Design }) {
-  const chain = (
-    horizontal: boolean,
-    at: number,
-    start: number,
-    segs: number[],
-  ) => {
-    let pos = start;
-    return (
-      <g className="dimension">
-        {segs.map((v, i) => {
-          const p = pos;
-          pos += v;
-          return (
-            <g key={i}>
-              {horizontal ? (
-                <>
-                  <line x1={p} y1={at} x2={pos} y2={at} />
-                  <path
-                    d={`M${p} ${at - 100}V${at + 100}M${pos} ${at - 100}V${at + 100}M${p - 60} ${at + 60}L${p + 60} ${at - 60}`}
-                  />
-                  <text
-                    x={(p + pos) / 2}
-                    y={at - 70}
-                    textAnchor="middle"
-                    fontSize={v < 400 ? 125 : 180}
-                    className="dimension-text"
-                  >
-                    {formatMeters(v)} m
-                  </text>
-                </>
-              ) : (
-                <>
-                  <line x1={at} y1={p} x2={at} y2={pos} />
-                  <path
-                    d={`M${at - 100} ${p}H${at + 100}M${at - 100} ${pos}H${at + 100}`}
-                  />
-                  <text
-                    x={at - 70}
-                    y={(p + pos) / 2}
-                    transform={`rotate(-90 ${at - 70} ${(p + pos) / 2})`}
-                    textAnchor="middle"
-                    fontSize={180}
-                    className="dimension-text"
-                  >
-                    {formatMeters(v)} m
-                  </text>
-                </>
-              )}
-            </g>
-          );
-        })}
-      </g>
-    );
-  };
-  return (
-    <g pointerEvents="none">
-      {chain(
-        true,
-        -650,
-        0,
-        d.template === "reference"
-          ? [1580, 240, 2760, 240, 1540, 240, 3670]
-          : [d.width],
-      )}
-      {chain(
-        true,
-        d.depth + 750,
-        0,
-        d.template === "reference"
-          ? [2180, 240, 2160, 240, 5450, 240, 1340]
-          : [d.width],
-      )}
-      {chain(
-        false,
-        -800,
-        0,
-        d.template === "reference"
-          ? [3370, 1580, 240, 2770, 240, 2360]
-          : [d.depth],
-      )}
-      {chain(false, d.width + 900, 0, [d.depth])}
     </g>
   );
 }
