@@ -51,23 +51,29 @@
 
 ## Implementation checklist
 
-- [ ] `Workbench.tsx` 2D 编辑组中，`测量` 独立按钮替换为含「测量距离」与「清除测量线」两项的下拉菜单
-- [ ] `测量` 触发器在 `tool === "measure"` 时带 `active` 类，`d.measures.length > 0` 时显示计数徽标
-- [ ] 菜单内「测量距离」触发 `setTool("measure")`，`M` 快捷键（第 339 行）行为保持不变
-- [ ] 菜单内「清除测量线」调用 `clearMeasures`，无测量线时 `disabled` 且显示数量
-- [ ] `Workbench.tsx` 的 `<div className="panel-footer">` 及其内部按钮整块删除
-- [ ] 工具栏 `wide-only` 破坏性分组（`重置方案` / `清空家具`）从 `Workbench.tsx` 删除
-- [ ] 「文件」菜单中 `重置当前方案` 与 `清空家具布置` 去掉 `compact-only` 并加 `danger-item`，分隔线同步去掉 `compact-only`
-- [ ] 「结构」菜单中 `拆改非承重墙` 加 `danger-item`
-- [ ] `index.css` 新增 `.tool-count` / `.menu-kbd` / `.menu-mark` / `.danger-item` 四条规则，全部使用语义令牌
-- [ ] `index.css` 删除 `.panel-footer`、`.panel-action`（含 hover 与 `.count`）规则；grep 确认无引用后删除 `.compact-only`、`.wide-only` 规则
-- [ ] `tip` 与帮助弹窗文案改为指向顶部「测量」菜单
-- [ ] 移动端窄屏下触发器降级为图标且工具栏不溢出（沿用现有媒体查询，必要时补 `aria-label`）
+- [x] `Workbench.tsx` 2D 编辑组中，`测量` 独立按钮替换为含「测量距离」与「清除测量线」两项的下拉菜单
+- [x] `测量` 触发器在 `tool === "measure"` 时带 `active` 类，`d.measures.length > 0` 时显示计数徽标
+- [x] 菜单内「测量距离」触发 `setTool("measure")`，`M` 快捷键行为保持不变
+- [x] 菜单内「清除测量线」调用 `clearMeasures`，无测量线时 `disabled` 且显示数量
+- [x] `Workbench.tsx` 的 `<div className="panel-footer">` 及其内部按钮整块删除
+- [x] 工具栏 `wide-only` 破坏性分组（`重置方案` / `清空家具`）从 `Workbench.tsx` 删除
+- [x] 「文件」菜单中 `重置当前方案` 与 `清空家具布置` 去掉 `compact-only` 并加 `danger-item`，分隔线同步去掉 `compact-only`
+- [x] 「结构」菜单中 `拆改非承重墙` 加 `danger-item`
+- [x] `index.css` 新增 `.tool-count` / `.menu-kbd` / `.menu-mark` / `.menu-count` / `.danger-item` 规则，全部使用语义令牌
+- [x] `index.css` 删除 `.panel-footer`、`.panel-action`（含 hover 与 `.count`）、`.danger-actions`、`.compact-only`、`.wide-only` 规则（grep 确认已无引用）
+- [x] `tip` 与帮助弹窗文案改为指向顶部「测量」菜单
+- [x] 移动端窄屏下触发器降级为图标且工具栏不溢出（沿用现有媒体查询 + `aria-label`）
 
 ## Verification checklist
 
-- [ ] `pnpm lint`、`pnpm exec tsc --noEmit`、`pnpm test`、`pnpm run build` 全部通过
-- [ ] 正向：点开「测量」菜单 → 「测量距离」→ 状态栏显示「测量模式」且画布出现模式提示条 → 画一段测量 → 重新打开菜单看到计数徽标与可用的「清除测量线」→ 点击后测量线清空且菜单自动关闭
-- [ ] 负向/默认态：无测量线时「清除测量线」为禁用态；未登录（游客）状态下「文件」菜单中仍能看到「重置当前方案」「清空家具布置」并呈破坏性配色
-- [ ] 边界：`M` 键仍直接进入测量、`Esc` 仍退出测量；`撤销` 可恢复被清除的测量线；3D 视图下工具栏无「测量」菜单且布局不错位
-- [ ] 视觉证据：`website_screenshot` 抓取工作台首页 `desktop_1280` 与 `mobile_390`，确认工具栏分块清晰、菜单项对齐、窄屏不溢出（若窄屏溢出则回改 CSS 后重测）
+- [x] `pnpm exec tsc --noEmit`、`pnpm lint`、`pnpm test`（36 passed）、`pnpm run build` 全部通过
+- [ ] 正向：点开「测量」菜单 → 「测量距离」→ 状态栏显示「测量模式」且画布出现模式提示条 → 画一段测量 → 重新打开菜单看到计数徽标与可用的「清除测量线」→ 点击后测量线清空且菜单自动关闭（**需在预览中人工确认**）
+- [ ] 负向/默认态：无测量线时「清除测量线」为禁用态；未登录（游客）状态下「文件」菜单中仍能看到「重置当前方案」「清空家具布置」并呈破坏性配色（**需在预览中人工确认**）
+- [ ] 边界：`M` 键仍直接进入测量、`Esc` 仍退出测量；`撤销` 可恢复被清除的测量线；3D 视图下工具栏无「测量」菜单且布局不错位（**需在预览中人工确认**）
+- [x] 视觉证据：`website_screenshot` 抓取工作台首页 `desktop_1280` 与 `mobile_390`，工具栏分块清晰（视图 / 编辑 / 历史 / 工具）、无破坏性按钮残留、窄屏图标态不溢出
+
+## 执行备注
+
+- 本轮有另一个会话（`55e7f425…`，turn 62）同时修改 `Workbench.tsx` 与 `index.css`（顶部游客「登录 / 保存」头部）。本次改动已基于其后的最新文件内容落地，两处改动互不冲突。
+- 新菜单项图标沿用兄弟菜单（结构 / 图层 / 文件）的写法，未显式指定尺寸，因此与现有菜单观感一致；若希望把工具栏菜单图标统一收紧到 15–16px，可作为后续单独调整。
+
