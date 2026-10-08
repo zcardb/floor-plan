@@ -78,9 +78,7 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
     <div className="cms-heading">
       <div><h1>项目管理</h1><p>把每个空间的灵感，保存成独立方案。</p></div>
       <div className="cms-heading-actions">
-        <EditorTooltip label="刷新项目" disabled={projects.loading}>
-          <Button variant="ghost" size="icon" className="cms-refresh-button" aria-label="刷新项目" disabled={projects.loading} aria-busy={refreshing} onClick={() => void projects.reload()}><RefreshCw className={refreshing ? 'animate-spin' : ''} /></Button>
-        </EditorTooltip>
+        <Button variant="outline" className="cms-refresh-button" disabled={projects.loading} aria-busy={refreshing} onClick={() => void projects.reload()}><RefreshCw className={refreshing ? 'animate-spin' : ''} />刷新</Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button className="cms-create-button" disabled={createBusy} aria-busy={importFile.pending}>
