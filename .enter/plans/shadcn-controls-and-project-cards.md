@@ -44,18 +44,26 @@
 复用：现有 shadcn Select/Input/Label/Button；`createSizeTransaction`、`editSelection`、`resizeBlank`、`appearanceDimensions`、`validateProcurement`、`validPrice`，不复制业务计算。
 
 ## Implementation checklist
-- [ ] 新增长度转换/显示/草稿工具，明确旋转与非长度字段不转换。
-- [ ] Visual Editor 地面/墙面 Select 绑定原材质 key，保留 `paint` 默认值及单房间更新。
-- [ ] SizeFields 使用 shadcn Input，米制草稿转换后进入毫米事务，保留即时预览/取消/一步撤销。
-- [ ] PriceInput 使用 shadcn Input/Button，保留空值、金额验证与禁用/键盘行为。
-- [ ] 采购规格使用 shadcn Select/Input/Button；仅长宽换算，单位切换仍清空价格。
-- [ ] PropertyPanel 长度输入和名称采用 Input，长度范围/异步拒绝回滚均用正确单位，角度不转换。
-- [ ] 新建家具与参考几何编辑的默认值、形状联动、预览、限制提示及提交完成米↔毫米转换。
-- [ ] 所有素材库/账号家具/成本条目尺寸摘要及房间开间进深显示米。
-- [ ] PlanCanvas 测量线、绘墙临时距离、尺寸链和导出标注显示米，不修改 SVG 几何。
-- [ ] Workbench 实时坐标/默认坐标和墙段长度错误提示显示米。
-- [ ] 收窄旧编辑控件 CSS，集中定义紧凑样式与焦点/禁用态，保持主题令牌。
-- [ ] 添加单位工具与表单绑定回归测试，旧毫米数据不迁移、不重复换算。
+- [x] 新增长度转换/显示/草稿工具，明确旋转与非长度字段不转换。
+- [x] Visual Editor 地面/墙面 Select 绑定原材质 key，保留 `paint` 默认值及单房间更新。
+- [x] SizeFields 使用 shadcn Input，米制草稿转换后进入毫米事务，保留即时预览/取消/一步撤销。
+- [x] PriceInput 使用 shadcn Input/Button，保留空值、金额验证与禁用/键盘行为。
+- [x] 采购规格使用 shadcn Select/Input/Button；仅长宽换算，单位切换仍清空价格。
+- [x] PropertyPanel 长度输入和名称采用 Input，长度范围/异步拒绝回滚均用正确单位，角度不转换。
+- [x] 新建家具与参考几何编辑的默认值、形状联动、预览、限制提示及提交完成米↔毫米转换。
+- [x] 所有素材库/账号家具/成本条目尺寸摘要及房间开间进深显示米。
+- [x] PlanCanvas 测量线、绘墙临时距离、尺寸链和导出标注显示米，不修改 SVG 几何。
+- [x] Workbench 实时坐标/默认坐标和墙段长度错误提示显示米。
+- [x] 收窄旧编辑控件 CSS，集中定义紧凑样式与焦点/禁用态，保持主题令牌。
+- [x] 添加单位工具与表单绑定回归测试，旧毫米数据不迁移、不重复换算。
+
+### 已执行验证记录
+- lint、应用 TypeScript、开发/生产构建通过；18 个测试文件共 107 项测试通过。
+- 桌面 1280、手机 390 根路由截图可见米制尺寸链与素材卡片，未发现布局截断。没有可用浏览器点击工具，弹出的材质菜单与交互视觉仍未验证。
+- app 类型，入口 `/`，沿用 CSR/静态路由、账号恢复和 2D 工作台；3D 仍仅在用户切换后加载。无新增依赖、网络请求或高频状态更新。
+- 生产审计完成但 strict 有告警：入口 JS 约 1030311 B raw / 265891 B Brotli 超默认预算；已有初始 ponyfill 动态依赖与平台注入字体未验证。没有修改预算或移除平台能力，不能宣称性能验收通过。
+- 浏览器性能与部署 HTTP 未验证；缺少可用交互自动化/性能追踪及发布 URL。只读技能目录无法安装审计依赖，使用 `/tmp/enter-performance-audit` 可写副本完成审计，不修改应用依赖。
+- 并行改动带来的 PromiseLike.catch 类型错误已通过 Promise.resolve 包装修正，保持账号数据读取行为。
 
 ## Verification checklist
 - [ ] 正向单位测试：1800→1.8，240→0.24，输入 2.4→2400；重复编辑不产生 1000 倍偏差。

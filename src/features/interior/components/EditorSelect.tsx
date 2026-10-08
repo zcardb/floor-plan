@@ -11,7 +11,7 @@ export function EditorSelect({ label, value, options, onChange, disabled = false
   disabled?: boolean;
 }) {
   const id = useId();
-  return <div className="editor-field">
+  return <div className="editor-field" onKeyDown={event => event.stopPropagation()}>
     <Label htmlFor={id}>{label}</Label>
     <Select value={value} onValueChange={onChange} disabled={disabled}>
       <SelectTrigger id={id} className="editor-control"><SelectValue /></SelectTrigger>
