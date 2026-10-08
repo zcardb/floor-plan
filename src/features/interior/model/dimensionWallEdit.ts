@@ -1,6 +1,7 @@
 import polygonClipping from 'polygon-clipping';
-import { canEditWall } from './wallPolicy';
-import { bbox, length, nearestOnWall, rebuildRooms, rect, ringArea, wallPoly } from './geometry';
+import { canResizeWall } from './wallPolicy';
+import { syncRooms } from './roomFollow';
+import { bbox, length, nearestOnWall, rect, ringArea, wallPoly } from './geometry';
 import { perimeterDimensions } from './perimeterDimensions';
 import { validateWallSegment } from './wallDrawing';
 import type { Design, Point, Wall } from './types';
@@ -9,10 +10,10 @@ export type FixedDimensionSide = 'start' | 'end';
 const epsilon = 0.05;
 const distance = (a: Point, b: Point) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const sameIds = (a: string[], b: string[]) => a.length === b.length && a.every(id => b.includes(id));
-const movable = (d: Design, ids: string[]) => ids.length > 0 && ids.every(id => d.walls.some(w => w.id === id && canEditWall(d, w) && !d.demolished.includes(id)));
+const movable = (d: Design, ids: string[]) => ids.length > 0 && ids.every(id => d.walls.some(w => w.id === id && canResizeWall(d, w) && !d.demolished.includes(id)));
 export function dimensionEditPolicy(d: Design, binding?: DimensionBinding): { reason?: string; fixed?: FixedDimensionSide; chooseSide: boolean } {
   if (!binding) return { reason: '总尺寸、墙厚或未明确对应墙体的标注仅供查看', chooseSide: false };
-  if (d.template !== 'blank') return { reason: '参考户型的结构尺寸已锁定', chooseSide: false };
+  if (d.template !== 'blank' && d.structureUnlocked !== true) return { reason: '参考户型的结构尺寸已锁定', chooseSide: false };
   const start = movable(d, binding.startWalls), end = movable(d, binding.endWalls);
   if (!start && !end) return { reason: '两侧均为固定结构，不能通过净距移动', chooseSide: false };
   return { fixed: !start ? 'start' : !end ? 'end' : undefined, chooseSide: start && end };
@@ -48,7 +49,7 @@ export function editDimensionWalls(before: Design, binding: DimensionBinding, re
     if (!aConnected && !bConnected) return w;
     // A moving wall may slide along the INTERIOR of a fixed wall; its endpoint
     // does not require changing that fixed wall. A fixed endpoint joint cannot.
-    if (!canEditWall(before, w)) throw new Error('该移动会改变外墙或承重墙的连接端点');
+    if (!canResizeWall(before, w)) throw new Error('该移动会改变外墙或承重墙的连接端点');
     const next = { ...w, a: aConnected ? translate(w.a) : w.a, b: bConnected ? translate(w.b) : w.b };
     if (Math.abs(w.a[0] - w.b[0]) < epsilon && Math.abs(next.a[0] - next.b[0]) >= epsilon ||
       Math.abs(w.a[1] - w.b[1]) < epsilon && Math.abs(next.a[1] - next.b[1]) >= epsilon) throw new Error('该连接无法保持原墙体方向');
@@ -104,7 +105,7 @@ export function editDimensionWalls(before: Design, binding: DimensionBinding, re
       if (crossed) throw new Error('目标墙不能跨过其他墙体');
     }
   }
-  const updated = rebuildRooms(candidate);
+  const updated = syncRooms(before, candidate);
   const match = perimeterDimensions(updated)?.chains.flatMap(chain => chain.overall ? [] : chain.segments).find(s => s.binding &&
     s.binding.axis === axis && sameIds(s.binding.startWalls, binding.startWalls) && sameIds(s.binding.endWalls, binding.endWalls));
   if (!match || Math.abs(match.end - match.start - requested) > epsilon) throw new Error('结构变化后无法得到指定净距，请检查连接关系');

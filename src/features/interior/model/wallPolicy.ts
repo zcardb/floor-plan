@@ -2,6 +2,12 @@ import type { Design, Wall } from './types';
 
 export const isBearingWall = (wall: Wall) => wall.kind === 'bearing' || wall.loadBearing === true;
 export const canEditWall = (design: Design, wall: Wall) => design.template === 'blank' && wall.kind === 'partition' && !isBearingWall(wall);
+/** 承重墙结构改动的统一提醒文案。 */
+export const BEARING_WALL_WARNING = '承重墙改动仅用于方案示意，实际施工须经结构专业评估';
+/** 可调整尺寸/位置的墙体。空白户型的房间由外框推导，外围墙尺寸只能走属性面板的整体重设，避免墙与房间脱节。 */
+export const canResizeWall = (design: Design, wall: Wall) =>
+  canEditWall(design, wall) ||
+  (design.structureUnlocked === true && design.template !== 'blank' && !design.demolished.includes(wall.id));
 export const canDemolishWall = (wall: Wall) => !isBearingWall(wall) && (wall.kind === 'partition' || wall.kind === 'low');
 export const openingIsLocked = (design: Design, wallId: string) => design.walls.some(w => w.id === wallId && isBearingWall(w));
 export const wallKindName = (wall: Wall) => wall.kind === 'bearing' ? '承重墙' : wall.kind === 'exterior' ? '外围墙' : wall.kind === 'low' ? '矮墙' : '隔墙';

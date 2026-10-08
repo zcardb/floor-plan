@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Armchair, Check, Layers, Loader2, Plus, Search, X } from 'lucide-react';
 import { LoadError } from './LoadError';
 import { Button } from '@/components/ui/button';
+import { EditorTooltip } from '@/components/ui/editor-tooltip';
 import { notify } from '@/lib/notify';
 import { categories } from '../data/catalog';
 import { formatMeters } from '../model/lengthUnits';

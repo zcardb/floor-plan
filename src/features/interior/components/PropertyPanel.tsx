@@ -29,7 +29,7 @@ import { editSelection } from "../model/selectionEdits";
 import { useCostDesign } from './CostDefaultsContext';
 import { SizeFields } from './SizeFields';
 import { WallOptionsMenu } from './WallOptionsMenu';
-import { canEditWall, openingIsLocked, wallKindName } from '../model/wallPolicy';
+import { canEditWall, canResizeWall, openingIsLocked, wallKindName } from '../model/wallPolicy';
 import { RotationControls } from './RotationControls';
 import { DimensionSettings } from './DimensionSettings';
 import type { SizeTransaction } from '../model/sizeTransaction';
@@ -420,6 +420,7 @@ export function PropertyPanel({
   }
   if (w) {
     const editable = canEditWall(design, w);
+    const resizable = canResizeWall(design, w);
     return (
       <>
         <div className="panel-heading">
@@ -431,7 +432,7 @@ export function PropertyPanel({
         <section>
           {back}
           <h3 className="section-title">
-            {editable ? "可编辑内部墙体" : "受保护墙体"}
+            {editable ? "可编辑内部墙体" : resizable ? "可调整尺寸的墙体" : "受保护墙体"}
           </h3>
           <WallOptionsMenu design={design} wall={w} change={change} splitWall={splitWall} mergeWall={mergeWall} />
           <p className="muted-note">分割与承重标记独立；取消分割不会解除承重保护。实际承重性质须专业确认。</p>

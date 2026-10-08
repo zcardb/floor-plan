@@ -2,6 +2,7 @@ import * as React from "react";
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
@@ -34,17 +35,19 @@ export function EditorTooltip({
   children,
 }: EditorTooltipProps) {
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        {disabled ? <span className="editor-tooltip-trigger">{children}</span> : children}
-      </TooltipTrigger>
-      <TooltipContent side={side} sideOffset={8} className="tool-tooltip">
-        <span className="tool-tooltip-row">
-          <span>{label}</span>
-          {shortcut && <kbd>{shortcut}</kbd>}
-        </span>
-        {description && <small className="tool-tooltip-note">{description}</small>}
-      </TooltipContent>
-    </Tooltip>
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          {disabled ? <span className="editor-tooltip-trigger">{children}</span> : children}
+        </TooltipTrigger>
+        <TooltipContent side={side} sideOffset={8} className="tool-tooltip">
+          <span className="tool-tooltip-row">
+            <span>{label}</span>
+            {shortcut && <kbd>{shortcut}</kbd>}
+          </span>
+          {description && <small className="tool-tooltip-note">{description}</small>}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }

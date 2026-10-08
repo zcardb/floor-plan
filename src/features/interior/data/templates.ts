@@ -319,7 +319,10 @@ export function createProject(
     id: uid(),
     name:
       name || (template === "blank" ? "未命名户型" : "三室两厅两卫 · 原木之家"),
-    state: template === "blank" ? blankDesign() : referenceDesign(),
+    state: {
+      ...(template === "blank" ? blankDesign() : referenceDesign()),
+      structureUnlocked: true,
+    },
     updatedAt: new Date().toISOString(),
     revision: 0,
   };

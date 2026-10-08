@@ -76,4 +76,14 @@ describe('净距驱动真实墙体',()=>{
     const locked=fixture();locked.walls.push({...wall('locked',[1000,2000],[3000,2000]),kind:'bearing'});
     expect(()=>editDimensionWalls(locked,binding(locked,'partition','outer-1'),1500,'end')).toThrow('承重');
   });
+  it('结构解锁的参考户型可以按净距移动墙体',()=>{
+    const d={...referenceDesign(),structureUnlocked:true};
+    const b=binding(d,'w6','w10');
+    const policy=dimensionEditPolicy(d,b);
+    expect(policy.reason).toBeUndefined();
+    const fixed=policy.fixed??'start',moving=fixed==='start'?'w10':'w6';
+    const next=editDimensionWalls(d,b,b.end-b.start-100,fixed);
+    expect(next.walls.find(w=>w.id===moving)!.a).not.toEqual(d.walls.find(w=>w.id===moving)!.a);
+    expect(next.rooms.map(r=>r.name)).toEqual(d.rooms.map(r=>r.name));
+  });
 });

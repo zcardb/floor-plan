@@ -6,8 +6,9 @@ import {
   useRef,
   useState,
 } from "react";
-import { notify } from "@/lib/notify";
-import { canEditWall, canDemolishWall, isBearingWall, openingIsLocked } from '../model/wallPolicy';
+import { errorMessage, notify } from "@/lib/notify";
+import { canDemolishWall, canResizeWall, isBearingWall, openingIsLocked, BEARING_WALL_WARNING } from '../model/wallPolicy';
+import { syncRooms } from '../model/roomFollow';
 import {
   area,
   center,
@@ -316,13 +317,23 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     }
     if (["move", "rot", "size", "wallmove", "endpoint"].includes(dr.kind)) {
       if (dr.moved) {
-        const next =
-          dr.kind === "wallmove" || dr.kind === "endpoint"
-            ? rebuildRooms(d)
-            : d;
+        const wallEdit = dr.kind === "wallmove" || dr.kind === "endpoint";
+        let next = d;
+        if (wallEdit) {
+          try {
+            next = syncRooms(dr.before, d);
+          } catch (cause) {
+            preview(dr.before);
+            notify.fail(errorMessage(cause, "该调整会破坏房间划分"));
+            return;
+          }
+        }
         commit(next, dr.before);
         if (next.rooms.length !== dr.before.rooms.length)
           notify.info("房间划分已更新，请检查名称与地面材质");
+        const wall = wallEdit ? next.walls.find((w) => w.id === dr.id) : undefined;
+        if (wall && isBearingWall(wall) && next.template !== "blank")
+          notify.warning(BEARING_WALL_WARNING);
       }
       return;
     }
@@ -448,7 +459,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         } else if (handle && selection) {
           const selectedWall = selection.kind === 'wall' ? design.walls.find(w => w.id === selection.id) : null;
           const selectedOpening = selection.kind === 'opening' ? design.openings.find(o => o.id === selection.id) : null;
-          if ((selectedWall && !canEditWall(design, selectedWall)) || (selectedOpening && openingIsLocked(design, selectedOpening.wallId))) return;
+          if ((selectedWall && !canResizeWall(design, selectedWall)) || (selectedOpening && openingIsLocked(design, selectedOpening.wallId))) return;
           base.kind = handle === "a" || handle === "b" ? "endpoint" : handle;
           base.id = selection.id;
           base.room = handle;
@@ -469,7 +480,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           const w = design.walls.find((w) => w.id === wid)!;
           wallClick.current={id:wid,fraction:nearestOnWall(p,w).offset/length(w)};
           select({ kind: "wall", id: wid });
-          if (canEditWall(design, w)) {
+          if (canResizeWall(design, w)) {
             base.kind = "wallmove";
             base.id = wid;
           } else return;
@@ -869,7 +880,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
                     stroke="var(--plan-selection)"
                     strokeWidth={2 / view.s}
                   />
-                  {canEditWall(design, w) &&
+                  {canResizeWall(design, w) &&
                     selection.kind === "wall" &&
                     (["a", "b"] as const).map((k) => (
                       <circle

@@ -17,6 +17,7 @@ export function errorMessage(cause: unknown, fallback = "未知错误"): string 
  * - fail：操作未执行（规则限制 / 输入无效），仅标题
  * - error：异常报错，标题 + Error Info 描述行
  * - info：中性说明
+ * - warning：操作已生效但需用户复核的提醒
  */
 export const notify = {
   success: (title: string, description?: string) =>
@@ -28,4 +29,6 @@ export const notify = {
       duration: 6000,
     }),
   info: (title: string) => toast.info(title, { duration: 3000 }),
+  warning: (title: string, description?: string) =>
+    toast.warning(title, { description, duration: 5000 }),
 };

@@ -21,7 +21,7 @@ const Index=()=>{
     if(!owner){pendingCloud.current=true;setAuthIntent('cloud');setAuthOpen(true);return false;}
     if(!projects.active)return false;
     const name=projects.active.name+' · 云端副本';
-    const ok=await projects.create({...projects.active,name},true);
+    const ok=await projects.create({...projects.active,name,state:{...projects.active.state,structureUnlocked:true}},true);
     if(ok)notify.success('已另存为云端项目「'+name+'」');
     return ok;
   };

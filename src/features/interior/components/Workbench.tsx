@@ -499,7 +499,10 @@ export function Workbench(p: Props) {
       tone: "destructive",
     });
     if (!ok) return;
-    change(() => (d.template === "blank" ? blankDesign() : referenceDesign()));
+    change((d) => ({
+      ...(d.template === "blank" ? blankDesign() : referenceDesign()),
+      ...(d.structureUnlocked ? { structureUnlocked: true } : {}),
+    }));
     setSelection(null);
     notify.success("已重置为初始模板，可撤销恢复");
   };

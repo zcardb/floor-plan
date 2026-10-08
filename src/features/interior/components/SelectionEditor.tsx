@@ -28,7 +28,7 @@ import {
 import { floorMaterialOf, floorMaterialsOf } from "../model/floorMaterials";
 import { FURNITURE_COLORS } from "../data/palette";
 import { WallOptionsMenu } from './WallOptionsMenu';
-import { canEditWall, openingIsLocked, wallKindName } from '../model/wallPolicy';
+import { canEditWall, canResizeWall, openingIsLocked, wallKindName } from '../model/wallPolicy';
 import { length } from "../model/geometry";
 import { SizeFields } from './SizeFields';
 
@@ -146,6 +146,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           : null;
     const editableWall =
       w && canEditWall(p.design, w);
+    const resizableWall = w && canResizeWall(p.design, w);
     const fields = f
       ? [
           ["w", "宽 / m", f.w],
@@ -281,10 +282,10 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
               collisionPadding={12}
             >
               <h3>尺寸与位置</h3>
-              {w && !editableWall ? (
+              {w && !resizableWall ? (
                 <p className="visual-locked">
                   <LockKeyhole size={15} />
-                  建筑结构已锁定，不能修改尺寸。
+                  此项目创建时锁定了结构尺寸，复制该项目后副本可自由调整。
                 </p>
               ) : (
                 <SizeFields design={p.design} selection={p.selection} transaction={p.transaction} close={()=>setOpen(null)}/>

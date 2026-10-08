@@ -1,5 +1,6 @@
-import { length, norm, rebuildRooms } from "./geometry";
-import { canEditWall, openingIsLocked } from './wallPolicy';
+import { length, norm } from "./geometry";
+import { canResizeWall, openingIsLocked } from './wallPolicy';
+import { syncRooms } from './roomFollow';
 import type { Design, Selection } from "./types";
 export function editSelection(
   d: Design,
@@ -48,7 +49,7 @@ export function editSelection(
     };
   if (s.kind === "wall") {
     const w = d.walls.find((w) => w.id === s.id);
-    if (!w || !canEditWall(d, w))
+    if (!w || !canResizeWall(d, w))
       throw new Error("此墙体的结构尺寸已锁定");
     const L = length(w),
       next = {
@@ -68,7 +69,7 @@ export function editSelection(
       )
     )
       throw new Error("墙体缩短后无法容纳门窗");
-    return rebuildRooms({
+    return syncRooms(d, {
       ...d,
       walls: d.walls.map((g) => (g.id === s.id ? next : g)),
     });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { blankDesign, referenceDesign } from '../data/templates';
-import { canDemolishWall, canEditWall, isBearingWall, setWallBearing, wallKindName } from './wallPolicy';
+import { blankDesign, createProject, referenceDesign } from '../data/templates';
+import { canDemolishWall, canEditWall, canResizeWall, isBearingWall, setWallBearing, wallKindName } from './wallPolicy';
 import { rebuildRooms, resizeBlank } from './geometry';
 import { calculateCosts } from './costs';
 import { editSelection } from './selectionEdits';
@@ -49,5 +49,42 @@ describe('承重墙标记策略', () => {
     const low = { ...partition, kind: 'low' as const };
     const d = { ...blankDesign(), walls: [...before.walls, low] };
     expect(wallKindName(setWallBearing(d, low.id, true).walls[d.walls.length - 1]!)).toBe('矮墙');
+  });
+});
+
+describe('复制/新建项目的结构解锁', () => {
+  const unlocked = () => ({ ...referenceDesign(), structureUnlocked: true });
+  it('未解锁的参考户型所有墙体仍锁定尺寸', () => {
+    const d = referenceDesign();
+    expect(d.walls.some(w => canResizeWall(d, w))).toBe(false);
+  });
+  it('解锁后外围、承重、矮墙、隔墙均可调尺寸，已拆墙除外', () => {
+    const d = unlocked();
+    for (const kind of ['exterior', 'bearing', 'low', 'partition'] as const) {
+      const w = d.walls.find(w => w.kind === kind)!;
+      expect(canResizeWall(d, w)).toBe(true);
+    }
+    const low = d.walls.find(w => w.kind === 'low')!;
+    expect(canResizeWall({ ...d, demolished: [low.id] }, low)).toBe(false);
+  });
+  it('删除权限不随解锁放开', () => {
+    const d = unlocked();
+    expect(d.walls.some(w => canEditWall(d, w))).toBe(false);
+  });
+  it('空白户型的结果与原规则完全一致', () => {
+    const d = { ...fixture(), structureUnlocked: true };
+    for (const w of d.walls) expect(canResizeWall(d, w)).toBe(canEditWall(d, w));
+  });
+  it('解锁参考户型可改外墙长度，未解锁仍抛锁定', () => {
+    const d = unlocked(), w = d.walls.find(w => w.id === 'w7')!;
+    const next = editSelection(d, { kind: 'wall', id: w.id }, { thickness: 300 });
+    expect(next.walls.find(x => x.id === w.id)!.thickness).toBe(300);
+    expect(next.rooms.map(r => r.name)).toEqual(d.rooms.map(r => r.name));
+    expect(() => editSelection(referenceDesign(), { kind: 'wall', id: w.id }, { thickness: 300 })).toThrow('锁定');
+  });
+  it('新建项目自动解锁结构', () => {
+    expect(createProject('reference').state.structureUnlocked).toBe(true);
+    expect(createProject('blank').state.structureUnlocked).toBe(true);
+    expect(referenceDesign().structureUnlocked).toBeUndefined();
   });
 });

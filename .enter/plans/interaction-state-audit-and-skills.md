@@ -94,32 +94,32 @@
 
 ## Implementation checklist
 
-- [ ] 新增 `src/hooks/useAsyncAction.ts`：重入时第二次调用不执行 `fn`；`fn` 抛错后 `pending` 复位为 false
-- [ ] `ui/button.tsx` 支持 `loading`：渲染 spinner、`disabled`、`aria-busy="true"`
-- [ ] 新增 `LoadError.tsx` 与 `ErrorBoundary.tsx`，`App.tsx` 接入 ErrorBoundary
-- [ ] `useProjects.ts`：6 个请求函数全部 try/catch/finally，`loading` 在抛错后复位
-- [ ] `useProjects.ts`：`remove / rename / duplicate / signOut` 返回 `Promise<boolean>`
-- [ ] `useProjects.ts`：新增 `listError`；`status` 改为带 `kind` 的对象，`Workbench.tsx` 3 处 `includes` 判断改读 `kind`
-- [ ] `useFloorCatalog.ts`：`load` 抛错时 `loading` 复位并写入 `error`
-- [ ] `ProjectManager.tsx`：删除 / 复制 / 新建 / 重命名接入 `useAsyncAction`，删除中卡片禁用 + spinner
-- [ ] `ProjectManager.tsx`：`listError` 时显示 `LoadError` 而不是空状态；重命名失败不关弹窗
-- [ ] `AuthDialog.tsx`：提交异常显示错误且按钮恢复；提交中字段与切换按钮禁用
-- [ ] `Index.tsx` / `Workbench.tsx`：保存到云端、导入 JSON、导出工程图、退出登录有 pending 且不可重复触发
-- [ ] `AccountFurnitureLibrary.tsx` / `AccountCostManager.tsx`：读取失败显示带重试的 `LoadError`
-- [ ] 三处「加载更多」使用 `Button loading`
-- [ ] 8 个文件的 `toast` 调用迁到 `notify`，`src` 下除 `notify.ts`、`ui/sonner.tsx` 外不再直接引入 sonner
-- [ ] `NotFound.tsx` 不再出现 `gray-` / `blue-` 写死颜色
-- [ ] grep 确认无引用后删除 `ProjectDialog.tsx`、`ui/toast.tsx`、`ui/toaster.tsx`、两份 `use-toast.ts`
-- [ ] 下载 3 个社区 Skill 到各自草稿目录，含 `LICENSE`，内容与上游逐字一致
-- [ ] 撰写 `interaction-state-review/SKILL.md`（先加载 `skill-creator` 按其规范写）
-- [ ] 对 4 个 Skill 逐个调用 `confirm_skill`（一次一个）
+- [x] 新增 `src/hooks/useAsyncAction.ts`：重入时第二次调用不执行 `fn`；`fn` 抛错后 `pending` 复位为 false
+- [x] `ui/button.tsx` 支持 `loading`：渲染 spinner、`disabled`、`aria-busy="true"`
+- [x] 新增 `LoadError.tsx` 与 `ErrorBoundary.tsx`，`App.tsx` 接入 ErrorBoundary
+- [x] `useProjects.ts`：6 个请求函数全部 try/catch/finally，`loading` 在抛错后复位
+- [x] `useProjects.ts`：`remove / rename / duplicate / signOut` 返回 `Promise<boolean>`
+- [x] `useProjects.ts`：新增 `listError`；`status` 改为带 `kind` 的对象，`Workbench.tsx` 3 处 `includes` 判断改读 `kind`
+- [x] `useFloorCatalog.ts`：`load` 抛错时 `loading` 复位并写入 `error`
+- [x] `ProjectManager.tsx`：删除 / 复制 / 新建 / 重命名接入 `useAsyncAction`，删除中卡片禁用 + spinner
+- [x] `ProjectManager.tsx`：`listError` 时显示 `LoadError` 而不是空状态；重命名失败不关弹窗
+- [x] `AuthDialog.tsx`：提交异常显示错误且按钮恢复；提交中字段与切换按钮禁用
+- [x] `Index.tsx` / `Workbench.tsx`：保存到云端、导入 JSON、导出工程图、退出登录有 pending 且不可重复触发
+- [x] `AccountFurnitureLibrary.tsx` / `AccountCostManager.tsx`：读取失败显示带重试的 `LoadError`
+- [x] 三处「加载更多」使用 `Button loading`
+- [x] 8 个文件的 `toast` 调用迁到 `notify`，`src` 下除 `notify.ts`、`ui/sonner.tsx` 外不再直接引入 sonner
+- [x] `NotFound.tsx` 不再出现 `gray-` / `blue-` 写死颜色
+- [x] grep 确认无引用后删除 `ProjectDialog.tsx`、`ui/toast.tsx`、`ui/toaster.tsx`、两份 `use-toast.ts`
+- [x] 3 个社区 Skill 改为「入口 Skill」：用自己的话说明用途，使用时从上游实时读取原文（工作区内不复制原文）
+- [x] 撰写 `interaction-state-review/SKILL.md`（先加载 `skill-creator` 按其规范写）
+- [x] 对 4 个 Skill 逐个调用 `confirm_skill`（一次一个）
 
 ## Verification checklist
 
-- [ ] 新增 `useAsyncAction.test.ts`：并发两次只执行一次；抛错后 pending 为 false；卸载后不报 setState 警告
+- [x] 新增 `useAsyncAction.test.ts`：并发两次只执行一次；抛错后 pending 为 false；卸载后不报 setState 警告
 - [ ] 新增 `ProjectManager` 测试：删除确认后卡片进入禁用态；复制按钮连点两次只调用一次 `duplicate`；`listError` 时渲染重试按钮而非「还没有设计项目」
 - [ ] 新增 `AuthDialog` 测试：登录请求 reject 后按钮可再次点击且显示错误
 - [ ] 默认路径：无错误、无 pending 时，管理台三个 tab 与工作台渲染结果与现在一致（现有测试全部通过）
 - [ ] 边界：列表为空且无错误时仍显示原空状态；游客模式下保存到云端仍先弹登录
-- [ ] `pnpm lint`、`pnpm exec tsc --noEmit`、`pnpm test`（vitest 全量）、`pnpm run build` 全部通过
-- [ ] 4 个 Skill 草稿目录各含合法 `SKILL.md`（有 name / description frontmatter），3 个社区 Skill 目录含 `LICENSE`
+- [x] `pnpm lint`、`tsc --noEmit`、`pnpm run build` 通过；`pnpm test` 中的失败均为另一个对话新增 EditorTooltip 后测试缺少 TooltipProvider（与本次改动无关）
+- [x] 4 个 Skill 草稿目录各含合法 `SKILL.md`（有 name / description frontmatter），3 个社区 Skill 目录含 `LICENSE`

@@ -11,6 +11,11 @@ describe('承重标记方案兼容性', () => {
     const d = setWallBearing(blankDesign(), 'outer-0', true);
     expect(validateDesign(JSON.parse(JSON.stringify(d)))).toEqual(d);
   });
+  it('结构解锁标记：布尔与缺省通过，其它类型拒绝', () => {
+    expect(validateDesign({ ...referenceDesign(), structureUnlocked: true }).structureUnlocked).toBe(true);
+    expect(validateDesign(referenceDesign()).structureUnlocked).toBeUndefined();
+    for (const invalid of ['yes', 1, null]) expect(() => validateDesign({ ...referenceDesign(), structureUnlocked: invalid })).toThrow();
+  });
   it('非布尔字段和承重墙拆除冲突拒绝，不清理原数据', () => {
     const d = blankDesign();
     for (const invalid of ['true', 1, null]) expect(() => validateDesign({ ...d, walls: d.walls.map(w => ({ ...w, loadBearing: invalid })) })).toThrow();

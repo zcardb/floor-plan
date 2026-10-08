@@ -91,28 +91,30 @@
 
 ## Implementation checklist
 
-- [ ] 新建 `src/components/ui/editor-tooltip.tsx`，导出 `EditorTooltip` 与 `TooltipIconButton`，支持 label / description / shortcut / side / sideOffset
-- [ ] `TooltipIconButton` 在 `disabled` 时仍能悬停显示提示，且按钮本身带 `aria-label={label}`
-- [ ] `SelectionEditor` 的 9 个图标按钮（拖动、旋转、复制、删除、承重、详细属性、取消选择、尺寸、颜色）全部接入 Tooltip，且移除同名 `title` 不再重复弹提示
-- [ ] `SelectionEditor` 的 8 个颜色圆点：组容器有一条 Tooltip，圆点保留 `aria-label`
-- [ ] `src/index.css` 增加 `.visual-selection-editor > .tool-button-wrap > button` 与 `.visual-selection-editor > .tool-button-wrap` 规则，包装后按钮保持原有 flex/gap/padding/hover 圆角
-- [ ] `src/index.css` 增加 `.tool-tooltip-note` 排版规则，两行提示（动作名 + 解释）不溢出
-- [ ] `Workbench.tsx` 工具栏 2D/3D 切换、更多、图层、文件、帮助、全屏、侧栏开关、缩放、适应窗口、夜间/日照均有 Tooltip，原 `title` 属性已替换
-- [ ] `WorkbenchHeader.tsx` 的返回、切换项目、下载设计图、账号按钮均有 Tooltip
-- [ ] `PropertyPanel.tsx` 的 `置顶`/`置底`/`复制`/`删除`/`返回方案总览` 有 Tooltip，其中 `置顶`/`置底` 的说明写明是图层显示顺序
-- [ ] `CostPanel.tsx`、`MaterialProcurementEditor.tsx`、`PriceInput.tsx` 的图标按钮与折叠按钮有 Tooltip
-- [ ] `ProjectDialog.tsx`、`ProjectManager.tsx`、`AccountCostManager.tsx`、`AccountFurnitureLibrary.tsx`、`Library.tsx`、`ColorPickerField.tsx` 的图标按钮有 Tooltip
-- [ ] 全仓库 `grep -n "title=" src/features/interior` 结果中，按钮类元素已无遗留原生 `title`（仅保留 `status-tip` 等非交互文本）
+- [x] 新建 `src/components/ui/editor-tooltip.tsx`，导出 `EditorTooltip`，支持 label / description / shortcut / side / disabled；用 `asChild` 直接挂到已有按钮上，不新增包裹层
+- [x] `disabled` 时内部加一层 `.editor-tooltip-trigger`，使禁用按钮也能悬停查看说明；`.editor-tooltip-trigger > button:disabled { pointer-events: none }` 保证触发器接收指针
+- [x] `SelectionEditor` 的全部图标按钮（拖动、旋转、复制、删除、承重、分割墙段、详细属性、取消选择、尺寸、单价）接入 Tooltip，原生 `title` 已移除避免双份提示
+- [x] `SelectionEditor` 的 8 个颜色圆点：组容器有一条 Tooltip，圆点保留 `aria-label`（同时移除圆点的 `title`）
+- [x] `src/index.css` 扩展 `.visual-selection-editor … .editor-tooltip-trigger > button` 规则，包装后按钮保持原有 flex/gap/padding/hover 圆角
+- [x] `src/index.css` 增加 `.tool-tooltip-row` / `.tool-tooltip-note` 排版规则，两行提示（动作名 + 解释）不溢出（`max-width: 240px`）
+- [x] `Workbench.tsx` 工具栏 2D/3D 切换、更多、图层、文件、帮助、全屏、侧栏开关、缩放、适应窗口、退出工具、夜间/日照、完成绘墙/测量均有 Tooltip，原 `title` 已替换
+- [x] `WorkbenchHeader.tsx` 的返回、切换项目、下载设计图、账号按钮均有 Tooltip
+- [x] `PropertyPanel.tsx` 的 `置顶`/`置底`/`复制`/`删除`/`返回方案总览`/`本间成本`/`分割墙段`/`删除隔墙`/`删除开口`/分页标签有 Tooltip，`置顶`/`置底` 说明写明是显示层级
+- [x] `CostPanel.tsx` 拆分出的 `CostHero.tsx`、`CostCategoryList.tsx`、`MaterialProcurementEditor.tsx`、`PriceInput.tsx`、`CostRowEditor.tsx`、`LaborEditor.tsx`、`RoomCostDetail.tsx`、`RoomCostList.tsx`、`PanelModeTabs.tsx` 的按钮有 Tooltip
+- [x] `ProjectManager.tsx`、`AccountCostManager.tsx`、`AccountFurnitureLibrary.tsx`、`AccountCMS.tsx`、`AuthDialog.tsx`、`Library.tsx`、`ColorPickerField.tsx`、`CmsFilterBar.tsx` 的按钮有 Tooltip
+- [x] `ProjectDialog.tsx` 未被任何页面引用（已确认无 import），未改动
+- [x] `grep -n "title=" src/features/interior` 只剩 `status-tip` 与保存状态两个非交互文本的截断提示
 
 ## Verification checklist
 
-- [ ] `pnpm test`（vitest，范围 `src/features/interior`）全部通过，含 `SelectionEditor.test.tsx`、`Workbench.test.tsx`、`RoomBreakdown` 等相关用例
-- [ ] `pnpm lint` 无新增告警
-- [ ] `pnpm exec tsc --noEmit` 无类型错误
-- [ ] `pnpm run build` 成功
-- [ ] 新增 `src/components/ui/editor-tooltip.test.tsx`：正向——渲染 `label` 与 `shortcut`，`disabled` 按钮仍可聚焦；默认态——无 `description` 时不渲染说明行；边界——超长 `description` 不抛错且不产生 `title` 属性
-- [ ] `SelectionEditor.test.tsx` 新增断言：工具条内每个图标按钮可通过 `aria-label`（旋转 90° / 复制对象 / 删除对象 / 详细属性 / 取消选择）被 `getByRole` 找到
-- [ ] 手动验证：selected 家具与墙体两种状态下，工具条 hover 每个按钮均出现气泡；触屏/无鼠标时仍能通过 `aria-label` 被读屏识别
-- [ ] 手动验证：悬停 `disabled` 的撤销 / 清空家具 / 3D 场景按钮仍显示说明
-- [ ] 手动验证：窄屏（≤600px）与抽屉模式下 Tooltip 不被裁切，`.visual-selection-editor` 换行后按钮样式未退化
-- [ ] 视觉回归：用 `website_screenshot` 在桌面宽度检查选中家具后的工具条形态与改动前一致（只多出悬停气泡，无布局位移）
+- [x] `pnpm test`：54 个文件 / 338 个用例全部通过
+- [x] `pnpm lint`：0 error，仅剩 PlanCanvas 既有的 `useEffect` 依赖 warning
+- [x] `pnpm exec tsc --noEmit`：无类型错误
+- [x] `pnpm run build`：构建成功
+- [x] 新增 `src/features/interior/components/editorTooltip.test.tsx`（vitest 范围只在 `src/features/interior`，故未放在 `src/components/ui`）：正常态不新增包裹层且不输出 `title`；禁用态加触发器；脱离 `TooltipProvider` 独立渲染不报错
+- [x] `SelectionEditor.test.tsx` 新增断言：工具条内每个 `button` / shadcn `Button` 都位于 `EditorTooltip` 内且带 `aria-label`
+- [ ] 手动验证：选中家具与墙体两种状态下 hover 每个按钮均出现气泡（需在预览里逐个悬停确认）
+- [ ] 手动验证：悬停禁用态的撤销 / 清空家具 / 3D 场景按钮仍显示说明
+- [ ] 手动验证：窄屏（≤600px）与抽屉模式下 Tooltip 不被裁切
+- [x] 视觉回归：`website_screenshot` 桌面宽度下工具栏与面板布局与改动前一致，无位移（改动只在悬停时出现气泡）
+

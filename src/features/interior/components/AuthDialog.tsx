@@ -8,6 +8,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { EditorTooltip } from "@/components/ui/editor-tooltip";
 import { Input } from "@/components/ui/input";
 import { Mail, LockKeyhole, Cloud } from "lucide-react";
 import { notify } from "@/lib/notify";
@@ -139,21 +140,29 @@ export function AuthDialog({
             {signup ? (saving ? "注册并保存到云端" : "注册并继续") : "登录"}
           </Button>
         </form>
-        <button
-          type="button"
-          className="auth-toggle"
+        <EditorTooltip
+          label={signup ? "切换到登录" : "切换到注册"}
+          description={signup ? "已有账号时直接登录" : "用邮箱注册一个新账号"}
           disabled={busy}
-          onClick={() => {
-            setSignup(!signup);
-            setError("");
-            setMessage("");
-          }}
         >
-          {signup ? "已有账号？前往登录" : "还没有账号？注册一个"}
-        </button>
-        <button className="muted-note" onClick={() => onOpenChange(false)}>
-          暂不登录，继续游客设计
-        </button>
+          <button
+            type="button"
+            className="auth-toggle"
+            disabled={busy}
+            onClick={() => {
+              setSignup(!signup);
+              setError("");
+              setMessage("");
+            }}
+          >
+            {signup ? "已有账号？前往登录" : "还没有账号？注册一个"}
+          </button>
+        </EditorTooltip>
+        <EditorTooltip label="暂不登录" description="关闭窗口，以游客身份继续设计，可下载但不会云端保存">
+          <button className="muted-note" onClick={() => onOpenChange(false)}>
+            暂不登录，继续游客设计
+          </button>
+        </EditorTooltip>
       </DialogContent>
     </Dialog>
   );

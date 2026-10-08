@@ -24,6 +24,8 @@ vi.mock('./CostDefaultsContext', async importOriginal => {
   return { ...original, useCostDesign: (design: unknown) => design };
 });
 import { SelectionEditor } from './SelectionEditor';
+import { EditorTooltip } from '@/components/ui/editor-tooltip';
+import { Button } from '@/components/ui/button';
 
 type Props = React.ComponentProps<typeof SelectionEditor>;
 function harness(kind: Opening['kind'], hidden = false) {
@@ -70,5 +72,26 @@ describe('门窗 Visual editor 定位与可见性', () => {
     }
     h.update({ left: 100, top: 100, right: 150, bottom: 150 });
     expect(h.node.style.visibility).toBe('visible');
+  });
+});
+
+describe('Visual editor 悬浮提示覆盖', () => {
+  const walk = (tree: React.ReactNode, insideTooltip = false): { label?: string; covered: boolean }[] => {
+    if (Array.isArray(tree)) return tree.flatMap(child => walk(child, insideTooltip));
+    if (!tree || typeof tree !== 'object' || !('props' in tree)) return [];
+    const node = tree as ReactElement<{ children?: React.ReactNode; 'aria-label'?: string }>;
+    const covered = insideTooltip || node.type === EditorTooltip;
+    const self = node.type === 'button' || node.type === Button
+      ? [{ label: node.props['aria-label'], covered }]
+      : [];
+    return [...self, ...walk(node.props.children, covered)];
+  };
+  it('工具条内每个可点按钮都在悬浮提示内，并带有可访问名称', () => {
+    const buttons = walk((harness('door').element.props as { children: React.ReactNode }).children);
+    expect(buttons.length).toBeGreaterThan(0);
+    for (const button of buttons) {
+      expect(button.covered).toBe(true);
+      expect(button.label).toBeTruthy();
+    }
   });
 });

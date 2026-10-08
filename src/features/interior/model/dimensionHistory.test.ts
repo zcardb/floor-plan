@@ -8,12 +8,21 @@ vi.mock('react',async original=>({...await original<typeof import('react')>(),
 }));
 import { useDesign } from './useDesign';
 import { splitWall } from './wallSplit';
+import { mergeWall } from './wallMerge';
 import { setWallBearing } from './wallPolicy';
 import { blankDesign } from '../data/templates';
 import { perimeterDimensions } from './perimeterDimensions';
 import { editDimensionWalls } from './dimensionWallEdit';
 beforeEach(()=>{hooks.refs=[];hooks.values=[];hooks.r=0;hooks.s=0;});
 describe('净距操作使用原项目撤销历史',()=>{
+  it('合并一次历史、撤销恢复局部承重与洞口、重做恢复整墙',()=>{
+    const d=blankDesign();d.openings.push({id:'o',wallId:'outer-0',kind:'window',offset:2000,width:800});
+    const split=splitWall(d,'outer-0',[300],0);const before=setWallBearing(split.design,'outer-0',true);
+    const RenderModel=()=>{hooks.r=0;hooks.s=0;return useDesign(before,vi.fn());};
+    let model=RenderModel();const result=mergeWall(before,'outer-0');model.commit(result.design,before);
+    model=RenderModel();expect(model.counts.undo).toBe(1);model.undo();model=RenderModel();expect(model.current.current).toEqual(before);
+    model.redo();model=RenderModel();expect(model.current.current).toEqual(result.design);
+  });
   it('分割和承重标记是独立历史，撤销重做精确还原墙和洞口ID',()=>{
     const d=blankDesign();d.walls.push({id:'p',a:[3000,0],b:[3000,6000],kind:'partition',thickness:240});
     d.openings.push({id:'o',wallId:'p',kind:'door',offset:2000,width:900});

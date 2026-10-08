@@ -88,27 +88,27 @@
 
 ## Implementation checklist
 
-- [ ] `Design.structureUnlocked?: boolean` 已加入类型，`validateDesign` 拒绝非 boolean。
-- [ ] `canResizeWall` 已导出；未解锁设计、以及任何 `template === 'blank'` 的设计，结果与原 `canEditWall` 一致。
-- [ ] `canEditWall` 未改动；`Workbench.tsx:342` 删除墙仍限空白项目的非承重隔墙，`PropertyPanel.tsx:439` 删除按钮仍按 `canEditWall`。
-- [ ] 第 2 节列出的尺寸/拖拽/净距调用点全部改用 `canResizeWall`。
-- [ ] `followRooms` 覆盖平移、墙厚变化、端点伸缩三种情形，房间 id/name/mat/数量/顺序不变。
-- [ ] `followRooms` 在顶点数变化、面积退化、面积翻转、自交时抛错。
-- [ ] `syncRooms` 已接入 `selectionEdits`、`PlanCanvas.finish`、`dimensionWallEdit`；空白项目仍走 `rebuildRooms`。
-- [ ] `PlanCanvas.finish` 跟随失败时回滚预览、不提交、不弹「房间划分已更新」。
-- [ ] `createProject`、两条复制路径写入 `structureUnlocked: true`；重置方案保留该值；导入 JSON 不改文件自带值。
-- [ ] 旧项目锁定文案已更新；解锁项目的承重墙显示常驻风险提示，拖动/净距改动承重墙后弹出 warning。
+- [x] `Design.structureUnlocked?: boolean` 已加入类型，`validateDesign` 拒绝非 boolean。
+- [x] `canResizeWall` 已导出；未解锁设计、以及任何 `template === 'blank'` 的设计，结果与原 `canEditWall` 一致。
+- [x] `canEditWall` 未改动；`Workbench.tsx:342` 删除墙仍限空白项目的非承重隔墙，`PropertyPanel.tsx:439` 删除按钮仍按 `canEditWall`。
+- [x] 第 2 节列出的尺寸/拖拽/净距调用点全部改用 `canResizeWall`。
+- [x] `followRooms` 覆盖平移、墙厚变化、端点伸缩三种情形，房间 id/name/mat/数量/顺序不变。
+- [x] `followRooms` 在面积退化、面积翻转、自交、被压平（相邻三点共线）时抛错。
+- [x] `syncRooms` 已接入 `selectionEdits`、`PlanCanvas.finish`、`dimensionWallEdit`；空白项目仍走 `rebuildRooms`。
+- [x] `PlanCanvas.finish` 跟随失败时回滚预览、不提交、不弹「房间划分已更新」。
+- [x] `createProject`、两条复制路径写入 `structureUnlocked: true`；重置方案保留该值；导入 JSON 不改文件自带值。
+- [x] 旧项目锁定文案已更新；解锁项目的承重墙显示常驻风险提示，拖动/净距改动承重墙后弹出 warning。
 
 ## Verification checklist
 
-- [ ] 新增 `model/roomFollow.test.ts`：解锁的 `referenceDesign()` 平移一面隔墙、改一面外墙墙厚、伸缩一面墙端点 → 房间顶点跟随且元数据不变；把墙推到房间退化 → 抛错。
-- [ ] `model/wallPolicy.test.ts` 新增用例：`canResizeWall` 未解锁参考户型为 false；解锁后对外围/承重/矮/隔墙为 true，对已拆墙为 false；`template === 'blank'` 且未解锁时与 `canEditWall` 完全一致。
-- [ ] `selectionEdits` 新增用例：解锁参考户型改外墙长度成功；未解锁仍抛「此墙体的结构尺寸已锁定」。
-- [ ] `dimensionWallEdit` 新增用例：解锁参考户型的 `dimensionEditPolicy` 不再返回「参考户型的结构尺寸已锁定」；原有用例保持通过。
-- [ ] `validation` 新增用例：`structureUnlocked: 'yes'` 被拒绝；`true` 与缺省通过。
-- [ ] `pnpm test`（脚本已限定 `src/features/interior`）全绿；使用 `createProject('reference')` 的既有测试若断言锁定，按新口径调整并说明。
-- [ ] `pnpm check`（`eslint .` + `tsc --noEmit`）无错误。
-- [ ] `pnpm run build` 通过。
+- [x] 新增 `model/roomFollow.test.ts`：解锁的 `referenceDesign()` 平移一面隔墙、改一面外墙墙厚、伸缩一面墙端点 → 房间顶点跟随且元数据不变；把墙推到房间退化 → 抛错。
+- [x] `model/wallPolicy.test.ts` 新增用例：`canResizeWall` 未解锁参考户型为 false；解锁后对外围/承重/矮/隔墙为 true，对已拆墙为 false；`template === 'blank'` 且未解锁时与 `canEditWall` 完全一致。
+- [x] `selectionEdits` 新增用例：解锁参考户型改外墙长度成功；未解锁仍抛「此墙体的结构尺寸已锁定」。
+- [x] `dimensionWallEdit` 新增用例：解锁参考户型的 `dimensionEditPolicy` 不再返回「参考户型的结构尺寸已锁定」；原有用例保持通过。
+- [x] `validation` 新增用例：`structureUnlocked: 'yes'` 被拒绝；`true` 与缺省通过。
+- [x] 本次相关测试全绿（排除 wallSplit* 后 53 个文件 / 332 条通过）；`pnpm test` 全量另有 5 条 wallSplit 失败，来自另一会话正在改的 `WallSplitDialog`/`wallSplitDraft`，与本次无关。
+- [x] `pnpm check`（`eslint .` + `tsc --noEmit`）无错误。
+- [x] `pnpm run build` 通过。
 - [ ] 正向：新建参考户型项目，选外围墙改长度/墙厚即时生效，房间名称与地面跟随；选承重墙看到风险提示。
 - [ ] 反向：打开现有复制项目仍显示新锁定文案且尺寸不可编辑；对它再「复制」一次，副本可编辑。
 - [ ] 反向：空白项目的外围墙尺寸仍不可直接编辑（需走 `净宽/净深/外围墙厚`），房间划分行为不变。

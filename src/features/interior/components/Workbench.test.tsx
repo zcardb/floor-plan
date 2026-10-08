@@ -15,6 +15,7 @@ vi.mock('react', async original => ({
   useRef: (value: unknown) => ({ current: value }),
 }));
 vi.mock('@/components/ui/confirm-dialog', () => ({ useConfirm: () => state.confirm }));
+vi.mock('../cloud/useProjects', () => ({ isSaveProblem: () => false }));
 vi.mock('./CustomFurnitureDialog', () => ({ CustomFurnitureDialog: () => null }));
 vi.mock('../model/useDesign', () => ({ useDesign: () => ({
   design: state.design, current: { get current() { return state.design; } }, change: state.change, commit: state.commit, preview: vi.fn(), undo: vi.fn(), redo: vi.fn(),

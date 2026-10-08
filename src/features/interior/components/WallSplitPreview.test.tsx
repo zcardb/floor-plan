@@ -8,6 +8,15 @@ type Node = ReactElement<Record<string, unknown>>;
 function nodes(tree: ReactNode): Node[] { if (Array.isArray(tree)) return tree.flatMap(nodes); if (!isValidElement<Record<string, unknown>>(tree)) return []; return [tree, ...nodes(tree.props.children as ReactNode)]; }
 const circle = (tree: Node[], key: string, value: string | number) => nodes(tree.find(n => n.props[key] === value)!).find(n => n.type === 'circle')!.props;
 describe('真实朝向局部墙分割示意', () => {
+  it('交换后A/B标签互换、图纸坐标不旋转，切点按新A编号', () => {
+    const d = blankDesign(); d.walls.push({ id: 'p', a: [0, 0], b: [3000, 0], thickness: 240, kind: 'partition' });
+    const normal = nodes(WallSplitPreview({ design: d, wallId: 'p', intervals: [0, 2200, 2700, 3000], selected: 2 }));
+    const swapped = nodes(WallSplitPreview({ design: d, wallId: 'p', intervals: [0, 2200, 2700, 3000], selected: 2, reversed: true }));
+    expect(circle(swapped, 'data-endpoint', 'A').cx).toBe(circle(normal, 'data-endpoint', 'B').cx);
+    expect(circle(swapped, 'data-endpoint', 'B').cx).toBe(circle(normal, 'data-endpoint', 'A').cx);
+    expect(circle(swapped, 'data-cut', 1).cx).toBe(circle(normal, 'data-cut', 2).cx);
+    expect(swapped.find(n => n.props.className === 'wall-split-map-wall')!.props.points).toBe(normal.find(n => n.props.className === 'wall-split-map-wall')!.props.points);
+  });
   it.each([{ a: [0, 0], b: [3000, 0] }, { a: [3000, 0], b: [0, 0] }, { a: [0, 3000], b: [0, 0] }, { a: [0, 0], b: [3000, 4000] }])('A/B及切点保持方向 $a → $b', ({ a, b }) => {
     const d = blankDesign(); d.walls.push({ id: 'p', a: a as Point, b: b as Point, thickness: 240, kind: 'partition' });
     const L = Math.hypot(b[0] - a[0], b[1] - a[1]);

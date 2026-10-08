@@ -80,6 +80,8 @@ export interface Design {
   furniture: Furniture[];
   demolished: string[];
   measures: Measure[];
+  /** 复制/新建的项目可以自由调整墙体结构尺寸；旧项目没有该字段，保持结构锁定。 */
+  structureUnlocked?: boolean;
   dimensionSettings?: { visible?: boolean; top?: number; bottom?: number; left?: number; right?: number };
   costSettings?: CostSettings;
   customCatalog?: LibraryItem[];

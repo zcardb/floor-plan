@@ -23,7 +23,7 @@ describe('墙属性和浮动工具条分割按钮', () => {
         const menu = nodes(tree).find(n => n.type === WallOptionsMenu)!;
         expect(menu).toBeDefined();
         const content = WallOptionsMenu(menu.props as React.ComponentProps<typeof WallOptionsMenu>);
-        const button = nodes(content).find(n => n.props.onSelect && text(n.props.children as ReactNode) === '分割墙段')!;
+        const button = nodes(content).find(n => n.props.onSelect && n.props['aria-label'] === '分割墙段')!;
         expect(button.props.disabled).toBe(demolished);
         if (!demolished) (button.props.onSelect as () => void)();
       }

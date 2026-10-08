@@ -20,7 +20,7 @@ function deferred<T>() {
   const promise = new Promise<T>(res => { resolve = res; });
   return { promise, resolve };
 }
-function render<A extends unknown[], R>(action: (...args: A) => Promise<R>, keyOf?: (...args: A) => string) {
+function useHarness<A extends unknown[], R>(action: (...args: A) => Promise<R>, keyOf?: (...args: A) => string) {
   hooks.cursor = 0;
   return useAsyncAction(action, keyOf);
 }
@@ -31,36 +31,36 @@ describe('useAsyncAction', () => {
   it('进行中再次调用会被忽略，只执行一次', async () => {
     const gate = deferred<string>();
     const action = vi.fn(() => gate.promise);
-    const first = render(action).run();
-    const second = render(action).run();
+    const first = useHarness(action).run();
+    const second = useHarness(action).run();
     expect(action).toHaveBeenCalledTimes(1);
-    expect(render(action).pending).toBe(true);
+    expect(useHarness(action).pending).toBe(true);
     gate.resolve('done');
     expect(await first).toBe('done');
     expect(await second).toBeUndefined();
-    expect(render(action).pending).toBe(false);
+    expect(useHarness(action).pending).toBe(false);
   });
 
   it('操作抛错后 pending 复位，并且可以重试', async () => {
     const action = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce('ok');
-    await expect(render(action).run()).rejects.toThrow('offline');
-    expect(render(action).pending).toBe(false);
-    expect(await render(action).run()).toBe('ok');
+    await expect(useHarness(action).run()).rejects.toThrow('offline');
+    expect(useHarness(action).pending).toBe(false);
+    expect(await useHarness(action).run()).toBe('ok');
   });
 
   it('pendingKey 标识正在处理的那一行', async () => {
     const gate = deferred<void>();
     const keyOf = (id: string) => id;
-    const run = render((_id: string) => gate.promise, keyOf).run('row-2');
-    expect(render((_id: string) => gate.promise, keyOf).pendingKey).toBe('row-2');
+    const run = useHarness((_id: string) => gate.promise, keyOf).run('row-2');
+    expect(useHarness((_id: string) => gate.promise, keyOf).pendingKey).toBe('row-2');
     gate.resolve();
     await run;
-    expect(render((_id: string) => gate.promise, keyOf).pendingKey).toBeNull();
+    expect(useHarness((_id: string) => gate.promise, keyOf).pendingKey).toBeNull();
   });
 
   it('卸载后结束不再写入状态', async () => {
     const gate = deferred<void>();
-    const run = render(() => gate.promise).run();
+    const run = useHarness(() => gate.promise).run();
     const pendingBefore = hooks.values[0];
     hooks.cleanups.forEach(cleanup => cleanup());
     gate.resolve();
