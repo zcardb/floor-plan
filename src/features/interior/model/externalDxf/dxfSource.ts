@@ -69,7 +69,8 @@ export function readDxfSource(text: string): DxfSource {
         for (let i = 0; i + 1 < points.length; i++) push(points[i], points[i + 1], layer, group);
         if (e.shape && points.length > 2) push(points[points.length - 1], points[0], layer, group);
       } else if (e.type === 'ARC' && e.center && e.radius) {
-        let start = e.startAngle ?? 0, end = e.endAngle ?? Math.PI * 2;
+        const start = e.startAngle ?? 0;
+        let end = e.endAngle ?? Math.PI * 2;
         if (end <= start) end += Math.PI * 2;
         const steps = Math.max(2, Math.ceil((end - start) / (Math.PI / 12)));
         const at = (t: number) => apply(m, e.center!.x + e.radius! * Math.cos(t), e.center!.y + e.radius! * Math.sin(t));
