@@ -38,6 +38,7 @@ import {
 } from "../model/geometry";
 import type { Design, Selection } from "../model/types";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 interface Props {
   design: Design;
   selection: Selection;
