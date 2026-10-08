@@ -10,10 +10,9 @@ interface Props {
   scale: number;
   connection?: WallSnap | null;
   demolished?: string[];
-  variant?: 'wall' | 'measure';
 }
 
-export function WallHoverOverlay({ walls, candidate, scale, connection = candidate, demolished = [], variant = 'wall' }: Props) {
+export function WallHoverOverlay({ walls, candidate, scale, connection = candidate, demolished = [] }: Props) {
   const wall = candidate?.target && walls.find(w => w.id === candidate.target?.wallId);
   if (!wall || !candidate) return null;
   const [x, y] = candidate.point;
@@ -24,9 +23,8 @@ export function WallHoverOverlay({ walls, candidate, scale, connection = candida
     <g data-export-hide="true" pointerEvents="none">
       <polygon points={connectedWallPoly(wall, walls, demolished).map(p => p.join(',')).join(' ')} fill="var(--plan-selection-soft)" stroke="var(--plan-selection)" strokeWidth={2 / scale} />
       <circle cx={x} cy={y} r={6 / scale} fill="var(--plan-porcelain)" stroke="var(--plan-selection)" strokeWidth={2 / scale} />
-      <text x={x + 12 / scale} y={y - 28 / scale} fontSize={12 / scale} fill="var(--plan-selection)" stroke="var(--plan-porcelain)" strokeWidth={3 / scale} paintOrder="stroke" strokeLinejoin="round">{variant === 'measure' ? `距起端 ${formatMeters(offset)} 米` : `距近端 ${meters} 米`}</text>
-      {variant === 'measure' && <text x={x + 12 / scale} y={y - 12 / scale} fontSize={12 / scale} fill="var(--plan-selection)" stroke="var(--plan-porcelain)" strokeWidth={3 / scale} paintOrder="stroke" strokeLinejoin="round">距末端 {formatMeters(length(wall) - offset)} 米</text>}
-      {variant === 'wall' && canConnect && <text x={x + 12 / scale} y={y - 12 / scale} fontSize={12 / scale} fill="var(--plan-selection)" stroke="var(--plan-porcelain)" strokeWidth={3 / scale} paintOrder="stroke" strokeLinejoin="round">点击连接</text>}
+      <text x={x + 12 / scale} y={y - 28 / scale} fontSize={12 / scale} fill="var(--plan-selection)" stroke="var(--plan-porcelain)" strokeWidth={3 / scale} paintOrder="stroke" strokeLinejoin="round">距近端 {meters} 米</text>
+      {canConnect && <text x={x + 12 / scale} y={y - 12 / scale} fontSize={12 / scale} fill="var(--plan-selection)" stroke="var(--plan-porcelain)" strokeWidth={3 / scale} paintOrder="stroke" strokeLinejoin="round">点击连接</text>}
     </g>
   );
 }

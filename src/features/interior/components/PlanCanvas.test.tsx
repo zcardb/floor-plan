@@ -4,7 +4,6 @@ import { blankDesign } from '../data/templates';
 import type { Design, Opening, Tool } from '../model/types';
 
 const hooks = vi.hoisted(() => ({ refs: [] as { current: unknown }[], svg: {} as object,
-  measurement: { clear: vi.fn(), clearHover: vi.fn(), down: vi.fn(), move: vi.fn(), up: vi.fn() },
 }));
 vi.mock('react', async importOriginal => {
   const react = await importOriginal<typeof import('react')>();
@@ -21,7 +20,6 @@ vi.mock('react', async importOriginal => {
   };
 });
 vi.mock('./useWallDrawing', () => ({ useWallDrawing: () => ({ clear: vi.fn(), clearHover: vi.fn(), down: vi.fn(), move: vi.fn(), up: vi.fn() }) }));
-vi.mock('./useSegmentDrawing', () => ({ useSegmentDrawing: () => hooks.measurement }));
 import { PlanCanvas } from './PlanCanvas';
 import { PerimeterDimensions } from './PerimeterDimensions';
 import { OpeningDistances } from './OpeningDistances';
@@ -50,12 +48,11 @@ function harness(kind: Opening['kind'] = 'door', tool: Tool = 'select') {
 }
 beforeEach(() => {
   hooks.refs = [];
-  Object.values(hooks.measurement).forEach(mock => mock.mockClear());
   hooks.svg = { hasPointerCapture: () => true, releasePointerCapture: vi.fn(), setPointerCapture: vi.fn(), getScreenCTM: () => ({ inverse: () => ({}) }),
     createSVGPoint: () => ({ x: 0, y: 0, matrixTransform() { return { x: this.x, y: this.y }; } }) };
 });
 describe('PlanCanvas 承重保护', () => {
-  it.each(['select', 'demolish', 'door', 'window'] as Tool[])('%s 不修改用户标记承重墙', tool => {
+  it.each(['select', 'door', 'window'] as Tool[])('%s 不修改用户标记承重墙', tool => {
     const h = harness('door', tool); h.design.walls[0].loadBearing = true;
     h.handlers.onPointerDown!(event(2000, 0, 1, 'data-wall', 'wall'));
     h.handlers.onPointerMove!(event(3000)); h.handlers.onPointerUp!(event(3000));
@@ -67,46 +64,30 @@ describe('PlanCanvas 承重保护', () => {
     expect(h.select).toHaveBeenCalledWith({ kind: 'opening', id: 'opening' }); expect(h.commit).not.toHaveBeenCalled(); expect(h.preview).not.toHaveBeenCalled();
   });
 });
-describe('PlanCanvas 测量完成事件链', () => {
-  it('测量手势调用共享 down/move/up，不走旧测量提交路径', () => {
-    const h = harness('door', 'measure');
-    h.handlers.onPointerDown!(event(2000));
-    h.handlers.onPointerMove!(event(3000));
-    h.handlers.onPointerUp!(event(3000));
-    expect(hooks.measurement.down).toHaveBeenCalledWith([2000, 0], 1, [2000, 0]);
-    expect(hooks.measurement.move).toHaveBeenCalledWith([3000, 0]);
-    expect(hooks.measurement.up).toHaveBeenCalledWith([3000, 0], 1, [3000, 0]);
-    expect(h.commit).not.toHaveBeenCalled();
-  });
+describe('PlanCanvas 绘墙完成事件链', () => {
   it.each(['onDoubleClick', 'onContextMenu'] as const)('%s 清理并退出，释放指针但不提交末段', handler => {
-    const h = harness('door', 'measure');
+    const h = harness('door', 'wall');
     h.handlers.onPointerDown!(event(2000));
     const preventDefault = vi.fn();
     h.handlers[handler]!({ preventDefault } as unknown as React.MouseEvent<SVGSVGElement>);
     expect(preventDefault).toHaveBeenCalledOnce();
-    expect(hooks.measurement.clear).toHaveBeenCalledOnce();
     expect(h.finishTool).toHaveBeenCalledOnce();
     expect((hooks.svg as { releasePointerCapture: ReturnType<typeof vi.fn> }).releasePointerCapture).toHaveBeenCalledWith(1);
     expect(h.commit).not.toHaveBeenCalled();
   });
   it('第二次鼠标按下先结束，不把双击的第二点提交', () => {
-    const h = harness('door', 'measure');
+    const h = harness('door', 'wall');
     h.handlers.onPointerDown!({ ...event(2000), pointerType: 'mouse' });
     h.handlers.onMouseDown!({ button: 0, detail: 1, preventDefault: vi.fn() } as unknown as React.MouseEvent<SVGSVGElement>);
-    expect(hooks.measurement.down).toHaveBeenCalledOnce();
     h.handlers.onPointerDown!({ ...event(3000), pointerType: 'mouse' });
     h.handlers.onMouseDown!({ button: 0, detail: 2, preventDefault: vi.fn() } as unknown as React.MouseEvent<SVGSVGElement>);
-    expect(hooks.measurement.down).toHaveBeenCalledOnce();
-    expect(hooks.measurement.clear).toHaveBeenCalledOnce();
+    expect(h.finishTool).toHaveBeenCalledOnce();
     expect(h.commit).not.toHaveBeenCalled();
   });
-  it('指针取消仅清理草稿，不退出工具或清除既有测量', () => {
-    const h = harness('door', 'measure');
-    h.design.measures.push({ id: 'saved', a: [0, 0], b: [1000, 0] });
+  it('指针取消仅清理草稿，不退出工具也不提交', () => {
+    const h = harness('door', 'wall');
     h.handlers.onPointerDown!(event(2000));
     h.handlers.onPointerCancel!(event(2500));
-    expect(hooks.measurement.clear).toHaveBeenCalledOnce();
-    expect(h.design.measures).toHaveLength(1);
     expect(h.finishTool).not.toHaveBeenCalled(); expect(h.commit).not.toHaveBeenCalled();
   });
 });

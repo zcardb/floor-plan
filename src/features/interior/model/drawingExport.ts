@@ -32,7 +32,8 @@ async function drawingBlob(design: Design, format: DrawingFormat, name: string):
   if (format !== 'pdf') return new Blob([serializeDrawing(design, format, name)], { type: MIME[format] });
   const drawing = createExportDocument(design);
   const [{ serializePdf }, fontBytes] = await Promise.all([import('./pdfExport'), loadPdfFont()]);
-  return new Blob([await serializePdf(drawing, { fontBytes, title: name })], { type: MIME.pdf });
+  const bytes = await serializePdf(drawing, { fontBytes, title: name });
+  return new Blob([bytes as Uint8Array<ArrayBuffer>], { type: MIME.pdf });
 }
 
 const fileName = (name: string, extension: string) => `${name.replace(/[\\/:*?"<>|]/g, '-') || '平面图'}.${extension}`;

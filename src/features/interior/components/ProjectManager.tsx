@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { ManagementLoading } from './ManagementLoading';
 import { LoadError } from './LoadError';
-import { Plus, Pencil, Copy, Trash2, LayoutTemplate, RefreshCw, Loader2, ChevronDown, FilePlus2, FileUp, AppWindow } from 'lucide-react';
+import { Plus, Pencil, Copy, Trash2, LayoutTemplate, RefreshCw, Loader2, ChevronDown, FilePlus2, FileUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EditorTooltip } from '@/components/ui/editor-tooltip';
 import { Input } from '@/components/ui/input';
@@ -14,10 +14,12 @@ import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { notify } from '@/lib/notify';
 import { createProject } from '../data/templates';
 import { IMPORT_FORMATS, parseDesignFile } from '../model/designImport';
-import { SoftwareSoonItems } from './SoftwareSoonItems';
+import { SoftwareSoonItem } from './SoftwareSoonItem';
 import type { useProjects, ProjectSummary } from '../cloud/useProjects';
 
 const iconAction = 'h-8 w-8 text-muted-foreground hover:text-foreground';
+// 删除不可撤销，图标常驻危险色，和重命名/复制一眼区分。
+const dangerIconAction = 'h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive';
 type Projects = ReturnType<typeof useProjects>;
 
 export function ProjectManager({ projects, opened }: { projects: Projects; opened: () => void }) {
@@ -68,7 +70,7 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
     </EditorTooltip>
     {row.cloud && <EditorTooltip label="复制项目" disabled={rowAction.pending}><Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'复制' + row.name} disabled={rowAction.pending} aria-busy={isPending('duplicate', row)} onClick={() => void rowAction.run('duplicate', row)}>{isPending('duplicate', row) ? <Loader2 className="animate-spin" size={16} /> : <Copy size={16} />}</Button></EditorTooltip>}
     <EditorTooltip label="删除项目" disabled={rowAction.pending}>
-      <Button type="button" variant="ghost" size="icon" className={iconAction} aria-label={'删除' + row.name} disabled={rowAction.pending} onClick={() => setDeleting(row)}><Trash2 size={16} /></Button>
+      <Button type="button" variant="ghost" size="icon" className={dangerIconAction} aria-label={'删除' + row.name} disabled={rowAction.pending} onClick={() => setDeleting(row)}><Trash2 size={16} /></Button>
     </EditorTooltip>
   </>;
 
@@ -98,10 +100,7 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
                 ))}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger className="gap-2"><AppWindow size={16} />从其他软件导入</DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="create-menu"><SoftwareSoonItems /></DropdownMenuSubContent>
-            </DropdownMenuSub>
+            <SoftwareSoonItem label="从其他软件导入" />
           </DropdownMenuContent>
         </DropdownMenu>
         <input ref={file} type="file" hidden aria-hidden="true" tabIndex={-1} onChange={event => {

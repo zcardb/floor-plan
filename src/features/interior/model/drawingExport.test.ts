@@ -25,7 +25,7 @@ function fixture(){
   d.walls.push({id:'partition',a:[3000,0],b:[3000,d.depth],kind:'partition',thickness:240});
   d.openings.push({id:'door',wallId:'partition',kind:'door',offset:2000,width:900});
   d.furniture.push({id:'sofa',type:'sofa',name:'沙发',cx:2000,cy:3000,w:1800,d:800,rot:45,color:'#a08060'});
-  d.measures.push({id:'measure',a:[0,0],b:[1000,0]});return d;
+  return d;
 }
 /** Canvas has dimensions hidden; exports must still contain everything. */
 const hiddenOnCanvas=(d:Design):Design=>({...d,dimensionSettings:{...d.dimensionSettings,visible:false}});
@@ -34,7 +34,7 @@ async function ocgNames(bytes:Uint8Array){
   const pdf=await PDFDocument.load(bytes);
   const props=pdf.catalog.lookup(PDFName.of('OCProperties'),PDFDict);
   const ocgs=props.lookup(PDFName.of('OCGs'),PDFArray);
-  return {pdf,names:ocgs.asArray().map(ref=>(pdf.context.lookup(ref,PDFDict).get(PDFName.of('Name')) as {decodeText():string}).decodeText())};
+  return {pdf,names:ocgs.asArray().map(ref=>(pdf.context.lookup(ref,PDFDict).get(PDFName.of('Name')) as unknown as {decodeText():string}).decodeText())};
 }
 describe('工程交换图',()=>{
   it('分割后SVG/DXF保持洞口和净距，子段均能矢量导出',()=>{
@@ -72,10 +72,8 @@ describe('工程交换图',()=>{
     expect(parsed.entities.some(e=>e.type==='ARC')).toBe(true);
     expect(parsed.entities.some(e=>e.type==='TEXT' && 'text' in e && e.text==='客厅 & <书房>')).toBe(true);
     expect(text).toContain('STUDIO_METERS');expect(text).not.toContain('NaN');
-    const manual=dimensions.find(e=>e.layer==='MEASURES');expect(manual).toBeDefined();
-    expect((manual as unknown as {actualMeasurement:number}).actualMeasurement).toBe(1000);
-    const block=Object.values(parsed.blocks).find(b=>b.entities?.some(e=>e.type==='TEXT'&&'text'in e&&e.text==='1.00 m'));
-    expect(block).toBeDefined();
+    const manual=dimensions.find(e=>e.layer==='DIMENSIONS');expect(manual).toBeDefined();
+    expect(Object.values(parsed.blocks).some(b=>b.entities?.some(e=>e.type==='TEXT'&&'text'in e&&/^\d+\.\d\d m$/.test(String(e.text))))).toBe(true);
   });
   it('DXF开头写入分段999方案数据，几何输出与不嵌入时一致',()=>{
     const d=fixture(),text=serializeDrawing(d,'dxf'),lines=text.split('\n');
@@ -147,9 +145,9 @@ describe('工程交换图',()=>{
     }
     expect(furnitureDrawing({id:'stair',type:'stairs',name:'楼梯',w:1000,d:3000,cx:0,cy:0,rot:0,color:'#aaa'}).length).toBeGreaterThan(12);
   });
-  it('画布关闭显示层只保留实际结构和手工测量，导出不修改设计',()=>{
+  it('画布关闭显示层只保留实际结构，导出不修改设计',()=>{
     const d=fixture(),before=JSON.stringify(d),document=createDrawingDocument(d,{...layers,dims:false,furn:false,labels:false});
-    expect(document.dimensions.every(dim=>dim.layer==='MEASURES')).toBe(true);
+    expect(document.dimensions).toHaveLength(0);
     expect(document.entities.some(e=>e.layer==='FURNITURE'||e.layer==='ROOM_LABELS')).toBe(false);
     serializeDrawing(d,'svg');expect(JSON.stringify(d)).toBe(before);
     expect(()=>serializeDrawing({...d,walls:[]},'dxf')).toThrow('有效墙体');

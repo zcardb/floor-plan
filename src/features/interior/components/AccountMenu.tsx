@@ -6,7 +6,7 @@ import {
 import { AccountAvatar } from './AccountAvatar';
 import { accountName } from '../model/accountIdentity';
 
-/** Right end of the toolbar: square avatar with name below, or a login button for guests. */
+/** Right end of the toolbar: circular avatar only; the menu shows account info and logout. Guests get a login button. */
 export function AccountMenu({ email, loggedIn, loggingOut, onLogin, onLogout }: {
   email?: string; loggedIn: boolean; loggingOut?: boolean; onLogin: () => void; onLogout: () => void;
 }) {
@@ -15,12 +15,14 @@ export function AccountMenu({ email, loggedIn, loggingOut, onLogin, onLogout }: 
   return <DropdownMenu>
     <DropdownMenuTrigger asChild>
       <button type="button" className="account-trigger" aria-label={'我的账号：' + name}>
-        <AccountAvatar email={email} size={24} square />
-        <span className="account-trigger-name">{name}</span>
+        <AccountAvatar email={email} size={30} />
       </button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end" className="account-menu">
-      <DropdownMenuLabel className="account-menu-email">{email}</DropdownMenuLabel>
+      <DropdownMenuLabel className="account-menu-head">
+        <AccountAvatar email={email} size={36} />
+        <span><b>{name}</b><small className="account-menu-email">{email}</small></span>
+      </DropdownMenuLabel>
       <DropdownMenuSeparator />
       <DropdownMenuItem disabled={loggingOut} onSelect={onLogout}>{loggingOut ? <Loader2 className="animate-spin" /> : <LogOut />}退出登录</DropdownMenuItem>
     </DropdownMenuContent>

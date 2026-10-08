@@ -282,7 +282,6 @@ export function referenceDesign(): Design {
     })),
     furniture: defaultFurniture(),
     demolished: [],
-    measures: [],
   };
 }
 function lengthOf(w: Wall) {
@@ -308,7 +307,6 @@ export function blankDesign(): Design {
     ],
     furniture: [],
     demolished: [],
-    measures: [],
   };
 }
 export function createProject(

@@ -1,9 +1,9 @@
-import { AppWindow, ChevronDown, Download, FileCode2, FileJson, FilePenLine, FileText, Image, Loader2 } from 'lucide-react';
+import { ChevronDown, Download, FileCode2, FileJson, FilePenLine, FileText, Image, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { SoftwareSoonItems } from './SoftwareSoonItems';
+import { SoftwareSoonItem } from './SoftwareSoonItem';
 import type { DrawingFormat } from '../model/drawingExport';
 
 export type ExportFormat = 'png' | DrawingFormat | 'json';
@@ -33,10 +33,7 @@ export function ExportMenu({ view, pending, onExport }: { view: '2d' | '3d'; pen
           ))}
         </DropdownMenuSubContent>
       </DropdownMenuSub>
-      <DropdownMenuSub>
-        <DropdownMenuSubTrigger className="gap-2"><AppWindow size={16} />导出到其他软件</DropdownMenuSubTrigger>
-        <DropdownMenuSubContent className="export-menu"><SoftwareSoonItems /></DropdownMenuSubContent>
-      </DropdownMenuSub>
+      <SoftwareSoonItem label="导出到其他软件" />
     </DropdownMenuContent>
   </DropdownMenu>;
 }

@@ -6,7 +6,7 @@ import { calculateCosts } from './costs';
 import { editSelection } from './selectionEdits';
 import { createSizeTransaction } from './sizeTransaction';
 import { createDrawingDocument } from './drawingDocument';
-import type { Wall } from './types';
+import type { Design, Wall } from './types';
 const partition: Wall = { id: 'partition', kind: 'partition', a: [3000, 0], b: [3000, 6000], thickness: 240 };
 const fixture = () => rebuildRooms({ ...blankDesign(), walls: [...blankDesign().walls, partition] });
 describe('承重墙标记策略', () => {
@@ -100,7 +100,7 @@ describe('复制/新建项目的结构解锁', () => {
   });
   it('非法尺寸回滚预览且不提交，合法尺寸可撤销到原值', () => {
     const before = unlocked();
-    let design = before;
+    let design: Design = before;
     const transaction = createSizeTransaction(() => design, next => { design = next; }, (next, prev) => { design = next; expect(prev).toBe(before); });
     const w = before.walls.find(x => x.id === 'w7')!;
     const token = transaction.begin({ kind: 'wall', id: w.id });

@@ -7,6 +7,7 @@ import { AccountMenu } from './AccountMenu';
 import { DimensionEditDialog } from './DimensionEditDialog';
 import { WallSplitDialog } from './WallSplitDialog';
 import { splitWall as splitWallModel } from '../model/wallSplit';
+import { removeWall as removeWallModel } from '../model/wallRemoval';
 import { mergeWall as mergeWallModel, wallMergeGroup } from '../model/wallMerge';
 import { isBearingWall } from '../model/wallPolicy';
 import { length } from '../model/geometry';
@@ -19,7 +20,6 @@ import {
   ChevronDown,
   Copy,
   DoorOpen,
-  Eraser,
   Expand,
   Eye,
   Layers3,
@@ -60,7 +60,7 @@ import {
 import { EditorTooltip } from "@/components/ui/editor-tooltip";
 import { useDesign } from "../model/useDesign";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { center, norm, pushOut, rebuildRooms } from "../model/geometry";
+import { center, norm, pushOut } from "../model/geometry";
 import {
   uid,
   type CustomFloor,
@@ -346,6 +346,16 @@ export function Workbench(p: Props) {
     setSelection({ kind: "furniture", id: next.id });
     notify.success(`已复制「${f.name}」`);
   }, [d, selection, change]);
+  const removeWall = useCallback(
+    (wallId: string) => {
+      const w = d.walls.find((w) => w.id === wallId);
+      if (!w || !canEditWall(d, w)) return notify.fail("此墙体不可删除");
+      change((d) => removeWallModel(d, wallId));
+      notify.success("已删除墙体，可撤销恢复");
+      setSelection(null);
+    },
+    [d, change],
+  );
   const remove = useCallback(() => {
     if (!selection) return;
     const s = selection;
@@ -363,21 +373,9 @@ export function Workbench(p: Props) {
       change((d) => ({ ...d, openings: d.openings.filter((o) => o.id !== s.id) }));
       if (opening) notify.success(`已删除${opening.kind === "door" ? "门" : "窗"}，可撤销恢复`);
     }
-    else if (s.kind === "wall") {
-      const w = d.walls.find((w) => w.id === s.id);
-      if (!w || !canEditWall(d, w))
-        return notify.fail("此墙体不可删除");
-      change((d) =>
-        rebuildRooms({
-          ...d,
-          walls: d.walls.filter((w) => w.id !== s.id),
-          openings: d.openings.filter((o) => o.wallId !== s.id),
-        }),
-      );
-      notify.success("已删除墙体，可撤销恢复");
-    }
+    else if (s.kind === "wall") return removeWall(s.id);
     setSelection(null);
-  }, [d, selection, change]);
+  }, [d, selection, change, removeWall]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (
@@ -410,8 +408,6 @@ export function Workbench(p: Props) {
         if (view === "2d") canvas.current?.fit();
         else scene.current?.iso();
       } else if (k === "v") setTool("select");
-      else if (k === "m" && view === "2d") setTool("measure");
-      else if (k === "x" && view === "2d") setTool("demolish");
       else if (k.startsWith("arrow") && selection?.kind === "furniture") {
         e.preventDefault();
         const st = e.shiftKey ? 100 : 10;
@@ -491,23 +487,14 @@ export function Workbench(p: Props) {
     setSelection(null);
     notify.success("已重置为初始模板，可撤销恢复");
   };
-  const clearMeasures = () => {
-    if (!d.measures.length) return;
-    change((d) => ({ ...d, measures: [] }));
-    notify.success("已清除全部测量");
-  };
   const tip =
     tool === "wall"
       ? "点击起点与转角连续绘墙 · 可拖动起段 · 双击 / 右键 / Enter 完成 · Esc 取消草稿"
-      : tool === "measure"
-        ? "点击起点与转角连续测量 · 可拖动起段 · 双击 / 右键 / Enter 完成 · Esc 取消草稿 · 在「更多」菜单清除测量线"
-        : tool === "demolish"
-          ? "点击非承重墙标记拆除，再次点击恢复"
-          : tool === "door" || tool === "window"
-            ? "点击墙体放置门窗，选中后可沿墙拖动或使用可视编辑工具条调整"
-            : view === "3d"
-              ? "拖动旋转 · 滚轮缩放 · 选中家具可移动 · 点击门开关"
-              : "拖入家具，开始规划你的理想空间";
+      : tool === "door" || tool === "window"
+        ? "点击墙体放置门窗，选中后可沿墙拖动或使用可视编辑工具条调整"
+        : view === "3d"
+          ? "拖动旋转 · 滚轮缩放 · 选中家具可移动 · 点击门开关"
+          : "拖入家具，开始规划你的理想空间";
   return (
     <div
       className={
@@ -527,6 +514,7 @@ export function Workbench(p: Props) {
           cloudSaving={cloudSave.pending}
         />
         <span className="toolbar-divider" />
+        <div className="toolbar-scroll">
         <div className="view-switch">
           <EditorTooltip
             label="2D 平面"
@@ -537,7 +525,7 @@ export function Workbench(p: Props) {
               onClick={() => void toggleView("2d")}
             >
               <LayoutTemplate size={15} />
-              2D 平面
+              2D<span className="view-switch-suffix">平面</span>
             </button>
           </EditorTooltip>
           <EditorTooltip
@@ -555,7 +543,7 @@ export function Workbench(p: Props) {
               ) : (
                 <Layers3 size={15} />
               )}
-              3D 场景
+              3D<span className="view-switch-suffix">场景</span>
             </button>
           </EditorTooltip>
         </div>
@@ -591,53 +579,13 @@ export function Workbench(p: Props) {
             )}
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button
-                    className={
-                      "tool-button " + (tool === "measure" || tool === "demolish" ? "active" : "")
-                    }
-                    aria-label="更多"
-                  >
+                  <button className="tool-button compact-only" aria-label="更多">
                     <Settings2 size={16} />
                     <span>更多</span>
                     <ChevronDown size={12} />
                   </button>
                 </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem onSelect={() => setTool("measure")}>
-                  <Ruler />
-                  测量距离
-                  {tool === "measure" ? (
-                    <Check size={13} className="menu-mark" />
-                  ) : (
-                    <kbd className="menu-kbd">M</kbd>
-                  )}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="danger-item"
-                  disabled={!d.measures.length}
-                  onSelect={clearMeasures}
-                >
-                  <Eraser />
-                  清除测量线
-                  {d.measures.length > 0 && (
-                    <span className="menu-count">{d.measures.length}</span>
-                  )}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="danger-item"
-                  onSelect={() => setTool("demolish")}
-                >
-                  <Trash2 />
-                  拆改非承重墙
-                  {tool === "demolish" ? (
-                    <Check size={13} className="menu-mark" />
-                  ) : (
-                    <kbd className="menu-kbd">X</kbd>
-                  )}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="compact-only" />
                 <DropdownMenuItem className="danger-item compact-only" onSelect={resetDesign}>
                   <RotateCcw />
                   重置方案
@@ -712,7 +660,7 @@ export function Workbench(p: Props) {
             <Trash2 size={16} />
           </ToolButton>
         </div>
-        <div className="header-spacer" />
+        </div>
         <div className="toolbar-right">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -990,6 +938,7 @@ export function Workbench(p: Props) {
         <SelectionEditor
           splitWall={view === '2d' ? openWallSplit : undefined}
           mergeWall={view === '2d' ? id => void cancelWallSplit(id) : undefined}
+          removeWall={view === '2d' ? removeWall : undefined}
           key={`${selection?.kind}:${selection?.id}`}
           ref={editor}
           design={d}
@@ -1046,6 +995,7 @@ export function Workbench(p: Props) {
             <PropertyPanel
               splitWall={view === '2d' && tool === 'select' ? openWallSplit : undefined}
               mergeWall={view === '2d' && tool === 'select' ? id => void cancelWallSplit(id) : undefined}
+              removeWall={view === '2d' && tool === 'select' ? removeWall : undefined}
               transaction={sizeTransaction} showCosts={p.loggedIn}
               accountFloors={accountFloors} accountWalls={accountWalls} accountOpenings={accountOpenings}
               design={d}
@@ -1075,16 +1025,14 @@ export function Workbench(p: Props) {
               ? "选择模式"
               : tool === "wall"
                 ? "绘制墙体"
-                : tool === "measure"
-                  ? "测量模式"
-                  : "结构编辑"}
+                : "结构编辑"}
           </b>
         </span>
         <span className="status-coordinates" ref={coordLabel}>
           X 0 / Y 0 m
         </span>
         <span className="status-tip" title={tip}>{tip}</span>
-        {(tool === 'wall' || tool === 'measure') && <EditorTooltip label={tool === 'wall' ? '完成绘墙' : '完成测量'} side="top"><button className="status-finish-wall" onClick={() => setTool('select')}>{tool === 'wall' ? '完成绘墙' : '完成测量'}</button></EditorTooltip>}
+        {tool === 'wall' && <EditorTooltip label="完成绘墙" side="top"><button className="status-finish-wall" onClick={() => setTool('select')}>完成绘墙</button></EditorTooltip>}
         <span className={'workspace-save-status' + (isSaveProblem(p.status) ? ' is-error' : '')} role="status" title={p.status.label}><span className={isSaveProblem(p.status) ? 'error-dot' : 'status-dot'} />{p.status.label}</span>
         <span className="status-safe">
           <ShieldCheck size={13} />

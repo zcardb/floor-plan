@@ -29,7 +29,7 @@ export function splitWall(design: Design, wallId: string, cuts: number[], select
   const wall = design.walls.find(w => w.id === wallId)!;
   const L = length(wall);
   const point = (distance: number): Point => distance === 0 ? wall.a : distance === L ? wall.b : [wall.a[0] + (wall.b[0] - wall.a[0]) * distance / L, wall.a[1] + (wall.b[1] - wall.a[1]) * distance / L];
-  const used = new Set([...design.walls, ...design.openings, ...design.rooms, ...design.furniture, ...design.measures].map(o => o.id));
+  const used = new Set([...design.walls, ...design.openings, ...design.rooms, ...design.furniture].map(o => o.id));
   const segments: Wall[] = intervals.slice(0, -1).map((start, i) => {
     let id = wall.id;
     if (i) { do { id = uid(); } while (used.has(id)); used.add(id); }

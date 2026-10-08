@@ -119,7 +119,6 @@ describe("户型几何与输入保护", () => {
         d.rooms.map((r) => [r.id, { name: r.name, mat: r.mat }]),
       ),
       demolished: [],
-      measures: [],
     };
     expect(validateDesign(old).version).toBe(2);
   });

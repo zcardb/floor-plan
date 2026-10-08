@@ -1,0 +1,161 @@
+import { isValidElement, type ReactElement, type ReactNode } from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const state = vi.hoisted(() => ({ values: [] as unknown[], cursor: 0, refs: [] as { current: unknown }[], effects: [] as (() => unknown)[] }));
+vi.mock('react', async original => ({
+  ...await original<typeof import('react')>(),
+  useState: (initial: unknown) => {
+    const index = state.cursor++;
+    if (!(index in state.values)) state.values[index] = initial;
+    return [state.values[index], (value: unknown) => { state.values[index] = value; }];
+  },
+  useRef: (value: unknown) => { const ref = { current: value }; state.refs.push(ref); return ref; },
+  useEffect: (effect: () => unknown) => { state.effects.push(effect); },
+}));
+import { ProjectMenu, LoadMoreSentinel } from './ProjectMenu';
+import { AccountMenu } from './AccountMenu';
+import { AccountAvatar } from './AccountAvatar';
+import { ExportMenu } from './ExportMenu';
+import { SoftwareSoonItem } from './SoftwareSoonItem';
+import { Button } from '@/components/ui/button';
+import { EditorTooltip } from '@/components/ui/editor-tooltip';
+import { DropdownMenuItem, DropdownMenuSubTrigger } from '@/components/ui/dropdown-menu';
+import type { ProjectSummary } from '../cloud/useProjects';
+
+type Node = ReactElement<Record<string, unknown>>;
+function nodes(tree: ReactNode): Node[] {
+  if (Array.isArray(tree)) return tree.flatMap(nodes);
+  if (!isValidElement<Record<string, unknown>>(tree)) return [];
+  return [tree, ...nodes(tree.props.children as ReactNode)];
+}
+function text(tree: ReactNode): string {
+  if (typeof tree === 'string' || typeof tree === 'number') return String(tree);
+  if (Array.isArray(tree)) return tree.map(text).join('');
+  return isValidElement<{ children?: ReactNode }>(tree) ? text(tree.props.children) : '';
+}
+const row = (id: string, name: string): ProjectSummary => ({ id, name, updatedAt: '2026-10-08T08:00:00Z', revision: 0, cloud: true });
+const current = row('a', '三室两厅两卫'), other = row('b', 'Home');
+function menu(overrides: Partial<Parameters<typeof ProjectMenu>[0]> = {}) {
+  state.cursor = 0;
+  const props = {
+    project: current, loggedIn: true, projectList: [current, other], hasMore: false, listLoading: false,
+    onOpen: vi.fn(async () => true), onLoadMore: vi.fn(), onBack: vi.fn(), onCloudSave: vi.fn(), cloudSaving: false, ...overrides,
+  };
+  return { props, tree: nodes(ProjectMenu(props)) };
+}
+const items = (tree: Node[]) => tree.filter(n => n.type === DropdownMenuItem);
+beforeEach(() => { state.values = []; state.cursor = 0; state.refs = []; state.effects = []; });
+
+describe('ProjectMenu', () => {
+  it('触发器只显示项目名；顶部为返回项目管理，列表为名称 + 日期 + 当前勾选，无头像', () => {
+    const { props, tree } = menu();
+    const trigger = tree.find(n => n.props.className === 'project-menu-trigger')!;
+    expect(text(trigger.props.children as ReactNode)).toBe('三室两厅两卫');
+    const [back, ...rows] = items(tree);
+    expect(text(back.props.children as ReactNode)).toBe('返回项目管理');
+    expect(rows).toHaveLength(2);
+    expect(tree.some(n => n.type === AccountAvatar)).toBe(false);
+    expect(rows[0].props['aria-current']).toBe('true');
+    expect(nodes(rows[0]).some(n => n.props['aria-label'] === '当前项目')).toBe(true);
+    expect(nodes(rows[1]).some(n => n.props['aria-label'] === '当前项目')).toBe(false);
+    expect(text(rows[1].props.children as ReactNode)).toContain('10/08');
+    (back.props.onSelect as () => void)();
+    expect(props.onBack).toHaveBeenCalledOnce();
+  });
+  it('点击其他项目切换，当前项不可再点', () => {
+    const { props, tree } = menu();
+    const [, mine, theirs] = items(tree);
+    const event = { preventDefault: vi.fn() };
+    (mine.props.onSelect as (e: typeof event) => void)(event);
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(props.onOpen).not.toHaveBeenCalled();
+    (theirs.props.onSelect as (e: typeof event) => void)({ preventDefault: vi.fn() });
+    expect(props.onOpen).toHaveBeenCalledWith(other);
+    expect(state.values[0]).toBe('b');
+    expect(items(menu().tree).slice(1).every(n => n.props.disabled === !n.props['aria-current'])).toBe(true);
+  });
+  it('有下一页时渲染底部哨兵，加载中显示 spinner', () => {
+    expect(menu().tree.some(n => n.type === LoadMoreSentinel)).toBe(false);
+    const { props, tree } = menu({ hasMore: true });
+    const sentinel = tree.find(n => n.type === LoadMoreSentinel)!;
+    expect(sentinel.props.onVisible).toBe(props.onLoadMore);
+    expect(menu({ hasMore: true, listLoading: true }).tree.some(n => n.props.className === 'project-menu-loading')).toBe(true);
+  });
+  it('访客显示“参考户型”，顶部为保存到云端，无返回项目管理', () => {
+    const { props, tree } = menu({ loggedIn: false });
+    expect(text(tree.find(n => n.props.className === 'project-menu-trigger')!.props.children as ReactNode)).toBe('参考户型');
+    const labels = items(tree).map(n => text(n.props.children as ReactNode));
+    expect(labels[0]).toBe('保存到云端');
+    expect(labels).not.toContain('返回项目管理');
+    (items(tree)[0].props.onSelect as () => void)();
+    expect(props.onCloudSave).toHaveBeenCalledOnce();
+  });
+});
+
+describe('LoadMoreSentinel', () => {
+  it('滚到底触发加载，禁用时不监听', () => {
+    const observers: { callback: IntersectionObserverCallback; disconnect: () => void }[] = [];
+    vi.stubGlobal('IntersectionObserver', class {
+      constructor(public callback: IntersectionObserverCallback) { observers.push(this as never); }
+      observe() {} disconnect() {}
+    });
+    try {
+      const onVisible = vi.fn();
+      LoadMoreSentinel({ disabled: false, onVisible });
+      state.refs[0].current = { parentElement: {} };
+      state.effects.forEach(effect => effect());
+      expect(observers).toHaveLength(1);
+      observers[0].callback([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
+      expect(onVisible).toHaveBeenCalledOnce();
+      state.refs = []; state.effects = [];
+      LoadMoreSentinel({ disabled: true, onVisible });
+      state.refs[0].current = { parentElement: {} };
+      state.effects.forEach(effect => effect());
+      expect(observers).toHaveLength(1);
+    } finally { vi.unstubAllGlobals(); }
+  });
+});
+
+describe('AccountMenu', () => {
+  it('登录后只显示圆形头像，菜单含名称、邮箱全文与退出登录', () => {
+    const onLogout = vi.fn();
+    const tree = nodes(AccountMenu({ email: '1879385@qq.com', loggedIn: true, onLogin: vi.fn(), onLogout }));
+    const trigger = tree.find(n => n.props.className === 'account-trigger')!;
+    expect(nodes(trigger.props.children as ReactNode).map(n => n.type)).toEqual([AccountAvatar]);
+    expect(trigger.props['aria-label']).toBe('我的账号：1879385');
+    const head = tree.find(n => n.props.className === 'account-menu-head')!;
+    expect(text(head.props.children as ReactNode)).toBe('18793851879385@qq.com');
+    (items(tree).find(n => text(n.props.children as ReactNode).includes('退出登录'))!.props.onSelect as () => void)();
+    expect(onLogout).toHaveBeenCalledOnce();
+  });
+  it('访客显示登录按钮', () => {
+    const onLogin = vi.fn(), tree = nodes(AccountMenu({ loggedIn: false, onLogin, onLogout: vi.fn() }));
+    expect(tree[0].type).toBe(Button);
+    expect(text(tree[0].props.children as ReactNode)).toBe('登录');
+  });
+});
+
+describe('ExportMenu 与 Coming soon', () => {
+  it('导出按钮为 outline，按格式导出 5 项并回调对应格式', () => {
+    const onExport = vi.fn(), tree = nodes(ExportMenu({ view: '2d', pending: false, onExport }));
+    const button = tree.find(n => n.type === Button)!;
+    expect(button.props.variant).toBe('outline');
+    expect(text(button.props.children as ReactNode)).toBe('导出');
+    const formats = items(tree);
+    expect(formats.map(n => text(n.props.children as ReactNode))).toEqual(['PNG 平面图', 'PDF 矢量图', 'SVG 矢量图', 'DXF CAD 图纸', 'JSON 方案文件']);
+    formats.forEach(n => (n.props.onSelect as () => void)());
+    expect(onExport.mock.calls.map(c => c[0])).toEqual(['png', 'pdf', 'svg', 'dxf', 'json']);
+    expect(tree.some(n => n.type === SoftwareSoonItem && n.props.label === '导出到其他软件')).toBe(true);
+    expect(tree.some(n => n.type === DropdownMenuSubTrigger && text(n.props.children as ReactNode) === '导出到其他软件')).toBe(false);
+    expect(text(nodes(ExportMenu({ view: '3d', pending: false, onExport })).filter(n => n.type === DropdownMenuItem)[0].props.children as ReactNode)).toBe('PNG 当前视角');
+  });
+  it('其他软件入口直接禁用、不展开子菜单，悬停提示 Coming soon', () => {
+    const tree = nodes(SoftwareSoonItem({ label: '从其他软件导入' }));
+    expect(tree[0].type).toBe(EditorTooltip);
+    expect(tree[0].props).toMatchObject({ label: 'Coming soon', disabled: true });
+    const item = tree.find(n => n.type === DropdownMenuItem)!;
+    expect(item.props.disabled).toBe(true);
+    expect(text(item.props.children as ReactNode)).toBe('从其他软件导入');
+    expect(tree.some(n => n.type === DropdownMenuSubTrigger)).toBe(false);
+  });
+});

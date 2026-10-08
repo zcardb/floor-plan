@@ -31,6 +31,9 @@ import { DimensionEditDialog } from './DimensionEditDialog';
 import { WallSplitDialog } from './WallSplitDialog';
 import { PropertyPanel } from './PropertyPanel';
 import { SelectionEditor } from './SelectionEditor';
+import { ProjectMenu } from './ProjectMenu';
+import { ExportMenu } from './ExportMenu';
+import { AccountMenu } from './AccountMenu';
 import { perimeterDimensions } from '../model/perimeterDimensions';
 import type { DimensionSegment } from '../model/perimeterDimensions';
 
@@ -52,7 +55,7 @@ function render() {
     project: { id: 'test', name: '测试', state: state.design } as Project,
     projectNavigation: { projectList: [], hasMore: false, listLoading: false, onOpen: noop, onLoadMore: noop },
     update: noop, status: { kind: 'saved' as const, label: '' }, loggedIn: false, projects: noop, login: noop, logout: noop,
-    save: noop, cloudSave: noop, importProject: noop,
+    cloudSave: noop,
   }));
 }
 function tools(tree: Node[]) {
@@ -143,7 +146,7 @@ describe('尺寸驱动墙体提交链', () => {
     expect(render().some(n => n.type === DimensionEditDialog)).toBe(false);
   });
 });
-describe('2D 常用工具与更多菜单', () => {
+describe('2D 常用工具与顶部工具栏', () => {
   it('直接展示选择、绘墙、门、窗，并切换对应画布工具及选中态', () => {
     expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['选择', '绘墙', '门', '窗']);
     for (const [label, tool] of [['选择', 'select'], ['绘墙', 'wall'], ['门', 'door'], ['窗', 'window']]) {
@@ -156,28 +159,16 @@ describe('2D 常用工具与更多菜单', () => {
     expect(tree.filter(node => node.type === 'button').map(node => node.props['aria-label'])).toEqual(['更多']);
     expect(text(tree.map(node => node.props.children as ReactNode))).not.toContain('添加门');
   });
-  it('更多菜单切换测量与拆改，入口高亮且保留快捷键和标记', () => {
-    for (const [label, tool, shortcut] of [['测量距离', 'measure', 'M'], ['拆改非承重墙', 'demolish', 'X']]) {
-      const item = tools(render()).find(node => node.props.onSelect && text(node.props.children as ReactNode).startsWith(label))!;
-      expect(text(item.props.children as ReactNode)).toContain(shortcut);
-      (item.props.onSelect as () => void)();
-      expect(state.values[1]).toBe(tool);
-      const tree = tools(render());
-      expect(tree.find(node => node.props['aria-label'] === '更多')!.props.className).toContain('active');
-      expect(nodes(tree.find(node => node.props.onSelect && text(node.props.children as ReactNode).startsWith(label))!).some(node => node.props.className === 'menu-mark')).toBe(true);
-    }
+  it('测量与拆改入口已移除，更多菜单只保留窄屏可用的破坏性操作', () => {
+    const tree = tools(render());
+    expect(text(tree.map(node => node.props.children as ReactNode))).not.toContain('测量距离');
+    expect(text(tree.map(node => node.props.children as ReactNode))).not.toContain('拆改非承重墙');
+    const more = tools(render()).find(node => node.props['aria-label'] === '更多')!;
+    expect(more.props.className).toContain('compact-only');
+    const items = nodes(more).filter(node => typeof node.props.onSelect === 'function');
+    expect(items.map(item => text(item.props.children as ReactNode))).toEqual(['重置方案', '清空家具']);
   });
-  it('无测量线时禁用清除，有测量线时保留数量并清空', () => {
-    const clear = () => tools(render()).find(node => node.props.onSelect && text(node.props.children as ReactNode).startsWith('清除测量线'))!;
-    expect(clear().props.disabled).toBe(true);
-    state.design = { ...state.design!, measures: [{ id: 'm1', a: [0, 0], b: [1000, 0] }] };
-    expect(clear().props.disabled).toBe(false);
-    expect(text(clear().props.children as ReactNode)).toContain('1');
-    (clear().props.onSelect as () => void)();
-    const update = state.change.mock.calls[0][0] as (design: Design) => Design;
-    expect(update(state.design).measures).toEqual([]);
-  });
-  it('V、M、X、Esc 保留工具切换，输入框与 3D 不触发测量拆改', () => {
+  it('V、Esc 保留工具切换，M、X 不再切换工具', () => {
     const listeners = new Map<string, (event: KeyboardEvent) => void>();
     vi.stubGlobal('window', {
       addEventListener: (name: string, callback: (event: KeyboardEvent) => void) => listeners.set(name, callback),
@@ -193,15 +184,17 @@ describe('2D 常用工具与更多菜单', () => {
     } as unknown as KeyboardEvent);
     try {
       attach();
-      for (const [shortcut, tool] of [['m', 'measure'], ['x', 'demolish'], ['v', 'select'], ['m', 'measure'], ['Escape', 'select']]) {
-        key(shortcut);
-        expect(state.values[1]).toBe(tool);
-      }
+      key('x'); key('m');
+      expect(state.values[1]).toBe('select');
+      key('v');
+      expect(state.values[1]).toBe('select');
       key('m', true);
       expect(state.values[1]).toBe('select');
       state.values[2] = '3d';
       attach();
-      key('m'); key('x');
+      key('x'); key('m');
+      expect(state.values[1]).toBe('select');
+      key('Escape');
       expect(state.values[1]).toBe('select');
     } finally {
       vi.unstubAllGlobals();
@@ -210,8 +203,29 @@ describe('2D 常用工具与更多菜单', () => {
   it('参考户型不开放绘墙和门窗，3D 保持原有工具', () => {
     state.design = referenceDesign();
     expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['选择']);
+    const more = tools(render()).find(node => node.props['aria-label'] === '更多')!;
+    expect(more.props.className).toContain('compact-only');
     state.values[2] = '3d';
     expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['鸟瞰', '漫游', '俯视', '剖切']);
-    expect(tools(render()).some(node => node.props['aria-label'] === '更多')).toBe(false);
+  });
+});
+describe('单行顶部工具栏', () => {
+  it('只有一行工具栏：项目菜单在最左，视图、导出、账号在右；无帮助按钮和旧 header', () => {
+    const tree = render();
+    expect(tree.some(n => typeof n.props.className === 'string' && (n.props.className as string).includes('main-header'))).toBe(false);
+    const toolbar = tree.find(n => n.props.className === 'main-toolbar')!;
+    const inside = nodes(toolbar);
+    const order = [ProjectMenu, ExportMenu, AccountMenu].map(type => inside.findIndex(n => n.type === type));
+    expect(order.every(i => i >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(nodes((toolbar.props.children as ReactNode[])[0])[0].type).toBe(ProjectMenu);
+    expect(tree.some(n => n.props['aria-label'] === '操作帮助')).toBe(false);
+    expect(tree.some(n => n.props['aria-label'] === '视图')).toBe(true);
+    expect(tree.some(n => n.props['aria-label'] === '文件' || n.props['aria-label'] === '图层')).toBe(false);
+    expect(tree.some(n => n.props.className === 'workspace-save-status' && n.props.role === 'status')).toBe(true);
+  });
+  it('小屏的重置方案 / 清空家具在 2D「更多」菜单的 compact-only 项里', () => {
+    const more = tools(render()).filter(n => typeof n.props.className === 'string' && (n.props.className as string).includes('compact-only') && n.props.onSelect);
+    expect(more.map(n => text(n.props.children as ReactNode))).toEqual(['重置方案', '清空家具']);
   });
 });

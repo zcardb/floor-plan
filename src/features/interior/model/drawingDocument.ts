@@ -8,7 +8,7 @@ import type { Design, Layers, Point } from './types';
 import { furnitureDrawing } from './furnitureDrawing';
 import { isBearingWall, wallKindName } from './wallPolicy';
 
-export type DrawingLayer = 'WALLS' | 'DEMOLISHED' | 'ROOMS' | 'OPENINGS' | 'FURNITURE' | 'ROOM_LABELS' | 'DIMENSIONS' | 'MEASURES';
+export type DrawingLayer = 'WALLS' | 'DEMOLISHED' | 'ROOMS' | 'OPENINGS' | 'FURNITURE' | 'ROOM_LABELS' | 'DIMENSIONS';
 /** Object grouping for vector exports (SVG/PDF). DXF geometry ignores it. */
 export interface DrawingGroup { id: string; name: string }
 export type DrawingEntity = (
@@ -16,10 +16,10 @@ export type DrawingEntity = (
   | { kind: 'arc'; center: Point; radius: number; start: number; end: number; clockwise: boolean; layer: DrawingLayer }
   | { kind: 'text'; point: Point; height: number; rotation: number; text: string; layer: DrawingLayer }
 ) & { group?: DrawingGroup };
-export const DRAWING_LAYERS: DrawingLayer[] = ['WALLS', 'DEMOLISHED', 'ROOMS', 'OPENINGS', 'FURNITURE', 'ROOM_LABELS', 'DIMENSIONS', 'MEASURES'];
+export const DRAWING_LAYERS: DrawingLayer[] = ['WALLS', 'DEMOLISHED', 'ROOMS', 'OPENINGS', 'FURNITURE', 'ROOM_LABELS', 'DIMENSIONS'];
 export const DRAWING_LAYER_NAMES: Record<DrawingLayer, string> = {
   WALLS: '墙体', DEMOLISHED: '拆除墙体', ROOMS: '房间', OPENINGS: '门窗', FURNITURE: '家具',
-  ROOM_LABELS: '房间名称', DIMENSIONS: '尺寸标注', MEASURES: '测量',
+  ROOM_LABELS: '房间名称', DIMENSIONS: '尺寸标注',
 };
 const ALL_LAYERS: Layers = { grid: false, dims: true, labels: true, furn: true, bearing: false, snap: false };
 /** Exports always contain every layer, independent of canvas visibility toggles. */
@@ -109,11 +109,6 @@ export function createDrawingDocument(d: Design, layers: Layers): DrawingDocumen
       chain.horizontal ? [segment.end, source] : [source, segment.end],
       chain.horizontal ? [segment.start, at] : [at, segment.start], chain.horizontal ? [segment.end, at] : [at, segment.end],
       chain.horizontal ? [center, labelAt] : [labelAt, center], segment.fontSize, chain.horizontal ? 0 : -90, segment.end - segment.start, 'DIMENSIONS'));
-  }
-  for (const m of d.measures) {
-    const L = Math.hypot(m.b[0] - m.a[0], m.b[1] - m.a[1]);
-    if (L > 0.01) dimensions.push(drawingDimension(m.a, m.b, m.a, m.b, [(m.a[0] + m.b[0]) / 2, (m.a[1] + m.b[1]) / 2 - 100], 160,
-      Math.atan2(m.b[1] - m.a[1], m.b[0] - m.a[0]) * 180 / Math.PI, L, 'MEASURES'));
   }
   const points: Point[] = [];
   for (const e of [...entities, ...dimensions.flatMap(dim => dim.display)]) {

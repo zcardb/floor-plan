@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import { CircleDollarSign, SlidersHorizontal } from "lucide-react";
-import { EditorTooltip } from "@/components/ui/editor-tooltip";
 import { calculateCosts } from "../model/costs";
 import { yuan } from "../model/money";
 import type { Design } from "../model/types";
@@ -25,9 +24,10 @@ export function PanelModeTabs({
       (r) => r.price === null && r.quantity > 0,
     ).length;
   return (
-    <div className="panel-mode-tabs" role="tablist" aria-label="右侧面板模式">
-      <EditorTooltip label="属性">
+    <div className="panel-mode-tabs">
+      <div className="panel-mode-track" role="tablist" aria-label="右侧面板模式">
         <button
+          type="button"
           role="tab"
           aria-selected={mode === "props"}
           className={mode === "props" ? "active" : ""}
@@ -36,11 +36,8 @@ export function PanelModeTabs({
           <SlidersHorizontal size={14} />
           属性
         </button>
-      </EditorTooltip>
-      <EditorTooltip
-        label="成本"
-      >
         <button
+          type="button"
           role="tab"
           aria-selected={mode === "cost"}
           className={mode === "cost" ? "active" : ""}
@@ -56,7 +53,7 @@ export function PanelModeTabs({
             />
           )}
         </button>
-      </EditorTooltip>
+      </div>
     </div>
   );
 }

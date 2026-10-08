@@ -80,6 +80,8 @@ interface Props {
   accountOpenings?: CustomOpening[];
   splitWall?: (wallId: string) => void;
   mergeWall?: (wallId: string) => void;
+  /** 删除墙体（与属性面板的「删除隔墙」共用同一实现）。 */
+  removeWall?: (wallId: string) => void;
 }
 const colors = FURNITURE_COLORS;
 export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
@@ -299,7 +301,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </PopoverContent>
           </Popover>
         )}
-        {w && <WallOptionsMenu design={p.design} wall={w} change={p.change} splitWall={p.splitWall} mergeWall={p.mergeWall} />}
+        {w && <WallOptionsMenu design={p.design} wall={w} change={p.change} splitWall={p.splitWall} mergeWall={p.mergeWall} removeWall={p.removeWall} />}
         {(f || w) && (
           <EditorTooltip label="常用颜色">
             <div className="visual-colors" role="group" aria-label="常用颜色">

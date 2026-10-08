@@ -2,8 +2,8 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { ManagementLoading } from './ManagementLoading';
 
 // Key this boundary by menu: initial reads block entry, subsequent reads keep drafts mounted.
-export function ManagementEntry({ loading, label, load, reset, children }: {
-  loading: boolean; label: string; load?: () => Promise<void>; reset?: () => void; children: ReactNode;
+export function ManagementEntry({ loading, label, load, reset, variant = 'cards', children }: {
+  loading: boolean; label: string; load?: () => Promise<void>; reset?: () => void; variant?: 'cards' | 'library'; children: ReactNode;
 }) {
   const [settled, setSettled] = useState(!load);
   const [displayed, setDisplayed] = useState(false);
@@ -14,5 +14,5 @@ export function ManagementEntry({ loading, label, load, reset, children }: {
   }, [load, reset]);
   const ready = settled && !loading;
   if (ready && !displayed) setDisplayed(true);
-  return displayed || ready ? children : <ManagementLoading heading label={label}/>;
+  return displayed || ready ? children : <ManagementLoading heading label={label} variant={variant}/>;
 }

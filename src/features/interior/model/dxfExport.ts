@@ -36,7 +36,7 @@ export function serializeDxf(document:DrawingDocument,payload?:string):string{
   writer.setVariable('$MEASUREMENT',{70:1});writer.setVariable('$DWGCODEPAGE',{3:'UTF-8'});
   writer.setVariable('$EXTMIN',{10:document.bounds.x,20:-document.bounds.y2,30:0});
   writer.setVariable('$EXTMAX',{10:document.bounds.x2,20:-document.bounds.y,30:0});
-  for(const layer of ['WALLS','DEMOLISHED','ROOMS','OPENINGS','FURNITURE','ROOM_LABELS','DIMENSIONS','MEASURES'])writer.addLayer(layer,7,'CONTINUOUS');
+  for(const layer of ['WALLS','DEMOLISHED','ROOMS','OPENINGS','FURNITURE','ROOM_LABELS','DIMENSIONS'])writer.addLayer(layer,7,'CONTINUOUS');
   const style=writer.addDimStyle('STUDIO_METERS');
   Object.assign(style,{DIMTXT:180,DIMASZ:120,DIMTSZ:60,DIMEXO:35,DIMEXE:120,DIMLFAC:0.001,DIMDEC:2,DIMLUNIT:2,DIMPOST:'<> m',DIMGAP:90,DIMTAD:1,DIMTMOVE:1,DIMZIN:0});
   for(const e of document.entities)writeEntity(writer.modelSpace,e);

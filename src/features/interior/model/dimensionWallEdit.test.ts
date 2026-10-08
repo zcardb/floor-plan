@@ -20,14 +20,14 @@ describe('净距驱动真实墙体',()=>{
     const connected=fixture();connected.walls.push({...wall('locked',[1000,2000],[3000,2000]),loadBearing:true});
     expect(()=>editDimensionWalls(connected,binding(connected,'partition','outer-1'),1500,'end')).toThrow('承重');
   });
-  it('外墙固定，隔墙移动到指定墙面净距，不改变厚度、家具或测量',()=>{
+  it('外墙固定，隔墙移动到指定墙面净距，不改变厚度或家具',()=>{
     const d=fixture(),b=binding(d,'partition','outer-1'),before=JSON.stringify(d);
     expect(dimensionEditPolicy(d,b)).toEqual({fixed:'end',chooseSide:false});
     const next=editDimensionWalls(d,b,2200,'end');
     const moved=next.walls.find(w=>w.id==='partition')!;
     expect(moved.a[0]).toBe(d.width-2200-120);expect(moved.b[0]).toBe(moved.a[0]);expect(moved.thickness).toBe(240);
     expect(next.walls.find(w=>w.id==='outer-1')).toEqual(d.walls.find(w=>w.id==='outer-1'));
-    expect(next.furniture).toBe(d.furniture);expect(next.measures).toBe(d.measures);expect(JSON.stringify(d)).toBe(before);
+    expect(next.furniture).toBe(d.furniture);expect(JSON.stringify(d)).toBe(before);
     expect(binding(next,'partition','outer-1').end-binding(next,'partition','outer-1').start).toBeCloseTo(2200);
   });
   it('两隔墙明确固定侧，竖向净距也可驱动水平隔墙',()=>{

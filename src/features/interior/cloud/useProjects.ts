@@ -4,31 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { errorMessage, notify } from "@/lib/notify";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { createProject } from "../data/templates";
 import { validateDesign } from "../model/validation";
 import { uid, type Design, type Project } from "../model/types";
-const KEY = "interior-guest-projects-v2";
-const DEMO_KEY = 'interior-guest-default-v1';
-function defaultGuest(): Project {
-  try { const raw = localStorage.getItem(DEMO_KEY); if (raw) { const p = JSON.parse(raw) as Project; return {...p, cloud:false, state:validateDesign(p.state)}; } } catch { /* Preserve legacy storage independently. */ }
-  return createProject('reference');
-}
-function initialProjects(): Project[] {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) {
-      const items = JSON.parse(raw) as Project[];
-      return items.map((p) => ({
-        ...p,
-        state: validateDesign(p.state),
-        cloud: false,
-      }));
-    }
-  } catch (cause) {
-    notify.error("本机项目读取失败，可通过 JSON 文件恢复", cause);
-  }
-  return [createProject("reference")];
-}
+import { GUEST_DEFAULT_KEY, purgeRecoveryCopies, readGuestDefault, readGuests, writeGuests } from "./guestStore";
 export type SaveStatusKind = "saved" | "saving" | "dirty" | "error" | "conflict";
 export interface SaveStatus {
   kind: SaveStatusKind;
@@ -42,7 +20,6 @@ const STATUS = {
   cloudFailed: { kind: "error", label: "云端保存失败" },
   conflict: { kind: "conflict", label: "版本冲突，请另存" },
   dirty: { kind: "dirty", label: "有待保存更改" },
-  recovery: { kind: "dirty", label: "恢复副本待保存" },
 } as const satisfies Record<string, SaveStatus>;
 /** 保存状态是否需要用户处理（失败或冲突）。 */
 export const isSaveProblem = (status: SaveStatus) =>
@@ -69,10 +46,10 @@ export interface ProjectSummary {
 }
 export function useProjects() {
   const confirm = useConfirm();
-  const [guests, setGuests] = useState(initialProjects),
+  const [guests, setGuests] = useState(readGuests),
     [session, setSession] = useState<Session | null>(null),
     [cloud, setCloud] = useState<ProjectSummary[]>([]),
-    [active, setActive] = useState<Project | null>(defaultGuest),
+    [active, setActive] = useState<Project | null>(readGuestDefault),
     [ready, setReady] = useState(false),
     [status, setStatus] = useState<SaveStatus>(STATUS.local),
     [listError, setListError] = useState(""),
@@ -93,17 +70,17 @@ export function useProjects() {
   activeRef.current = active;
   guestsRef.current = guests;
   const persist = useCallback((ps: Project[]) => {
-    setGuests(ps);
-    guestsRef.current = ps;
-    try {
-      localStorage.setItem(KEY, JSON.stringify(ps));
-      setStatus(STATUS.local);
-      return true;
-    } catch (cause) {
+    // 先写存储，成功了才更新界面状态：否则会出现「界面删了、刷新又回来」。
+    const result = writeGuests(ps);
+    if (!result.ok) {
       setStatus(STATUS.localFailed);
-      notify.error("本机存储空间不足，请导出 JSON 保留方案", cause);
+      notify.error("本机存储空间不足，请导出 JSON 保留方案", result.cause);
       return false;
     }
+    setGuests(ps);
+    guestsRef.current = ps;
+    setStatus(STATUS.local);
+    return true;
   }, []);
   const loadList = useCallback(
     async (more = false) => {
@@ -161,7 +138,7 @@ export function useProjects() {
         setListReady(false);
         setListError("");
         setLoading(false);
-        const guest = defaultGuest(); activeRef.current = guest; setActive(guest);
+        const guest = readGuestDefault(); activeRef.current = guest; setActive(guest);
         setStatus(STATUS.local);
       }
       sessionRef.current = s;
@@ -188,11 +165,9 @@ export function useProjects() {
     };
   }, []);
   useEffect(() => {
-    try {
-      localStorage.setItem(KEY, JSON.stringify(guestsRef.current));
-    } catch {
-      setStatus(STATUS.localFailed);
-    }
+    // 顺带清掉历史版本写入的本机恢复副本死数据。
+    purgeRecoveryCopies();
+    if (!writeGuests(guestsRef.current).ok) setStatus(STATUS.localFailed);
   }, []);
   const save = useCallback(async (): Promise<boolean> => {
     if (timer.current) {
@@ -208,7 +183,7 @@ export function useProjects() {
     const p = activeRef.current;
     if (!p) return true;
     if (!p.cloud) {
-      if (!sessionRef.current) { try { localStorage.setItem(DEMO_KEY, JSON.stringify(p)); return true; } catch (cause) { notify.error('本机保存失败，请下载备份', cause); return false; } }
+      if (!sessionRef.current) { try { localStorage.setItem(GUEST_DEFAULT_KEY, JSON.stringify(p)); return true; } catch (cause) { notify.error('本机保存失败，请下载备份', cause); return false; } }
       return persist(guestsRef.current);
     }
     if (!dirty.current) return true;
@@ -233,7 +208,7 @@ export function useProjects() {
       if (generation !== epoch.current) return false;
       if (error || !data) {
         setStatus(error ? STATUS.cloudFailed : STATUS.conflict);
-        if (error) notify.error("云端保存失败，已保留本机恢复副本", error);
+        if (error) notify.error("云端保存失败，请检查网络后重试", error);
         else notify.fail("项目已在其它窗口修改，请另存新项目以保留当前设计");
         return false;
       }
@@ -282,18 +257,10 @@ export function useProjects() {
       if (p.cloud) {
         dirty.current = true;
         setStatus(STATUS.dirty);
-        try {
-          localStorage.setItem(
-            "interior-recovery-" + sessionRef.current?.user.id + "-" + p.id,
-            JSON.stringify(next),
-          );
-        } catch (cause) {
-          notify.error("恢复副本保存失败，请立即导出 JSON", cause);
-        }
         if (timer.current) clearTimeout(timer.current);
         timer.current = setTimeout(() => void save(), 1000);
       } else if (!sessionRef.current) {
-        try { localStorage.setItem(DEMO_KEY, JSON.stringify(next)); setStatus(STATUS.local); } catch { setStatus(STATUS.localFailed); }
+        try { localStorage.setItem(GUEST_DEFAULT_KEY, JSON.stringify(next)); setStatus(STATUS.local); } catch { setStatus(STATUS.localFailed); }
       } else persist(guestsRef.current.map((r) => (r.id === p.id ? next : r)));
     },
     [persist, save],
@@ -328,7 +295,7 @@ export function useProjects() {
         return false;
       }
       try {
-        let found: Project = {
+        const found: Project = {
           id: data.id,
           name: data.name,
           state: validateDesign(data.state),
@@ -336,34 +303,16 @@ export function useProjects() {
           updatedAt: data.updated_at || "",
           cloud: true,
         };
-        const raw = localStorage.getItem(
-          "interior-recovery-" + sessionRef.current?.user.id + "-" + p.id,
-        );
-        if (raw) {
-          const draft = JSON.parse(raw) as Project;
-          if (draft.updatedAt > found.updatedAt) {
-            const restore = await confirm({
-              title: "发现较新的本机恢复副本",
-              description:
-                "此项目的本机副本比云端更新，恢复它以保留未保存的编辑？",
-              confirmText: "恢复副本",
-            });
-            if (restore) {
-              found = { ...found, state: validateDesign(draft.state) };
-              dirty.current = true;
-            }
-          }
-        }
         activeRef.current = found;
         setActive(found);
-        setStatus(dirty.current ? STATUS.recovery : STATUS.cloud);
+        setStatus(STATUS.cloud);
         return true;
       } catch (cause) {
         notify.error("项目数据不完整，请导入备份", cause);
         return false;
       }
     },
-    [confirm, save],
+    [save],
   );
   const create = useCallback(
     async (p: Project, toCloud = false) => {
@@ -473,20 +422,32 @@ export function useProjects() {
   const remove = useCallback(
     async (p: ProjectSummary) => {
       if (!sessionRef.current) return false;
-      if (!(await save())) return false;
+      // 只有删掉正在编辑的项目才需要先落盘；删别的项目不该被当前项目的保存状态拦住。
+      if (activeRef.current?.id === p.id && !(await save())) {
+        notify.fail("当前项目还有未保存的改动，已取消删除");
+        return false;
+      }
       const generation = epoch.current;
       if (p.cloud) {
-        const { error } = await attempt(supabase
+        const { data, error } = await attempt(supabase
           .from("interior_design_projects")
           .delete()
-          .eq("id", p.id));
+          .eq("id", p.id)
+          .select("id")
+          .maybeSingle());
         if (generation !== epoch.current) return false;
         if (error) {
           notify.error("删除项目「" + p.name + "」失败", error);
           return false;
         }
+        if (!data) {
+          notify.fail("没有权限删除项目「" + p.name + "」，它仍在云端");
+          return false;
+        }
         setCloud((c) => c.filter((r) => r.id !== p.id));
-      } else persist(guestsRef.current.filter((r) => r.id !== p.id));
+      } else if (!persist(guestsRef.current.filter((r) => r.id !== p.id))) {
+        return false; // persist 已提示本机存储写入失败，列表保持原样
+      }
       if (activeRef.current?.id === p.id) {
         epoch.current++;
         dirty.current = false;

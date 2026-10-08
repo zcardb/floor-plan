@@ -60,6 +60,6 @@ describe('净距操作使用原项目撤销历史',()=>{
     model=RenderModel();expect(model.counts).toEqual({undo:1,redo:0});expect(model.current.current).toEqual(next);
     model.undo();model=RenderModel();expect(model.current.current).toEqual(d);expect(model.counts).toEqual({undo:0,redo:1});
     model.redo();model=RenderModel();expect(model.current.current).toEqual(next);expect(model.counts).toEqual({undo:1,redo:0});
-    expect((model.current.current as Design).measures).toEqual(d.measures);expect(notify).toHaveBeenCalledTimes(3);
+    expect(notify).toHaveBeenCalledTimes(3);
   });
 });

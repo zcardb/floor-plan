@@ -65,6 +65,8 @@ interface Props {
   accountWalls?: CustomWall[];
   splitWall?: (wallId: string) => void;
   mergeWall?: (wallId: string) => void;
+  /** 删除墙体（由外观层复用同一实现，见 WallOptionsMenu）。 */
+  removeWall?: (wallId: string) => void;
   /** 切到成本页；成本页口径跟随当前选中对象。 */
   openCosts: () => void;
 }
@@ -79,6 +81,7 @@ export function PropertyPanel({
   remove,
   splitWall,
   mergeWall,
+  removeWall,
   openCosts,
   accountFloors = [],
   accountOpenings = [],
@@ -445,7 +448,7 @@ export function PropertyPanel({
           <h3 className="section-title">
             {editable ? "可编辑内部墙体" : resizable ? "可调整尺寸的墙体" : "受保护墙体"}
           </h3>
-          <WallOptionsMenu design={design} wall={w} change={change} splitWall={splitWall} mergeWall={mergeWall} />
+          <WallOptionsMenu design={design} wall={w} change={change} splitWall={splitWall} mergeWall={mergeWall} removeWall={removeWall} />
           <p className="muted-note">分割与承重标记独立；取消分割不会解除承重保护。实际承重性质须专业确认。</p>
           {design.demolished.includes(w.id) && <p className="muted-note">请先撤销拆除，再分割墙段。</p>}
           <SizeFields key={w.id} design={design} selection={s} transaction={transaction}/>
@@ -606,8 +609,6 @@ export function PropertyPanel({
             <div className="shortcut-list">
               <kbd>V</kbd>
               <span>选择 / 移动</span>
-              <kbd>M</kbd>
-              <span>测量距离</span>
               <kbd>R</kbd>
               <span>旋转家具 90°</span>
               <kbd>Ctrl Z</kbd>

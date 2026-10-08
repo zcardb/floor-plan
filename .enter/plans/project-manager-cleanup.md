@@ -129,30 +129,35 @@ const dangerIconAction = 'h-8 w-8 text-destructive hover:bg-destructive/10 hover
 - `src/features/interior/components/managementUi.test.tsx`（断言补充）
 
 ## Implementation checklist
-- [ ] `useProjects.ts`：删除 `STATUS.recovery`，且全文件不再出现 `STATUS.recovery`。
-- [ ] `useProjects.ts`：`update()` 云端分支不再写 `interior-recovery-*`（仅保留 dirty 标记 + 1s 防抖 save）。
-- [ ] `useProjects.ts`：`open()` 云端分支不再读副本、不再 `confirm`，直接使用云端 state 并 `setStatus(STATUS.cloud)`；`open` 依赖数组不再含 `confirm`。
-- [ ] `useProjects.ts`：`save()` 失败提示不再出现「恢复副本」字样；`open`/`create` 里其余 `confirm` 用法保留可用。
-- [ ] 新增 `guestStore.ts`，含 `readGuests` / `readGuestDefault` / `writeGuests` / `purgeRecoveryCopies` 与两个 key 常量；`useProjects.ts` 中原 `KEY`/`DEMO_KEY`/`defaultGuest`/`initialProjects` 已迁出且无重复定义。
-- [ ] `persist()` 先 `writeGuests()` 成功后才 `setGuests`：写入失败时 `guests` 状态与 localStorage 内容都不变。
-- [ ] `remove()` 删除非当前项目时不调用 `save()`；删除当前项目且 `save()` 失败时给出 `notify.fail` 并保留该项目。
-- [ ] `remove()` 本机分支 `persist()` 失败时返回 false 且不弹「已删除项目」成功提示。
-- [ ] `remove()` 云端分支用 `.delete().eq("id",…).select("id").maybeSingle()`，0 行时提示无权限并保留卡片。
-- [ ] 挂载 effect 调用 `purgeRecoveryCopies()`，清除所有 `interior-recovery-*` key。
-- [ ] 图表：项目管理卡片删除按钮 class 含 `text-destructive`，重命名/复制按钮不含。
+- [x] `useProjects.ts`：删除 `STATUS.recovery`，且全文件不再出现 `STATUS.recovery`。
+- [x] `useProjects.ts`：`update()` 云端分支不再写 `interior-recovery-*`（仅保留 dirty 标记 + 1s 防抖 save）。
+- [x] `useProjects.ts`：`open()` 云端分支不再读副本、不再 `confirm`，直接使用云端 state 并 `setStatus(STATUS.cloud)`；`open` 依赖数组不再含 `confirm`。
+- [x] `useProjects.ts`：`save()` 失败提示不再出现「恢复副本」字样；`create()` 里的 `confirm` 用法保留可用。
+- [x] 新增 `guestStore.ts`，含 `readGuests` / `readGuestDefault` / `writeGuests` / `purgeRecoveryCopies` 与两个 key 常量；`useProjects.ts` 中原 `KEY`/`DEMO_KEY`/`defaultGuest`/`initialProjects` 已迁出且无重复定义。
+- [x] `persist()` 先 `writeGuests()` 成功后才 `setGuests`：写入失败时 `guests` 状态与 localStorage 内容都不变。
+- [x] `remove()` 删除非当前项目时不调用 `save()`；删除当前项目且 `save()` 失败时给出 `notify.fail` 并保留该项目。
+- [x] `remove()` 本机分支 `persist()` 失败时返回 false 且不弹「已删除项目」成功提示。
+- [x] `remove()` 云端分支用 `.delete().eq("id",…).select("id").maybeSingle()`，0 行时提示无权限并保留卡片。
+- [x] 挂载 effect 调用 `purgeRecoveryCopies()`，清除所有 `interior-recovery-*` key。
+- [x] 项目管理卡片删除按钮 class 含 `text-destructive`，重命名/复制按钮不含。
 
 ## Verification checklist
-- [ ] `pnpm exec tsc --noEmit` 通过（无未使用变量/类型错误）。
-- [ ] `pnpm lint` 通过。
-- [ ] `pnpm test`（= `vitest run src/features/interior`）全绿，含新增 `guestStore.test.ts`：
-  - [ ] 正向：`writeGuests` 成功后 `readGuests` 能读回同样内容。
-  - [ ] 负向：`setItem` 抛错时 `writeGuests` 返回 `{ok:false}`，且存储里仍是上一次的内容（不会「界面删了、刷新又回来」）。
-  - [ ] 边界：`writeGuests([])` 之后 `readGuests()` 返回 `[]`（删掉的本机默认方案不会被重新播种）。
-  - [ ] 负向：`getItem` 抛错时 `readGuests()` 返回 `[]`，不凭空造项目。
-  - [ ] `purgeRecoveryCopies()` 清掉全部 `interior-recovery-*`，且保留其它 key。
-- [ ] 新增断言：`managementUi.test.tsx` 中「删除X」按钮 class 含 `text-destructive`，「重命名X」按钮不含。
-- [ ] `pnpm run build` 成功。
-- [ ] 浏览器（预览）人工确认：打开项目**不再**出现「发现较新的本机恢复副本」弹窗，直接进入编辑。
-- [ ] 浏览器人工确认：项目管理页本机默认方案「三室两厅两卫 · 原木之家」点删除 → 确认后卡片消失，**刷新后不再出现**。
-- [ ] 浏览器人工确认：卡片删除图标为红色（危险色），重命名/复制图标仍为中性灰。
-- [ ] 浏览器人工确认：`localStorage` 中不再新增 `interior-recovery-*` key。
+- [x] `pnpm exec tsc --noEmit` 通过。
+- [x] `pnpm lint` 通过（仅剩 PlanCanvas 既有的 useEffect 依赖 warning，与本次无关）。
+- [x] 改动完成时刻 `pnpm test` 全绿：58 文件 / 397 用例，含新增 `guestStore.test.ts` 6 条。
+  - [x] 正向：`writeGuests` 成功后 `readGuests` 能读回同样内容。
+  - [x] 负向：`setItem` 抛错时 `writeGuests` 返回 `{ok:false}`，且存储里仍是上一次的内容（不会「界面删了、刷新又回来」）。
+  - [x] 边界：`writeGuests([])` 之后 `readGuests()` 返回 `[]`（删掉的本机默认方案不会被重新播种）。
+  - [x] 负向：`getItem` 抛错时 `readGuests()` 返回 `[]`，不凭空造项目。
+  - [x] `purgeRecoveryCopies()` 清掉全部 `interior-recovery-*`，且保留其它 key。
+- [x] 新增断言：`managementUi.test.tsx` 中「删除X」按钮 class 含 `text-destructive`，「重命名/复制X」按钮不含（该文件 8 条断言全绿）。
+- [x] `pnpm run build` 成功。
+- [x] 预览渲染正常（desktop_1280 与 mobile_390 各一张截图），状态显示「本机已保存」，无新的控制台报错。
+- [ ] 浏览器（预览）人工确认：打开项目**不再**出现「发现较新的本机恢复副本」弹窗。— 需登录态，本地无法进入项目管理页，未验证。
+- [ ] 浏览器人工确认：本机默认方案「三室两厅两卫 · 原木之家」删除后刷新不再出现。— 同上，未验证。
+- [ ] 浏览器人工确认：卡片删除图标为红色。— 仅由 DOM 断言 + `--destructive` token 保证，未做视觉核对。
+- [x] 代码层面确认：`useProjects.ts` 不再读写任何 `interior-recovery-*` key（grep 无命中）。
+
+## 备注
+执行期间工作区另有一个并行改动（`model/wallRemoval.ts` 新增、`softwareTargets.ts` 删除、`Design.measures` 移除、`index.css` 大幅精简）正在进行中，导致 `PlanCanvas.test.tsx` / `Workbench.test.tsx` / `useSegmentDrawing.test.ts` / `drawingExport.test.ts` 等 51 条用例失败。这些失败与本次改动无关（上述文件均不引用 `useProjects` / `guestStore` / `ProjectManager`），本次自己引入的 `guestStore.test.ts` 与 `managementUi.test.tsx` 独立运行全绿。
+

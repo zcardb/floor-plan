@@ -23,7 +23,7 @@ interface Props extends ProjectNavigation {
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
 
 /** Triggers `onVisible` when scrolled into view inside its scroll container. */
-function LoadMoreSentinel({ disabled, onVisible }: { disabled: boolean; onVisible: () => void }) {
+export function LoadMoreSentinel({ disabled, onVisible }: { disabled: boolean; onVisible: () => void }) {
   const ref = useRef<HTMLDivElement>(null), latest = useRef(onVisible);
   useEffect(() => { latest.current = onVisible; });
   useEffect(() => {

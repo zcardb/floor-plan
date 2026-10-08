@@ -22,7 +22,6 @@ export function validateDesign(value: unknown): Design {
       furniture?: unknown[];
       rooms?: Record<string, { name: string; mat: string }>;
       demolished?: string[];
-      measures?: { a: { x: number; y: number }; b: { x: number; y: number } }[];
     };
     if (!Array.isArray(legacy.furniture)) return fail();
     const base = referenceDesign();
@@ -31,11 +30,6 @@ export function validateDesign(value: unknown): Design {
       furniture: legacy.furniture,
       rooms: base.rooms.map((r) => ({ ...r, ...legacy.rooms?.[r.id] })),
       demolished: legacy.demolished || [],
-      measures: (legacy.measures || []).map((m, i) => ({
-        id: "m" + i,
-        a: [m.a.x, m.a.y],
-        b: [m.b.x, m.b.y],
-      })),
     });
   }
   if (
@@ -52,7 +46,6 @@ export function validateDesign(value: unknown): Design {
     "openings",
     "furniture",
     "demolished",
-    "measures",
   ] as const)
     if (!Array.isArray(v[k]) || v[k].length > 2000) return fail();
   if (!v.rooms.length || !v.walls.length) return fail();
@@ -190,10 +183,6 @@ export function validateDesign(value: unknown): Design {
         )
     )
       fail();
-  }
-  for (const m of v.measures) {
-    id(m.id);
-    if (!point(m.a) || !point(m.b)) fail();
   }
   for (const s of v.demolished) {
     const w = v.walls.find((w) => w.id === s);
