@@ -3,6 +3,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { createProject } from "../data/templates";
 import { validateDesign } from "../model/validation";
 import { uid, type Design, type Project } from "../model/types";
@@ -36,6 +37,7 @@ export interface ProjectSummary {
   cloud?: boolean;
 }
 export function useProjects() {
+  const confirm = useConfirm();
   const [guests, setGuests] = useState(initialProjects),
     [session, setSession] = useState<Session | null>(null),
     [cloud, setCloud] = useState<ProjectSummary[]>([]),
@@ -293,14 +295,17 @@ export function useProjects() {
         );
         if (raw) {
           const draft = JSON.parse(raw) as Project;
-          if (
-            draft.updatedAt > found.updatedAt &&
-            window.confirm(
-              "发现此项目较新的本机恢复副本。恢复它以保留未保存编辑？",
-            )
-          ) {
-            found = { ...found, state: validateDesign(draft.state) };
-            dirty.current = true;
+          if (draft.updatedAt > found.updatedAt) {
+            const restore = await confirm({
+              title: "发现较新的本机恢复副本",
+              description:
+                "此项目的本机副本比云端更新，恢复它以保留未保存的编辑？",
+              confirmText: "恢复副本",
+            });
+            if (restore) {
+              found = { ...found, state: validateDesign(draft.state) };
+              dirty.current = true;
+            }
           }
         }
         activeRef.current = found;
@@ -312,22 +317,22 @@ export function useProjects() {
         return false;
       }
     },
-    [save],
+    [confirm, save],
   );
   const create = useCallback(
     async (p: Project, toCloud = false) => {
       if (!sessionRef.current) return false;
       const saved = await save();
-      if (
-        !saved &&
-        !(
+      if (!saved) {
+        const keep =
           dirty.current &&
-          window.confirm(
-            "当前云端项目保存失败。将当前设计另存为新项目以保留更改？",
-          )
-        )
-      )
-        return false;
+          (await confirm({
+            title: "云端保存失败",
+            description: "当前设计未能保存到云端，将其另存为新项目以保留更改？",
+            confirmText: "另存为新项目",
+          }));
+        if (!keep) return false;
+      }
       if (timer.current) {
         clearTimeout(timer.current);
         timer.current = null;
@@ -376,7 +381,7 @@ export function useProjects() {
       setActive(next);
       return true;
     },
-    [persist, save],
+    [confirm, persist, save],
   );
   const saveGuestToCloud = useCallback(async (): Promise<boolean> => {
     const p = activeRef.current;

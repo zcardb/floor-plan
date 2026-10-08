@@ -40,12 +40,14 @@ import {
   UserRound,
   X,
 } from "lucide-react";
+import { AccountAvatar } from "./AccountAvatar";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -463,15 +465,19 @@ export function Workbench(p: Props) {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="header-plain">
-              <UserRound size={16} />
+              <AccountAvatar email={p.email} size={20} />
               <span>{p.loggedIn ? "我的账号" : "游客模式"}</span>
               <ChevronDown size={12} />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem disabled>
-              {p.email || "无需登录即可编辑与下载"}
-            </DropdownMenuItem>
+            <DropdownMenuLabel className="account-menu-head">
+              <AccountAvatar email={p.email} size={34} />
+              <span>
+                <b>{p.email || "游客模式"}</b>
+                <small>{p.email ? "已登录 · 云端同步" : "无需登录即可编辑与下载"}</small>
+              </span>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
             {p.loggedIn ? (
               <DropdownMenuItem onClick={p.logout}>退出登录</DropdownMenuItem>
@@ -482,7 +488,12 @@ export function Workbench(p: Props) {
               将当前项目另存到云端
             </DropdownMenuItem>
           </DropdownMenuContent>
-        </DropdownMenu></> : <button className="header-plain guest-login" onClick={p.login}><UserRound size={16} />登录</button>}
+        </DropdownMenu></> : <><button className="header-plain guest-login" onClick={p.login}><UserRound size={16} />登录</button>
+        <Button size="sm" className="cloud-save-button" onClick={p.cloudSave}>
+          <Cloud size={15} />
+          <span className="wide-only">保存到云端</span>
+          <span className="compact-only">存云端</span>
+        </Button></>}
         <Button size="sm" className="download-button" onClick={exportImage}>
           <Download />
           <span>下载{view === "2d" ? "设计图" : "当前视角"}</span>

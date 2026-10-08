@@ -55,7 +55,7 @@ export function AccountAvatar({ email, size = 40, className }: { email?: string;
 ```
 退出登录按钮保留现有的 `navigate('logout')` 脏数据守卫（未保存的账号成本会先弹确认对话框），不改成直接 `signOut()`。其余（`modules`、`tab`、`catalog` 加载、`leaving` 对话框、`CustomFurnitureDialog`）完全不动。
 
-### 4. `src/features/interior/components/Workbench.tsx`（第 455–477 行区域）
+### 4. `src/features/interior/components/Workbench.tsx`（`main-header` 里「我的账号」区域，约第 460–490 行；注意游客分支刚新增了 `cloud-save-button`，本次不动那部分）
 
 - 触发器：已登录时在 `<span>我的账号</span>` 前插 `<AccountAvatar email={p.email} size={20} />`（游客/未登录分支保持原样）。
 - 下拉内容：把 `DropdownMenuItem disabled`（邮箱）换成 `DropdownMenuLabel` 身份块：

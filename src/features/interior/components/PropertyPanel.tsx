@@ -62,6 +62,7 @@ export function PropertyPanel({
   rotate,
 }: Props) {
   const d = useCostDesign(design);
+  const confirm = useConfirm();
   const [tab, setTab] = useState("overview");
   const f =
       s?.kind === "furniture" ? d.furniture.find((f) => f.id === s.id) : null,
@@ -78,7 +79,7 @@ export function PropertyPanel({
   const input = (
     label: string,
     value: number,
-    update: (v: number) => void,
+    update: (v: number) => void | Promise<boolean>,
     min = -100000,
     max = 100000,
   ) => (
@@ -92,11 +93,16 @@ export function PropertyPanel({
         max={max}
         step={10}
         onBlur={(e) => {
-          const v = Number(e.target.value);
-          if (e.target.value && Number.isFinite(v) && v >= min && v <= max)
-            update(v);
-          else {
-            e.target.value = String(value);
+          const target = e.target;
+          const v = Number(target.value);
+          if (target.value && Number.isFinite(v) && v >= min && v <= max) {
+            const result = update(v);
+            if (result instanceof Promise)
+              void result.then((applied) => {
+                if (!applied) target.value = String(value);
+              });
+          } else {
+            target.value = String(value);
             toast.error("请输入允许范围内的有效数值");
           }
         }}
@@ -479,8 +485,8 @@ export function PropertyPanel({
               {input(
                 "净宽 / mm",
                 d.width,
-                (v) => {
-                  if (d.template !== "blank") return;
+                async (v) => {
+                  if (d.template !== "blank") return false;
                   const outside =
                     d.furniture.some((f) => f.cx > v) ||
                     d.walls.some(
@@ -489,12 +495,16 @@ export function PropertyPanel({
                     );
                   if (
                     outside &&
-                    !window.confirm(
-                      "缩小后部分对象将位于室外，仍保留这些对象并继续？",
-                    )
+                    !(await confirm({
+                      title: "部分对象将位于室外",
+                      description:
+                        "缩小净宽后，部分家具或隔墙会落在户型之外，仍保留这些对象并继续？",
+                      confirmText: "保留并继续",
+                    }))
                   )
-                    return;
+                    return false;
                   change((d) => resizeBlank(d, v, d.depth, d.thickness));
+                  return true;
                 },
                 500,
                 50000,
@@ -502,8 +512,8 @@ export function PropertyPanel({
               {input(
                 "净深 / mm",
                 d.depth,
-                (v) => {
-                  if (d.template !== "blank") return;
+                async (v) => {
+                  if (d.template !== "blank") return false;
                   const outside =
                     d.furniture.some((f) => f.cy > v) ||
                     d.walls.some(
@@ -512,12 +522,16 @@ export function PropertyPanel({
                     );
                   if (
                     outside &&
-                    !window.confirm(
-                      "缩小后部分对象将位于室外，仍保留这些对象并继续？",
-                    )
+                    !(await confirm({
+                      title: "部分对象将位于室外",
+                      description:
+                        "缩小净深后，部分家具或隔墙会落在户型之外，仍保留这些对象并继续？",
+                      confirmText: "保留并继续",
+                    }))
                   )
-                    return;
+                    return false;
                   change((d) => resizeBlank(d, d.width, v, d.thickness));
+                  return true;
                 },
                 500,
                 50000,

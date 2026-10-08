@@ -94,26 +94,27 @@
 
 ## Implementation checklist
 
-- [ ] 新增 `src/components/ui/confirm-dialog.tsx`，导出 `ConfirmDialogProvider` 与 `useConfirm`，内部只组合 `alert-dialog`、`button` 的现成导出。
-- [ ] `settle` 保证 Promise 只解决一次；Esc/遮罩/取消 → `false`，确认 → `true`；新请求到来时上一个 pending 请求以 `false` 结束。
-- [ ] `tone: "destructive"` 时确认按钮使用 `buttonVariants({ variant: "destructive" })`，默认仍为 primary。
-- [ ] `src/App.tsx` 在 `TooltipProvider` 内包裹 `<ConfirmDialogProvider>`，`Toaster`/`Sonner` 保持原样。
-- [ ] `src/index.css` 新增 `.confirm-dialog`（`@layer components`，全部语义 token，含标题与 description 样式）。
-- [ ] `Workbench.tsx` 的 `clearFurniture` / `resetDesign` 不再调用 `window.confirm`，且取消时不产生任何 state 变更。
-- [ ] `PropertyPanel.tsx` 的 `input` 支持 `Promise<boolean>` 返回值并仅在被拒绝时恢复输入框显示值。
-- [ ] `PropertyPanel.tsx` 净宽、净深两处 `window.confirm` 替换为 `await confirm(...)`，取消时宽度/深度保持原值。
-- [ ] `useProjects.ts` 两处 `window.confirm` 替换为 `await confirm(...)`，`create` 在保存失败且用户选择不另存时仍返回 `false`。
-- [ ] `ProjectManager.tsx` 删除项目弹窗套用 `confirm-dialog` 样式，删除逻辑不变。
-- [ ] 全仓 `grep "window.confirm"` 无结果。
+- [x] 新增 `src/components/ui/confirm-dialog.tsx`，导出 `ConfirmDialogProvider` 与 `useConfirm`，内部只组合 `alert-dialog`、`button` 的现成导出。
+- [x] `settle` 保证 Promise 只解决一次；Esc/遮罩/取消 → `false`，确认 → `true`；新请求到来时上一个 pending 请求以 `false` 结束。
+- [x] `tone: "destructive"` 时确认按钮使用 `buttonVariants({ variant: "destructive" })`，默认仍为 primary。
+- [x] `src/App.tsx` 在 `TooltipProvider` 内包裹 `<ConfirmDialogProvider>`，`Toaster`/`Sonner` 保持原样。
+- [x] `src/index.css` 新增 `.confirm-dialog`（`@layer components`，全部语义 token，含标题与 description 样式，并补齐窄屏规则）。
+- [x] `Workbench.tsx` 的 `clearFurniture` / `resetDesign` 不再调用 `window.confirm`，且取消时不产生任何 state 变更。
+- [x] `PropertyPanel.tsx` 的 `input` 支持 `Promise<boolean>` 返回值并仅在被拒绝时恢复输入框显示值。
+- [x] `PropertyPanel.tsx` 净宽、净深两处 `window.confirm` 替换为 `await confirm(...)`，取消时宽度/深度保持原值。
+- [x] `useProjects.ts` 两处 `window.confirm` 替换为 `await confirm(...)`，`create` 在保存失败且用户选择不另存时仍返回 `false`。
+- [x] `ProjectManager.tsx` 删除项目弹窗套用 `confirm-dialog` 样式，删除逻辑不变。
+- [x] 全仓 `grep "window.confirm"` 无结果。
 
 ## Verification checklist
 
-- [ ] `pnpm lint` 通过（`src/components/ui/**` 被忽略，`src/features/**` 与 `App.tsx` 必须无新增告警）。
-- [ ] `pnpm exec tsc --noEmit` 通过（重点：`input` 的 `update` 联合返回类型、`onClick` 接收 async 回调）。
-- [ ] `pnpm test` 通过（`src/features/interior` 现有测试无回归）。
-- [ ] `pnpm run build` 通过。
+- [x] `pnpm lint` 通过（`src/components/ui/**` 被忽略，`src/features/**` 与 `App.tsx` 必须无新增告警）。
+- [x] `pnpm exec tsc --noEmit` 通过（重点：`input` 的 `update` 联合返回类型、`onClick` 接收 async 回调）。
+- [x] `pnpm test` 通过（`src/features/interior` 现有测试无回归，33 tests / 7 files 全绿）。
+- [x] `pnpm run build` 通过。
 - [ ] 预览人工验证（正向）：点击「清空家具」「重置方案」出现 shadcn 弹窗，确认后家具清空/方案重置，且可用撤销恢复。
 - [ ] 预览人工验证（取消/默认路径）：弹窗点「取消」或按 Esc，均不改变设计内容；弹窗为浅色卡片样式，不再是浏览器原生弹窗。
 - [ ] 预览人工验证（边界）：空白户型下把净宽改小到对象在室外时弹出确认，取消后输入框显示值回到当前模型值且平面图未变形；确认后户型按新尺寸重排。
 - [ ] 预览人工验证（异步路径）：在云端项目存在本机较新恢复副本时打开项目会弹出确认；云端保存失败时弹出「另存为新项目」确认，选择取消不改动本机项目。
 - [ ] 预览人工验证（风格一致性）：项目管理中删除项目弹窗与新确认弹窗外观一致，破坏性按钮为红色 destructive。
+- 说明：以上 5 项为交互触发的运行时检查，未在本次自动化验证中执行（静态截图无法打开弹窗）。

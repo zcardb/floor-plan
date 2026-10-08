@@ -12,14 +12,17 @@ import { Mail, LockKeyhole, Cloud, Loader2 } from "lucide-react";
 export function AuthDialog({
   open,
   onOpenChange,
+  intent,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
+  intent?: "cloud" | null;
 }) {
   const [signup, setSignup] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
-    [message,setMessage]=useState('');
+    [message, setMessage] = useState("");
+  const saving = intent === "cloud";
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="auth-dialog">
@@ -28,16 +31,25 @@ export function AuthDialog({
         </div>
         <DialogHeader>
           <DialogTitle>
-            {signup ? "创建你的设计账号" : "让设计，随处可见"}
+            {signup
+              ? saving
+                ? "注册并保存你的设计"
+                : "创建你的设计账号"
+              : saving
+                ? "登录后保存到云端"
+                : "让设计，随处可见"}
           </DialogTitle>
           <DialogDescription>
-            登录后保存多个云端项目。游客模式始终可以免费编辑和下载。
+            {saving
+              ? "注册或登录后，当前的设计会保存成你的云端项目。游客模式依旧可以免费编辑和下载。"
+              : "登录后保存多个云端项目。游客模式始终可以免费编辑和下载。"}
           </DialogDescription>
         </DialogHeader>
         <form
           onSubmit={async (e) => {
             e.preventDefault();
-            setError("");setMessage('');
+            setError("");
+            setMessage("");
             setBusy(true);
             const form = new FormData(e.currentTarget),
               email = String(form.get("email")),
@@ -58,7 +70,14 @@ export function AuthDialog({
               );
               return;
             }
-            if(!result.data.session){setMessage('注册成功，请查收验证邮件。完成验证后登录进入工作室。');return;}
+            if (!result.data.session) {
+              setMessage(
+                saving
+                  ? "注册成功，请查收验证邮件。完成验证后登录，当前的设计会自动保存到云端。"
+                  : "注册成功，请查收验证邮件。完成验证后登录进入工作室。",
+              );
+              return;
+            }
             onOpenChange(false);
           }}
         >
@@ -89,7 +108,11 @@ export function AuthDialog({
               />
             </div>
           </label>
-          {message&&<p role="status" className="muted-note">{message}</p>}
+          {message && (
+            <p role="status" className="muted-note">
+              {message}
+            </p>
+          )}
           {error && (
             <p className="form-error" role="alert">
               {error}
@@ -97,7 +120,7 @@ export function AuthDialog({
           )}
           <Button className="auth-submit" disabled={busy}>
             {busy && <Loader2 className="animate-spin" />}
-            {signup ? "注册并继续" : "登录"}
+            {signup ? (saving ? "注册并保存到云端" : "注册并继续") : "登录"}
           </Button>
         </form>
         <button
@@ -105,6 +128,7 @@ export function AuthDialog({
           onClick={() => {
             setSignup(!signup);
             setError("");
+            setMessage("");
           }}
         >
           {signup ? "已有账号？前往登录" : "还没有账号？注册一个"}
