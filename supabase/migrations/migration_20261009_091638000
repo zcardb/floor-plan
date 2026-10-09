@@ -1,0 +1,100 @@
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('images','images',true,10 * 1024 * 1024, array['image/jpeg','image/png','image/webp','image/gif']::text[])
+on conflict (id) do nothing;
+
+do $$
+begin
+  if not exists (select 1 from pg_policies where schemaname='storage' and tablename='objects' and policyname='ai_all_media_read_images') then
+    execute $policy$
+    create policy "ai_all_media_read_images" on storage.objects for select to public
+    using (bucket_id = 'images' and name like 'ai-all/%')
+    $policy$;
+  end if;
+  if not exists (select 1 from pg_policies where schemaname='storage' and tablename='objects' and policyname='ai_all_media_upload_images') then
+    execute $policy$
+    create policy "ai_all_media_upload_images" on storage.objects for insert to anon
+    with check (bucket_id = 'images' and name like 'ai-all/%')
+    $policy$;
+  end if;
+end $$;
+
+create table if not exists public.interior_ai_agents (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid references auth.users(id) on delete cascade,
+  kind text not null check (kind in ('plan','room')),
+  name text not null,
+  instructions text not null default '',
+  model text,
+  temperature numeric(3,2) not null default 0.40 check (temperature >= 0 and temperature <= 1),
+  repair_rounds int not null default 1 check (repair_rounds >= 0 and repair_rounds <= 3),
+  enabled boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists interior_ai_agents_owner_kind_idx on public.interior_ai_agents (owner_id, kind);
+
+create table if not exists public.interior_ai_generations (
+  id uuid primary key,
+  owner_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  kind text not null check (kind in ('plan','room')),
+  project_id uuid,
+  room_id text,
+  prompt text not null default '' check (char_length(prompt) <= 2000),
+  images jsonb not null default '[]'::jsonb,
+  required jsonb not null default '[]'::jsonb,
+  model text not null,
+  status text not null default 'running' check (status in ('running','succeeded','failed')),
+  error text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists interior_ai_generations_owner_idx on public.interior_ai_generations (owner_id, created_at desc);
+
+create table if not exists public.interior_ai_candidates (
+  id uuid primary key default gen_random_uuid(),
+  generation_id uuid not null references public.interior_ai_generations(id) on delete cascade,
+  owner_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  idx int not null check (idx >= 0 and idx <= 3),
+  payload jsonb not null,
+  summary text,
+  applied_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique (generation_id, idx)
+);
+
+create index if not exists interior_ai_candidates_generation_idx on public.interior_ai_candidates (generation_id, idx);
+
+alter table public.interior_ai_agents enable row level security;
+alter table public.interior_ai_generations enable row level security;
+alter table public.interior_ai_candidates enable row level security;
+
+drop policy if exists interior_ai_agents_read on public.interior_ai_agents;
+create policy interior_ai_agents_read on public.interior_ai_agents for select to authenticated
+using (owner_id = auth.uid() or owner_id is null);
+
+drop policy if exists interior_ai_agents_write on public.interior_ai_agents;
+create policy interior_ai_agents_write on public.interior_ai_agents for all to authenticated
+using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+
+drop policy if exists interior_ai_generations_read on public.interior_ai_generations;
+create policy interior_ai_generations_read on public.interior_ai_generations for select to authenticated
+using (owner_id = auth.uid());
+
+drop policy if exists interior_ai_generations_write on public.interior_ai_generations;
+create policy interior_ai_generations_write on public.interior_ai_generations for insert to authenticated
+with check (owner_id = auth.uid());
+
+drop policy if exists interior_ai_candidates_read on public.interior_ai_candidates;
+create policy interior_ai_candidates_read on public.interior_ai_candidates for select to authenticated
+using (owner_id = auth.uid());
+
+drop policy if exists interior_ai_candidates_apply on public.interior_ai_candidates;
+create policy interior_ai_candidates_apply on public.interior_ai_candidates for update to authenticated
+using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+
+insert into public.interior_ai_agents (owner_id, kind, name, instructions)
+values
+  (null, 'plan', '整户户型生成', '先在给定长宽内划分房间，再布置门窗与家具。优先保证主要房间朝南（下方）、动静分区合理、无暗厨暗卫。'),
+  (null, 'room', '房间家具布局', '结合整套户型的房间关系与门洞位置布置目标房间，保证通行顺畅、不遮挡门窗，风格与相邻房间现有家具协调。')
+on conflict do nothing;

@@ -23,7 +23,7 @@ const categoryIcons: Record<string, typeof Armchair> = { 卧室: BedDouble, 客�
 export function Library({
   add,
   setTool,
-  blank,
+  structureTools,
   customItems = [],
   onNew,
   rooms,
@@ -32,7 +32,7 @@ export function Library({
   readOnly?: boolean;
   add: (i: LibraryItem) => void;
   setTool: (t: Tool) => void;
-  blank: boolean;
+  structureTools: boolean;
   customItems?: LibraryItem[];
   onNew?: () => void;
   /** 顶部的房间快捷切换列表。 */
@@ -87,7 +87,7 @@ export function Library({
           );
         })}
       </div>
-      {blank && (category === '硬装' || !!query && ['墙体', '门', '窗'].some(name => name.includes(query))) && (
+      {structureTools && (category === '硬装' || !!query && ['墙体', '门', '窗'].some(name => name.includes(query))) && (
         <div className="structural-items">
           <EditorTooltip label="墙体">
             <button onClick={() => setTool("wall")}>

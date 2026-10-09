@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { blankDesign, referenceDesign } from '../data/templates';
-import { rebuildRooms } from './geometry';
-import { syncRooms } from './roomFollow';
+import { rebuildRooms, ringArea } from './geometry';
+import { splitRoomsWithWall, syncRooms } from './roomFollow';
 import type { Design, Point, Wall } from './types';
 
 /** 复制/新建出来的项目：结构可编辑 */
@@ -57,5 +57,37 @@ describe('墙体变化后的房间跟随', () => {
     const base = { ...blankDesign(), walls: [...blankDesign().walls, partition] };
     expect(syncRooms(blankDesign(), base).rooms).toHaveLength(rebuildRooms(base).rooms.length);
     expect(rebuildRooms(base).rooms).toHaveLength(2);
+  });
+});
+
+describe('参考户型新增墙体时切分房间', () => {
+  const room = (d: Design, id: string) => d.rooms.find(r => r.id === id)!;
+  const roomArea = (d: Design, id: string) => ringArea(room(d, id).rings[0]!);
+  const withWall = (d: Design, a: Point, b: Point) => {
+    const wall: Wall = { id: 'drawn', kind: 'partition', a, b, thickness: 120 };
+    return splitRoomsWithWall({ ...d, walls: [...d.walls, wall] }, wall.id);
+  };
+  it('横穿主卧的墙把主卧切成两块，原房间属性保留在大块上', () => {
+    const before = referenceDesign();
+    const next = withWall(before, [9000, -120], [9000, 3490]);
+    expect(next.rooms).toHaveLength(before.rooms.length + 1);
+    const master = room(before, 'master'), kept = room(next, 'master');
+    expect([kept.name, kept.mat, kept.wallMat, kept.counted]).toEqual([master.name, master.mat, master.wallMat, master.counted]);
+    const added = next.rooms[next.rooms.length - 1]!;
+    expect(added.name).toBe(master.name + ' 2');
+    expect(added.mat).toBe(master.mat);
+    const total = roomArea(next, 'master') + ringArea(added.rings[0]!) + 120 * 3370;
+    expect(Math.abs(total - roomArea(before, 'master')) / roomArea(before, 'master')).toBeLessThan(0.01);
+    expect(next.rooms.filter(r => r.id !== 'master' && r !== added)).toEqual(before.rooms.filter(r => r.id !== 'master'));
+  });
+  it('没有穿透房间的短墙不切分', () => {
+    const before = referenceDesign();
+    expect(withWall(before, [9000, -120], [9000, 1500]).rooms).toEqual(before.rooms);
+  });
+  it('切出的残片过小时只保留主块', () => {
+    const before = referenceDesign();
+    const ring = ringOf(before, 'master'), x = ring[0]![0] + 120 / 2 + 2;
+    const next = withWall(before, [x, -120], [x, 3490]);
+    expect(next.rooms).toHaveLength(before.rooms.length);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { blankDesign, createProject, referenceDesign } from '../data/templates';
-import { canDeleteWall, canEditWall, canResizeWall, isBearingWall, isOnBearingWall, setWallBearing, wallKindName } from './wallPolicy';
+import { canDeleteWall, canEditStructure, canEditWall, canResizeWall, isBearingWall, isOnBearingWall, setWallBearing, wallKindName } from './wallPolicy';
 import { rebuildRooms, resizeBlank } from './geometry';
 import { calculateCosts } from './costs';
 import { editSelection } from './selectionEdits';
@@ -64,6 +64,14 @@ describe('承重墙标记策略', () => {
     const low = { ...partition, kind: 'low' as const };
     const d = { ...blankDesign(), walls: [...before.walls, low] };
     expect(wallKindName(setWallBearing(d, low.id, true).walls[d.walls.length - 1]!)).toBe('矮墙');
+  });
+});
+
+describe('绘墙 / 门 / 窗入口', () => {
+  it('空白户型恒开放；参考户型只在非只读时开放', () => {
+    expect(canEditStructure(blankDesign(), true)).toBe(true);
+    expect(canEditStructure(referenceDesign(), true)).toBe(false);
+    expect(canEditStructure(referenceDesign(), false)).toBe(true);
   });
 });
 

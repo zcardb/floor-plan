@@ -14,9 +14,9 @@ function nodes(tree:ReactNode):Node[]{
   if(!isValidElement<Record<string,unknown>>(tree))return [];
   return [tree,...nodes(tree.props.children as ReactNode)];
 }
-function harness(blank=true){
+function harness(structureTools=true){
   const add=vi.fn(),setTool=vi.fn();
-  const render=()=>{state.cursor=0;return nodes(Library({add,setTool,blank}));};
+  const render=()=>{state.cursor=0;return nodes(Library({add,setTool,structureTools}));};
   return {render,add,setTool};
 }
 beforeEach(()=>{state.values=[];state.cursor=0;});
@@ -38,7 +38,7 @@ describe('硬装分类入口',()=>{
       (button.props.onClick as ()=>void)();expect(h.setTool).toHaveBeenLastCalledWith(tool);
     }
   });
-  it('搜索楼梯跨分类可添加，参考项目仍不开放原本锁定的墙门窗工具',()=>{
+  it('搜索楼梯跨分类可添加，只读预览不开放墙门窗工具',()=>{
     const h=harness(false);
     let tree=h.render();
     const search=tree.find(n=>n.type==='input'&&n.props['aria-label']==='搜索家具')!;

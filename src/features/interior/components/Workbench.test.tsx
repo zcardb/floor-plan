@@ -30,6 +30,7 @@ import { Workbench } from './Workbench';
 import { initialSceneState } from './useSceneLifecycle';
 import { blankDesign, referenceDesign } from '../data/templates';
 import { PlanCanvas } from './PlanCanvas';
+import { Library } from './Library';
 import { DimensionEditDialog } from './DimensionEditDialog';
 import { WallSplitDialog } from './WallSplitDialog';
 import { PropertyPanel } from './PropertyPanel';
@@ -207,13 +208,20 @@ describe('2D 常用工具与顶部工具栏', () => {
       vi.unstubAllGlobals();
     }
   });
-  it('参考户型不开放绘墙和门窗，3D 保持原有工具', () => {
+  it('可编辑的参考户型（游客/复制项目）开放绘墙和门窗，3D 保持原有工具', () => {
     state.design = referenceDesign();
-    expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['选择']);
+    expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['选择', '绘墙', '门', '窗']);
+    expect(render().find(n => n.type === Library)!.props.structureTools).toBe(true);
     const more = tools(render()).find(node => node.props['aria-label'] === '更多')!;
     expect(more.props.className).toContain('compact-only');
     state.values[2] = { ...initialSceneState, view: '3d' };
     expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['鸟瞰', '漫游', '俯视', '剖切']);
+  });
+  it('内置模板只读预览不开放绘墙和门窗', () => {
+    state.design = referenceDesign();
+    const tree = render({ project: { id: 'builtin', name: '模板', state: state.design, builtin: true } as Project });
+    expect(tools(tree).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['选择']);
+    expect(tree.find(n => n.type === Library)!.props.structureTools).toBe(false);
   });
 });
 describe('账号家具库并入左侧家具库', () => {

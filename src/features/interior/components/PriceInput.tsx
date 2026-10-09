@@ -34,13 +34,16 @@ export function PriceInput({
 }) {
   const [text, setText] = useState(draftOf(value)),
     [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    // 已成功应用的草稿：父级 value 尚未刷新（或随 key 重挂载）前，不应再视为未应用。
+    [appliedDraft, setAppliedDraft] = useState<string | null>(null);
   const pending = useRef<Promise<boolean> | null>(null);
-  const dirty = text.trim() !== draftOf(value);
+  const draft = text.trim();
+  const dirty = draft !== draftOf(value) && draft !== appliedDraft;
   const apply = (): Promise<boolean> => {
     if (pending.current) return pending.current;
     if (disabled) return Promise.resolve(false);
-    const v = text.trim() === "" ? null : Number(text);
+    const v = draft === "" ? null : Number(draft);
     if (v !== null && !validPrice(v)) {
       setError("请输入非负有效金额");
       notify.fail(`「${label}」请输入非负有效金额`);
@@ -52,6 +55,7 @@ export function PriceInput({
       try {
         const result = await onApply(v);
         if (result === false) return false;
+        setAppliedDraft(draft);
         notify.success(v === null ? `「${label}」已设为未定价` : `「${label}」已更新为 ${yuanPrecise(v)}`);
         return true;
       } catch (cause) {

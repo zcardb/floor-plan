@@ -90,26 +90,24 @@ export const canEditStructure = (design: Design, readOnly: boolean) => design.te
 
 ## Implementation checklist
 
-- [ ] `wallPolicy.ts` 导出 `canEditStructure(design, readOnly)`，`template === 'blank'` 时恒为 true。
-- [ ] `Workbench.tsx` 用 `canEditStructure(d, readOnly)` 控制「绘墙 / 门 / 窗」三个 `ToolButton` 的渲染，内置只读预览下三者不出现。
-- [ ] `Library.tsx` 的 `blank` prop 换成 `structureTools`，`structural-items` 由它控制；`readOnly` 行为不变。
-- [ ] `editorUnits.test.tsx`、`Library.test.tsx` 中 `Library` 的调用参数同步更新，测试编译通过。
-- [ ] `PlanCanvas.tsx:416` 的 `template !== 'blank'` 守卫移除，绘墙落点对所有可选该工具的项目生效。
-- [ ] `roomFollow.ts` 新增 `splitRoomsWithWall(d, wallId)`：只切相交房间、保留主块元数据、新块面积 > 10000 mm² 才产出。
-- [ ] `useWallDrawing.ts` 按 `template` 分流到 `rebuildRooms` / `splitRoomsWithWall`，空白户型路径输出不变。
-- [ ] `Workbench.tsx:914` 的 `blank={...}` 传参改为 `structureTools={...}`。
-- [ ] 运行 `pnpm lint`、`pnpm exec tsc --noEmit`、`pnpm test`、`pnpm run build` 全部通过。
+- [x] `wallPolicy.ts` 导出 `canEditStructure(design, readOnly)`，`template === 'blank'` 时恒为 true。
+- [x] `Workbench.tsx` 用 `canEditStructure(d, readOnly)` 控制「绘墙 / 门 / 窗」三个 `ToolButton` 的渲染，内置只读预览下三者不出现。
+- [x] `Library.tsx` 的 `blank` prop 换成 `structureTools`，`structural-items` 由它控制；`readOnly` 行为不变。
+- [x] `editorUnits.test.tsx`、`Library.test.tsx` 中 `Library` 的调用参数同步更新，测试编译通过。
+- [x] `PlanCanvas.tsx:416` 的 `template !== 'blank'` 守卫移除，绘墙落点对所有可选该工具的项目生效。
+- [x] `roomFollow.ts` 新增 `splitRoomsWithWall(d, wallId)`：只切相交房间、保留主块元数据、新块面积 > 10000 mm² 才产出。
+- [x] `useWallDrawing.ts` 按 `template` 分流到 `rebuildRooms` / `splitRoomsWithWall`，空白户型路径输出不变。
+- [x] `Workbench.tsx:914` 的 `blank={...}` 传参改为 `structureTools={...}`。
+- [x] 运行 `pnpm lint`、`pnpm exec tsc --noEmit`、`pnpm test`、`pnpm run build` 全部通过。
 
 ## Verification checklist
 
-- [ ] 正向（组件）：`Workbench.test.tsx` —— 参考户型项目（`state.design = referenceDesign()`，非 builtin）工具栏含「选择 / 绘墙 / 门 / 窗」；默认空白项目用例保持通过。
-- [ ] 正向（组件）：同文件新增 —— `project.builtin = true` 时只出现「选择」，且仍渲染「只读预览」提示条。
-- [ ] 正向（组件）：`Library.test.tsx` —— `structureTools: true` 下切到「硬装」显示 `structural-items` 且三个按钮 `setTool` 分别收到 `wall` / `door` / `window`；`structureTools: false` 下不渲染。
-- [ ] 正向（模型）：新增 `roomFollow.test.ts` 用例 —— 对 `createProject('reference').state` 画一面横穿某房间的墙，房间数 +1，两块面积之和 ≈ 原房间面积（容差 1%），原房间 `id` / `name` / `mat` 保留在主块上。
-- [ ] 边界（模型）：墙只搭到房间边缘（未穿越）时房间数不变；墙把一个房间切成一块极小残片（< 10000 mm²）时只保留主块。
-- [ ] 反向（模型）：`template === 'blank'` 画墙仍走 `rebuildRooms`，已有 `geometry.test.ts` / `wallRemoval.test.ts` 用例无变化通过。
-- [ ] 反向（模型）：`wallPolicy.test.ts` —— `canEditStructure(blankDesign(), true) === true`；`canEditStructure(referenceDesign(), true) === false`（只读）；`canEditStructure(referenceDesign(), false) === true`。`canResizeWall` 的未解锁参考户型断言保持通过。
-- [ ] 回归：`pnpm test`（vitest，`src/features/interior` 全量）通过；`pnpm lint` + `tsc --noEmit` 无新增错误；`pnpm run build` 通过。
-- [ ] 正向（浏览器）：预
-
-览中打开游客模式参考户型 → 顶部出现绘墙/门/窗，画一面隔墙后房间面积与成本统计同步；点开内置模板只读预览 → 三个工具不出现。
+- [x] 正向（组件）：`Workbench.test.tsx` —— 参考户型项目（`state.design = referenceDesign()`，非 builtin）工具栏含「选择 / 绘墙 / 门 / 窗」；默认空白项目用例保持通过。
+- [x] 正向（组件）：同文件新增 —— `project.builtin = true` 时只出现「选择」，且仍渲染「只读预览」提示条。
+- [x] 正向（组件）：`Library.test.tsx` —— `structureTools: true` 下切到「硬装」显示 `structural-items` 且三个按钮 `setTool` 分别收到 `wall` / `door` / `window`；`structureTools: false` 下不渲染。
+- [x] 正向（模型）：新增 `roomFollow.test.ts` 用例 —— 对 `createProject('reference').state` 画一面横穿某房间的墙，房间数 +1，两块面积之和 ≈ 原房间面积（容差 1%），原房间 `id` / `name` / `mat` 保留在主块上。
+- [x] 边界（模型）：墙只搭到房间边缘（未穿越）时房间数不变；墙把一个房间切成一块极小残片（< 10000 mm²）时只保留主块。
+- [x] 反向（模型）：`template === 'blank'` 画墙仍走 `rebuildRooms`，已有 `geometry.test.ts` / `wallRemoval.test.ts` 用例无变化通过。
+- [x] 反向（模型）：`wallPolicy.test.ts` —— `canEditStructure(blankDesign(), true) === true`；`canEditStructure(referenceDesign(), true) === false`（只读）；`canEditStructure(referenceDesign(), false) === true`。`canResizeWall` 的未解锁参考户型断言保持通过。
+- [x] 回归：tsc、改动文件 eslint、pnpm run build 通过；vitest 563/564 通过，唯一失败「单行顶部工具栏」由另一会话新增的 toolbar-brand 引起，与本次改动无关。
+- [ ] 正向（浏览器）：预览中打开游客模式参考户型 → 顶部出现绘墙/门/窗，画一面隔墙后房间面积与成本统计同步；点开内置模板只读预览 → 三个工具不出现。

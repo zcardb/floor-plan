@@ -13,7 +13,7 @@ import { splitWall as splitWallModel } from '../model/wallSplit';
 import { removeWall as removeWallModel } from '../model/wallRemoval';
 import { mergeWall as mergeWallModel, wallMergeGroup } from '../model/wallMerge';
 import { bearingWalls, clearBearing, mergeAllSplits, splitPointCount } from '../model/wallBulk';
-import { isBearingWall } from '../model/wallPolicy';
+import { isBearingWall, canEditStructure } from '../model/wallPolicy';
 import { length } from '../model/geometry';
 import { dimensionEditPolicy, editDimensionWalls } from '../model/dimensionWallEdit';
 import type { DimensionBinding } from '../model/dimensionBinding';
@@ -166,6 +166,7 @@ export function Workbench(p: Props) {
   const readOnly = !!p.project.builtin;
   const model = useDesign(p.project.state, p.update, readOnly),
     { design: d, change, commit, preview, undo, redo, counts, sizeTransaction } = model;
+  const structureTools = canEditStructure(d, readOnly);
   const [selection, setSelection] = useState<Selection>(null),
     [tool, setTool] = useState<Tool>("select");
   // 3D 的打开 / 首帧 / 失败 / 自动恢复全部由这一个状态机决定
@@ -722,17 +723,15 @@ export function Workbench(p: Props) {
             >
               <MousePointer2 size={16} />
             </ToolButton>
-            {d.template === "blank" && (
-              <ToolButton
-                label="绘墙"
-                active={tool === "wall"}
-                onClick={() => setTool("wall")}
-              >
-                <SquareDashed size={16} />
-              </ToolButton>
-            )}
-            {d.template === "blank" && (
+            {structureTools && (
               <>
+                <ToolButton
+                  label="绘墙"
+                  active={tool === "wall"}
+                  onClick={() => setTool("wall")}
+                >
+                  <SquareDashed size={16} />
+                </ToolButton>
                 <ToolButton label="门" active={tool === "door"} onClick={() => setTool("door")}>
                   <DoorOpen size={16} />
                 </ToolButton>
@@ -917,7 +916,7 @@ export function Workbench(p: Props) {
             setTool(t);
             setDrawer(null);
           }}
-          blank={d.template === "blank"}
+          structureTools={structureTools}
           customItems={[...projectCatalog, ...accountFurniture]}
           onNew={p.loggedIn && !readOnly ? () => setCustomOpen(true) : undefined}
           readOnly={readOnly}

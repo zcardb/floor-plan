@@ -3381,6 +3381,133 @@ export type Database = {
         }
         Relationships: []
       }
+      interior_ai_agents: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          id: string
+          instructions: string
+          kind: string
+          model: string | null
+          name: string
+          owner_id: string | null
+          repair_rounds: number
+          temperature: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          instructions?: string
+          kind: string
+          model?: string | null
+          name: string
+          owner_id?: string | null
+          repair_rounds?: number
+          temperature?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          instructions?: string
+          kind?: string
+          model?: string | null
+          name?: string
+          owner_id?: string | null
+          repair_rounds?: number
+          temperature?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      interior_ai_candidates: {
+        Row: {
+          applied_at: string | null
+          created_at: string
+          generation_id: string
+          id: string
+          idx: number
+          owner_id: string
+          payload: Json
+          summary: string | null
+        }
+        Insert: {
+          applied_at?: string | null
+          created_at?: string
+          generation_id: string
+          id?: string
+          idx: number
+          owner_id?: string
+          payload: Json
+          summary?: string | null
+        }
+        Update: {
+          applied_at?: string | null
+          created_at?: string
+          generation_id?: string
+          id?: string
+          idx?: number
+          owner_id?: string
+          payload?: Json
+          summary?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interior_ai_candidates_generation_id_fkey"
+            columns: ["generation_id"]
+            referencedRelation: "interior_ai_generations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      interior_ai_generations: {
+        Row: {
+          created_at: string
+          error: string | null
+          id: string
+          images: Json
+          kind: string
+          model: string
+          owner_id: string
+          project_id: string | null
+          prompt: string
+          required: Json
+          room_id: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          id: string
+          images?: Json
+          kind: string
+          model: string
+          owner_id?: string
+          project_id?: string | null
+          prompt?: string
+          required?: Json
+          room_id?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          images?: Json
+          kind?: string
+          model?: string
+          owner_id?: string
+          project_id?: string | null
+          prompt?: string
+          required?: Json
+          room_id?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       interior_ceiling_catalog: {
         Row: {
           ceiling_key: string

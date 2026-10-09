@@ -3,6 +3,8 @@ import type { Design, Wall } from './types';
 /** 手动标记优先；参考户型原始承重墙默认承重，可被取消（loadBearing: false）。 */
 export const isBearingWall = (wall: Wall) => wall.loadBearing ?? wall.kind === 'bearing';
 export const canEditWall = (design: Design, wall: Wall) => design.template === 'blank' && wall.kind === 'partition' && !isBearingWall(wall);
+/** 绘墙 / 门 / 窗入口：空白户型恒开放；其余项目只要不是只读预览（游客、复制、导入、旧项目）都开放。 */
+export const canEditStructure = (design: Design, readOnly: boolean) => design.template === 'blank' || !readOnly;
 /** 所有墙都可删除，承重墙除外（先取消承重标记）。 */
 export const canDeleteWall = (wall: Wall) => !isBearingWall(wall);
 /** 承重墙结构改动的统一提醒文案。 */

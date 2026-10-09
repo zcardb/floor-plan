@@ -31,7 +31,7 @@ describe('编辑控件与米制 UI',()=>{
     expect(selects.every(tag=>tag.includes('aria-hidden="true"'))).toBe(true);
   });
   it('素材库尺寸摘要统一米制',()=>{
-    const html=render(createElement(Library,{add:()=>{},setTool:()=>{},blank:true}));
+    const html=render(createElement(Library,{add:()=>{},setTool:()=>{},structureTools:true}));
     expect(html).toContain('2.40 × 0.90 m');
     expect(html).not.toContain(' mm');
   });

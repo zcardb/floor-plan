@@ -413,7 +413,6 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           return;
         }
         if (tool === 'wall') {
-          if (design.template !== 'blank') return;
           select(null); wallDrawing.down(p, e.pointerId, [e.clientX, e.clientY]); return;
         }
         if ((tool === "door" || tool === "window") && wid) {

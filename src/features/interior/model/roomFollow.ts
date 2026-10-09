@@ -1,5 +1,7 @@
+import polygonClipping from 'polygon-clipping';
 import { rebuildRooms, ringArea } from './geometry';
-import type { Design, Point, Room, Wall } from './types';
+import { connectedWallPoly } from './wallConnections';
+import { uid, type Design, type Point, type Room, type Wall } from './types';
 
 /** 房间环贴合墙面的容差（mm）。 */
 const faceEpsilon = 1.5;
@@ -136,6 +138,41 @@ export function followRooms(before: Design, after: Design): Design {
     }),
   }));
   return { ...after, rooms };
+}
+
+const openRing = (ring: Point[]) => {
+  const first = ring[0], last = ring[ring.length - 1];
+  return ring.length > 1 && first && last && first[0] === last[0] && first[1] === last[1] ? ring.slice(0, -1) : ring;
+};
+const pieceArea = (rings: Point[][]) => ringArea(rings[0]!) - rings.slice(1).reduce((s, r) => s + ringArea(r), 0);
+function freeName(base: string, taken: Set<string>) {
+  for (let i = 2; ; i++) if (!taken.has(`${base} ${i}`)) return `${base} ${i}`;
+}
+
+/**
+ * 非空白户型新增一面墙后，只切开与墙相交的房间；其余房间原样保留。
+ * 面积最大的一块继承原房间全部属性，其余块作为新房间追加（同材质，名称加序号）。
+ */
+export function splitRoomsWithWall(d: Design, wallId: string): Design {
+  const wall = d.walls.find(w => w.id === wallId);
+  if (!wall) return d;
+  const cut = connectedWallPoly(wall, d.walls, d.demolished);
+  const names = new Set(d.rooms.map(r => r.name));
+  const kept: Room[] = [], added: Room[] = [];
+  for (const room of d.rooms) {
+    const pieces = polygonClipping.difference(room.rings, [cut])
+      .map(poly => poly.map(r => openRing(r as Point[])))
+      .filter(rings => rings[0]!.length >= 3 && pieceArea(rings) > minRoomArea)
+      .sort((a, b) => pieceArea(b) - pieceArea(a));
+    if (pieces.length < 2) { kept.push(room); continue; }
+    kept.push({ ...room, rings: pieces[0]! });
+    for (const rings of pieces.slice(1)) {
+      const name = freeName(room.name, names);
+      names.add(name);
+      added.push({ id: uid(), name, rings, mat: room.mat, wallMat: room.wallMat, counted: room.counted });
+    }
+  }
+  return added.length ? { ...d, rooms: [...kept, ...added] } : d;
 }
 
 /** 改墙后的房间同步：空白户型按外框重算，其余项目让房间跟随墙面。 */
