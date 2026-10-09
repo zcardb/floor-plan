@@ -11,6 +11,8 @@ import { purgeRecoveryCopies, readGuestDefault, readGuests, writeGuests, writeGu
 import { TEMPLATE_PRESETS, presetById } from '../data/templates';
 import { builtinProject, isBuiltinId, isPresetId } from '../data/templatePresets';
 import { compactThumbnail, readThumbnail, type ThumbnailDesign } from '../model/planThumbnail';
+/** 云端项目列表每次加载条数，与列表滚动加载的批次一致。 */
+const LIST_PAGE_SIZE = 12;
 export type SaveStatusKind = "saved" | "saving" | "dirty" | "error" | "conflict";
 export interface SaveStatus {
   kind: SaveStatusKind;
@@ -121,7 +123,7 @@ export function useProjects() {
           .from("interior_design_projects")
           .select("id,name,updated_at,revision,thumbnail")
           .order("updated_at", { ascending: false })
-          .range(start, start + 19);
+          .range(start, start + LIST_PAGE_SIZE - 1);
       } catch (cause) {
         if (generation !== epoch.current) return;
         setLoading(false); setListReady(true);
@@ -146,7 +148,7 @@ export function useProjects() {
         cloud: true,
       }));
       setCloud((c) => (more ? [...c, ...list] : list));
-      setHasMore(data.length === 20);
+      setHasMore(data.length === LIST_PAGE_SIZE);
       void backfillThumbnails(list.filter((r) => !r.thumbnail));
     },
     [cloud.length, backfillThumbnails],

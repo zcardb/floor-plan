@@ -120,15 +120,17 @@ describe('管理端精简与加载分支', () => {
     // 我的项目按修改时间排在内置模板之前
     expect(html.indexOf('打开项目 我的项目')).toBeLessThan(html.indexOf('预览模板 '));
   });
-  it('超过一页显示分页，一页以内不显示；云端还有更多时数量带 +', () => {
+  it('滚动加载：首批只渲染 12 条，云端还有更多时内置模板暂不露出、数量带 +', () => {
     const many = Array.from({ length: 20 }, (_, i) => ({ ...project, id: 'p' + i, name: '项目' + i }));
-    const paged = render(createElement(ProjectManager, { projects: projects(false, many), opened: () => {} }));
-    expect(paged).toContain('aria-label="项目分页"');
-    expect(paged).toContain('aria-current="page"');
-    expect(render(createElement(ProjectManager, { projects: projects(false), opened: () => {} }))).not.toContain('aria-label="项目分页"');
+    const first = render(createElement(ProjectManager, { projects: projects(false, many), opened: () => {} }));
+    expect(first.match(/aria-label="打开项目 /g)).toHaveLength(12);
+    expect(first).toContain('正在加载更多');
+    expect(first).not.toContain('aria-label="项目分页"');
+    expect(render(createElement(ProjectManager, { projects: projects(false), opened: () => {} }))).toContain('已显示全部');
     const more = render(createElement(ProjectManager, { projects: { ...projects(false), hasMore: true } as ReturnType<typeof useProjects>, opened: () => {} }));
     expect(more).toMatch(/>我的<b>1\+<\/b>/);
-    expect(more).toContain('aria-label="项目分页"');
+    expect(more).not.toContain('预览模板 ');
+    expect(more).toContain('正在加载更多');
   });
   it('列表读取失败显示错误与重试，而不是“还没有设计项目”', () => {
     const failed = render(createElement(ProjectManager, { projects: { ...projects(false, []), listError: 'Failed to fetch' } as ReturnType<typeof useProjects>, opened: () => {} }));

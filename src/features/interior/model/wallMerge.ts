@@ -32,15 +32,25 @@ export function mergeWall(design: Design, id: string): { design: Design; selecte
   const walls = wallMergeGroup(design, id);
   if (walls.length < 2) throw new Error('没有可合并的同类型、同厚度、同颜色连续墙段');
   const selected = walls.find(w => w.id === id)!;
-  const L = length(selected), dx = (selected.b[0] - selected.a[0]) / L, dy = (selected.b[1] - selected.a[1]) / L;
-  const project = (p: Point) => (p[0] - selected.a[0]) * dx + (p[1] - selected.a[1]) * dy;
-  const endpoints = walls.flatMap(w => [w.a, w.b]).sort((a, b) => project(a) - project(b));
   const ids = new Set(walls.map(w => w.id));
   const root = selected.exteriorRootId;
   const complete = !!root && design.walls.filter(w => w.exteriorRootId === root).every(w => ids.has(w.id));
   const restored = complete && !design.walls.some(w => w.id === root && !ids.has(w.id));
-  const merged: Wall = { ...selected, id: restored ? root! : id, a: endpoints[0], b: endpoints[endpoints.length - 1], loadBearing: walls.some(isBearingWall) };
-  if (restored) delete merged.exteriorRootId;
+  const base: Wall = { ...selected, id: restored ? root! : id, loadBearing: walls.some(isBearingWall) };
+  if (restored) delete base.exteriorRootId;
+  return combineCollinearWalls(design, walls, base);
+}
+
+/**
+ * 把一组共线墙段替换为一面墙：几何取整组两端，其余属性取 base（含 id）；墙上门窗换算到新墙并校验不重叠、不越界。
+ * 新墙放在原组第一段的位置，避免打乱墙体顺序。
+ */
+export function combineCollinearWalls(design: Design, walls: Wall[], base: Wall): { design: Design; selectedId: string } {
+  const L = length(base), dx = (base.b[0] - base.a[0]) / L, dy = (base.b[1] - base.a[1]) / L;
+  const project = (p: Point) => (p[0] - base.a[0]) * dx + (p[1] - base.a[1]) * dy;
+  const endpoints = walls.flatMap(w => [w.a, w.b]).sort((a, b) => project(a) - project(b));
+  const ids = new Set(walls.map(w => w.id));
+  const merged: Wall = { ...base, a: endpoints[0], b: endpoints[endpoints.length - 1] };
   const openings = design.openings.map(o => {
     if (!ids.has(o.wallId)) return o;
     const old = walls.find(w => w.id === o.wallId)!, oldL = length(old);

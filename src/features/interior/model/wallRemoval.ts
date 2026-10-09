@@ -1,25 +1,27 @@
 import { rebuildRooms } from './geometry';
-import { canDemolishWall, canEditWall } from './wallPolicy';
+import { canDeleteWall } from './wallPolicy';
 import type { Design } from './types';
 
-/** 真实删除空白户型自绘的隔墙及其门窗，并重建房间；参考户型的原始墙体不可删除。 */
+/** 删除墙体及墙上门窗并重建房间；承重墙需先取消承重标记。 */
 export function removeWall(design: Design, wallId: string): Design {
   const wall = design.walls.find((w) => w.id === wallId);
-  if (!wall || !canEditWall(design, wall)) throw new Error('此墙体不可删除');
+  if (!wall) throw new Error('墙体不存在，请重新选择');
+  if (!canDeleteWall(wall)) throw new Error('承重墙不可删除，请先取消承重标记');
+  if (design.walls.length <= 1) throw new Error('至少保留一面墙体');
   return rebuildRooms({
     ...design,
     walls: design.walls.filter((w) => w.id !== wallId),
     openings: design.openings.filter((o) => o.wallId !== wallId),
-    demolished: design.demolished.filter((id) => id !== wallId),
   });
 }
 
-/** 拆除标注开关：非承重墙与矮墙可标记/撤销拆除，承重墙与建筑外墙不可拆除。 */
-export function toggleWallDemolition(design: Design, wallId: string): Design {
-  const wall = design.walls.find((w) => w.id === wallId);
-  if (!wall || !canDemolishWall(wall)) throw new Error('承重墙和建筑外墙不可拆除');
-  const demolished = design.demolished.includes(wallId)
-    ? design.demolished.filter((id) => id !== wallId)
-    : [...design.demolished, wallId];
-  return rebuildRooms({ ...design, demolished });
+/** 旧版「标记拆除」已移除：加载时直接删掉被标记的墙及墙上门窗。 */
+export function purgeDemolished(design: Design): Design {
+  const ids = new Set(design.demolished);
+  return {
+    ...design,
+    walls: design.walls.filter((w) => !ids.has(w.id)),
+    openings: design.openings.filter((o) => !ids.has(o.wallId)),
+    demolished: [],
+  };
 }

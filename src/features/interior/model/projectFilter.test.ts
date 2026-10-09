@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterProjects, pageNumbers, paginate } from './projectFilter';
+import { filterProjects, visibleEntries } from './projectFilter';
 import type { TemplatePreset } from '../data/templatePresets';
 import type { ProjectSummary } from '../cloud/useProjects';
 
@@ -30,19 +30,14 @@ describe('filterProjects', () => {
   });
 });
 
-describe('paginate', () => {
-  const list = Array.from({ length: 25 }, (_, i) => i);
-  it('按页切片并返回总页数', () => {
-    expect(paginate(list, 1, 12)).toEqual({ items: list.slice(0, 12), page: 1, pages: 3 });
-    expect(paginate(list, 3, 12).items).toEqual([24]);
+describe('visibleEntries', () => {
+  const entries = filterProjects(presets, rows, 'all', '');
+  it('取前 visible 条', () => {
+    expect(keys(visibleEntries(entries, 2, false).items)).toEqual(['mine:new', 'mine:mid']);
+    expect(visibleEntries(entries, 12, false)).toMatchObject({ available: 5 });
   });
-  it('页码越界修正到有效范围，空列表视为 1 页', () => {
-    expect(paginate(list, 9, 12).page).toBe(3);
-    expect(paginate(list, 0, 12).page).toBe(1);
-    expect(paginate([], 2, 12)).toEqual({ items: [], page: 1, pages: 1 });
-  });
-  it('页码保留首尾与当前页邻居，其余折叠为省略号', () => {
-    expect(pageNumbers(1, 3)).toEqual([1, 2, 3]);
-    expect(pageNumbers(5, 10)).toEqual([1, '…', 4, 5, 6, '…', 10]);
+  it('云端还有更多时内置模板暂不露出', () => {
+    expect(keys(visibleEntries(entries, 12, true).items)).toEqual(['mine:new', 'mine:mid', 'mine:old']);
+    expect(visibleEntries(entries, 12, true).available).toBe(3);
   });
 });
