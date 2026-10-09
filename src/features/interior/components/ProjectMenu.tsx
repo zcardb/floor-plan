@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Check, ChevronDown, Loader2, Plus } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, Copy, Loader2, Plus } from 'lucide-react';
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent,
+  DropdownMenuSubTrigger, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { notify } from '@/lib/notify';
 import { ProjectDeleteDialog, ProjectRenameDialog } from './ProjectDialogs';
-import { NewProjectDialog, type NewProjectInput } from './NewProjectDialog';
 import { ProjectRowActions } from './ProjectRowActions';
+import { CreateProjectMenuItems } from './CreateProjectMenuItems';
+import { useProjectCreation } from './useProjectCreation';
 import type { ProjectSummary } from '../cloud/useProjects';
+import type { Project } from '../model/types';
 
 export interface ProjectNavigation {
   projectList: ProjectSummary[];
@@ -17,8 +19,10 @@ export interface ProjectNavigation {
   onLoadMore: () => void;
   onRename: (project: ProjectSummary, name: string) => Promise<boolean>;
   onRemove: (project: ProjectSummary) => Promise<boolean>;
-  /** 登录后可在编辑器内直接新建项目，成功后切换到新项目。 */
-  onCreate?: (input: NewProjectInput) => Promise<boolean>;
+  /** 登录后可在编辑器内新建项目（与项目管理页同一套方式），成功后切换到新项目。 */
+  onCreateProject?: (project: Project) => Promise<boolean>;
+  /** 登录后可复制当前项目，成功后进入副本。 */
+  onDuplicate?: (project: ProjectSummary) => Promise<boolean>;
 }
 interface Props extends ProjectNavigation {
   project: ProjectSummary;
@@ -47,8 +51,8 @@ export function LoadMoreSentinel({ disabled, onVisible }: { disabled: boolean; o
 export function ProjectMenu(p: Props) {
   const [pending, setPending] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<ProjectSummary | null>(null), [deleting, setDeleting] = useState<ProjectSummary | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [creating, setCreating] = useState(false), [createPending, setCreatePending] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false), [duplicating, setDuplicating] = useState(false);
+  const creation = useProjectCreation({ create: p.onCreateProject ?? (async () => false), opened: () => {}, ai: p.loggedIn });
   const opening = useRef(false);
   const open = async (row: ProjectSummary) => {
     if (opening.current || row.id === p.project.id) return;
@@ -56,29 +60,32 @@ export function ProjectMenu(p: Props) {
     setPending(row.id);
     try { await p.onOpen(row); } finally { opening.current = false; setPending(null); }
   };
-  const create = async (input: NewProjectInput) => {
-    if (!p.onCreate || createPending) return;
-    setCreatePending(true);
-    try {
-      if (await p.onCreate(input)) { setCreating(false); notify.success('已创建项目「' + input.name.trim() + '」'); }
-    } finally { setCreatePending(false); }
+  const duplicate = async () => {
+    if (!p.onDuplicate || duplicating) return;
+    setDuplicating(true);
+    try { await p.onDuplicate(p.project); } finally { setDuplicating(false); }
   };
+  const busy = !!pending || duplicating || creation.importing || creation.submitting;
   const name = p.project.name;
   const rows = p.projectList;
   return <>
     <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
       <DropdownMenuTrigger asChild>
-        <button type="button" className="project-menu-trigger" aria-label={'项目：' + name} aria-busy={!!pending}>
-          <span>{name}</span>{pending ? <Loader2 className="animate-spin" size={14} /> : <ChevronDown size={14} />}
+        <button type="button" className="project-menu-trigger" aria-label={'项目：' + name} aria-busy={busy}>
+          <span>{name}</span>{pending || duplicating || creation.importing ? <Loader2 className="animate-spin" size={14} /> : <ChevronDown size={14} />}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="project-menu" onCloseAutoFocus={event => { if (renaming || deleting || creating) event.preventDefault(); }}>
+      <DropdownMenuContent align="start" className="project-menu" onCloseAutoFocus={event => { if (renaming || deleting || creation.dialogOpen) event.preventDefault(); }}>
         {p.loggedIn && <>
-          <div className="project-menu-head">
-            <DropdownMenuItem className="project-menu-back" disabled={!!pending} onSelect={p.onBack}><ArrowLeft />返回项目管理</DropdownMenuItem>
-            {p.onCreate && <DropdownMenuItem className="project-menu-create" disabled={!!pending}
-              onSelect={() => { setMenuOpen(false); setCreating(true); }}><Plus />新建项目</DropdownMenuItem>}
-          </div>
+          <DropdownMenuItem disabled={busy} onSelect={p.onBack}><ArrowLeft />返回项目管理</DropdownMenuItem>
+          {/* 与项目管理页的「新建项目」同一套选项：悬停展开，点击选项再创建。 */}
+          {p.onCreateProject && <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="project-menu-create" disabled={busy}><Plus size={16} />新建项目</DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="create-menu" sideOffset={6}>
+              <CreateProjectMenuItems actions={creation.actions} />
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>}
+          {p.onDuplicate && <DropdownMenuItem disabled={busy} onSelect={() => void duplicate()}><Copy />复制当前项目</DropdownMenuItem>}
           <DropdownMenuSeparator />
         </>}
         <div className="project-menu-list" role="group" aria-label="项目列表">
@@ -106,6 +113,6 @@ export function ProjectMenu(p: Props) {
     </DropdownMenu>
     <ProjectRenameDialog project={renaming} onClose={() => setRenaming(null)} onSubmit={p.onRename} />
     <ProjectDeleteDialog project={deleting} current={deleting?.id === p.project.id} onClose={() => setDeleting(null)} onConfirm={p.onRemove} />
-    {p.onCreate && <NewProjectDialog open={creating} pending={createPending} onClose={() => setCreating(false)} onSubmit={input => void create(input)} />}
+    {creation.dialogs}
   </>;
 }

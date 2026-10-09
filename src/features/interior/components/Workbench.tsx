@@ -684,7 +684,8 @@ export function Workbench(p: Props) {
           loggedIn={p.loggedIn}
           onBack={() => { sizeTransaction.cancel(); p.projects(); }}
           onOpen={async (row) => { sizeTransaction.cancel(); return p.projectNavigation.onOpen(row); }}
-          onCreate={p.projectNavigation.onCreate && (async (input) => { sizeTransaction.cancel(); return p.projectNavigation.onCreate!(input); })}
+          onCreateProject={p.projectNavigation.onCreateProject && (async (project) => { sizeTransaction.cancel(); return p.projectNavigation.onCreateProject!(project); })}
+          onDuplicate={p.projectNavigation.onDuplicate && (async (row) => { sizeTransaction.cancel(); return p.projectNavigation.onDuplicate!(row); })}
         />
         <span className="toolbar-divider" />
         <div className="toolbar-scroll">

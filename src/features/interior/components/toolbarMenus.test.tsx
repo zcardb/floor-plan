@@ -11,10 +11,13 @@ vi.mock('react', async original => ({
   },
   useRef: (value: unknown) => { const ref = { current: value }; state.refs.push(ref); return ref; },
   useEffect: (effect: () => unknown) => { state.effects.push(effect); },
+  useCallback: <T,>(fn: T) => fn,
 }));
 import { ProjectMenu, LoadMoreSentinel } from './ProjectMenu';
 import { ProjectDeleteDialog, ProjectRenameDialog } from './ProjectDialogs';
 import { NewProjectDialog } from './NewProjectDialog';
+import { AiCreateProjectDialog } from './AiCreateProjectDialog';
+import { CreateProjectMenuItems, type CreateProjectActions } from './CreateProjectMenuItems';
 import { ProjectRowActions } from './ProjectRowActions';
 import { AccountMenu } from './AccountMenu';
 import { AccountAvatar } from './AccountAvatar';
@@ -22,7 +25,7 @@ import { ExportMenu } from './ExportMenu';
 import { SoftwareSoonItem } from './SoftwareSoonItem';
 import { Button } from '@/components/ui/button';
 import { EditorTooltip } from '@/components/ui/editor-tooltip';
-import { DropdownMenuItem, DropdownMenuSubTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenuItem, DropdownMenuSubContent, DropdownMenuSubTrigger } from '@/components/ui/dropdown-menu';
 import type { ProjectSummary } from '../cloud/useProjects';
 
 type Node = ReactElement<Record<string, unknown>>;
@@ -123,20 +126,40 @@ describe('ProjectMenu', () => {
     state.values[0] = 'b';
     expect(actions(menu().tree).every(n => n.props.disabled === true)).toBe(true);
   });
-  it('登录且可新建时，返回项目管理右侧显示新建项目，点击收起下拉并打开新建弹窗', () => {
+  it('新建项目为悬停子菜单，选项与项目管理页一致；点击选项才打开对应弹窗', () => {
     expect(menu().tree.some(n => n.props.className === 'project-menu-create')).toBe(false);
-    const onCreate = vi.fn(async () => true);
-    const { tree } = menu({ onCreate });
-    const head = tree.find(n => n.props.className === 'project-menu-head')!;
-    const [back, create] = items(nodes(head.props.children as ReactNode));
-    expect(text(back.props.children as ReactNode)).toBe('返回项目管理');
-    expect(text(create.props.children as ReactNode)).toBe('新建项目');
-    state.values[3] = true;
-    (create.props.onSelect as () => void)();
-    expect(state.values[3]).toBe(false);
-    expect(state.values[4]).toBe(true);
-    expect(menu({ onCreate }).tree.find(n => n.type === NewProjectDialog)!.props.open).toBe(true);
-    expect(menu({ onCreate, loggedIn: false }).tree.some(n => n.props.className === 'project-menu-create')).toBe(false);
+    const onCreateProject = vi.fn(async () => true);
+    const { tree } = menu({ onCreateProject });
+    const trigger = tree.find(n => n.type === DropdownMenuSubTrigger)!;
+    expect(trigger.props.className).toBe('project-menu-create');
+    expect(text(trigger.props.children as ReactNode)).toBe('新建项目');
+    const options = tree.find(n => n.type === DropdownMenuSubContent)!;
+    const shared = nodes(options.props.children as ReactNode).find(n => n.type === CreateProjectMenuItems)!;
+    const actions = shared.props.actions as CreateProjectActions;
+    expect(actions.ai).toBeTypeOf('function');
+    expect(menu({ onCreateProject }).tree.find(n => n.type === NewProjectDialog)!.props.open).toBe(false);
+    actions.blank();
+    expect(menu({ onCreateProject }).tree.find(n => n.type === NewProjectDialog)!.props.open).toBe(true);
+    expect(menu({ onCreateProject }).tree.some(n => n.type === AiCreateProjectDialog)).toBe(true);
+    expect(menu({ onCreateProject, loggedIn: false }).tree.some(n => n.type === DropdownMenuSubTrigger)).toBe(false);
+  });
+  it('共享的新建选项：新建、AI 创建（可选）、导入 DXF、其他软件 Coming soon', () => {
+    const actions = { blank: vi.fn(), ai: vi.fn(), importFile: vi.fn() };
+    const tree = nodes(CreateProjectMenuItems({ actions }));
+    const labels = items(tree).map(n => text(n.props.children as ReactNode));
+    expect(labels).toEqual(['新建项目', 'AI 创建…', '导入 DXF 图纸…']);
+    expect(tree.some(n => n.type === SoftwareSoonItem && n.props.label === '从其他软件导入')).toBe(true);
+    items(tree).forEach(n => (n.props.onSelect as () => void)());
+    expect([actions.blank, actions.ai, actions.importFile].every(f => f.mock.calls.length === 1)).toBe(true);
+    expect(items(nodes(CreateProjectMenuItems({ actions: { ...actions, ai: undefined } }))).map(n => text(n.props.children as ReactNode))).not.toContain('AI 创建…');
+  });
+  it('复制当前项目：登录且可复制时显示，点击复制当前项目', () => {
+    expect(items(menu().tree).some(n => text(n.props.children as ReactNode) === '复制当前项目')).toBe(false);
+    const onDuplicate = vi.fn(async () => true);
+    const copy = items(menu({ onDuplicate }).tree).find(n => text(n.props.children as ReactNode) === '复制当前项目')!;
+    (copy.props.onSelect as () => void)();
+    expect(onDuplicate).toHaveBeenCalledWith(current);
+    expect(items(menu({ onDuplicate, loggedIn: false }).tree).some(n => text(n.props.children as ReactNode) === '复制当前项目')).toBe(false);
   });
 });
 

@@ -1,15 +1,15 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { ManagementLoading, ProjectCardsSkeleton } from './ManagementLoading';
 import { LoadError } from './LoadError';
-import { Plus, LayoutTemplate, LayoutGrid, RefreshCw, Loader2, ChevronDown, FilePlus2, FileUp, Search, Sparkles, X } from 'lucide-react';
+import { Plus, LayoutTemplate, LayoutGrid, RefreshCw, Loader2, ChevronDown, Search, X } from 'lucide-react';
 import { CmsPageHeader } from './CmsPageHeader';
 import { CmsSearchField } from './CmsSearchField';
 import { Button } from '@/components/ui/button';
 import { EditorTooltip } from '@/components/ui/editor-tooltip';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ProjectRenameDialog, ProjectDeleteDialog } from './ProjectDialogs';
-import { NewProjectDialog, type NewProjectInput } from './NewProjectDialog';
-import { AiCreateProjectDialog } from './AiCreateProjectDialog';
+import { CreateProjectMenuItems } from './CreateProjectMenuItems';
+import { useProjectCreation } from './useProjectCreation';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { notify } from '@/lib/notify';
 import { createProject, TEMPLATE_PRESETS } from '../data/templates';
@@ -19,10 +19,6 @@ import { mineCardActions, templateCardActions } from './projectCardActions';
 import { CmsFilterBar } from './CmsFilterBar';
 import { ProjectLoadMore } from './ProjectLoadMore';
 import { filterProjects, visibleEntries, PROJECT_SCOPES, type ProjectScope } from '../model/projectFilter';
-import { IMPORT_ACCEPT } from '../model/designImport';
-import { DxfImportDialog } from './DxfImportDialog';
-import { useProjectImport } from './useProjectImport';
-import { SoftwareSoonItem } from './SoftwareSoonItem';
 import type { useProjects, ProjectSummary } from '../cloud/useProjects';
 
 type Projects = ReturnType<typeof useProjects>;
@@ -33,7 +29,6 @@ type RowKind = 'open' | 'duplicate' | 'remove' | 'copyTemplate';
 const BUSY_LABEL: Record<RowKind, string> = { open: '正在打开…', duplicate: '正在复制…', remove: '正在删除…', copyTemplate: '正在复制…' };
 
 export function ProjectManager({ projects, opened }: { projects: Projects; opened: () => void }) {
-  const [creating, setCreating] = useState(false), [aiCreating, setAiCreating] = useState(false);
   const [rename, setRename] = useState<ProjectSummary | null>(null), [deleting, setDeleting] = useState<ProjectSummary | null>(null);
   const [scope, setScopeState] = useState<ProjectScope>('all'), [query, setQueryState] = useState('');
   const [visible, setVisible] = useState(PAGE_SIZE), [refreshing, setRefreshing] = useState(false);
@@ -88,14 +83,8 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
     },
     (kind, row) => kind + ':' + row.id,
   );
-  const submit = useAsyncAction(async ({ template, name, size, design }: NewProjectInput) => {
-    const project = createProject(template, name, size, design);
-    if (await projects.create(project, true)) { setCreating(false); setAiCreating(false); notify.success('已创建项目「' + project.name + '」'); opened(); }
-  });
-  const file = useRef<HTMLInputElement>(null);
-  const imports = useProjectImport(projects, opened);
-  const pickFile = () => file.current?.click();
-  const createBusy = rowAction.pending || imports.reading || imports.saving;
+  const creation = useProjectCreation({ create: project => projects.create(project, true), opened, ai: !!projects.session });
+  const createBusy = rowAction.pending || creation.importing;
   const busyLabel = (row: ProjectSummary) => {
     const [kind, id] = rowAction.pendingKey?.split(/:(.*)/) ?? [];
     return id === row.id ? BUSY_LABEL[kind as RowKind] : undefined;
@@ -110,23 +99,14 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
         </EditorTooltip>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button className="cms-create-button" disabled={createBusy} aria-busy={imports.reading}>
-              {imports.reading ? <Loader2 className="animate-spin" /> : <Plus />}新建项目<ChevronDown />
+            <Button className="cms-create-button" disabled={createBusy} aria-busy={creation.reading}>
+              {creation.reading ? <Loader2 className="animate-spin" /> : <Plus />}新建项目<ChevronDown />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="create-menu">
-            <DropdownMenuItem onSelect={() => setCreating(true)}><FilePlus2 />新建项目</DropdownMenuItem>
-            {projects.session && <DropdownMenuItem onSelect={() => setAiCreating(true)}><Sparkles />AI 创建…</DropdownMenuItem>}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={pickFile}><FileUp />导入 DXF 图纸…</DropdownMenuItem>
-            <SoftwareSoonItem label="从其他软件导入" />
+            <CreateProjectMenuItems actions={creation.actions} />
           </DropdownMenuContent>
         </DropdownMenu>
-        <input ref={file} type="file" accept={IMPORT_ACCEPT} hidden aria-hidden="true" tabIndex={-1} onChange={event => {
-          const selected = event.target.files?.[0];
-          event.target.value = '';
-          if (selected) imports.importFile(selected);
-        }} />
       </>} />
     {refreshing
       ? <ManagementLoading variant="projects" label="刷新项目列表" />
@@ -155,7 +135,7 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
             const row = projects.builtins.find(r => r.templateId === entry.preset.id);
             if (!row) return null;
             return <ProjectCard key={entry.key} title={entry.preset.name} badge="内置" thumbnail={<PresetThumbnail preset={entry.preset} />}
-              busyLabel={busyLabel(row)} locked={createBusy || submit.pending} openLabel="预览模板" onOpen={() => void rowAction.run('open', row)}
+              busyLabel={busyLabel(row)} locked={createBusy || creation.submitting} openLabel="预览模板" onOpen={() => void rowAction.run('open', row)}
               actions={templateCardActions(() => void rowAction.run('copyTemplate', row))} />;
           }
           const row = entry.row, design = guestStates.get(row.id) ?? row.thumbnail;
@@ -167,11 +147,7 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
         <ProjectLoadMore shown={shown.items.length} total={shown.available} hasMore={more} loading={projects.loading} onReach={() => loadMore(shown.available)} />
       </>}
 
-    <NewProjectDialog open={creating} pending={submit.pending} onClose={() => setCreating(false)} onSubmit={input => void submit.run(input)} />
-    {projects.session && <AiCreateProjectDialog open={aiCreating} pending={submit.pending} onClose={() => setAiCreating(false)} onSubmit={input => void submit.run(input)} />}
-
-    {imports.drawing && <DxfImportDialog source={imports.drawing.source} defaultName={imports.drawing.name} pending={imports.saving}
-      onImport={imports.confirmDrawing} onClose={imports.closeDrawing} />}
+    {creation.dialogs}
 
     <ProjectRenameDialog project={rename} onClose={() => setRename(null)} onSubmit={projects.rename} />
     <ProjectDeleteDialog project={deleting} onClose={() => setDeleting(null)} onConfirm={row => rowAction.run('remove', row)} />
