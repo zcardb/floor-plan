@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Check, ChevronDown, Loader2 } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, Loader2, Plus } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { notify } from '@/lib/notify';
 import { ProjectDeleteDialog, ProjectRenameDialog } from './ProjectDialogs';
+import { NewProjectDialog, type NewProjectInput } from './NewProjectDialog';
 import { ProjectRowActions } from './ProjectRowActions';
 import type { ProjectSummary } from '../cloud/useProjects';
 
@@ -15,6 +17,8 @@ export interface ProjectNavigation {
   onLoadMore: () => void;
   onRename: (project: ProjectSummary, name: string) => Promise<boolean>;
   onRemove: (project: ProjectSummary) => Promise<boolean>;
+  /** 登录后可在编辑器内直接新建项目，成功后切换到新项目。 */
+  onCreate?: (input: NewProjectInput) => Promise<boolean>;
 }
 interface Props extends ProjectNavigation {
   project: ProjectSummary;
@@ -44,12 +48,20 @@ export function ProjectMenu(p: Props) {
   const [pending, setPending] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<ProjectSummary | null>(null), [deleting, setDeleting] = useState<ProjectSummary | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [creating, setCreating] = useState(false), [createPending, setCreatePending] = useState(false);
   const opening = useRef(false);
   const open = async (row: ProjectSummary) => {
     if (opening.current || row.id === p.project.id) return;
     opening.current = true;
     setPending(row.id);
     try { await p.onOpen(row); } finally { opening.current = false; setPending(null); }
+  };
+  const create = async (input: NewProjectInput) => {
+    if (!p.onCreate || createPending) return;
+    setCreatePending(true);
+    try {
+      if (await p.onCreate(input)) { setCreating(false); notify.success('已创建项目「' + input.name.trim() + '」'); }
+    } finally { setCreatePending(false); }
   };
   const name = p.project.name;
   const rows = p.projectList;
@@ -60,9 +72,13 @@ export function ProjectMenu(p: Props) {
           <span>{name}</span>{pending ? <Loader2 className="animate-spin" size={14} /> : <ChevronDown size={14} />}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="project-menu" onCloseAutoFocus={event => { if (renaming || deleting) event.preventDefault(); }}>
+      <DropdownMenuContent align="start" className="project-menu" onCloseAutoFocus={event => { if (renaming || deleting || creating) event.preventDefault(); }}>
         {p.loggedIn && <>
-          <DropdownMenuItem disabled={!!pending} onSelect={p.onBack}><ArrowLeft />返回项目管理</DropdownMenuItem>
+          <div className="project-menu-head">
+            <DropdownMenuItem className="project-menu-back" disabled={!!pending} onSelect={p.onBack}><ArrowLeft />返回项目管理</DropdownMenuItem>
+            {p.onCreate && <DropdownMenuItem className="project-menu-create" disabled={!!pending}
+              onSelect={() => { setMenuOpen(false); setCreating(true); }}><Plus />新建项目</DropdownMenuItem>}
+          </div>
           <DropdownMenuSeparator />
         </>}
         <div className="project-menu-list" role="group" aria-label="项目列表">
@@ -90,5 +106,6 @@ export function ProjectMenu(p: Props) {
     </DropdownMenu>
     <ProjectRenameDialog project={renaming} onClose={() => setRenaming(null)} onSubmit={p.onRename} />
     <ProjectDeleteDialog project={deleting} current={deleting?.id === p.project.id} onClose={() => setDeleting(null)} onConfirm={p.onRemove} />
+    {p.onCreate && <NewProjectDialog open={creating} pending={createPending} onClose={() => setCreating(false)} onSubmit={input => void create(input)} />}
   </>;
 }

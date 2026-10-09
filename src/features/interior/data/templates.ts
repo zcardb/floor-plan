@@ -2,6 +2,7 @@ import { library } from "./catalog";
 import { NEW_TEMPLATE_PRESETS, type TemplatePreset } from './templatePresets';
 import { normalizeFurniture } from "../model/costs";
 import { outerWalls, rect } from "../model/geometry";
+import { mergeAllSplits } from "../model/wallBulk";
 import {
   uid,
   type Design,
@@ -165,7 +166,9 @@ export function defaultFurniture(): Furniture[] {
     f("plant", "绿植", 11550, 10250, 500, 500),
   ].map(normalizeFurniture);
 }
-export function referenceDesign(): Design {
+/** 参考户型（已执行「清空分割」，与模板列表里的一致）。 */
+export const referenceDesign = (): Design => mergeAllSplits(rawReferenceDesign()).design;
+function rawReferenceDesign(): Design {
   const data: [string, string, Point[], string, boolean?][] = [
     ["master", "主卧室", rect(6600, 0, 3670, 3370), "wood"],
     ["mbath", "主卫浴", rect(4820, 0, 1540, 2080), "antislip"],
@@ -315,10 +318,11 @@ export function blankDesign({ width, depth }: BlankSize = DEFAULT_BLANK_SIZE): D
     demolished: [],
   };
 }
+/** 模板生成时每个门窗各占一段满宽墙，门窗无法沿墙拖动：出厂即执行一次「清空分割」。 */
 export const TEMPLATE_PRESETS: TemplatePreset[] = [
   { id: 'reference', name: '三室两厅两卫 · 原木之家', layout: '三室两厅两卫', description: '原木风格 · 双卫 · 完整家具方案', area: 125, build: referenceDesign },
   ...NEW_TEMPLATE_PRESETS,
-];
+].map((preset) => ({ ...preset, build: () => mergeAllSplits(preset.build()).design }));
 export const presetById = (id: string) => TEMPLATE_PRESETS.find(p => p.id === id);
 export const designForTemplate = (id: string): Design => (presetById(id) ?? TEMPLATE_PRESETS[0]).build();
 

@@ -33,6 +33,9 @@ export interface AiRequestBase {
   images: string[];
   catalog: AiCatalogEntry[];
   projectId?: string;
+  /** 直接选择的模型，或自己的小助手（二选一，见 models.ts engineFields）。 */
+  model?: string;
+  assistantId?: string;
 }
 
 export interface AiRoomRequest extends AiRequestBase {

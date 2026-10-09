@@ -10,6 +10,7 @@ import { readyImageUrls, type AiImageDraft } from "./referenceImages";
 import { sanitizeRoomItems } from "./sanitize";
 import { useAiBatch } from "./useAiBatch";
 import type { AiCatalog, AiFurniturePick } from "./types";
+import { DEFAULT_AI_ENGINE, engineFields, type AiEngine } from "./models";
 
 /** 输入草稿：每个房间一份，关掉弹窗、切换选中对象都保留。 */
 export interface AiRoomDraft {
@@ -17,6 +18,7 @@ export interface AiRoomDraft {
   images: AiImageDraft[];
   count: number;
   picks: AiFurniturePick[];
+  engine: AiEngine;
 }
 
 /** 一批候选对应的请求：回显内容 + 发送时的目录（应用时必须用同一份目录解析）。 */
@@ -37,7 +39,7 @@ export interface AiRoomResult {
 
 export type AiEntryTone = "idle" | "running" | "unseen";
 
-/** 默认 2 个方案：Opus 成本最高，2 个已能比较，又不让等待和花费翻倍。 */
+/** 默认 2 个方案：2 个已能比较，又不让等待和花费翻倍。 */
 export const DEFAULT_AI_COUNT = 2;
 
 /**
@@ -77,7 +79,7 @@ export function useRoomAi({ design, catalog, projectId, change }: {
     const { design: d, catalog: c } = latest.current;
     const room = d.rooms.find((r) => r.id === roomId);
     if (!room) return;
-    setDrafts((all) => (all[roomId] ? all : { ...all, [roomId]: { description: "", images: [], count: DEFAULT_AI_COUNT, picks: initialPicks(d, room, c) } }));
+    setDrafts((all) => (all[roomId] ? all : { ...all, [roomId]: { description: "", images: [], count: DEFAULT_AI_COUNT, engine: DEFAULT_AI_ENGINE, picks: initialPicks(d, room, c) } }));
     setView(batchRoom === roomId ? "results" : "input");
     setOpenId(roomId);
   }, [batchRoom]);
@@ -98,10 +100,10 @@ export function useRoomAi({ design, catalog, projectId, change }: {
     const context = roomContext(source, room), plan = planSnapshot(source, room.id);
     const existing = furnitureInRoom(source, room).slice(0, 60).map((f) => ({ name: f.name, w: Math.round(f.w), d: Math.round(f.d) }));
     const request: AiRoomRequest = { roomId: room.id, roomName: room.name, description, images, furniture: pickNames(draft.picks, aiCatalog), catalog: aiCatalog };
-    const count = draft.count;
+    const count = draft.count, engine = engineFields(draft.engine);
     const launch = () => ai.start(request, count, async (index, generationId) => {
       const { candidate } = await generateRoomCandidate({
-        generationId, index, description, images, catalog: aiCatalog.entries, projectId, room: context, plan, existing, required,
+        generationId, index, description, images, catalog: aiCatalog.entries, projectId, room: context, plan, existing, required, ...engine,
       });
       const items = sanitizeRoomItems(candidate!.result, { zone: roomZone(room), catalog: aiCatalog, required });
       return { id: candidate!.candidateId, index, summary: candidate!.summary, warnings: candidate!.warnings, result: { items, preview: applyRoomLayout(source, room.id, items, aiCatalog) } };

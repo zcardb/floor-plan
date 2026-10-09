@@ -14,6 +14,7 @@ vi.mock('react', async original => ({
 }));
 import { ProjectMenu, LoadMoreSentinel } from './ProjectMenu';
 import { ProjectDeleteDialog, ProjectRenameDialog } from './ProjectDialogs';
+import { NewProjectDialog } from './NewProjectDialog';
 import { ProjectRowActions } from './ProjectRowActions';
 import { AccountMenu } from './AccountMenu';
 import { AccountAvatar } from './AccountAvatar';
@@ -121,6 +122,21 @@ describe('ProjectMenu', () => {
   it('切换项目进行中时行内操作禁用', () => {
     state.values[0] = 'b';
     expect(actions(menu().tree).every(n => n.props.disabled === true)).toBe(true);
+  });
+  it('登录且可新建时，返回项目管理右侧显示新建项目，点击收起下拉并打开新建弹窗', () => {
+    expect(menu().tree.some(n => n.props.className === 'project-menu-create')).toBe(false);
+    const onCreate = vi.fn(async () => true);
+    const { tree } = menu({ onCreate });
+    const head = tree.find(n => n.props.className === 'project-menu-head')!;
+    const [back, create] = items(nodes(head.props.children as ReactNode));
+    expect(text(back.props.children as ReactNode)).toBe('返回项目管理');
+    expect(text(create.props.children as ReactNode)).toBe('新建项目');
+    state.values[3] = true;
+    (create.props.onSelect as () => void)();
+    expect(state.values[3]).toBe(false);
+    expect(state.values[4]).toBe(true);
+    expect(menu({ onCreate }).tree.find(n => n.type === NewProjectDialog)!.props.open).toBe(true);
+    expect(menu({ onCreate, loggedIn: false }).tree.some(n => n.props.className === 'project-menu-create')).toBe(false);
   });
 });
 

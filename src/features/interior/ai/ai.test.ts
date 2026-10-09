@@ -176,6 +176,14 @@ describe("整户户型候选清洗与落地", () => {
     expect(project.name).toBe("AI 户型");
     expect(project.state.rooms).toEqual(design.rooms);
   });
+  it("落地时默认清空分割：门窗所在墙比洞口长，可以沿墙拖动", () => {
+    const design = planToDesign(sanitizePlan(plan, { width: 8000, depth: 9000, catalog }), catalog);
+    expect(design.walls.some((w) => w.id.startsWith("opening-wall-"))).toBe(false);
+    for (const o of design.openings) {
+      const wall = design.walls.find((w) => w.id === o.wallId)!;
+      expect(Math.hypot(wall.b[0] - wall.a[0], wall.b[1] - wall.a[1])).toBeGreaterThan(o.width);
+    }
+  });
   it("房间全部不可用时抛错", () => {
     expect(() => sanitizePlan({ ...plan, rooms: [{ id: "x", box: [0, 0, 10, 10] }] }, { width: 8000, depth: 9000, catalog })).toThrow("房间");
   });

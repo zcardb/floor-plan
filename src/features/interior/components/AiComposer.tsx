@@ -4,12 +4,16 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenu
 import { EditorTooltip } from "@/components/ui/editor-tooltip";
 import { AI_COUNT_OPTIONS, AI_IMAGE_LIMIT } from "../ai/client";
 import { ImagePreview } from "./ImagePreview";
+import { AiEnginePicker } from "./AiEnginePicker";
 import { imagesUploading, useReferenceImages, type AiImageDraft, type ImagesUpdate } from "../ai/referenceImages";
+import { modelOf, type AiEngine } from "../ai/models";
+import { useAssistants } from "../cloud/useAssistants";
 
 export interface AiComposerValue {
   description: string;
   images: AiImageDraft[];
   count: number;
+  engine: AiEngine;
 }
 
 const IMAGE_ACCEPT = "image/jpeg,image/png,image/webp,image/gif";
@@ -22,14 +26,15 @@ const fromClipboard = (items: DataTransferItemList | null | undefined) =>
 
 /**
  * 两处 AI 入口共用的输入框（圆角卡片）：上方是参考图缩略图（悬停显示 ✕），中间是描述，
- * 底部左侧 ＋ 添加参考图，右侧「数量」下拉（1–4）与发送按钮。
+ * 底部左侧 ＋ 添加参考图，右侧「模型 / 小助手」选择、「数量」下拉（1–4）与发送按钮。
  * 支持粘贴（Ctrl / ⌘ + V）和拖入图片；Enter 发送，Shift + Enter 换行，输入法组字时不发送。
  */
-export function AiComposer({ value, onDescription, onImages, onCount, onSend, placeholder, sendLabel = "生成", blocked }: {
+export function AiComposer({ value, onDescription, onImages, onCount, onEngine, onSend, placeholder, sendLabel = "生成", blocked }: {
   value: AiComposerValue;
   onDescription: (text: string) => void;
   onImages: ImagesUpdate;
   onCount: (count: number) => void;
+  onEngine: (engine: AiEngine) => void;
   onSend: () => void;
   placeholder: string;
   sendLabel?: string;
@@ -41,7 +46,12 @@ export function AiComposer({ value, onDescription, onImages, onCount, onSend, pl
   const images = useReferenceImages(value.images, onImages);
   const uploading = imagesUploading(value.images);
   const full = value.images.length >= AI_IMAGE_LIMIT;
-  const reason = blocked || (!value.description.trim() ? "请先描述需求" : uploading ? "参考图上传中" : "");
+  const assistants = useAssistants();
+  const assistant = value.engine.kind === "assistant" ? assistants.items.find((a) => a.id === value.engine.id) : undefined;
+  const missingAssistant = value.engine.kind === "assistant" && !assistants.loading && !assistant;
+  const model = modelOf(value.engine.kind === "model" ? value.engine.id : assistant?.model);
+  const blind = value.images.length > 0 && !!model && !model.vision;
+  const reason = blocked || (missingAssistant ? "所选小助手已删除，请重新选择" : !value.description.trim() ? "请先描述需求" : uploading ? "参考图上传中" : "");
   const send = () => { if (!reason) onSend(); };
   // 输入框随内容增高，超过上限后内部滚动。
   useLayoutEffect(() => {
@@ -98,6 +108,7 @@ export function AiComposer({ value, onDescription, onImages, onCount, onSend, pl
       <input ref={file} type="file" accept={IMAGE_ACCEPT} multiple hidden aria-hidden="true" tabIndex={-1}
         onChange={(e) => { const files = fromList(e.target.files); e.target.value = ""; if (files.length) images.add(files); }} />
       <span className="ai-composer-spacer" />
+      <AiEnginePicker engine={value.engine} assistants={assistants.items} onChange={onEngine} />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button type="button" className="ai-composer-count" aria-label={`方案数量，当前 ${value.count} 个`}>{value.count} 个方案<ChevronDown size={12} /></button>
@@ -112,6 +123,7 @@ export function AiComposer({ value, onDescription, onImages, onCount, onSend, pl
         <button type="button" className="ai-composer-send" aria-label={sendLabel} disabled={!!reason} onClick={send}><ArrowUp size={15} /></button>
       </EditorTooltip>
     </div>
+    {blind && <p className="ai-composer-notice" role="status">{model!.name} 不读取参考图，生成时只参考文字描述；需要参考图请换成可读图的模型。</p>}
     <ImagePreview src={preview?.src ?? null} alt={preview?.alt ?? ""} onClose={() => setPreview(null)} />
   </div>;
 }

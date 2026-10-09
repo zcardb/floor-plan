@@ -63,6 +63,7 @@ export function AiRoomDialog({ ai, furniture }: { ai: RoomAi; furniture: Library
             onDescription={(description) => ai.updateDraft((d) => ({ ...d, description }))}
             onImages={(fn) => ai.updateDraft((d) => ({ ...d, images: fn(d.images) }))}
             onCount={(count) => ai.updateDraft((d) => ({ ...d, count }))}
+            onEngine={(engine) => ai.updateDraft((d) => ({ ...d, engine }))}
             onSend={ai.send}
           />
         </>}

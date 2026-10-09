@@ -2,6 +2,7 @@ import { buildPlan, placeFurniture, type FurnitureSpec, type PlanSpec } from "..
 import { AI_TEMPLATE_ID } from "../data/templates";
 import { furnitureKey } from "../model/costs";
 import { validateDesign } from "../model/validation";
+import { mergeAllSplits } from "../model/wallBulk";
 import type { Design, Furniture, LibraryItem } from "../model/types";
 import { isBuiltinItem } from "./catalog";
 import { furnitureInRoom, roomZone } from "./context";
@@ -23,7 +24,8 @@ function registerCatalog(design: Design, furniture: Furniture[], catalog: AiCata
 
 /** 整户户型候选 → 可直接新建项目的方案（标记为 AI 户型，结构可编辑）。 */
 export function planToDesign(spec: PlanSpec, catalog: AiCatalog): Design {
-  const built = buildPlan(spec, catalogResolver(catalog));
+  // 生成时每个门窗各占一段满宽墙，门窗无法沿墙拖动：默认执行一次「清空分割」。
+  const built = mergeAllSplits(buildPlan(spec, catalogResolver(catalog))).design;
   const design: Design = { ...built, templateId: AI_TEMPLATE_ID, structureUnlocked: true };
   return validateDesign({ ...design, customCatalog: registerCatalog(design, design.furniture, catalog) });
 }

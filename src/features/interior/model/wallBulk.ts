@@ -41,8 +41,12 @@ export function collinearWallChains(design: Design): Wall[][] {
 
 /** 整条线合并后的墙：类型取最高优先级，厚度/颜色/id 取该类型中最长的一段；任一段承重则整面墙承重。 */
 function chainBase(design: Design, chain: Wall[]): Wall {
-  const top = Math.max(...chain.map(w => KIND_RANK[w.kind]));
-  const base = chain.filter(w => KIND_RANK[w.kind] === top).sort((a, b) => length(b) - length(a))[0];
+  // 门窗满宽墙段（洞口宽 = 墙段长）只是洞口的载体，类型常与所在墙不一致，不参与类型判定。
+  const isOpeningHost = (w: Wall) => design.openings.some(o => o.wallId === w.id && Math.abs(o.width - length(w)) < tolerance);
+  const solid = chain.filter(w => !isOpeningHost(w));
+  const ranked = solid.length ? solid : chain;
+  const top = Math.max(...ranked.map(w => KIND_RANK[w.kind]));
+  const base = ranked.filter(w => KIND_RANK[w.kind] === top).sort((a, b) => length(b) - length(a))[0];
   const ids = new Set(chain.map(w => w.id));
   // 外围墙被分割过：整组都在链内且原 id 空闲时恢复原墙 id。
   const root = base.kind === 'exterior' ? chain.find(w => w.exteriorRootId)?.exteriorRootId : undefined;

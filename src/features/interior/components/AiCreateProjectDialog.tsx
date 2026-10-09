@@ -14,6 +14,7 @@ import { sanitizePlan } from "../ai/sanitize";
 import { useAiBatch } from "../ai/useAiBatch";
 import { useAiCatalog } from "../ai/useAiCatalog";
 import { DEFAULT_AI_COUNT } from "../ai/useRoomAi";
+import { DEFAULT_AI_ENGINE, engineFields } from "../ai/models";
 import { AI_TEMPLATE_ID } from "../data/templates";
 import { area } from "../model/geometry";
 import { parseMeterDraft } from "../model/lengthUnits";
@@ -46,7 +47,7 @@ export function AiCreateProjectForm({ pending, onClose, onSubmit }: { pending: b
   const [advanced, setAdvanced] = useState(false);
   const [width, setWidth] = useState(""), [depth, setDepth] = useState("");
   const [rooms, setRooms] = useState({ bedrooms: "", livingRooms: "", bathrooms: "" });
-  const [composer, setComposer] = useState<AiComposerValue>({ description: "", images: [], count: DEFAULT_AI_COUNT });
+  const [composer, setComposer] = useState<AiComposerValue>({ description: "", images: [], count: DEFAULT_AI_COUNT, engine: DEFAULT_AI_ENGINE });
   const [view, setView] = useState<"input" | "results">("input"), [picked, setPicked] = useState<number | null>(null);
   const { catalog } = useAiCatalog(undefined, true);
   const ai = useAiBatch<PlanRequest, { design: Design }>();
@@ -65,10 +66,10 @@ export function AiCreateProjectForm({ pending, onClose, onSubmit }: { pending: b
       ...(Number.isFinite(size.width) ? { width: Math.round(size.width) } : {}),
       ...(Number.isFinite(size.depth) ? { depth: Math.round(size.depth) } : {}),
     };
-    const aiCatalog = catalog, count = composer.count;
+    const aiCatalog = catalog, count = composer.count, engine = engineFields(composer.engine);
     const launch = () => ai.start(request, count, async (index, generationId) => {
       const { candidate } = await generatePlanCandidate({
-        generationId, index, description, images: request.images, catalog: aiCatalog.entries, hints, width: request.width, depth: request.depth,
+        generationId, index, description, images: request.images, catalog: aiCatalog.entries, hints, width: request.width, depth: request.depth, ...engine,
       });
       const spec = sanitizePlan(candidate!.result, { width: request.width, depth: request.depth, catalog: aiCatalog });
       return { id: candidate!.candidateId, index, summary: candidate!.summary, warnings: candidate!.warnings, result: { design: planToDesign(spec, aiCatalog) } };
@@ -119,6 +120,7 @@ export function AiCreateProjectForm({ pending, onClose, onSubmit }: { pending: b
       onDescription={(description) => setComposer((c) => ({ ...c, description }))}
       onImages={(fn) => setComposer((c) => ({ ...c, images: fn(c.images) }))}
       onCount={(count) => setComposer((c) => ({ ...c, count }))}
+      onEngine={(engine) => setComposer((c) => ({ ...c, engine }))}
       onSend={send}
     />
     <section className={"ai-advanced" + (advanced ? " is-open" : "")}>
