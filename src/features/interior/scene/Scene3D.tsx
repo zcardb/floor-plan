@@ -15,6 +15,7 @@ import {
 import { notify } from "@/lib/notify";
 import { floorMaterialOf } from "../model/floorMaterials";
 import { floorTexture } from "./floorTexture";
+import { releasePointerLock } from "./pointerLock";
 import { doorOrientation } from '../model/doorOrientation';
 import {
   area,
@@ -726,7 +727,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         document.removeEventListener("pointerlockerror", lockError);
         walk.removeEventListener("lock", lock);
         walk.removeEventListener("unlock", unlock);
-        walk.unlock();
+        releasePointerLock(walk);
         walk.dispose();
         orbit.dispose();
         clear(arch);
@@ -988,7 +989,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         r.fly = null;
         teleport();
       } else {
-        r.walk.unlock();
+        releasePointerLock(r.walk);
         r.orbit.enabled = true;
         fly();
       }
