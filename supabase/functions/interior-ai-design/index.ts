@@ -107,10 +107,11 @@ const ROOM_CONTRACT = `你是资深室内设计师，为一套户型中的「目
 4. 结合整套户型：门连通哪些房间、相邻房间的功能与现有家具，保持风格一致、动线顺畅。
 5. 「指定家具」不为空时，只能使用指定的代号，且每个代号的件数必须与指定件数完全相同，不得增减或加入其他家具；为空时由你从目录中挑选适合该房间功能的家具。`;
 
-const PLAN_CONTRACT = `你是住宅空间规划与户型设计助手。根据用户的文字需求（可能附参考图），在矩形外轮廓内设计一套功能合理、连通顺畅、尺寸自洽的单层户型，包括内墙、房间、门窗与家具。只输出一个 JSON 对象，不要输出解释或 Markdown。
+const PLAN_CONTRACT = `你是住宅空间规划与户型设计助手。根据用户的文字需求（可能附参考图），设计一套功能合理、连通顺畅、尺寸自洽的单层户型，包括外轮廓、内墙、房间、门窗与家具。只输出一个 JSON 对象，不要输出解释或 Markdown。
 
 一、理解需求
-- 从描述中提取：外轮廓长宽或面积、朝向、居住人数、房间数量与用途、采光／隐私／收纳／办公等需求，以及用户指定的门窗位置。
+- 从描述中提取：外轮廓形状与长宽或面积、朝向、居住人数、房间数量与用途、采光／隐私／收纳／办公等需求，以及用户指定的门窗位置。
+- 外轮廓按用户给的来：用户描述或参考图是 L 形、凹凸、缺角等不规则外形时，保持原外形输出 outline，不要补成矩形；没有特别说明时可以用矩形。
 - 区分硬性要求（尺寸、房间数、指定门窗）和偏好（风格、氛围）。先满足硬性要求，偏好在不冲突时再满足。
 - 信息不全时按常见住宅做法合理假设，不要提问。需求互相冲突时先保证空间能用，再尽量贴近偏好。
 - 参考图：用户要求还原或照着做时，按图中的房间关系、形状和比例来；否则只当作风格参考，不照搬房间数量和布局。
@@ -152,20 +153,25 @@ const PLAN_CONTRACT = `你是住宅空间规划与户型设计助手。根据用
 - 墙端点、房间边界、门窗坐标是否互相对得上。
 
 —— 输出约定（系统解析用，必须遵守）——
-坐标：单位 mm；原点在室内净轮廓左上角；x 向右，y 向下（下方为南）。室内净尺寸为 width × depth，外墙固定是矩形，由系统生成，名字为 top / right / bottom / left，不要输出外墙。
-尺寸：在顶层输出 width（长，x 方向）和 depth（宽，y 方向），范围 3000–40000，取 100 的整数倍。用户写了长宽或面积就按用户的来。
+坐标：单位 mm；原点在室内净轮廓外接矩形的左上角；x 向右，y 向下（下方为南）。
+尺寸：在顶层输出 width（长，x 方向）和 depth（宽，y 方向），即室内净轮廓外接矩形的长宽，范围 3000–40000，取 100 的整数倍。用户写了长宽或面积就按用户的来。
+外轮廓：外墙由系统生成，不要放进 walls。
+- 矩形户型：不输出 outline，外墙名为 top / right / bottom / left。
+- 不规则户型：输出 outline，为室内净轮廓的顶点数组（横平竖直、按顺序首尾相连、全部落在 0–width × 0–depth 内，每条边不短于 600）。外墙沿 outline 生成，第 k 条边（第 k 点 → 第 k+1 点，最后一点回到第 1 点）的外墙名为 ek，例如 e1、e2；此时不要再用 top / right / bottom / left。
+  L 形示例（右上角缺 4000×3000）："outline":[[0,0],[8000,0],[8000,3000],[12000,3000],[12000,10000],[0,10000]]，其中 e2 是 x=8000 那段竖墙。
 
 {
   "summary": "一句话方案说明，20 字以内",
   "width": 12000, "depth": 10000,
-  "walls": [{"key":"a","dir":"h","at":4200,"from":0,"to":6000}],
-  "rooms": [{"id":"living","name":"客厅","mat":"tile800","box":[0,4200,6000,9000]}],
-  "openings": [{"wall":"bottom","kind":"window","at":3000,"width":1800},{"wall":"a","kind":"door","at":1500,"width":900,"into":"up"}],
+  "outline": [[0,0],[8000,0],[8000,3000],[12000,3000],[12000,10000],[0,10000]],
+  "walls": [{"key":"a","dir":"h","at":6000,"from":0,"to":12000}],
+  "rooms": [{"id":"living","name":"客厅","mat":"tile800","box":[0,6000,7000,10000]}],
+  "openings": [{"wall":"e5","kind":"window","at":3500,"width":1800},{"wall":"a","kind":"door","at":1500,"width":900,"into":"up"}],
   "furniture": [{"room":"living","items":[{"code":"F12","back":"down","along":2000,"gap":0}]}]
 }
 
-- 墙：dir=h 为横墙（at 是 y，from/to 是 x 范围），dir=v 为竖墙（at 是 x，from/to 是 y 范围）。坐标取墙中心线，内墙厚 120。端点落在外墙内侧或另一面内墙的中心线上；key 唯一。
-- 房间：沿墙中心线给轮廓。矩形用 box:[x1,y1,x2,y2]，L 形用 poly（横平竖直的顶点数组）。id 唯一，name 用中文。mat 取 wood、walnut、tile800、tile600、antislip、marble、terrazzo、carpet 之一。
+- 墙：dir=h 为横墙（at 是 y，from/to 是 x 范围），dir=v 为竖墙（at 是 x，from/to 是 y 范围）。坐标取墙中心线，内墙厚 120。端点落在外轮廓内侧或另一面内墙的中心线上；key 唯一。
+- 房间：沿墙中心线给轮廓，全部落在外轮廓内。矩形用 box:[x1,y1,x2,y2]，L 形用 poly（横平竖直的顶点数组）。id 唯一，name 用中文。mat 取 wood、walnut、tile800、tile600、antislip、marble、terrazzo、carpet 之一。
 - 门窗：kind 取 door 或 window；wall 引用内墙 key 或外墙名；at 是洞口中心沿墙的位置，width 是洞口宽。门的 into 是开向（横墙填 up/down，竖墙填 left/right）。同一面墙上的洞口互不重叠，离墙端至少 100。
 - 家具：按房间分组，room 引用房间 id。每件家具用 back（背靠哪条边：up/down/left/right）、along（中心沿这条边的位置）、gap（背面到这条边的距离，贴墙为 0）描述，坐标相对该房间外接矩形的左上角。只能用目录里的代号。`;
 
@@ -229,7 +235,7 @@ function roomPrompt(b: Body) {
 }
 
 /** 长宽由描述里的需求决定（用户把长宽写在描述里），模型必须在 JSON 顶层输出。 */
-const SIZE_LINE = '室内净尺寸未固定：若用户需求里给出了长宽（如「长 12 m × 宽 10 m」）或面积，请严格按该数值换算成 mm 设计；否则按房间数量与面积确定合理尺寸。请在 JSON 顶层输出 "width" 与 "depth"（3000–40000 mm，取 100 的整数倍）。';
+const SIZE_LINE = '室内净尺寸未固定：若用户需求里给出了长宽（如「长 12 m × 宽 10 m」）或面积，请严格按该数值换算成 mm 设计；否则按房间数量与面积确定合理尺寸。请在 JSON 顶层输出 "width" 与 "depth"（室内净轮廓外接矩形的长宽，3000–40000 mm，取 100 的整数倍）；外形不规则时另外输出 "outline"。';
 
 function planPrompt(b: Body) {
   return [
@@ -317,16 +323,39 @@ const area = (ring: Ring) => Math.abs(ring.reduce((s, a, i) => { const c = ring[
 
 function validatePlan(value: unknown, b: Body): Issues {
   const found = issues(), errors = found.hard;
-  const v = value as { width?: unknown; depth?: unknown; walls?: unknown; rooms?: unknown; openings?: unknown; furniture?: unknown };
+  const v = value as { width?: unknown; depth?: unknown; outline?: unknown; walls?: unknown; rooms?: unknown; openings?: unknown; furniture?: unknown };
   const W = finite(v?.width, 3000, 40000) ? v.width : NaN, D = finite(v?.depth, 3000, 40000) ? v.depth : NaN;
   if (!Number.isFinite(W) || !Number.isFinite(D)) return { hard: ['顶层必须输出 width 与 depth（3000–40000 的数字，单位 mm）'], soft: [] };
   const byCode = new Map(b.catalog.map((e) => [e.code, e]));
+  // 外墙：给了合法 outline 就沿它生成（外墙名 ek），否则按长宽生成矩形（top / right / bottom / left）。
+  let outline: Ring | null = null;
+  if (v?.outline !== undefined) {
+    if (!Array.isArray(v.outline) || v.outline.length < 4 || v.outline.length > 40 || !v.outline.every((p) => Array.isArray(p) && p.length === 2 && finite(p[0]) && finite(p[1])))
+      found.soft.push('outline 必须是 4–40 个 [x,y] 点的数组，例如 [[0,0],[8000,0],[8000,3000],[12000,3000],[12000,10000],[0,10000]]');
+    else if (v.outline.some((p) => p[0] < -1 || p[1] < -1 || p[0] > W + 1 || p[1] > D + 1))
+      found.soft.push(`outline 的顶点必须落在 0–${W} × 0–${D} 内`);
+    else outline = v.outline as Ring;
+    if (outline) for (let i = 0; i < outline.length; i++) {
+      const p = outline[i], q = outline[(i + 1) % outline.length];
+      if (p[0] !== q[0] && p[1] !== q[1]) { found.soft.push(`outline 第 ${i + 1} 条边不是横平竖直的：外墙只能沿 x 或 y 方向`); outline = null; break; }
+      if (Math.abs(q[0] - p[0]) + Math.abs(q[1] - p[1]) < 600) { found.soft.push(`outline 第 ${i + 1} 条边短于 600，请合并或去掉`); outline = null; break; }
+    }
+  }
+  const outerEdges = new Map<string, { dir: 'h' | 'v'; from: number; to: number }>(outline
+    ? outline.map((p, i) => {
+        const q = outline![(i + 1) % outline!.length];
+        const dir: 'h' | 'v' = p[1] === q[1] ? 'h' : 'v';
+        const [a, z] = dir === 'h' ? [p[0], q[0]] : [p[1], q[1]];
+        return [`e${i + 1}`, { dir, from: Math.min(a, z), to: Math.max(a, z) }];
+      })
+    : [['top', { dir: 'h' as const, from: 0, to: W }], ['bottom', { dir: 'h' as const, from: 0, to: W }], ['left', { dir: 'v' as const, from: 0, to: D }], ['right', { dir: 'v' as const, from: 0, to: D }]]);
+  const isOuter = (name: string) => outerEdges.has(name);
   const walls = new Map<string, { dir: string; at: number; from: number; to: number }>();
   if (!Array.isArray(v?.walls)) errors.push('walls 必须是数组');
   else v.walls.forEach((raw, i) => {
     const w = raw as { key?: unknown; dir?: unknown; at?: unknown; from?: unknown; to?: unknown };
     const key = typeof w?.key === 'string' ? w.key : '';
-    if (!key || walls.has(key) || ['top', 'right', 'bottom', 'left'].includes(key)) { found.soft.push(`第 ${i + 1} 面内墙：key 缺失、重复或与外墙同名`); return; }
+    if (!key || walls.has(key) || ['top', 'right', 'bottom', 'left'].includes(key) || isOuter(key)) { found.soft.push(`第 ${i + 1} 面内墙：key 缺失、重复或与外墙同名`); return; }
     if (w.dir !== 'h' && w.dir !== 'v') { found.soft.push(`内墙 ${key}：dir 必须是 h 或 v`); return; }
     const [across, along] = w.dir === 'h' ? [D, W] : [W, D];
     if (!finite(w.at, 0, across) || !finite(w.from, 0, along) || !finite(w.to, 0, along) || w.to - w.from < 600) { found.soft.push(`内墙 ${key}：at/from/to 超出范围或长度不足 600`); return; }
@@ -357,12 +386,12 @@ function validatePlan(value: unknown, b: Body): Issues {
   else v.openings.forEach((raw, i) => {
     const o = raw as { wall?: unknown; kind?: unknown; at?: unknown; width?: unknown };
     const wall = typeof o?.wall === 'string' ? o.wall : '';
-    const outer = ['top', 'right', 'bottom', 'left'].includes(wall);
-    if (!outer && !walls.has(wall)) { found.soft.push(`第 ${i + 1} 个门窗：wall=${wall} 既不是外墙名也不是内墙 key`); return; }
+    const outer = isOuter(wall);
+    if (!outer && !walls.has(wall)) { found.soft.push(`第 ${i + 1} 个门窗：wall=${wall} 既不是外墙名（${[...outerEdges.keys()].join(' / ')}）也不是内墙 key`); return; }
     if (o.kind !== 'door' && o.kind !== 'window') { found.soft.push(`第 ${i + 1} 个门窗：kind 必须是 door 或 window`); return; }
     if (!finite(o.at) || !finite(o.width, 500, 4000)) { found.soft.push(`第 ${i + 1} 个门窗：at / width 无效`); return; }
     if (o.kind === 'window' && !outer) found.soft.push(`第 ${i + 1} 个门窗：窗只能开在外墙上`);
-    const [from, to] = outer ? [0, wall === 'top' || wall === 'bottom' ? W : D] : [walls.get(wall)!.from, walls.get(wall)!.to];
+    const { from, to } = outer ? outerEdges.get(wall)! : walls.get(wall)!;
     if (o.at - o.width / 2 < from || o.at + o.width / 2 > to) found.soft.push(`第 ${i + 1} 个门窗：洞口超出了墙 ${wall} 的范围`);
     if (o.kind === 'door' && outer) entrance = true;
   });

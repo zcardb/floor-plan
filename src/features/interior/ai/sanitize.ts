@@ -1,4 +1,4 @@
-import { INNER_WALL, libraryResolver } from "../data/floorplanBuilder";
+import { INNER_WALL, libraryResolver, outlineEdgeKey } from "../data/floorplanBuilder";
 import type { Box, CatalogResolver, FurnitureSpec, FurnitureZone, OpeningSpec, PlanSpec, RoomSpec, Side, WallSpec } from "../data/floorplanBuilder";
 import { materials } from "../data/catalog";
 import { inRing, ringArea } from "../model/geometry";
@@ -138,13 +138,30 @@ function netRing(source: Point[], walls: WallSpec[]): Point[] {
 }
 
 /**
- * 整户户型候选 → PlanSpec：只取内墙、门窗、房间与家具，外墙由渲染器按长宽生成。
+ * 模型给的不规则外轮廓 → 室内净轮廓顶点。必须至少 4 个点、每条边横平竖直且不短于 MIN_WALL_LENGTH；
+ * 不合法时返回 undefined，退回 width × depth 的矩形外墙。不去掉共线点：外墙名 e{k} 要与模型给的序号一致。
+ */
+export function parseOutline(value: unknown, width: number, depth: number): Point[] | undefined {
+  if (!Array.isArray(value) || value.length < 4 || value.length > 40) return undefined;
+  if (!value.every((p) => Array.isArray(p) && p.length === 2 && p.every((n) => num(n) !== undefined))) return undefined;
+  const ring = (value as Point[]).map(([x, y]): Point => [round10(clamp(x, 0, width)), round10(clamp(y, 0, depth))]);
+  const valid = ring.every((a, i) => {
+    const b = ring[(i + 1) % ring.length];
+    const length = Math.abs(b[0] - a[0]) + Math.abs(b[1] - a[1]);
+    return (a[0] === b[0] || a[1] === b[1]) && length >= MIN_WALL_LENGTH;
+  });
+  return valid && ringArea(ring) / 1e6 >= MIN_ROOM_AREA ? ring : undefined;
+}
+
+/**
+ * 整户户型候选 → PlanSpec：只取外轮廓、内墙、门窗、房间与家具，外墙由渲染器生成
+ * （给了合法 outline 就沿它生成，外墙名 e1、e2…；否则按长宽生成矩形，外墙名 top/right/bottom/left）。
  * - 墙 key 与房间 id 全部重新命名（w- / r-），避免与外墙名或彼此撞 id 导致方案加载失败；
  *   门窗与家具通过「原名 → 新名」映射重新对上。
  * - 越界 / 重叠的门窗、碎墙、过小的房间、目录外的家具都丢弃；房间或家具全部不可用时抛错。
  */
 export function sanitizePlan(value: unknown, { catalog }: { catalog: AiCatalog }): PlanSpec {
-  const raw = (value ?? {}) as { width?: unknown; depth?: unknown; walls?: unknown; openings?: unknown; rooms?: unknown; furniture?: unknown };
+  const raw = (value ?? {}) as { width?: unknown; depth?: unknown; outline?: unknown; walls?: unknown; openings?: unknown; rooms?: unknown; furniture?: unknown };
   // 长宽由模型按需求描述决定（用户把长宽写在描述里）；这里只把模型给的尺寸夹进合理范围。
   const sizeOf = (given: unknown) => {
     const n = num(given);
@@ -152,6 +169,18 @@ export function sanitizePlan(value: unknown, { catalog }: { catalog: AiCatalog }
     return round10(clamp(n, 3000, 40000));
   };
   const width = sizeOf(raw.width), depth = sizeOf(raw.depth);
+  const outline = parseOutline(raw.outline, width, depth);
+  // 外墙名 → [沿墙方向, 起点, 终点]；内墙 key 不能与外墙名相同。
+  const outer = new Map<string, ["h" | "v", number, number]>(
+    outline
+      ? outline.map((a, i) => {
+          const b = outline[(i + 1) % outline.length];
+          const dir = a[1] === b[1] ? "h" : "v";
+          const [p, q] = dir === "h" ? [a[0], b[0]] : [a[1], b[1]];
+          return [outlineEdgeKey(i), [dir, Math.min(p, q), Math.max(p, q)]];
+        })
+      : [["top", ["h", 0, width]], ["bottom", ["h", 0, width]], ["left", ["v", 0, depth]], ["right", ["v", 0, depth]]],
+  );
   const list = (v: unknown) => (Array.isArray(v) ? v : []);
 
   const walls: WallSpec[] = [];
@@ -159,8 +188,8 @@ export function sanitizePlan(value: unknown, { catalog }: { catalog: AiCatalog }
   for (const entry of list(raw.walls)) {
     const w = (entry ?? {}) as { key?: unknown; dir?: unknown; at?: unknown; from?: unknown; to?: unknown };
     const key = text(w.key), at = num(w.at);
-    // 外墙名 top/right/bottom/left 是保留字：模型把它们当内墙 key 用会造成歧义，直接丢弃。
-    if (!key || OUTER_NAMES.includes(key) || wallKeys.has(key) || (w.dir !== "h" && w.dir !== "v") || at === undefined) continue;
+    // 外墙名是保留字：模型把它们当内墙 key 用会造成歧义，直接丢弃。
+    if (!key || OUTER_NAMES.includes(key) || outer.has(key) || wallKeys.has(key) || (w.dir !== "h" && w.dir !== "v") || at === undefined) continue;
     const across = w.dir === "h" ? depth : width, limit = w.dir === "h" ? width : depth;
     if (at < MIN_WALL_OFFSET || at > across - MIN_WALL_OFFSET) continue;
     const ends = [clamp(num(w.from) ?? 0, 0, limit), clamp(num(w.to) ?? limit, 0, limit)].sort((a, b) => a - b);
@@ -170,11 +199,11 @@ export function sanitizePlan(value: unknown, { catalog }: { catalog: AiCatalog }
     walls.push({ key: next, dir: w.dir, at: round10(at), from: round10(ends[0]), to: round10(ends[1]) });
   }
 
-  const spanOf = (key: string): [string, number, number] | undefined => {
-    if (key === "top" || key === "bottom") return [key, 0, width];
-    if (key === "left" || key === "right") return [key, 0, depth];
+  const spanOf = (key: string): [string, "h" | "v", number, number] | undefined => {
+    const edge = outer.get(key);
+    if (edge) return [key, ...edge];
     const wall = walls.find((w) => w.key === wallKeys.get(key));
-    return wall && [wall.key, wall.from, wall.to];
+    return wall && [wall.key, wall.dir, wall.from, wall.to];
   };
   const openings: OpeningSpec[] = [];
   const cuts = new Map<string, [number, number][]>();
@@ -182,7 +211,7 @@ export function sanitizePlan(value: unknown, { catalog }: { catalog: AiCatalog }
     const o = (entry ?? {}) as { wall?: unknown; kind?: unknown; at?: unknown; width?: unknown; into?: unknown; hinge?: unknown };
     const span = spanOf(text(o.wall) ?? ""), at = num(o.at);
     if (!span || (o.kind !== "door" && o.kind !== "window") || at === undefined) continue;
-    const [wall, from, to] = span;
+    const [wall, dir, from, to] = span;
     const size = round10(clamp(num(o.width) ?? (o.kind === "door" ? 900 : 1500), 600, o.kind === "door" ? 2400 : 3600));
     // 洞口两侧各留 100mm 墙垛。
     if (to - from < size + 200) continue;
@@ -190,7 +219,7 @@ export function sanitizePlan(value: unknown, { catalog }: { catalog: AiCatalog }
     const used = cuts.get(wall) ?? [];
     if (used.some(([a, b]) => center - size / 2 < b + 100 && center + size / 2 > a - 100)) continue;
     cuts.set(wall, [...used, [center - size / 2, center + size / 2]]);
-    const horizontal = wall === "top" || wall === "bottom" || walls.find((w) => w.key === wall)?.dir === "h";
+    const horizontal = dir === "h";
     const into = isSide(o.into) && (horizontal ? o.into === "up" || o.into === "down" : o.into === "left" || o.into === "right") ? o.into : undefined;
     openings.push({
       wall,
@@ -238,5 +267,5 @@ export function sanitizePlan(value: unknown, { catalog }: { catalog: AiCatalog }
     furniture.push({ zone: target.zone, items: rugsFirst(items) });
   }
 
-  return { id: "ai", width: Math.round(width), depth: Math.round(depth), walls, openings, rooms, furniture };
+  return { id: "ai", width: Math.round(width), depth: Math.round(depth), ...(outline ? { outline } : {}), walls, openings, rooms, furniture };
 }

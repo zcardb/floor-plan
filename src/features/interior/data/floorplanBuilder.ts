@@ -81,8 +81,14 @@ export interface FurnitureZone {
 
 export interface PlanSpec {
   id: string;
+  /** 外接矩形的长宽（室内净尺寸）。 */
   width: number;
   depth: number;
+  /**
+   * 不规则外轮廓（室内净轮廓的顶点，横平竖直、首尾相连）。缺省为 width × depth 的矩形，
+   * 外墙名 top / right / bottom / left；给出时外墙沿它生成，第 k 条边命名为 e{k}（见 outlineEdgeKey）。
+   */
+  outline?: Point[];
   thickness?: number;
   height?: number;
   walls: WallSpec[];
@@ -136,6 +142,39 @@ function outline(width: number, depth: number, t: number): Axis[] {
   ];
 }
 
+/** 不规则外轮廓第 i 条边（第 i 点 → 第 i+1 点）的外墙名。 */
+export const outlineEdgeKey = (i: number) => `e${i + 1}`;
+
+/**
+ * 沿不规则外轮廓生成外墙：每条边向外偏移半个墙厚得到中心线，两端各伸出半个墙厚补上转角
+ * （与矩形外墙同一做法；凹角处伸出的部分落在相邻外墙墙体内，不侵入室内）。
+ */
+function polygonOutline(ring: Point[], t: number): Axis[] {
+  // 有符号面积 > 0 表示顺时针（y 向下的屏幕坐标）。
+  const signed = ring.reduce((s, a, i) => {
+    const b = ring[(i + 1) % ring.length];
+    return s + a[0] * b[1] - b[0] * a[1];
+  }, 0);
+  const cw = signed > 0;
+  return ring.map((a, i) => {
+    const b = ring[(i + 1) % ring.length];
+    const dir: "h" | "v" = a[1] === b[1] ? "h" : "v";
+    // 顺时针时：向右走外侧在上（-y），向下走外侧在右（+x）；逆时针相反。
+    const outward = dir === "h" ? (b[0] > a[0] ? -1 : 1) : (b[1] > a[1] ? 1 : -1);
+    const sign = cw ? outward : -outward;
+    const [p, q] = dir === "h" ? [a[0], b[0]] : [a[1], b[1]];
+    return {
+      key: outlineEdgeKey(i),
+      dir,
+      at: (dir === "h" ? a[1] : a[0]) + (sign * t) / 2,
+      from: Math.min(p, q) - t / 2,
+      to: Math.max(p, q) + t / 2,
+      thickness: t,
+      kind: "exterior" as WallKind,
+    };
+  });
+}
+
 /** 内墙两端各伸出半个墙厚，补上转角与丁字接头处的缺口；顶到外墙内表面的一端不伸。 */
 function innerAxis(w: WallSpec, width: number, depth: number): Axis {
   const thickness = w.thickness ?? INNER_WALL;
@@ -171,7 +210,7 @@ function swingSideOf(axis: Axis, into: Side): -1 | 1 {
 export function buildStructure(spec: PlanSpec): { walls: Wall[]; openings: Opening[] } {
   const t = spec.thickness ?? OUTER_WALL;
   const axes = [
-    ...outline(spec.width, spec.depth, t),
+    ...(spec.outline ? polygonOutline(spec.outline, t) : outline(spec.width, spec.depth, t)),
     ...spec.walls.map((w) => innerAxis(w, spec.width, spec.depth)),
   ];
   const keys = new Set<string>();
