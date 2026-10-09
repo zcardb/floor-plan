@@ -108,9 +108,8 @@ function appearanceOf(source: Furniture): Partial<Furniture> {
 
 /** 按家具类型从池子里取一件原件，取走的不再复用。 */
 function takeSource(pool: Furniture[], placed: Furniture): Furniture | undefined {
-  const index = pool.findIndex((f) => f.type === placed.type) >= 0
-    ? pool.findIndex((f) => f.type === placed.type)
-    : pool.findIndex((f) => !!f.catalogId && f.catalogId === placed.catalogId);
+  let index = pool.findIndex((f) => f.type === placed.type);
+  if (index < 0 && placed.catalogId) index = pool.findIndex((f) => f.catalogId === placed.catalogId);
   return index < 0 ? undefined : pool.splice(index, 1)[0];
 }
 
