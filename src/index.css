@@ -2664,6 +2664,26 @@
   align-items: center;
   gap: 7px;
 }
+/* 门窗 / 贴墙家具的沿墙位置：左侧墙段示意，右侧两端净距 */
+.wall-placement { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 12px; align-items: center; margin-bottom: var(--sp-row); }
+.wall-placement-fields { display: grid; gap: 8px; }
+.wall-placement-diagram {
+  display: block;
+  width: 100%;
+  height: 132px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--ctl-radius);
+  background: hsl(var(--secondary) / 0.45);
+}
+.wall-placement-wall { stroke: hsl(var(--muted-foreground) / 0.45); stroke-linecap: butt; }
+.wall-placement-object { fill: var(--plan-selection); }
+.wall-placement-dim { stroke: hsl(var(--muted-foreground) / 0.7); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.wall-placement-span.is-active .wall-placement-dim { stroke: var(--plan-selection); stroke-width: 2; }
+.wall-placement-marker circle { fill: hsl(var(--card)); stroke: hsl(var(--border)); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.wall-placement-marker text { fill: hsl(var(--muted-foreground)); font-weight: 600; }
+.wall-placement-span.is-active .wall-placement-marker circle { fill: var(--plan-selection); stroke: var(--plan-selection); }
+.wall-placement-span.is-active .wall-placement-marker text { fill: hsl(var(--primary-foreground)); }
+.visual-editor-popover:has(.wall-placement) { width: 440px; }
 /* 房间逐边尺寸：工具条弹层为「左预览 + 右输入」，属性面板只读标注边长 */
 .room-size-popover { width: 456px; }
 .room-sides { display: grid; grid-template-columns: minmax(0, 1fr) 168px; gap: 12px; align-items: start; }

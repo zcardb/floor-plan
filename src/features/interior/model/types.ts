@@ -92,6 +92,8 @@ export interface Design {
   dimensionSettings?: { visible?: boolean; top?: number; bottom?: number; left?: number; right?: number };
   /** 北方相对图纸正上方的顺时针角度（0–359°）；旧项目没有该字段，视为上北。 */
   northAngle?: number;
+  /** 拖动门窗时的步进（mm）；旧项目没有该字段，默认 50。 */
+  dragStep?: number;
   costSettings?: CostSettings;
   customCatalog?: LibraryItem[];
   customFloors?: CustomFloor[];

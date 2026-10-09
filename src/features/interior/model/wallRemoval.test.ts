@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { blankDesign, referenceDesign } from '../data/templates';
-import { area, rebuildRooms, rect, resizeBlank, ringArea, wallPoly } from './geometry';
+import { area, inRoom, rebuildRooms, rect, resizeBlank, ringArea, wallPoly } from './geometry';
 import { validateDesign } from './validation';
 import { isBearingWall, setWallBearing } from './wallPolicy';
 import { purgeDemolished, removeWall } from './wallRemoval';
@@ -8,6 +8,18 @@ import type { Design, Point, Wall } from './types';
 
 const drawn: Wall = { id: 'inner', kind: 'partition', a: [3000, 0], b: [3000, 6000], thickness: 200 };
 const blank = () => rebuildRooms({ ...blankDesign(), walls: [...blankDesign().walls, drawn] });
+/** 非空白户型：6 m × 6 m 外框 + x = 2500 的隔墙，两侧各一间。 */
+const partition2: Wall = { id: 'inner', kind: 'partition', a: [2500, 0], b: [2500, 6000], thickness: 200 };
+const split2 = (): Design => ({
+  ...blankDesign(),
+  template: 'reference',
+  walls: [...blankDesign().walls, partition2],
+  rooms: [
+    { id: 'small', name: '书房', mat: 'wood', rings: [rect(0, 0, 2400, 6000)] },
+    { id: 'big', name: '客厅', mat: 'wood', rings: [rect(2600, 0, 3400, 6000)] },
+  ],
+  furniture: [],
+});
 const withDoor = (): Design => {
   const d = blank();
   d.openings.push({ id: 'door', wallId: drawn.id, kind: 'door', offset: 2000, width: 900 });
@@ -24,9 +36,6 @@ describe('删除当前墙', () => {
     expect(before.walls.some(w => w.id === drawn.id)).toBe(true);
   });
   it('外围墙与参考户型的隔墙、外墙、矮墙都可删除，墙上门窗一并删除', () => {
-    const outer = removeWall(blank(), 'outer-0');
-    expect(outer.walls.some(w => w.id === 'outer-0')).toBe(false);
-    expect(validateDesign(JSON.parse(JSON.stringify(outer))).walls).toEqual(outer.walls);
     const reference = referenceDesign();
     for (const kind of ['partition', 'exterior', 'low'] as const) {
       const w = reference.walls.find(w => w.kind === kind)!, next = removeWall(reference, w.id);
@@ -35,12 +44,46 @@ describe('删除当前墙', () => {
       expect(validateDesign(JSON.parse(JSON.stringify(next)))).toEqual(next);
     }
   });
-  it('删外围墙：挨着的房间原样保留，不会因为区域开敞被删除', () => {
+  it('删外围墙：不再被围住的房间连同其中的家具一起删除，其余房间原样保留', () => {
     const reference = referenceDesign();
-    for (const w of reference.walls.filter(w => w.kind === 'exterior' && !w.id.startsWith('opening-wall-')))
-      expect(removeWall(reference, w.id).rooms).toBe(reference.rooms);
-    const d = removeWall(blank(), 'outer-0');
-    expect(d.rooms).toHaveLength(2);
+    let opened = 0;
+    for (const w of reference.walls.filter(w => w.kind === 'exterior' && !w.id.startsWith('opening-wall-'))) {
+      const next = removeWall(reference, w.id);
+      const gone = reference.rooms.filter(r => !next.rooms.some(n => n.id === r.id));
+      expect(next.rooms.every(r => reference.rooms.includes(r))).toBe(true);
+      if (gone.length) opened++;
+      for (const f of reference.furniture) {
+        const inGone = gone.some(r => inRoom([f.cx, f.cy], r));
+        const inKept = next.rooms.some(r => inRoom([f.cx, f.cy], r));
+        if (inGone && !inKept) expect(next.furniture.some(x => x.id === f.id)).toBe(false);
+        if (inKept) expect(next.furniture.some(x => x.id === f.id)).toBe(true);
+      }
+    }
+    expect(opened).toBeGreaterThan(0);
+  });
+  it('删完一间房都不剩时拒绝删除（空白户型删外框墙）', () => {
+    expect(() => removeWall(blank(), 'outer-0')).toThrow('删除后将没有房间');
+  });
+  it('删隔墙合并两侧房间时，家具全部保留', () => {
+    const before = split2();
+    before.furniture.push(
+      { id: 'f1', type: 'bed', name: '床', cx: 1200, cy: 3000, w: 1000, d: 2000, rot: 0, color: '#ccc' },
+      { id: 'f2', type: 'sofa', name: '沙发', cx: 4500, cy: 3000, w: 2000, d: 900, rot: 0, color: '#ccc' },
+    );
+    const next = removeWall(before, partition2.id);
+    expect(next.furniture.map(f => f.id)).toEqual(['f1', 'f2']);
+  });
+  it('删除墙后，相连墙上因它留下的分割点自动清除', () => {
+    // 外墙 outer-0 在 x = 3000 处被切成两段，隔墙从切点向下。
+    const d = split2();
+    const top = d.walls.find(w => w.id === 'outer-0')!;
+    const cut: Point = [2500, top.a[1]];
+    d.walls = d.walls.flatMap(w => w.id === 'outer-0' ? [{ ...w, b: cut }, { ...w, id: 'outer-0b', a: cut, exteriorRootId: undefined }] : [w]);
+    const next = removeWall(d, partition2.id);
+    expect(next.walls.some(w => w.id === 'outer-0b')).toBe(false);
+    const healed = next.walls.find(w => w.id === 'outer-0')!;
+    expect(healed.a).toEqual(top.a);
+    expect(healed.b).toEqual(top.b);
   });
   it('参考户型逐面删墙：两侧房间连同墙带并成一间，其余房间与顺序不变', () => {
     const reference = referenceDesign();
@@ -53,7 +96,8 @@ describe('删除当前墙', () => {
       expect(ids).toEqual(order.filter(id => ids.includes(id)));
       const gone = reference.rooms.filter(r => !ids.includes(r.id));
       const changed = next.rooms.filter(r => r.rings !== reference.rooms.find(o => o.id === r.id)!.rings);
-      if (!gone.length && !changed.length) continue;
+      // 只删不并：删墙让这些房间开敞，房间被删除。
+      if (!changed.length) continue;
       merges++;
       expect(changed).toHaveLength(1);
       const kept = changed[0]!, original = reference.rooms.find(r => r.id === kept.id)!;
@@ -97,7 +141,7 @@ describe('删除当前墙', () => {
     expect(() => removeWall({ ...blank(), walls: [drawn] }, drawn.id)).toThrow('至少保留');
   });
   it('删除外围墙后，户型设置不能整体重设尺寸', () => {
-    const d = removeWall(blank(), 'outer-0');
+    const d = { ...blank(), walls: blank().walls.filter(w => w.id !== 'outer-0') };
     expect(resizeBlank(d, d.width, d.depth, d.thickness)).toBe(d);
     expect(() => resizeBlank(d, d.width + 10, d.depth, d.thickness)).toThrow('已删除外围墙');
   });

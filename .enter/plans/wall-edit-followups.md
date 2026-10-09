@@ -97,21 +97,21 @@ export function followWallFurniture(before: Design, after: Design): Design;
 
 ## Implementation checklist
 
-- [ ] `wallAutoSplit.ts`：新增 `splitAtJunctionsOf(design, wallIds)`
-- [ ] `PlanCanvas.finish()`：`wallmove` / `endpoint` 提交时 `syncRooms` → `splitAtJunctions` → 空白户型 `rebuildRooms`，只 `commit` 一次
-- [ ] `Workbench` 按尺寸改墙：提交前对位置变化的墙做 `followWallFurniture` + `splitAtJunctionsOf`
-- [ ] `roomFurniture.ts`：`removeRoom`（含「至少保留一个房间」）与 `dropOrphanFurniture`
-- [ ] `SelectionEditor`：选中房间时显示删除按钮；`Workbench.remove()` 增加房间分支和提示文案
-- [ ] `wallRemoval.ts`：合并 → `dropOpenRooms(merged, before)` → `dropOrphanFurniture`；删到一个房间都不剩时抛错
-- [ ] `roomFollow.syncRooms`：丢掉开敞房间后再 `dropOrphanFurniture`
-- [ ] `furnitureFollow.ts`：`followWallFurniture`（平行 ≤ 1°、距墙面 ≤ 50 mm、沿墙有重叠、只取法向位移）
-- [ ] `PlanCanvas` 的 `wallmove` 预览接入 `followWallFurniture`
-- [ ] `useSegmentDrawing.start(p)`；`PlanCanvas` 的 `startWallTool` prop；选择模式单击墙身（≤ 5 px）进入绘墙并以吸附点为起点
-- [ ] 选择模式悬停点改用 `resolveWallPoint`，`WallHoverOverlay` 显示「点击开始绘墙」
-- [ ] `WallRangeDimensions` 新增 `keepVisible` → `data-editor-keep-visible`；`OpeningDistances` 开启它
-- [ ] `placeEditor` 新增 `keepVisible` 参数：围绕「对象 ∪ 标注」增加候选位置，与标注重叠按 ×10 计分
-- [ ] `SelectionEditor.position()` 收集 `[data-editor-keep-visible]` 的矩形，传给 `placeEditor`
-- [ ] `WallRangeDimensions` 导出 `rangeSide(wall)`；`WallHoverOverlay` 的提示改画在 `−rangeSide` 一侧，按方向选择文字对齐方式
+- [x] `wallAutoSplit.ts`：新增 `splitAtJunctionsOf(design, wallIds)`
+- [x] `PlanCanvas.finish()`：`wallmove` / `endpoint` 提交时 `syncRooms` → `splitAtJunctions` → 空白户型 `rebuildRooms`，只 `commit` 一次
+- [x] `Workbench` 按尺寸改墙：提交前对位置变化的墙做 `followWallFurniture` + `splitAtJunctionsOf`
+- [x] `roomFurniture.ts`：`removeRoom`（含「至少保留一个房间」）与 `dropOrphanFurniture`
+- [x] `SelectionEditor`：选中房间时显示删除按钮；`Workbench.remove()` 增加房间分支和提示文案
+- [x] `wallRemoval.ts`：合并 → `dropOpenRooms(merged, before)` → `dropOrphanFurniture`；删到一个房间都不剩时抛错
+- [x] `roomFollow.syncRooms`：丢掉开敞房间后再 `dropOrphanFurniture`
+- [x] `furnitureFollow.ts`：`followWallFurniture`（平行 ≤ 1°、距墙面 ≤ 50 mm、沿墙有重叠、只取法向位移）
+- [x] `PlanCanvas` 的 `wallmove` 预览接入 `followWallFurniture`
+- [x] `useSegmentDrawing.start(p)`；`PlanCanvas` 的 `startWallTool` prop；选择模式单击墙身（≤ 5 px）进入绘墙并以吸附点为起点
+- [x] 选择模式悬停点改用 `resolveWallPoint`，`WallHoverOverlay` 显示「点击开始绘墙」
+- [x] `WallRangeDimensions` 新增 `keepVisible` → `data-editor-keep-visible`；`OpeningDistances` 开启它
+- [x] `placeEditor` 新增 `keepVisible` 参数：围绕「对象 ∪ 标注」增加候选位置，与标注重叠按 ×10 计分
+- [x] `SelectionEditor.position()` 收集 `[data-editor-keep-visible]` 的矩形，传给 `placeEditor`
+- [x] `WallRangeDimensions` 导出 `rangeSide(wall)`；`WallHoverOverlay` 的提示改画在 `−rangeSide` 一侧，按方向选择文字对齐方式
 
 ## Verification checklist
 

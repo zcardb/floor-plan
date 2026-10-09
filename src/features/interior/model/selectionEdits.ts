@@ -1,13 +1,39 @@
 import { length, norm } from "./geometry";
 import { canResizeWall } from './wallPolicy';
 import { syncRooms } from './roomFollow';
+import { placementShift, wallPlacement } from './wallPlacement';
 import type { Design, Selection } from "./types";
+
+/**
+ * 把「沿墙位置」输入（gapA / gapB：对象两端到所在墙段第 1 / 第 2 端的净距）换算成沿墙位移后的 offset 或 cx / cy。
+ */
+function withPlacement(d: Design, s: Selection, values: { gapA?: number; gapB?: number }) {
+  const placement = wallPlacement(d, s);
+  if (!placement) throw new Error('该对象当前没有贴着的墙段');
+  for (const key of ['gapA', 'gapB'] as const)
+    if (values[key] !== undefined && (!Number.isFinite(values[key]) || values[key]! < -0.01 || values[key]! > 100000))
+      throw new Error('距墙端的净距须在 0–100 m 之间');
+  const shift = placementShift(placement, { gap0: values.gapA, gap1: values.gapB });
+  const wall = placement.wall, L = length(wall);
+  const ux = (wall.b[0] - wall.a[0]) / L, uy = (wall.b[1] - wall.a[1]) / L;
+  if (s?.kind === 'opening') return { values: { offset: d.openings.find(o => o.id === s.id)!.offset + shift } };
+  const f = d.furniture.find(f => f.id === s!.id)!;
+  return { values: { cx: f.cx + ux * shift, cy: f.cy + uy * shift } };
+}
+
 export function editSelection(
   d: Design,
   s: Selection,
-  values: Record<string, number>,
+  raw: Record<string, number>,
 ): Design {
   if (!s) return d;
+  // 净距输入在其他尺寸生效之后再换算，保证同时改宽度与净距时两者都准确。
+  if (raw.gapA !== undefined || raw.gapB !== undefined) {
+    const { gapA, gapB, ...rest } = raw;
+    const sized = Object.keys(rest).length ? editSelection(d, s, rest) : d;
+    return editSelection(sized, s, withPlacement(sized, s, { gapA, gapB }).values);
+  }
+  const values = raw;
   for (const [k, v] of Object.entries(values)) {
     const min = ["w", "d"].includes(k)
         ? 50

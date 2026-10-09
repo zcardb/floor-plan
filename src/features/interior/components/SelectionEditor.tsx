@@ -102,11 +102,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
       const node = el.current,
         stage = latest.current.stage.current;
       if (!node || !stage) return;
-      const obstacles = [
-        ...stage.querySelectorAll(
-          ".stage-topline,.canvas-zoom,.scene-light-control,.mobile-library,.mode-hint",
-        ),
-      ].map((e) => {
+      const rectOf = (e: Element) => {
         const a = e.getBoundingClientRect(),
           s = stage.getBoundingClientRect();
         return {
@@ -115,12 +111,20 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           right: a.right - s.left,
           bottom: a.bottom - s.top,
         };
-      });
+      };
+      const obstacles = [
+        ...stage.querySelectorAll(
+          ".stage-topline,.canvas-zoom,.scene-light-control,.mobile-library,.mode-hint",
+        ),
+      ].map(rectOf);
+      // 画在 SVG 里的距离标注（门窗两侧净距）：编辑栏不要压住它们。
+      const keepVisible = [...stage.querySelectorAll("[data-editor-keep-visible]")].map(rectOf);
       const pos = placeEditor(
         r,
         { width: stage.clientWidth, height: stage.clientHeight },
         { width: node.offsetWidth, height: node.offsetHeight },
         obstacles,
+        keepVisible,
       );
       node.style.visibility =
         pos && !latest.current.hidden ? "visible" : "hidden";
@@ -437,7 +441,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </EditorTooltip>
           </>
         )}
-        {(f || o || deletableWall) && (
+        {(f || o || r || deletableWall) && (
           <EditorTooltip
             label="删除对象"
             shortcut="Delete"

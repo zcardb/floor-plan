@@ -25,8 +25,10 @@ describe('复刻模板默认清空分割', () => {
     const wall = d.walls.find(w => w.id === door.wallId)!;
     const L = length(wall), dir = [(wall.b[0] - wall.a[0]) / L, (wall.b[1] - wall.a[1]) / L];
     const step = door.offset > L / 2 ? -100 : 100;
-    const moved = dragOpening(d, door.id, [0, 0], [dir[0] * step, dir[1] * step]);
-    expect(moved?.openings.find(o => o.id === door.id)?.offset).toBeCloseTo(door.offset + step);
+    const moved = dragOpening(d, door.id, [0, 0], [dir[0] * step, dir[1] * step])?.openings.find(o => o.id === door.id);
+    // 拖动按默认 5 cm 步进取整洞口边到墙端的距离，误差不超过半个步进。
+    expect(Math.abs(moved!.offset - (door.offset + step))).toBeLessThanOrEqual(25);
+    expect((moved!.offset - moved!.width / 2) % 50).toBeCloseTo(0);
   });
 
   it('原木之家：室内门洞口段原先标为外围墙，合并后所在隔墙不会被升级为外围墙', () => {

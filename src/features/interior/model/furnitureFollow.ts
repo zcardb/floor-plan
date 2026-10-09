@@ -8,15 +8,18 @@ const ANGLE_TOLERANCE = 1;
 
 const dot = (p: Point, q: Point) => p[0] * q[0] + p[1] * q[1];
 
+/** 贴墙家具在墙上的投影：中心距墙 A 端 t，沿墙半长 tangentHalf；不贴墙时为 null。 */
+export interface WallContact { t: number; tangentHalf: number; gap: number }
+
 /** 家具是否贴着墙（任一侧）：边与墙平行、离墙面不超过 ATTACH_GAP、沿墙方向与墙段有重叠。 */
-export function touchesWall(f: Furniture, w: Wall): boolean {
+export function wallContact(f: Furniture, w: Wall): WallContact | null {
   const L = length(w);
-  if (L < 1) return false;
+  if (L < 1) return null;
   const u: Point = [(w.b[0] - w.a[0]) / L, (w.b[1] - w.a[1]) / L];
   const n: Point = [-u[1], u[0]];
   const wallAngle = (Math.atan2(u[1], u[0]) * 180) / Math.PI;
   const diff = (((f.rot - wallAngle) % 90) + 90) % 90;
-  if (Math.min(diff, 90 - diff) > ANGLE_TOLERANCE) return false;
+  if (Math.min(diff, 90 - diff) > ANGLE_TOLERANCE) return null;
   // 家具 w 边与墙平行时，垂直墙方向的半宽是 d/2，否则是 w/2。
   const half = (((f.rot - wallAngle) % 180) + 180) % 180;
   const alongW = Math.min(half, 180 - half) < 45;
@@ -24,10 +27,12 @@ export function touchesWall(f: Furniture, w: Wall): boolean {
   const tangentHalf = (alongW ? f.w : f.d) / 2;
   const rel: Point = [f.cx - w.a[0], f.cy - w.a[1]];
   const gap = Math.abs(dot(rel, n)) - normalHalf - w.thickness / 2;
-  if (Math.abs(gap) > ATTACH_GAP) return false;
+  if (Math.abs(gap) > ATTACH_GAP) return null;
   const t = dot(rel, u);
-  return t + tangentHalf > 0 && t - tangentHalf < L;
+  return t + tangentHalf > 0 && t - tangentHalf < L ? { t, tangentHalf, gap } : null;
 }
+
+export const touchesWall = (f: Furniture, w: Wall) => wallContact(f, w) !== null;
 
 /**
  * before → after 中被整体平移的墙（长度、方向不变），把贴着它的家具沿墙的法向平移同样距离。

@@ -2,6 +2,7 @@ import { rebuildRooms } from './geometry';
 import { dropOpenRooms } from './roomEnclosure';
 import { dropOrphanFurniture } from './roomFurniture';
 import { mergeRoomsAcrossWall } from './roomMerge';
+import { healSplitsAround } from './wallHeal';
 import { stripStrayHoles } from './roomHoles';
 import { canDeleteWall } from './wallPolicy';
 import type { Design } from './types';
@@ -19,11 +20,12 @@ export function removeWall(design: Design, wallId: string): Design {
   if (!wall) throw new Error('墙体不存在，请重新选择');
   if (!canDeleteWall(wall)) throw new Error('承重墙不可删除，请先取消承重标记');
   if (design.walls.length <= 1) throw new Error('至少保留一面墙体');
-  const after = rebuildRooms({
+  // 相连墙上因这面墙留下的分割点一并清除（共线、属性一致的两段合并回一整面墙）。
+  const after = rebuildRooms(healSplitsAround({
     ...design,
     walls: design.walls.filter((w) => w.id !== wallId),
     openings: design.openings.filter((o) => o.wallId !== wallId),
-  });
+  }, wall));
   const merged = mergeRoomsAcrossWall(after, design, wall);
   const kept = dropOpenRooms(merged, design);
   if (!kept.rooms.length) throw new Error('删除后将没有房间，无法删除这面墙');

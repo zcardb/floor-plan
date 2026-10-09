@@ -49,6 +49,8 @@ export function placeEditor(
   viewport: { width: number; height: number },
   size: { width: number; height: number },
   obstacles: ScreenRect[] = [],
+  /** 选中对象附带、必须保持可见的标注（如门窗两侧距离）：与之重叠的计分同障碍物。 */
+  keepVisible: ScreenRect[] = [],
 ) {
   if (
     !object ||
@@ -62,15 +64,26 @@ export function placeEditor(
     pad = 10,
     maxX = Math.max(pad, viewport.width - size.width - pad),
     maxY = Math.max(pad, viewport.height - size.height - pad);
-  const left=object.local?.x ?? object.left, right=object.local?.x ?? object.right;
-  const top=object.local?.y ?? object.top, bottom=object.local?.y ?? object.bottom;
-  const candidates = [
-    [right + gap, bottom + gap],
-    [left, bottom + gap],
-    [left, top - size.height - gap],
-    [left - size.width - gap, top],
-    [right + gap, top],
-  ];
+  const around = (box: ScreenRect) => {
+    const left = box.local?.x ?? box.left, right = box.local?.x ?? box.right;
+    const top = box.local?.y ?? box.top, bottom = box.local?.y ?? box.bottom;
+    return [
+      [right + gap, bottom + gap],
+      [left, bottom + gap],
+      [left, top - size.height - gap],
+      [left - size.width - gap, top],
+      [right + gap, top],
+    ];
+  };
+  // 有标注时，再围绕「对象 ∪ 标注」的外接矩形取同样的 5 个候选位置。
+  const union: ScreenRect | null = keepVisible.length ? {
+    left: Math.min(object.left, ...keepVisible.map(r => r.left)),
+    top: Math.min(object.top, ...keepVisible.map(r => r.top)),
+    right: Math.max(object.right, ...keepVisible.map(r => r.right)),
+    bottom: Math.max(object.bottom, ...keepVisible.map(r => r.bottom)),
+  } : null;
+  const candidates = [...around(object), ...(union ? around(union) : [])];
+  const blocked = [...obstacles, ...keepVisible];
   const clamp = (v: number, max: number) => Math.max(pad, Math.min(max, v));
   const overlap = (a: ScreenRect, b: ScreenRect) =>
     Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) *
@@ -84,7 +97,7 @@ export function placeEditor(
         x: left,
         y: top,
         score:
-          obstacles.reduce((s, o) => s + overlap(r, o) * 10, 0) +
+          blocked.reduce((s, o) => s + overlap(r, o) * 10, 0) +
           overlap(r, object) +
           Math.abs(x - left) +
           Math.abs(y - top) +

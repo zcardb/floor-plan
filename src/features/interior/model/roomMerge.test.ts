@@ -51,11 +51,12 @@ describe('删墙后合并两侧房间', () => {
     expect(roundTrip(next)).toEqual(next);
   });
 
-  it('一侧没有房间（外围墙）：原样返回，房间不删不并', () => {
+  it('一侧没有房间（外围墙）：合并原样返回；删墙后不再围合的房间被删除', () => {
     const before = split();
     const after = { ...before, walls: before.walls.filter(w => w.id !== 'outer-0') };
     expect(mergeRoomsAcrossWall(after, before, before.walls[0]!)).toBe(after);
-    expect(removeWall(before, 'outer-0').rooms).toBe(before.rooms);
+    // 书房、客厅都靠着被删的外墙而开敞；原本就在墙外的房间保持原样。
+    expect(removeWall(before, 'outer-0').rooms.map(r => r.id)).toEqual(['decoy']);
   });
 
   it('空白户型不参与合并（房间按外框重算）', () => {

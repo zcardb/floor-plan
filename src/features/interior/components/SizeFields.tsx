@@ -7,10 +7,18 @@ import { Label } from '@/components/ui/label';
 import { meterDraft, sizeDraftToModel } from '../model/lengthUnits';
 import type { Design,Selection } from '../model/types';
 import type { SizeTransaction } from '../model/sizeTransaction';
+import { placementGaps, wallPlacement } from '../model/wallPlacement';
+import { WallPlacementDiagram } from './WallPlacementDiagram';
+/** 门窗与贴墙家具的位置改为「到所在墙段两端的净距」（gapA 为左 / 上端，gapB 为右 / 下端）。 */
+function gapFields(d:Design,s:Selection):[string,string,number][] {
+  const p=wallPlacement(d,s);if(!p)return [];
+  const [g0,g1]=placementGaps(p);
+  return [['gapA',`① 距${p.names[0]}端 / m`,g0],['gapB',`② 距${p.names[1]}端 / m`,g1]];
+}
 function sizeFields(d:Design,s:Selection):[string,string,number][] {
-  if(s?.kind==='furniture'){const f=d.furniture.find(f=>f.id===s.id);return f?[['w','宽度 / m',f.w],['d',f.type==='stairs'?'长度 / m':'深度 / m',f.d],['cx','中心 X / m',f.cx],['cy','中心 Y / m',f.cy]]:[];}
+  if(s?.kind==='furniture'){const f=d.furniture.find(f=>f.id===s.id);if(!f)return [];const gaps=gapFields(d,s);return [['w','宽度 / m',f.w],['d',f.type==='stairs'?'长度 / m':'深度 / m',f.d],...(gaps.length?gaps:[['cx','中心 X / m',f.cx],['cy','中心 Y / m',f.cy]] as [string,string,number][])];}
   if(s?.kind==='wall'){const w=d.walls.find(w=>w.id===s.id);return w?[['length','长度 / m',length(w)],['thickness','墙厚 / m',w.thickness]]:[];}
-  if(s?.kind==='opening'){const o=d.openings.find(o=>o.id===s.id);return o?[['width','宽度 / m',o.width],['offset','沿墙位置 / m',o.offset],['height','高度 / m',o.height??(o.kind==='door'?2100:1600)],...(o.kind==='window'?[['sill','窗台高 / m',o.sill??800] as [string,string,number]]:[])]:[];}
+  if(s?.kind==='opening'){const o=d.openings.find(o=>o.id===s.id);return o?[...gapFields(d,s),['width','宽度 / m',o.width],['height','高度 / m',o.height??(o.kind==='door'?2100:1600)],...(o.kind==='window'?[['sill','窗台高 / m',o.sill??800] as [string,string,number]]:[])]:[];}
   return [];
 }
 export function SizeFields({design,selection,transaction,close}:{design:Design;selection:Selection;transaction:SizeTransaction;close?:()=>void}){
@@ -20,6 +28,8 @@ export function SizeFields({design,selection,transaction,close}:{design:Design;s
   invalid.current=!!error;
   const draftFromDesign=()=>Object.fromEntries(sizeFields(design,selection).map(([key,,value])=>[key,key==='rot'?String(value):meterDraft(value)]));
   const [resync,setResync]=useState(0);
+  /** 正在编辑的净距（对应示意图上高亮的那一段）。 */
+  const [focusGap,setFocusGap]=useState<0|1|null>(null);
   // 未在本表单改过的字段跟随模型实时刷新（如加宽后自动平移的位置、另一处表单或拖拽的改动）。
   useEffect(()=>{
     const latest=Object.fromEntries(sizeFields(design,selection).map(([key,,value])=>[key,key==='rot'?String(value):meterDraft(value)]));
@@ -43,12 +53,20 @@ export function SizeFields({design,selection,transaction,close}:{design:Design;s
   const opening=selection?.kind==='opening'?design.openings.find(o=>o.id===selection.id):null;
   const bearingWarning=(wall&&design.template!=='blank'&&isBearingWall(wall))||(opening&&isOnBearingWall(design,opening.wallId));
   if(wall&&!canResizeWall(design,wall))return <p className="visual-locked">此项目创建时锁定了结构尺寸，复制该项目后副本可自由调整。</p>;
-  return <div onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cancel();}}}>{bearingWarning&&<p className="muted-note" role="note">{BEARING_WALL_WARNING}。</p>}<div className="visual-size-fields">{fields.current.map(([key,label])=><Label key={key} className="field-label">{label}<Input className="editor-control" aria-label={label} type="number" step={key==='rot'?1:0.01} value={draft[key]??''} onChange={e=>{
+  const placement=wallPlacement(design,selection);
+  const field=([key,label]:[string,string,number])=><Label key={key} className="field-label">{label}<Input className="editor-control" aria-label={label} type="number" step={key==='rot'?1:0.01} value={draft[key]??''} onFocus={()=>setFocusGap(key==='gapA'?0:key==='gapB'?1:null)} onChange={e=>{
     if(!token.current||!transaction.isActive(token.current)){token.current=transaction.begin(selection);edited.current.clear();}
     edited.current.add(key);
+    // 两端净距互斥：改一端时另一端跟随模型刷新，不再作为输入提交。
+    if(key==='gapA')edited.current.delete('gapB');
+    if(key==='gapB')edited.current.delete('gapA');
     const next={...draft,[key]:e.target.value};setDraft(next);
     // 只提交改过的字段：未改动的两位草稿不得把模型原值取整写回。
     const changed=Object.fromEntries(Object.entries(next).filter(([name])=>edited.current.has(name)));
     try{transaction.update(token.current,sizeDraftToModel(changed));setError('');}catch(err){setError(err instanceof Error?err.message:'尺寸无效');}
-  }} onBlur={()=>settle()} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();e.currentTarget.blur();}}}/></Label>)}{furniture&&<RotationControls key={furniture.id} id={furniture.id} value={furniture.rot} transaction={transaction} close={close}/>}</div>{error&&<p className="form-error" role="alert">{error}</p>}<p className="muted-note">改动即时生效</p></div>;
+  }} onBlur={()=>{setFocusGap(null);settle();}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();e.currentTarget.blur();}}}/></Label>;
+  const gaps=fields.current.filter(([key])=>key==='gapA'||key==='gapB'),others=fields.current.filter(([key])=>key!=='gapA'&&key!=='gapB');
+  return <div onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cancel();}}}>{bearingWarning&&<p className="muted-note" role="note">{BEARING_WALL_WARNING}。</p>}
+    {gaps.length>0&&placement&&<div className="wall-placement"><WallPlacementDiagram placement={placement} active={focusGap}/><div className="wall-placement-fields">{gaps.map(field)}</div></div>}
+    <div className="visual-size-fields">{others.map(field)}{furniture&&<RotationControls key={furniture.id} id={furniture.id} value={furniture.rot} transaction={transaction} close={close}/>}</div>{error&&<p className="form-error" role="alert">{error}</p>}<p className="muted-note">{gaps.length?'位置按到所在墙段两端的净距调整，改一端另一端自动变化；改动即时生效':'改动即时生效'}</p></div>;
 }

@@ -129,6 +129,8 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     showGuides = (next: AlignmentGuide[]) => setGuides(prev => sameGuides(prev, next) ? prev : next);
   const mouseDown = useRef<(() => void) | null>(null);
   const wallClick = useRef<{id:string;fraction:number}|null>(null);
+  /** 选择模式单击墙身进入绘墙时的墙与起点；紧接着双击即选中这面墙。 */
+  const wallClickStart = useRef<{ wallId: string; point: Point } | null>(null);
   const wallDrawing = useWallDrawing(tool === 'wall', current, view.s, layers.snap, commit, finishTool);
   // 选择模式悬停墙体时的测距点（与绘墙悬停共用 WallHoverOverlay）。
   const [selectHover, setSelectHover] = useState<WallSnap | null>(null);
@@ -312,11 +314,13 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     }
     const d = current.current;
     if ((dr.kind === 'wallmove' || dr.kind === 'wallclick') && !dr.moved) {
-      // 单击墙身（没有拖动）：切到绘墙，并以吸附点作为第一段墙的起点。
-      if (!startWallTool) return;
+      // 单击墙身（没有拖动）：切到绘墙，并以吸附点作为第一段墙的起点；双击才选中墙（见 completeTool）。
+      if (!startWallTool) return select({ kind: 'wall', id: dr.id! });
       const start = wallStartPoint(dr.start, dr.id!).point;
+      select(null);
       startWallTool();
       wallDrawing.start(start);
+      wallClickStart.current = { wallId: dr.id!, point: start };
       return;
     }
     if (dr.kind === 'openingmove') {
@@ -361,6 +365,11 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
   };
   const completeTool = () => {
     if (!supportsPointerCompletion(tool)) return;
+    // 单击墙身开画后还没画出任何一段就双击：这是「双击选中墙」。
+    const clicked = wallClickStart.current, draftStart = wallDrawing.draft?.a;
+    wallClickStart.current = null;
+    const selectWall = clicked && draftStart && Math.hypot(draftStart[0] - clicked.point[0], draftStart[1] - clicked.point[1]) < 0.1
+      && current.current.walls.some(w => w.id === clicked.wallId) ? clicked.wallId : null;
     wallDrawing.clear();
     drag.current = null;
     showGuides([]);
@@ -371,6 +380,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     }
     points.current.clear();
     finishTool();
+    if (selectWall) select({ kind: 'wall', id: selectWall });
   };
   useEffect(() => { mouseDown.current = null; }, [tool]);
   return (
@@ -499,8 +509,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         } else if (wid && tool === "select") {
           const w = design.walls.find((w) => w.id === wid)!;
           wallClick.current={id:wid,fraction:nearestOnWall(p,w).offset/length(w)};
-          select({ kind: "wall", id: wid });
-          // 锁定尺寸的墙不能拖动，但仍可单击作为绘墙起点。
+          // 墙体双击选中（单击是开始绘墙）；拖动时才选中并移动。
           base.kind = canResizeWall(design, w) ? "wallmove" : "wallclick";
           base.id = wid;
         } else
@@ -557,8 +566,10 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         if (tool === 'select' && !dr) hoverWall(e.target, p);
         if (!dr) return;
         if (dr.pid !== e.pointerId) return;
-        if (Math.hypot(e.clientX - dr.screen[0], e.clientY - dr.screen[1]) > 5)
+        if (Math.hypot(e.clientX - dr.screen[0], e.clientY - dr.screen[1]) > 5 && !dr.moved) {
           dr.moved = true;
+          if (dr.kind === 'wallmove') select({ kind: 'wall', id: dr.id! });
+        }
         if (!dr.moved) return;
         if (dr.kind === 'wallclick') return;
         if (dr.kind === "pan") {
@@ -813,7 +824,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       {layers.dims && <PerimeterDimensions layout={dimensionLayout} onSelect={tool === 'select' ? onDimensionSelect : undefined} selected={selectedDimension} />}
       {tool==='wall' && wallDrawing.draft && Math.hypot(wallDrawing.draft.b[0]-wallDrawing.draft.a[0],wallDrawing.draft.b[1]-wallDrawing.draft.a[1])>0 && <g data-export-hide="true" pointerEvents="none"><polygon points={connectedWallPoly({id:'draft',...wallDrawing.draft,thickness:design.thickness,kind:'partition'},design.walls,design.demolished).map(p=>p.join(',')).join(' ')} fill="var(--plan-selection-soft)" stroke="var(--plan-selection)" strokeWidth={1/view.s}/><MeasureLine a={wallDrawing.draft.a} b={wallDrawing.draft.b} scale={view.s}/></g>}
       {tool === 'wall' && <WallHoverOverlay walls={design.walls} demolished={design.demolished} candidate={wallDrawing.hover} connection={wallDrawing.candidate} scale={view.s} />}
-      {tool === 'select' && <WallHoverOverlay walls={design.walls} demolished={design.demolished} candidate={selectHover} connection={null} scale={view.s} label={startWallTool && !readOnly ? '点击开始绘墙' : undefined} />}
+      {tool === 'select' && <WallHoverOverlay walls={design.walls} demolished={design.demolished} candidate={selectHover} connection={null} scale={view.s} label={startWallTool && !readOnly ? '点击开始绘墙，双击选中' : undefined} />}
       <AlignmentGuides guides={guides} scale={view.s} />
       {selection?.kind === 'opening' && <OpeningDistances design={design} openingId={selection.id} scale={view.s} />}
       {selection && (

@@ -28,6 +28,7 @@ import { WallOptionsMenu } from './WallOptionsMenu';
 import { canEditWall, canResizeWall, wallKindName } from '../model/wallPolicy';
 import { DimensionSettings } from './DimensionSettings';
 import { NorthSettings } from './NorthSettings';
+import { DragStepSettings } from './DragStepSettings';
 import type { SizeTransaction } from '../model/sizeTransaction';
 import { area, bbox, inRoom, length, perim, resizeBlank } from "../model/geometry";
 import type { CustomFloor, CustomOpening, CustomWall, Design, Selection } from "../model/types";
@@ -595,6 +596,7 @@ export function PropertyPanel({
           </section>
           <DimensionSettings design={design} change={change} />
           <NorthSettings design={design} change={change} />
+          <DragStepSettings design={design} change={change} />
         </>
       ) : (
         <>

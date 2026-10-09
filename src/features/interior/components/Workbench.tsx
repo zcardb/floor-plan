@@ -11,6 +11,9 @@ import { CompassRose } from './CompassRose';
 import { northAngle } from '../model/northAngle';
 import { splitWall as splitWallModel } from '../model/wallSplit';
 import { removeWall as removeWallModel } from '../model/wallRemoval';
+import { removeRoom } from '../model/roomFurniture';
+import { followWallFurniture } from '../model/furnitureFollow';
+import { splitAtJunctionsOf } from '../model/wallAutoSplit';
 import { mergeWall as mergeWallModel, wallMergeGroup } from '../model/wallMerge';
 import { bearingWalls, clearBearing, mergeAllSplits, splitPointCount } from '../model/wallBulk';
 import { isBearingWall, canEditStructure } from '../model/wallPolicy';
@@ -168,7 +171,7 @@ export function Workbench(p: Props) {
   const confirm = useConfirm();
   const readOnly = !!p.project.builtin;
   const model = useDesign(p.project.state, p.update, readOnly),
-    { design: d, change, commit, preview, undo, redo, counts, sizeTransaction } = model;
+    { design: d, change, commit, preview, undo, redo, counts, sizeTransaction, current: designRef } = model;
   const structureTools = canEditStructure(d, readOnly);
   const [selection, setSelection] = useState<Selection>(null),
     [tool, setTool] = useState<Tool>("select");
@@ -424,16 +427,36 @@ export function Workbench(p: Props) {
       if (!w) return notify.fail("墙体不存在，请重新选择");
       if (!canDeleteWall(w)) return notify.fail("承重墙不可删除，请先取消承重标记");
       if (d.walls.length <= 1) return notify.fail("至少保留一面墙体");
-      change((d) => removeWallModel(d, wallId));
-      notify.success("已删除墙体，可撤销恢复");
+      const before = designRef.current;
+      let next: typeof before;
+      try {
+        next = removeWallModel(before, wallId);
+      } catch (cause) {
+        return notify.fail(cause instanceof Error ? cause.message : "无法删除这面墙");
+      }
+      commit(next, before);
+      const lostFurniture = before.furniture.length - next.furniture.length;
+      notify.success(lostFurniture > 0
+        ? `已删除墙体，不再围合的房间及其中 ${lostFurniture} 件家具一并删除，可撤销恢复`
+        : "已删除墙体，可撤销恢复");
       setSelection(null);
     },
-    [d, change],
+    [d, commit, designRef],
   );
   const remove = useCallback(() => {
     if (!selection) return;
     const s = selection;
-    if (s.kind === "furniture") {
+    if (s.kind === "room") {
+      const before = designRef.current;
+      try {
+        const next = removeRoom(before, s.id);
+        commit(next, before);
+        notify.success(`已删除房间及其中 ${before.furniture.length - next.furniture.length} 件家具，可撤销恢复`);
+      } catch (cause) {
+        return notify.fail(cause instanceof Error ? cause.message : "无法删除房间");
+      }
+    }
+    else if (s.kind === "furniture") {
       const f = d.furniture.find((f) => f.id === s.id);
       change((d) => ({
         ...d,
@@ -448,7 +471,7 @@ export function Workbench(p: Props) {
     }
     else if (s.kind === "wall") return removeWall(s.id);
     setSelection(null);
-  }, [d, selection, change, removeWall]);
+  }, [d, selection, change, commit, designRef, removeWall]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (readOnly && !['t', 'f', 'escape'].includes(e.key.toLowerCase())) return;
@@ -985,6 +1008,7 @@ export function Workbench(p: Props) {
             onCoord={onCoord}
             onAnchor={onAnchor}
             finishTool={()=>setTool('select')}
+            startWallTool={structureTools ? () => setTool('wall') : undefined}
             onDimensionSelect={openDimension}
             selectedDimension={dimensionValid ? dimensionEdit.binding : undefined}
           />
@@ -1121,9 +1145,15 @@ export function Workbench(p: Props) {
           onClose={() => setDimensionEdit(null)} onApply={(millimeters, fixed) => {
             const current = model.current.current;
             if (current !== dimensionEdit.before) throw new Error('设计已变化，请重新选择标注');
-            const next = editDimensionWalls(current, dimensionEdit.binding, millimeters, fixed);
+            const edited = editDimensionWalls(current, dimensionEdit.binding, millimeters, fixed);
             setDimensionEdit(null);
-            if (next !== current) commit(next, current);
+            if (edited === current) return;
+            // 位置变化的墙：贴墙家具沿法向跟随，并在新的交接点自动分割。
+            const changed = edited.walls.filter(w => {
+              const old = current.walls.find(o => o.id === w.id);
+              return !old || old.a[0] !== w.a[0] || old.a[1] !== w.a[1] || old.b[0] !== w.b[0] || old.b[1] !== w.b[1];
+            }).map(w => w.id);
+            commit(splitAtJunctionsOf(followWallFurniture(current, edited), changed), current);
           }} />}
         {splitValid && <WallSplitDialog design={wallSplit.before} wallId={wallSplit.wallId}
           onClose={() => setWallSplit(null)} onApply={(cuts, selectedSegment) => {
