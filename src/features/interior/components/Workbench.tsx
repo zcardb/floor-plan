@@ -564,7 +564,7 @@ export function Workbench(p: Props) {
     if (!count) return;
     const ok = await confirm({
       title: "清空所有墙体分割？",
-      description: `将合并 ${count} 处分割，连续的同类墙段恢复为整段；墙体交界处保持分开，门窗位置与承重标记保留，可撤销恢复。`,
+      description: `将合并 ${count} 处分割：同一直线上相连的墙段一拉到底合并为一面墙（交界处也不打断）。类型按外围墙 > 承重墙 > 隔墙 > 矮墙取，含承重段的整面墙保留承重；门窗位置不变，可撤销恢复。`,
       confirmText: "清空分割",
       tone: "destructive",
     });

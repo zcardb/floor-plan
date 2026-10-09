@@ -45,7 +45,8 @@ describe('图纸墙段分割', () => {
     const d = referenceDesign(), w = d.walls.find(w => w.kind === 'bearing')!;
     const next = splitWall(d, w.id, [300]).design;
     for (const segment of next.walls.filter(s => s.id === w.id || !d.walls.some(old => old.id === s.id))) {
-      expect(canEditWall(next, segment)).toBe(false); expect(() => setWallBearing(next, segment.id, false)).toThrow();
+      expect(canEditWall(next, segment)).toBe(false); expect(isBearingWall(segment)).toBe(true);
+      expect(isBearingWall(setWallBearing(next, segment.id, false).walls.find(s => s.id === segment.id)!)).toBe(false);
     }
     const marked = setWallBearing(fixture(), 'p', true); expect(splitWall(marked, 'p', [300]).design.walls.slice(-2).every(s => s.loadBearing)).toBe(true);
     const outer = splitWall(blankDesign(), 'outer-0', [300], 1);
