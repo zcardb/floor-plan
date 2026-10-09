@@ -337,6 +337,15 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </PopoverContent>
           </Popover>
         )}
+        {r && p.roomAi && (
+          <EditorTooltip label={p.roomAi.tone === "running" ? "AI 布局生成中 · 点击查看进度" : p.roomAi.tone === "unseen" ? "AI 布局已生成 · 点击查看" : "AI 布局"}>
+            <button type="button" className="visual-ai-trigger" data-tone={p.roomAi.tone} aria-label={p.roomAi.tone === "running" ? "AI 布局生成中" : p.roomAi.tone === "unseen" ? "AI 布局已生成，未查看" : "AI 布局"} aria-busy={p.roomAi.tone === "running" || undefined} onClick={p.roomAi.open}>
+              {p.roomAi.tone === "running" ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+              AI 布局
+              {p.roomAi.tone === "unseen" && <span className="visual-ai-dot" aria-hidden="true" />}
+            </button>
+          </EditorTooltip>
+        )}
         {r && (
           <Popover
             open={open === "material"}
@@ -362,15 +371,6 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
               <RoomSurfaceFields design={p.design} room={r} change={p.change} accountRoofs={p.accountRoofs || []} accountCeilings={p.accountCeilings || []} />
             </PopoverContent>
           </Popover>
-        )}
-        {r && p.roomAi && (
-          <EditorTooltip label={p.roomAi.tone === "running" ? "AI 布局生成中 · 点击查看进度" : p.roomAi.tone === "unseen" ? "AI 布局已生成 · 点击查看" : "AI 布局"}>
-            <button type="button" className="visual-ai-trigger" data-tone={p.roomAi.tone} aria-label={p.roomAi.tone === "running" ? "AI 布局生成中" : p.roomAi.tone === "unseen" ? "AI 布局已生成，未查看" : "AI 布局"} aria-busy={p.roomAi.tone === "running" || undefined} onClick={p.roomAi.open}>
-              {p.roomAi.tone === "running" ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
-              AI 布局
-              {p.roomAi.tone === "unseen" && <span className="visual-ai-dot" aria-hidden="true" />}
-            </button>
-          </EditorTooltip>
         )}
         {o?.kind === 'door' && <Popover open={open === 'direction'} onOpenChange={value => setPanel(value, 'direction')}>
           <EditorTooltip label="门开向">
