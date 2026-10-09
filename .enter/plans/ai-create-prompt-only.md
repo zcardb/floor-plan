@@ -1,79 +1,60 @@
-# AI 创建户型：去掉「高级设计」，尺寸直接写在 Prompt 里
+# AI 创建户型：支持不规则外轮廓（不再强制补成矩形）
 
 ## Context
 
-「AI 创建户型」弹窗现在是「描述 + 参考图」输入框，下面再挂一个默认收起的「高级设计」（长 / 宽 / 卧室 / 厅 / 卫生间）。用户希望直接干掉这块折叠区，让需求描述本身承担长宽与房间数，输入框的 placeholder 负责提示用户写长宽。
+用户输入不规则户型（L 形、凹凸、缺角），生成结果仍被补成方方正正的矩形。原因不只在提示词：
 
-已确认：
-1. **整条参数链路一起清理**（前端请求字段、`planFields.ts`、后端 `hints`/`width`/`depth` 校验），户型尺寸完全由描述文字决定，由模型在 JSON 顶层输出，前端 `sanitizePlan` 只做范围夹取。
-2. **示例文案直接作为默认输入**：弹窗打开时输入框里就带着这段示例需求，用户可以直接改；placeholder 用同一段文案，清空后仍能看到提示。
+- `supabase/functions/interior-ai-design/index.ts` 的 `PLAN_CONTRACT` 写着「外墙固定是矩形，由系统生成，名字为 top / right / bottom / left」，模型根本没有地方表达不规则外轮廓。
+- `src/features/interior/data/floorplanBuilder.ts` 的 `outline(width, depth, t)` 只会沿 `width × depth` 生成四面外墙；即使模型的房间是 L 形，外墙仍是整块矩形。
 
-## 改动
+下游已能处理任意外墙：AI 方案的 `template` 是 `"reference"`，不走 `rebuildRooms / resizeBlank`；平面、3D、尺寸标注、缩略图都按墙段几何绘制（DXF 导入就是任意外墙）。所以只需打通「提示词 → 模型输出 → 前端清洗 → 建墙」这一条链路。
 
-### 1. `src/features/interior/components/AiCreateProjectDialog.tsx`
-- 删除 `advanced / width / depth / rooms` 状态，以及 `size / badSize / summary / sizeError / useMemo`、`parseMeterDraft` 与 `planFields` 相关 import，`ChevronDown`、`SlidersHorizontal` 图标 import。
-- `PlanRequest` 收敛为 `{ description: string; images: string[] }`；`send()` 不再拼 `hints` / `width` / `depth`，`generatePlanCandidate` 只带 `description / images / catalog / ...engine`；`sanitizePlan(result, { catalog: aiCatalog })`。
-- `AiComposer` 不再传 `blocked`（`badSize` 已不存在）。
-- 新增文件内常量并作为默认输入：
-  ```ts
-  /** 默认填入的示例需求：长宽写在描述里由模型读取，用户可直接改。 */
-  const DEFAULT_PLAN_PROMPT = "长 12 m × 宽 10 m，三室两厅两卫，主卧朝南带卫生间，开放式厨房，原木风";
-  ```
-  `composer` 初值改为 `{ description: DEFAULT_PLAN_PROMPT, images: [], count: DEFAULT_AI_COUNT, engine: DEFAULT_AI_ENGINE }`。
-- placeholder 用 `描述户型需求，例如：${DEFAULT_PLAN_PROMPT}`（即「描述户型需求，例如：长 12 m × 宽 10 m，三室两厅两卫，主卧朝南带卫生间，开放式厨房，原木风」），默认有文字时不可见，清空后仍给提示。
-- 删除整个 `<section className="ai-advanced">`；`echo`（`AiResults` 回显）不再有 `details`，只回显描述与参考图。
-- `DialogDescription` 补一句提示尺寸写进描述：`描述需求（长宽、几室几厅几卫都写在描述里），AI 生成带门窗与家具的整套户型；选中一个方案后创建项目。`
+## 方案：新增可选 `outline`（外轮廓内侧顶点）
 
-### 2. `src/features/interior/components/AiComposer.tsx`
-- 删除只在「高级设计」里用过的 `blocked?: string` 属性与文档注释，`reason` 从 `missingAssistant` 起算。
+**约定**：矩形户型不输出 `outline`，行为与现在完全相同（外墙名 `top/right/bottom/left`，内置模板不受影响）。不规则户型输出 `outline`：外轮廓内侧（室内净轮廓）的顶点数组，横平竖直、按顺序首尾相连、全部落在 `0–width × 0–depth`；外墙沿它生成，第 k 条边（第 k 点 → 第 k+1 点，最后一点回到第 1 点）命名为 `e1、e2…`，门窗用这个名字引用外墙，`at` 仍是世界坐标（横墙给 x，竖墙给 y）。
 
-### 3. `src/features/interior/ai/client.ts`
-- `AiPlanRequest` 删除 `width` / `depth` / `hints` 字段。
+### 1. `src/features/interior/data/floorplanBuilder.ts`
+- `PlanSpec` 增加 `outline?: Point[]`（注释说明含义与 `e1…` 命名）；导出 `outlineEdgeKey = (i: number) => \`e${i + 1}\``。
+- 新增 `polygonOutline(ring, t): Axis[]`：按有符号面积判断朝向，每条边沿外法线偏移 `t/2` 得墙中心线，两端各伸出 `t/2` 补转角（与现有矩形外墙同一做法；凹角处的伸出段落在相邻外墙体内，不侵入室内）。
+- `buildStructure` 里 `spec.outline ? polygonOutline(...) : outline(...)`；`innerAxis` 不变（内墙顶到不规则外墙时多伸出的 60mm 落在外墙体内）。
 
-### 4. `src/features/interior/ai/sanitize.ts`
-- `sanitizePlan(value, { catalog })`：去掉 `fixedWidth / fixedDepth` 与 `sizeOf` 分支，改为只读模型输出的 `width` / `depth`，`round10(clamp(n, 3000, 40000))`，缺失仍抛 `方案缺少户型尺寸`；注释里的「高级设计没填的长宽」同步改写。
+### 2. `src/features/interior/ai/sanitize.ts`
+- 新增 `parseOutline(raw, width, depth)`：≥4 个点，坐标 `round10(clamp(...))` 到 `0–width × 0–depth`，每条边必须横平或竖直且长度 ≥ `MIN_WALL_LENGTH`（600），面积 ≥ 一定下限；任一不满足 → 返回 `undefined`（退回矩形，保证仍能出方案）。不去除共线点，保证 `eK` 与模型给的序号一致。
+- 外墙保留名：有 `outline` 时为 `e1…eN`，否则 `top/right/bottom/left`；内墙 key 撞保留名照旧丢弃。
+- `spanOf` 支持 `eK`：返回该边沿走向的 `[min, max]`；门窗方向判断 `horizontal` 同步支持 `eK`。
+- 返回的 `PlanSpec` 带上 `outline`。
 
-### 5. `src/features/interior/ai/planFields.ts`
-- 整体删除（`AI_SIZE_LIMITS` / `AI_ROOM_LIMITS` / `RoomCounts` / `advancedLabel` / `planHints` 已无其他引用）。
+### 3. `supabase/functions/interior-ai-design/index.ts`（改完重新部署）
+- `PLAN_CONTRACT`：
+  - 去掉「外墙固定是矩形」；输出约定里加 `outline` 字段说明与示例（L 形），写明矩形户型不输出 `outline`、外墙名 top/right/bottom/left；不规则户型外墙名 e1、e2…。
+  - 理解需求一节补一句：用户描述或参考图是 L 形、凹凸、缺角等不规则外形时，按原外形输出 `outline`，不要补成矩形。
+- `SIZE_LINE`：说明 `width / depth` 是外轮廓外接矩形的长宽。
+- `validatePlan`：解析可选 `outline`（同上规则，不合法 → soft 提示让模型修）；外墙名集合按有无 `outline` 切换；外墙门窗范围按对应边计算；窗只能开在外墙、入户门在外墙的判断沿用新集合。
 
-### 6. `src/index.css`
-- 删除 `/* AI 创建：高级设计（默认收起，选填） */` 起 `.ai-advanced` / `.ai-advanced-toggle` / `.ai-advanced-caret` / `.ai-advanced-body` / `.ai-advanced-row` 共 8 行；`.ai-size-hint`、`.ai-note` 仍被别处使用，保留。
-
-### 7. `supabase/functions/interior-ai-design/index.ts`（需重新部署）
-- `Body` 与 `guard` 删除 `width` / `depth` / `hints`（含 `高级设计参数无效` 分支）；`plan` 模式不再做长宽范围校验。
-- `sizeLine(b)` 改为固定一句：`室内净尺寸未固定：若用户需求里给出了长宽（如「长 12 m × 宽 10 m」）或面积，请严格按该数值换算成 mm（长 = width，宽 = depth）；否则按房间数量与面积确定合理尺寸，并在 JSON 顶层输出 "width" 与 "depth"（3000–40000 mm，取 100 的整数倍）。`
-- `planPrompt` 删除 `b.hints` 那两行；`PLAN_CONTRACT` 坐标约定处补一句「用户需求里写明长宽/面积时按该尺寸设计」。
-- `validatePlan`：`W / D` 只取 `v.width` / `v.depth`（`finite(..., 3000, 40000)`），缺失时仍返回 hard 错误 `顶层必须输出 width 与 depth`。
-
-### 8. 测试
-- `src/features/interior/components/aiComponents.test.tsx`：删除 `advancedLabel, planHints` import 与「高级设计参数」describe；弹窗用例改为断言 `html` 不含 `高级设计`、textarea 默认内容含 `长 12 m × 宽 10 m`（默认示例即默认输入，所以发送按钮可用，不再断言 disabled）、`2 个方案`、`DeepSeek V4 Flash`。
-- `src/features/interior/ai/ai.test.ts`：整户 fixture 的 `plan` 顶层补 `width: 8000, depth: 9000`，相应 `sanitizePlan(plan, { width: 8000, depth: 9000, catalog })` 全部改为 `{ catalog }`；「AI 决定户型尺寸」用例改为「模型给的尺寸被夹进 3000–40000」，并保留缺尺寸报错用例。
+### 4. 测试
+- 新增 `src/features/interior/data/floorplanBuilder.test.ts`：L 形 `outline` 生成 6 面外墙（`e1…e6`），中心线在内侧外偏 `t/2`；外墙 `e2` 上的窗落在正确位置；不传 `outline` 时仍是 `top/right/bottom/left` 四面墙。
+- `src/features/interior/ai/ai.test.ts`：`sanitizePlan` 保留合法 L 形 `outline`、门窗引用 `eK` 被保留；斜边 / 点数不足的 `outline` 被忽略回退矩形、引用 `eK` 的门窗被丢弃；`planToDesign` 的结果外墙不是 4 面。
 
 ## 关键文件
-- `src/features/interior/components/AiCreateProjectDialog.tsx`
-- `src/features/interior/components/AiComposer.tsx`
-- `src/features/interior/ai/{client,sanitize}.ts`
+- `src/features/interior/data/floorplanBuilder.ts`
+- `src/features/interior/ai/sanitize.ts`
 - `supabase/functions/interior-ai-design/index.ts`
-- `src/index.css`
 
 ## Implementation checklist
-- [x] `AiCreateProjectDialog.tsx` 删除高级设计状态、UI 与 `planFields` / `parseMeterDraft` / 图标 import，文件内不再出现 `ai-advanced`、`hints`、`width`、`depth`
-- [x] `PlanRequest` 只保留 `description` / `images`，`generatePlanCandidate` 与 `sanitizePlan` 调用同步收敛
-- [x] 新增 `DEFAULT_PLAN_PROMPT` 常量并作为 `composer.description` 初值（含长宽、几室几厅几卫、风格），placeholder 用同一段文案，`DialogDescription` 补上「长宽写在描述里」的提示
-- [x] `AiCreateProjectForm` 渲染结果不含 `高级设计` 与 `ai-advanced` 节点（SSR 断言）
-- [x] `AiComposer` 移除 `blocked` 属性，`AiRoomDialog` 调用处不受影响（本来就没传）
-- [x] `client.ts` 的 `AiPlanRequest` 删除 `width` / `depth` / `hints`
-- [x] `sanitize.ts` 的 `sanitizePlan` 只按模型输出定尺寸，缺尺寸仍抛错
-- [x] `planFields.ts` 删除，仓库内无残留引用（grep 无命中）
-- [x] `index.css` 删除 `.ai-advanced*` 规则，`.ai-size-hint` / `.ai-note` 保留
-- [x] 后端 `Body` / `guard` / `planPrompt` 去掉 `width` / `depth` / `hints`，`SIZE_LINE` 指向「按描述里的长宽」，`validatePlan` 只认模型输出尺寸
-- [x] 后端函数重新部署成功（未带 token 调用返回网关 401，函数为 ACTIVE）
-- [x] `aiComponents.test.tsx` 与 `ai.test.ts` 按新行为更新
+- [ ] `PlanSpec.outline?: Point[]` 与 `outlineEdgeKey` 导出
+- [ ] `polygonOutline` 按朝向外偏 `t/2`、两端伸出 `t/2`，`buildStructure` 有 `outline` 时用它，无 `outline` 时走原 `outline()`
+- [ ] `sanitize.ts` 的 `parseOutline` 校验横平竖直 / 范围 / 最短边，非法时返回 `undefined`
+- [ ] `sanitizePlan` 的外墙保留名、`spanOf`、门窗 `horizontal` 判断支持 `eK`，结果带 `outline`
+- [ ] 后端 `PLAN_CONTRACT` 去掉「外墙固定是矩形」，加入 `outline` 字段说明、L 形示例与「不要补成矩形」
+- [ ] 后端 `SIZE_LINE` 说明 width / depth 是外接矩形
+- [ ] 后端 `validatePlan` 支持 `outline` 与 `eK` 外墙名，窗 / 入户门判断用新外墙集合
+- [ ] 新增 / 更新 `floorplanBuilder.test.ts`、`ai.test.ts`
+- [ ] 重新部署 `interior-ai-design`
 
 ## Verification checklist
-- [x] `pnpm lint` 与 `pnpm exec tsc --noEmit` 无错误（lint 仅 3 条既有 warning）
-- [x] `pnpm test`（vitest，`src/features/interior`）全绿：79 文件 / 593 用例
-- [x] `pnpm run build` 通过
-- [ ] 人工确认（界面需点击才能打开弹窗，截图工具无法操作）：弹窗只剩项目名称 + 输入框，无「高级设计」，输入框已带默认示例且可编辑、发送可用，清空后 placeholder 显示同一段提示
-- [ ] 人工确认（需登录与 AI 额度）：用默认示例发一批方案，生成的户型长宽接近 12 × 10 m（模型输出，允许 100 mm 级偏差）；把描述改成「三室两厅两卫，原木风」（不写长宽）时仍能生成
-- [x] 描述里写超范围尺寸（如「长 100 m」）不会崩：`sanitizePlan` 把模型给的尺寸夹进 3000–40000 mm（单测覆盖 `width: 100000, depth: 1000` → `40000 × 3000`）
+- [ ] `pnpm exec tsc --noEmit`、`pnpm lint` 无新错误
+- [ ] `pnpm test` 全绿，含：L 形 6 面外墙、`eK` 门窗保留、非法 `outline` 回退矩形、无 `outline` 仍为 top/right/bottom/left
+- [ ] `pnpm run build` 通过
+- [ ] 内置户型模板（无 `outline`）生成结果不变：现有 `templates` 相关测试不需改动即通过
+- [ ] 部署后预检请求返回 `ok`，未带登录的请求返回 401
+- [ ] 人工确认（需登录与 AI 额度）：描述「L 形户型，长 12 m × 宽 10 m，右上角缺 4 m × 3 m」或上传不规则户型图，生成方案外墙为不规则轮廓而不是矩形；描述普通矩形户型时仍正常

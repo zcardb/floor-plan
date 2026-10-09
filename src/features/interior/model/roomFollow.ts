@@ -1,6 +1,7 @@
 import polygonClipping from 'polygon-clipping';
 import { rebuildRooms, ringArea } from './geometry';
 import { connectedWallPoly } from './wallConnections';
+import { dropOpenRooms } from './roomEnclosure';
 import { uid, type Design, type Point, type Room, type Wall } from './types';
 
 /** 房间环贴合墙面的容差（mm）。 */
@@ -175,7 +176,11 @@ export function splitRoomsWithWall(d: Design, wallId: string): Design {
   return added.length ? { ...d, rooms: [...kept, ...added] } : d;
 }
 
-/** 改墙后的房间同步：空白户型按外框重算，其余项目让房间跟随墙面。 */
+/**
+ * 改墙后的房间同步：空白户型按外框重算，其余项目让房间跟随墙面。
+ * 这次改动让某个房间不再被墙围住时，该房间随之删除。
+ */
 export function syncRooms(before: Design, after: Design): Design {
-  return after.template === 'blank' ? rebuildRooms(after) : followRooms(before, after);
+  const synced = after.template === 'blank' ? rebuildRooms(after) : followRooms(before, after);
+  return dropOpenRooms(synced, before);
 }
