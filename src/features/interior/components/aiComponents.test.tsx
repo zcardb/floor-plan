@@ -55,6 +55,15 @@ describe("候选方案网格", () => {
     expect(html).toContain('title="方案里的家具与指定清单不一致"');
     expect(html).toContain('aria-checked="true"');
   });
+  it("失败的方案可以单独重试；成功的方案可以放大查看", () => {
+    const html = renderToStaticMarkup(createElement(AiResults<string>, {
+      echo, slots: [{ status: "failed", error: "AI 服务繁忙" }, { status: "ready", candidate: { id: "c2", index: 1, summary: "动静分区", result: "x" } }],
+      selected: 1, onSelect: () => {}, onRetry: () => {}, preview: () => null,
+    }));
+    expect(html).toContain("方案 1 生成失败：AI 服务繁忙。点击重试");
+    expect(html).toContain("重试");
+    expect(html).toContain('aria-label="放大查看动静分区"');
+  });
   it("全部失败时给出错误提示", () => {
     const html = renderToStaticMarkup(createElement(AiResults<string>, {
       echo, slots: [{ status: "failed", error: "AI 额度不足" }], selected: null, onSelect: () => {}, preview: () => null,

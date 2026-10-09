@@ -6,23 +6,23 @@ export interface DimensionBinding {
 }
 const tolerance = 0.05;
 /** A structural face must belong to exactly one continuous, equal-thickness wall band. */
-function faceGroup(walls: Wall[], axis: 0 | 1, face: number, scan: number, sign: -1 | 1): string[] {
+export function faceGroup(walls: Wall[], axis: 0 | 1, face: number, scan: number, sign: -1 | 1, epsilon = tolerance): string[] {
   const cross = axis === 0 ? 1 : 0;
-  const matches = walls.filter(w => Math.abs(w.a[axis] - w.b[axis]) < tolerance &&
-    Math.abs(w.a[axis] + sign * w.thickness / 2 - face) < tolerance &&
-    scan >= Math.min(w.a[cross], w.b[cross]) - tolerance && scan <= Math.max(w.a[cross], w.b[cross]) + tolerance);
+  const matches = walls.filter(w => Math.abs(w.a[axis] - w.b[axis]) < epsilon &&
+    Math.abs(w.a[axis] + sign * w.thickness / 2 - face) < epsilon &&
+    scan >= Math.min(w.a[cross], w.b[cross]) - epsilon && scan <= Math.max(w.a[cross], w.b[cross]) + epsilon);
   if (!matches.length) return [];
   const origin = matches[0];
-  if (matches.some(w => Math.abs(w.a[axis] - origin.a[axis]) > tolerance || Math.abs(w.thickness - origin.thickness) > tolerance)) return [];
+  if (matches.some(w => Math.abs(w.a[axis] - origin.a[axis]) > epsilon || Math.abs(w.thickness - origin.thickness) > epsilon)) return [];
   const result = new Set(matches.map(w => w.id));
   let changed = true;
   while (changed) {
     changed = false;
     for (const w of walls) {
-      if (result.has(w.id) || Math.abs(w.a[axis] - w.b[axis]) > tolerance ||
-        Math.abs(w.a[axis] - origin.a[axis]) > tolerance || Math.abs(w.thickness - origin.thickness) > tolerance) continue;
+      if (result.has(w.id) || Math.abs(w.a[axis] - w.b[axis]) > epsilon ||
+        Math.abs(w.a[axis] - origin.a[axis]) > epsilon || Math.abs(w.thickness - origin.thickness) > epsilon) continue;
       if (walls.some(other => result.has(other.id) && Math.min(Math.max(w.a[cross], w.b[cross]), Math.max(other.a[cross], other.b[cross])) >=
-        Math.max(Math.min(w.a[cross], w.b[cross]), Math.min(other.a[cross], other.b[cross])) - tolerance)) {
+        Math.max(Math.min(w.a[cross], w.b[cross]), Math.min(other.a[cross], other.b[cross])) - epsilon)) {
         result.add(w.id); changed = true;
       }
     }

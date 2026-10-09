@@ -20,28 +20,42 @@ export const batchRunning = (batch: AiBatch<unknown, unknown> | null) => !!batch
 export function useAiBatch<Request, Result>() {
   const [batch, setBatch] = useState<AiBatch<Request, Result> | null>(null);
   const epoch = useRef(0);
+  /** 当前这一批的执行函数：单个格子重试时沿用同一个 generationId 与序号。 */
+  const current = useRef<{ epoch: number; generationId: string; run: (index: number, generationId: string) => Promise<AiCandidate<Result>> } | null>(null);
   useEffect(() => () => { epoch.current++; }, []);
+
+  const launch = useCallback((index: number) => {
+    const job = current.current;
+    if (!job || job.epoch !== epoch.current) return;
+    const settle = (slot: AiSlot<Result>) => {
+      if (job.epoch !== epoch.current) return;
+      setBatch((batch) => batch && { ...batch, slots: batch.slots.map((s, i) => (i === index ? slot : s)) });
+    };
+    job.run(index, job.generationId).then(
+      (candidate) => settle({ status: "ready", candidate }),
+      (cause) => settle({ status: "failed", error: errorMessage(cause, "生成失败，请重试") }),
+    );
+  }, []);
 
   const start = useCallback(
     (request: Request, count: number, run: (index: number, generationId: string) => Promise<AiCandidate<Result>>) => {
-      const run_ = ++epoch.current;
       const generationId = crypto.randomUUID();
+      current.current = { epoch: ++epoch.current, generationId, run };
       setBatch({ generationId, request, seen: false, slots: Array.from({ length: count }, () => ({ status: "pending" as const })) });
-      const settle = (index: number, slot: AiSlot<Result>) => {
-        if (run_ !== epoch.current) return;
-        setBatch((current) => current && { ...current, slots: current.slots.map((s, i) => (i === index ? slot : s)) });
-      };
-      for (let index = 0; index < count; index++)
-        run(index, generationId).then(
-          (candidate) => settle(index, { status: "ready", candidate }),
-          (cause) => settle(index, { status: "failed", error: errorMessage(cause, "生成失败，请重试") }),
-        );
+      for (let index = 0; index < count; index++) launch(index);
       return generationId;
     },
-    [],
+    [launch],
   );
+  /** 单个失败的格子重试：其他格子不动。 */
+  const retry = useCallback((index: number) => {
+    setBatch((batch) => batch && batch.slots[index]?.status === "failed"
+      ? { ...batch, seen: false, slots: batch.slots.map((s, i) => (i === index ? { status: "pending" as const } : s)) }
+      : batch);
+    launch(index);
+  }, [launch]);
   /** 停止并清空：迟到的结果不再写入。 */
   const clear = useCallback(() => { epoch.current++; setBatch(null); }, []);
   const markSeen = useCallback(() => setBatch((current) => (current && !current.seen ? { ...current, seen: true } : current)), []);
-  return { batch, running: batchRunning(batch), start, clear, markSeen };
+  return { batch, running: batchRunning(batch), start, retry, clear, markSeen };
 }
