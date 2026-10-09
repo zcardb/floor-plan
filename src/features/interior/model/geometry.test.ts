@@ -95,11 +95,10 @@ describe("户型几何与输入保护", () => {
       d.rooms.reduce((s, r) => s + area(r) * materials[r.mat].price * 1.05, 0),
     ).toBeGreaterThan(0);
   });
-  it("非法尺寸、NaN、越权拆除及越界开口被拒绝", () => {
+  it("非法尺寸、NaN 及越界开口被拒绝，旧拆除标记迁移为删除", () => {
     for (const patch of [
       { width: -1 },
       { height: NaN },
-      { demolished: ["outer-0"] },
       {
         openings: [
           { id: "o", wallId: "outer-0", kind: "door", offset: 0, width: 900 },
@@ -107,6 +106,9 @@ describe("户型几何与输入保护", () => {
       },
     ])
       expect(() => validateDesign({ ...blankDesign(), ...patch })).toThrow();
+    const migrated = validateDesign({ ...blankDesign(), demolished: ["outer-0"] });
+    expect(migrated.walls.some((w) => w.id === "outer-0")).toBe(false);
+    expect(migrated.demolished).toEqual([]);
   });
   it("JSON往返与旧参考JSON升级", () => {
     const d = referenceDesign();

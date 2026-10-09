@@ -22,14 +22,21 @@ describe('独立分割和承重菜单', () => {
     expect(h.item('分割墙段').props.disabled).toBe(false); expect(h.item('取消分割').props.disabled).toBe(false);
     (h.item('取消分割').props.onSelect as () => void)(); expect(h.mergeWall).toHaveBeenCalledWith('outer-0'); expect(h.change).not.toHaveBeenCalled();
   });
-  it('标记和取消标记都一键生效且无确认弹窗，原始承重及已拆禁用', () => {
+  it('标记和取消标记都一键生效且无确认弹窗，原始承重墙也可取消；单段墙不可取消分割', () => {
     const d = blankDesign(), h = fixture(d); (h.item('标记承重').props.onSelect as () => void)();
     expect(h.change).toHaveBeenCalledOnce(); expect((h.change.mock.calls[0][0] as (d: Design) => Design)(d).walls[0].loadBearing).toBe(true);
     d.walls[0].loadBearing = true; const marked = fixture(d);
     (marked.item('取消标记承重').props.onSelect as () => void)();
     expect(marked.change).toHaveBeenCalledOnce(); expect((marked.change.mock.calls[0][0] as (d: Design) => Design)(d).walls[0].loadBearing).toBe(false);
     expect(state.confirm).not.toHaveBeenCalled();
-    d.walls[0].kind = 'bearing'; expect(fixture(d).item('取消标记承重').props.disabled).toBe(true);
-    d.demolished = ['outer-0']; expect(fixture(d).item('分割墙段').props.disabled).toBe(true); expect(fixture(d).item('取消分割').props.disabled).toBe(true);
+    delete d.walls[0].loadBearing; d.walls[0].kind = 'bearing'; expect(fixture(d).item('取消标记承重').props.disabled).toBeFalsy();
+    expect(fixture(blankDesign()).item('取消分割').props.disabled).toBe(true);
+  });
+  it('菜单只保留分割、取消分割、承重切换和删除四个操作', () => {
+    const d = blankDesign();
+    const labels = nodes(WallOptionsMenu({ design: d, wall: d.walls[0], change: vi.fn(), splitWall: vi.fn(), mergeWall: vi.fn(), removeWall: vi.fn() }))
+      .filter(n => n.props.onSelect).map(n => n.props['aria-label']);
+    expect(labels).toEqual(['分割墙段', '取消分割', '标记承重', '删除当前墙']);
+    expect(text(nodes(WallOptionsMenu({ design: d, wall: d.walls[0], change: vi.fn() })))).not.toContain('拆除');
   });
 });

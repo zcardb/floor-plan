@@ -1,5 +1,5 @@
 import { isFloorKey, validCustomFloor } from "./floorMaterials";
-import { isBearingWall } from './wallPolicy';
+import { purgeDemolished } from './wallRemoval';
 import { validFurnitureType, validFurnitureOutline } from './furnitureAppearance';
 import { referenceDesign } from "../data/templates";
 import { length } from "./geometry";
@@ -48,6 +48,8 @@ export function validateDesign(value: unknown): Design {
     "demolished",
   ] as const)
     if (!Array.isArray(v[k]) || v[k].length > 2000) return fail();
+  // 旧版「标记拆除」：加载时直接删除被标记的墙，再完整校验一遍。
+  if (v.demolished.length) return validateDesign(purgeDemolished(v));
   if (!v.rooms.length || !v.walls.length) return fail();
   if (v.structureUnlocked !== undefined && typeof v.structureUnlocked !== 'boolean') return fail();
   if (v.northAngle !== undefined && !finite(v.northAngle, 0, 360)) return fail();
@@ -186,10 +188,6 @@ export function validateDesign(value: unknown): Design {
         )
     )
       fail();
-  }
-  for (const s of v.demolished) {
-    const w = v.walls.find((w) => w.id === s);
-    if (!w || isBearingWall(w) || !["partition", "low"].includes(w.kind)) fail();
   }
   for (const w of v.walls)
     if (w.color !== undefined && !/^#[0-9a-f]{6}$/i.test(w.color)) fail();

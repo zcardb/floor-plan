@@ -402,8 +402,7 @@ export function PropertyPanel({
   if (w) {
     const editable = canEditWall(design, w);
     const resizable = canResizeWall(design, w);
-    const demolished = design.demolished.includes(w.id);
-    const status = demolished ? "已标记拆除" : editable ? "可编辑" : resizable ? "可调尺寸" : "受保护";
+    const status = editable ? "可编辑" : resizable ? "可调尺寸" : "受保护";
     return (
       <>
         <div className="panel-heading">
@@ -419,7 +418,7 @@ export function PropertyPanel({
             <div>
               <h3>
                 {wallKindName(w)}
-                <span className={"object-status" + (editable && !demolished ? " is-editable" : "")}>{status}</span>
+                <span className={"object-status" + (editable ? " is-editable" : "")}>{status}</span>
               </h3>
               <small>长 {formatMeters(length(w))} m · 厚 {formatMeters(w.thickness)} m</small>
             </div>
@@ -428,11 +427,9 @@ export function PropertyPanel({
           <h4 className="property-subtitle">尺寸</h4>
           <SizeFields key={w.id} design={design} selection={s} transaction={transaction}/>
           <p className="muted-note">
-            {demolished
-              ? "已标记拆除。如需分割或删除，请先在「墙选项」中撤销拆除。"
-              : editable
-                ? "拖动墙体移动，拖动两端圆点调整长度；封闭隔墙会自动划分房间。"
-                : "参考户型的原始外墙与承重结构不支持编辑；空白户型的外围尺寸可在「户型设置」中调整。"}
+            {editable
+              ? "拖动墙体移动，拖动两端圆点调整长度；封闭隔墙会自动划分房间。"
+              : "此墙体尺寸已锁定；分割、承重标记与删除可在「墙选项」中操作。"}
           </p>
         </section>
         <div className="panel-note">

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatMeters } from '../model/lengthUnits';
-import { canEditWall } from '../model/wallPolicy';
+import { canDeleteWall } from '../model/wallPolicy';
 import { ExportMenu, type ExportFormat } from './ExportMenu';
 import { ProjectMenu, type ProjectNavigation } from './ProjectMenu';
 import { WorkbenchBanner } from './WorkbenchBanner';
@@ -413,7 +413,9 @@ export function Workbench(p: Props) {
   const removeWall = useCallback(
     (wallId: string) => {
       const w = d.walls.find((w) => w.id === wallId);
-      if (!w || !canEditWall(d, w)) return notify.fail("此墙体不可删除");
+      if (!w) return notify.fail("墙体不存在，请重新选择");
+      if (!canDeleteWall(w)) return notify.fail("承重墙不可删除，请先取消承重标记");
+      if (d.walls.length <= 1) return notify.fail("至少保留一面墙体");
       change((d) => removeWallModel(d, wallId));
       notify.success("已删除墙体，可撤销恢复");
       setSelection(null);

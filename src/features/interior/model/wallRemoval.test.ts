@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { blankDesign, referenceDesign } from '../data/templates';
-import { rebuildRooms } from './geometry';
+import { rebuildRooms, resizeBlank } from './geometry';
 import { validateDesign } from './validation';
-import { removeWall, toggleWallDemolition } from './wallRemoval';
+import { setWallBearing } from './wallPolicy';
+import { purgeDemolished, removeWall } from './wallRemoval';
 import type { Design, Wall } from './types';
 
 const drawn: Wall = { id: 'inner', kind: 'partition', a: [3000, 0], b: [3000, 6000], thickness: 200 };
@@ -12,7 +13,6 @@ const withDoor = (): Design => {
   d.openings.push({ id: 'door', wallId: drawn.id, kind: 'door', offset: 2000, width: 900 });
   return d;
 };
-const exterior = (d: Design) => d.walls.find(w => w.kind === 'exterior')!;
 
 describe('删除当前墙', () => {
   it('删除自绘隔墙及其门窗并重建房间，结果可再次通过校验', () => {
@@ -23,40 +23,41 @@ describe('删除当前墙', () => {
     expect(validateDesign(JSON.parse(JSON.stringify(next)))).toEqual(next);
     expect(before.walls.some(w => w.id === drawn.id)).toBe(true);
   });
-  it('清理已标记拆除的墙 id，避免遗留失效拆除记录', () => {
-    const next = removeWall(toggleWallDemolition(blank(), drawn.id), drawn.id);
-    expect(next.demolished).toEqual([]);
-    expect(validateDesign(JSON.parse(JSON.stringify(next))).walls.some(w => w.id === drawn.id)).toBe(false);
-  });
-  it('承重墙、外围墙、参考户型墙体与不存在的墙都拒绝删除', () => {
+  it('外围墙与参考户型的隔墙、外墙、矮墙都可删除，墙上门窗一并删除', () => {
+    const outer = removeWall(blank(), 'outer-0');
+    expect(outer.walls.some(w => w.id === 'outer-0')).toBe(false);
+    expect(validateDesign(JSON.parse(JSON.stringify(outer))).walls).toEqual(outer.walls);
     const reference = referenceDesign();
-    expect(() => removeWall(blank(), exterior(blank()).id)).toThrow('不可删除');
-    expect(() => removeWall({ ...blank(), walls: [{ ...drawn, kind: 'bearing' }] }, drawn.id)).toThrow('不可删除');
-    expect(() => removeWall(reference, reference.walls.find(w => w.kind === 'partition')!.id)).toThrow('不可删除');
-    expect(() => removeWall(blank(), 'missing')).toThrow('不可删除');
+    for (const kind of ['partition', 'exterior', 'low'] as const) {
+      const w = reference.walls.find(w => w.kind === kind)!, next = removeWall(reference, w.id);
+      expect(next.walls.some(x => x.id === w.id)).toBe(false);
+      expect(next.openings.some(o => o.wallId === w.id)).toBe(false);
+      expect(next.rooms).toBe(reference.rooms);
+    }
+  });
+  it('承重墙（原始或手动标记）拒绝删除，取消标记后可删；不存在与最后一面墙拒绝', () => {
+    const reference = referenceDesign(), original = reference.walls.find(w => w.kind === 'bearing')!;
+    expect(() => removeWall(reference, original.id)).toThrow('取消承重');
+    expect(removeWall(setWallBearing(reference, original.id, false), original.id).walls.some(w => w.id === original.id)).toBe(false);
+    expect(() => removeWall(setWallBearing(blank(), drawn.id, true), drawn.id)).toThrow('取消承重');
+    expect(() => removeWall(blank(), 'missing')).toThrow('不存在');
+    expect(() => removeWall({ ...blank(), walls: [drawn] }, drawn.id)).toThrow('至少保留');
+  });
+  it('删除外围墙后，户型设置不能整体重设尺寸', () => {
+    const d = removeWall(blank(), 'outer-0');
+    expect(resizeBlank(d, d.width, d.depth, d.thickness)).toBe(d);
+    expect(() => resizeBlank(d, d.width + 10, d.depth, d.thickness)).toThrow('已删除外围墙');
   });
 });
 
-describe('标记拆除当前墙', () => {
-  it('非承重墙可标记与撤销，房间随拆除重建', () => {
-    const before = blank(), marked = toggleWallDemolition(before, drawn.id);
-    expect(marked.demolished).toEqual([drawn.id]);
-    expect(marked.rooms).toHaveLength(1);
-    expect(validateDesign(JSON.parse(JSON.stringify(marked)))).toEqual(marked);
-    const restored = toggleWallDemolition(marked, drawn.id);
-    expect(restored.demolished).toEqual([]);
-    expect(restored.rooms).toHaveLength(before.rooms.length);
-  });
-  it('承重墙与建筑外墙拒绝拆除，参考户型外围墙保持原状', () => {
-    const reference = referenceDesign();
-    expect(() => toggleWallDemolition(blank(), exterior(blank()).id)).toThrow('不可拆除');
-    expect(() => toggleWallDemolition({ ...blank(), walls: [{ ...drawn, kind: 'bearing' }] }, drawn.id)).toThrow('不可拆除');
-    expect(() => toggleWallDemolition(reference, reference.walls.find(w => w.kind === 'bearing')!.id)).toThrow('不可拆除');
-    expect(() => toggleWallDemolition(blank(), 'missing')).toThrow('不可拆除');
-    const partition = reference.walls.find(w => w.kind === 'partition')!;
-    const next = toggleWallDemolition(reference, partition.id);
-    expect(next.demolished).toEqual([partition.id]);
-    expect(next.rooms).toBe(reference.rooms);
-    expect(reference.demolished).toEqual([]);
+describe('旧版拆除标记迁移', () => {
+  it('加载时删除已标记拆除的墙及门窗，清空 demolished，未知 id 忽略', () => {
+    const d = { ...withDoor(), demolished: [drawn.id, 'missing'] };
+    const next = validateDesign(JSON.parse(JSON.stringify(d)));
+    expect(next.walls.some(w => w.id === drawn.id)).toBe(false);
+    expect(next.openings.some(o => o.wallId === drawn.id)).toBe(false);
+    expect(next.demolished).toEqual([]);
+    expect(purgeDemolished(d).walls).toHaveLength(d.walls.length - 1);
+    expect(d.demolished).toEqual([drawn.id, 'missing']);
   });
 });

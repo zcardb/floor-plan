@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/popover";
 import { applyRoomFloor, floorMaterialOf, pickableFloors } from "../model/floorMaterials";
 import { WallOptionsMenu } from './WallOptionsMenu';
-import { canEditWall, canResizeWall, wallKindName } from '../model/wallPolicy';
+import { canDeleteWall, canResizeWall, wallKindName } from '../model/wallPolicy';
 import { length } from "../model/geometry";
 import { SizeFields } from './SizeFields';
 
@@ -151,8 +151,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         p.selection?.kind === "opening"
           ? p.design.openings.find((o) => o.id === p.selection!.id)
           : null;
-    const editableWall =
-      w && canEditWall(p.design, w);
+    const deletableWall = w && canDeleteWall(w);
     const resizableWall = w && canResizeWall(p.design, w);
     const fields = f
       ? [
@@ -396,7 +395,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </EditorTooltip>
           </>
         )}
-        {(f || o || editableWall) && (
+        {(f || o || deletableWall) && (
           <EditorTooltip
             label="删除对象"
             shortcut="Delete"

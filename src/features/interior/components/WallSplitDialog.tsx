@@ -51,7 +51,7 @@ export function WallSplitDialog({ design, wallId, onApply, onClose }: {
   const shown = reversed ? lengths.slice().reverse() : lengths;
   const stored = originalSegment(count, selected, reversed);
   const showValidation = !!draft.error && touched;
-  const inherit = wall.kind === 'bearing' ? '原始承重墙：分割后所有子段保持锁定。' : isBearingWall(wall) ? '所有子段继承承重标记，可再单独取消。' : '子段不会自动标记承重，分割后再按需标记。';
+  const inherit = isBearingWall(wall) ? '所有子段继承承重标记，可再单独取消。' : '子段不会自动标记承重，分割后再按需标记。';
   const edit = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => { setter(e.target.value); setError(''); };
   const setDistance = (offset: number) => {
     const value = meterDraft(contactDistances(L, [offset], reversed)[0]!);

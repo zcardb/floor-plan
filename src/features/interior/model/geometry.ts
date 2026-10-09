@@ -200,6 +200,11 @@ export function resizeBlank(
       throw new Error('已分割外围墙，当前不支持整体重设外围尺寸');
     return d;
   }
+  if ([0, 1, 2, 3].some(i => !d.walls.some(w => w.id === 'outer-' + i))) {
+    if (width !== d.width || depth !== d.depth || thickness !== d.thickness)
+      throw new Error('已删除外围墙，当前不支持整体重设外围尺寸');
+    return d;
+  }
   const exterior = outerWalls(width, depth, thickness).map(w => {
     const previous = d.walls.find(old => old.id === w.id && old.kind === 'exterior');
     if (previous && isBearingWall(previous) && (JSON.stringify(previous.a) !== JSON.stringify(w.a) || JSON.stringify(previous.b) !== JSON.stringify(w.b) || previous.thickness !== w.thickness))

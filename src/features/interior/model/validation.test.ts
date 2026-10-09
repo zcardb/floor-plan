@@ -16,11 +16,13 @@ describe('承重标记方案兼容性', () => {
     expect(validateDesign(referenceDesign()).structureUnlocked).toBeUndefined();
     for (const invalid of ['yes', 1, null]) expect(() => validateDesign({ ...referenceDesign(), structureUnlocked: invalid })).toThrow();
   });
-  it('非布尔字段和承重墙拆除冲突拒绝，不清理原数据', () => {
+  it('非布尔字段拒绝；承重墙上的旧拆除标记加载时连墙删除，不改原对象', () => {
     const d = blankDesign();
     for (const invalid of ['true', 1, null]) expect(() => validateDesign({ ...d, walls: d.walls.map(w => ({ ...w, loadBearing: invalid })) })).toThrow();
     d.walls.push({ id: 'inner', kind: 'partition', a: [3000, 0], b: [3000, 6000], thickness: 240, loadBearing: true });
-    const conflict = { ...d, demolished: ['inner'] };
-    expect(() => validateDesign(conflict)).toThrow(); expect(conflict.demolished).toEqual(['inner']);
+    const legacy = { ...d, demolished: ['inner'] };
+    const next = validateDesign(legacy);
+    expect(next.walls.some(w => w.id === 'inner')).toBe(false); expect(next.demolished).toEqual([]);
+    expect(legacy.demolished).toEqual(['inner']); expect(legacy.walls.some(w => w.id === 'inner')).toBe(true);
   });
 });

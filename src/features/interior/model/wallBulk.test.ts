@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { blankDesign, referenceDesign } from '../data/templates';
 import { splitWall } from './wallSplit';
-import { bearingWalls, clearBearing, mergeAllSplits } from './wallBulk';
+import { bearingWalls, clearBearing, collinearWallChains, mergeAllSplits, splitPointCount } from './wallBulk';
 import { isBearingWall, setWallBearing } from './wallPolicy';
 import { length } from './geometry';
+import type { Design } from './types';
 
 describe('清空分割', () => {
   it('把所有分割过的连续墙段合并回整段，转角保持分开', () => {
@@ -32,6 +33,73 @@ describe('清空分割', () => {
     const marked = setWallBearing(split, split.walls[split.walls.length - 1].id, true);
     const merged = mergeAllSplits(marked).design;
     expect(merged.walls.filter(isBearingWall)).toHaveLength(1);
+  });
+  it('一条直线一拉到底：不同类型、厚度的相接墙段与 T 形交界处都合并为一面墙', () => {
+    const base = blankDesign();
+    const d: Design = {
+      ...base,
+      walls: [
+        ...base.walls,
+        { id: 'p1', a: [0, 3000], b: [2000, 3000], thickness: 120, kind: 'partition' },
+        { id: 'p2', a: [2000, 3000], b: [4500, 3000], thickness: 240, kind: 'bearing' },
+        { id: 'p3', a: [4500, 3000], b: [6000, 3000], thickness: 120, kind: 'low' },
+        // 在 p1/p2 交界处形成 T 形接头的垂直墙，不应打断水平线
+        { id: 't', a: [2000, 3000], b: [2000, 6000], thickness: 120, kind: 'partition' },
+      ],
+      openings: [{ id: 'door', wallId: 'p3', kind: 'door', width: 800, offset: 600 }],
+    };
+    const result = mergeAllSplits(d);
+    expect(result).toMatchObject({ merged: 2, skipped: 0 });
+    const line = result.design.walls.filter(w => w.a[1] === 3000 && w.b[1] === 3000);
+    expect(line).toHaveLength(1);
+    expect(line[0]).toMatchObject({ id: 'p2', kind: 'bearing', thickness: 240, a: [0, 3000], b: [6000, 3000] });
+    expect(result.design.walls.some(w => w.id === 't')).toBe(true);
+    expect(result.design.openings[0]).toMatchObject({ wallId: 'p2', offset: 5100 });
+  });
+  it('外围墙优先、含承重段时整面墙保留承重；真实空隙不桥接', () => {
+    const base = blankDesign();
+    const d: Design = {
+      ...base,
+      walls: [
+        ...base.walls,
+        { id: 'e', a: [0, 3000], b: [1000, 3000], thickness: 240, kind: 'exterior' },
+        { id: 'b', a: [1000, 3000], b: [2000, 3000], thickness: 240, kind: 'bearing' },
+        { id: 'gap', a: [3000, 3000], b: [4000, 3000], thickness: 120, kind: 'partition' },
+      ],
+    };
+    const result = mergeAllSplits(d).design;
+    const merged = result.walls.find(w => w.id === 'e')!;
+    expect(merged).toMatchObject({ kind: 'exterior', loadBearing: true, a: [0, 3000], b: [2000, 3000] });
+    expect(result.walls.some(w => w.id === 'gap')).toBe(true);
+    expect(splitPointCount(d)).toBe(1);
+  });
+  it('参考户型合并后，不再有相接的共线墙段', () => {
+    const ref = referenceDesign();
+    expect(splitPointCount(ref)).toBeGreaterThan(0);
+    const result = mergeAllSplits(ref);
+    expect(result.skipped).toBe(0);
+    expect(collinearWallChains(result.design)).toEqual([]);
+    expect(splitPointCount(result.design)).toBe(0);
+    expect(result.design.openings).toHaveLength(ref.openings.length);
+    for (const o of result.design.openings) expect(result.design.walls.some(w => w.id === o.wallId)).toBe(true);
+  });
+  it('合并会让门窗越界或重叠时，该条线保持原样', () => {
+    const base = blankDesign();
+    const d: Design = {
+      ...base,
+      walls: [
+        ...base.walls,
+        { id: 'x', a: [0, 3000], b: [1000, 3000], thickness: 120, kind: 'partition' },
+        { id: 'y', a: [1000, 3000], b: [2000, 3000], thickness: 120, kind: 'partition' },
+      ],
+      openings: [
+        { id: 'o1', wallId: 'x', kind: 'door', width: 800, offset: 600 },
+        { id: 'o2', wallId: 'y', kind: 'door', width: 800, offset: 300 },
+      ],
+    };
+    const result = mergeAllSplits(d);
+    expect(result).toMatchObject({ merged: 0, skipped: 2 });
+    expect(result.design.walls).toEqual(d.walls);
   });
 });
 

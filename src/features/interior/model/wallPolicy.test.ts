@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { blankDesign, createProject, referenceDesign } from '../data/templates';
-import { canDemolishWall, canEditWall, canResizeWall, isBearingWall, isOnBearingWall, setWallBearing, wallKindName } from './wallPolicy';
+import { canDeleteWall, canEditWall, canResizeWall, isBearingWall, isOnBearingWall, setWallBearing, wallKindName } from './wallPolicy';
 import { rebuildRooms, resizeBlank } from './geometry';
 import { calculateCosts } from './costs';
 import { editSelection } from './selectionEdits';
@@ -20,7 +20,7 @@ describe('承重墙标记策略', () => {
     const geometry = (d: typeof before) => { const doc = createDrawingDocument(d, layers); return { ...doc, entities: doc.entities.map(({ group: _group, ...e }) => e) }; };
     expect(geometry(next)).toEqual(geometry(before));
     expect(canEditWall(next, next.walls[next.walls.length - 1]!)).toBe(false);
-    expect(canDemolishWall(next.walls[next.walls.length - 1]!)).toBe(false);
+    expect(canDeleteWall(next.walls[next.walls.length - 1]!)).toBe(false);
     expect(setWallBearing(next, partition.id, true)).toBe(next);
     const restored = setWallBearing(next, partition.id, false);
     expect(canEditWall(restored, restored.walls[restored.walls.length - 1]!)).toBe(true);
@@ -43,11 +43,14 @@ describe('承重墙标记策略', () => {
       expect(next.openings.find(x => x.id === o.id)!.width).toBe(o.width - 100);
     }
   });
-  it('原始承重、已拆墙和不存在的墙拒绝操作', () => {
+  it('原始承重墙默认承重，可取消后删除，再标记又受保护；不存在的墙拒绝', () => {
     const demo = referenceDesign(), original = demo.walls.find(w => w.kind === 'bearing')!;
-    expect(isBearingWall({ ...original, loadBearing: false })).toBe(true);
-    expect(() => setWallBearing(demo, original.id, false)).toThrow('原始');
-    expect(() => setWallBearing({ ...fixture(), demolished: [partition.id] }, partition.id, true)).toThrow('撤销');
+    expect(isBearingWall(original)).toBe(true); expect(canDeleteWall(original)).toBe(false);
+    const cleared = setWallBearing(demo, original.id, false), w = cleared.walls.find(w => w.id === original.id)!;
+    expect(w.loadBearing).toBe(false); expect(isBearingWall(w)).toBe(false); expect(canDeleteWall(w)).toBe(true);
+    const again = setWallBearing(cleared, original.id, true);
+    expect(canDeleteWall(again.walls.find(w => w.id === original.id)!)).toBe(false);
+    for (const kind of ['exterior', 'partition', 'low'] as const) expect(canDeleteWall(demo.walls.find(w => w.kind === kind)!)).toBe(true);
     expect(() => setWallBearing(fixture(), 'missing', true)).toThrow('不存在');
   });
   it('外围墙/矮墙身份保留，户型调整不会丢失标记或绕过保护', () => {
