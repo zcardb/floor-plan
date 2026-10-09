@@ -5,7 +5,7 @@ import { area, length, rebuildRooms, resizeBlank, ringArea } from './geometry';
 import { splitMaxCuts, splitWall } from './wallSplit';
 import { connectedWallPoly, wallSectionPolygons } from './wallConnections';
 import { validateDesign } from './validation';
-import { setWallBearing, canEditWall, isOnBearingWall } from './wallPolicy';
+import { setWallBearing, canEditWall, isBearingWall, isOnBearingWall } from './wallPolicy';
 import { dimensionBinding } from './dimensionBinding';
 import { dimensionEditPolicy } from './dimensionWallEdit';
 import { calculateCosts } from './costs';
