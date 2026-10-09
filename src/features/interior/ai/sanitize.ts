@@ -46,24 +46,16 @@ interface RawPlaced {
  * 模型给的家具条目 → 家具简写。代号在目录里查不到、背靠方向非法、放不进分区的都返回 null。
  * 沿墙位置与离墙距离会夹进分区，保证家具整体落在房间净空内。
  */
-function toSpec(raw: RawPlaced, zone: Box, catalog: AiCatalog, ring?: Point[]): FurnitureSpec | null {
+function toSpec(raw: RawPlaced, zone: Box, catalog: AiCatalog): FurnitureSpec | null {
   if (!raw || typeof raw !== "object") return null;
   const item = catalog.byCode.get(text(raw.code, 20) ?? "");
   if (!item?.catalogId || !isSide(raw.back)) return null;
   const [x1, y1, x2, y2] = zone;
   const horizontal = raw.back === "up" || raw.back === "down";
-  const alongSpan = horizontal ? x2 - x1 : y2 - y1;
-  const depthSpan = horizontal ? y2 - y1 : x2 - x1;
-  if (item.w > alongSpan || item.d > depthSpan) return null;
-  const along = round10(clamp(num(raw.along) ?? alongSpan / 2, item.w / 2, alongSpan - item.w / 2));
-  const gap = round10(clamp(num(raw.gap) ?? 0, 0, depthSpan - item.d));
-  if (ring) {
-    const offset = gap + item.d / 2;
-    const center: Point = horizontal
-      ? [x1 + along, raw.back === "up" ? y1 + offset : y2 - offset]
-      : [raw.back === "left" ? x1 + offset : x2 - offset, y1 + along];
-    if (!inRing(center, ring)) return null;
-  }
+  // 不因「尺寸超过这一边」或「落点不在轮廓内」丢件：丢件会让指定清单的件数对不上，
+  // 直接夹到分区中心即可，用户还能手动调整。
+  const along = round10(clamp(num(raw.along) ?? (horizontal ? x2 - x1 : y2 - y1) / 2, 0, Math.max(0, horizontal ? x2 - x1 : y2 - y1)));
+  const gap = round10(clamp(num(raw.gap) ?? 0, 0, Math.max(0, horizontal ? y2 - y1 : x2 - x1)));
   return { type: item.type, name: item.name, catalogId: item.catalogId, back: raw.back, along, gap };
 }
 
@@ -77,13 +69,13 @@ const rugsFirst = (specs: FurnitureSpec[]) => [...specs].sort((a, b) => Number(b
  */
 export function sanitizeRoomItems(
   value: unknown,
-  { zone, ring, catalog, required = [] }: { zone: Box; ring?: Point[]; catalog: AiCatalog; required?: AiRequiredItem[] },
+  { zone, catalog, required = [] }: { zone: Box; catalog: AiCatalog; required?: AiRequiredItem[] },
 ): FurnitureSpec[] {
   const raw = Array.isArray(value) ? value : (value as { items?: unknown } | null)?.items;
   if (!Array.isArray(raw)) throw new Error("方案里没有家具清单");
   const specs = raw
     .slice(0, MAX_ROOM_ITEMS)
-    .map((entry) => toSpec(entry as RawPlaced, zone, catalog, ring))
+    .map((entry) => toSpec(entry as RawPlaced, zone, catalog))
     .filter((spec): spec is FurnitureSpec => !!spec);
   if (!specs.length) throw new Error("方案里的家具放不进这个房间");
   if (required.length) {
@@ -240,7 +232,7 @@ export function sanitizePlan(value: unknown, { width: fixedWidth, depth: fixedDe
     if (!target || budget <= 0) continue;
     const items = list(g.items)
       .slice(0, Math.min(MAX_ROOM_ITEMS, budget))
-      .map((item) => toSpec(item as RawPlaced, target.zone, catalog, target.ring))
+      .map((item) => toSpec(item as RawPlaced, target.zone, catalog))
       .filter((spec): spec is FurnitureSpec => !!spec);
     if (!items.length) continue;
     budget -= items.length;

@@ -28,6 +28,7 @@ export function AiResults<T>({ echo, slots, selected, onSelect, preview, caption
   const ready = slots.filter((slot) => slot.status === "ready").length;
   const failed = slots.filter((slot): slot is Extract<AiSlot<T>, { status: "failed" }> => slot.status === "failed");
   const running = done < slots.length;
+  const warnings = slots.reduce((sum, slot) => sum + (slot.status === "ready" ? slot.candidate.warnings ?? 0 : 0), 0);
   const [zoomed, setZoomed] = useState<number | null>(null);
   return <div className="ai-results">
     <section className="ai-echo" aria-label="本次需求">
@@ -43,6 +44,7 @@ export function AiResults<T>({ echo, slots, selected, onSelect, preview, caption
         {running && <Loader2 size={13} className="animate-spin" />}
         {running ? `正在生成 ${slots.length} 个方案 · 已完成 ${done} / ${slots.length}` : ready ? `已生成 ${ready} 个方案${failed.length ? `，${failed.length} 个失败` : ""} · 选择一个应用` : "方案生成失败"}
       </p>
+      {!running && warnings > 0 && <span className="ai-note">其中 {warnings} 处尺寸或间距可能需要微调</span>}
       {onRegenerate && !running && <button type="button" className="ai-regenerate" onClick={onRegenerate}><RefreshCw size={13} />重新生成</button>}
     </div>
     {!running && !ready && <p className="ai-error" role="alert"><AlertCircle size={15} />{failed[0]?.error ?? "生成失败，请返回修改后重试"}</p>}

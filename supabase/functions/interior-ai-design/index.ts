@@ -5,7 +5,7 @@ const MODEL = 'anthropic/claude-opus-5.5';
 const API = 'https://api.enter.pro/code/api/v1/ai/messages';
 const PROJECT_ID = 'eba6e37b0b3d4d608b63a3efedec61a3';
 /** 超过这个耗时就不再进入修复轮，避免整个请求超时。 */
-const REPAIR_BUDGET_MS = 75_000;
+const REPAIR_BUDGET_MS = 90_000;
 const NL = String.fromCharCode(10);
 
 const cors = {
@@ -136,6 +136,7 @@ function roomPrompt(b: Body) {
     : '无（由你从目录中挑选）';
   return [
     `目标房间：${JSON.stringify(b.room)}`,
+    `目标房间净空：宽 ${Math.round(b.room!.zone[2] - b.room!.zone[0])}（x 方向）× 深 ${Math.round(b.room!.zone[3] - b.room!.zone[1])}（y 方向）mm。back 为 up/down 时 along 取值 [w/2, 宽 − w/2]、gap ≤ 深 − d；back 为 left/right 时 along 取值 [w/2, 深 − w/2]、gap ≤ 宽 − d。输出前请逐件核对占地范围不越界、彼此不重叠；空间实在不够时，宁可让家具贴墙紧凑排布，也不要越界。`,
     `目标房间现有家具：${b.existing!.length ? JSON.stringify(b.existing) : '无'}`,
     `指定家具：${required}`,
     `整套户型（墙 a→b、门窗中心 at 与连通房间 rooms、房间轮廓 ring、其他房间家具）：${JSON.stringify(b.plan)}`,
@@ -182,8 +183,17 @@ const footprint = (p: Placed, e: Entry, zone: [number, number, number, number]) 
   return { x1: cx - w / 2, y1: cy - d / 2, x2: cx + w / 2, y2: cy + d / 2 };
 };
 
-/** 一组家具的结构 + 几何校验：代号、方向、是否出界、是否互相重叠。 */
-function checkItems(items: unknown, zone: [number, number, number, number], byCode: Map<string, Entry>, label: string, errors: string[]): Placed[] {
+/**
+ * 校验结果分两级：
+ * - hard：方案无法落地（代号不存在、方向非法、指定家具件数不符、结构缺失），修不好就判失败；
+ * - soft：能落地但不够好（出界、重叠），先让模型修，修不好也接受，前端会把家具夹回房间内并提示需微调。
+ */
+interface Issues { hard: string[]; soft: string[] }
+const issues = (): Issues => ({ hard: [], soft: [] });
+
+/** 一组家具的结构 + 几何校验：代号、方向（hard），是否出界、是否互相重叠（soft）。 */
+function checkItems(items: unknown, zone: [number, number, number, number], byCode: Map<string, Entry>, label: string, found: Issues): Placed[] {
+  const errors = found.hard;
   if (!Array.isArray(items) || !items.length) { errors.push(`${label}：items 必须是非空数组`); return []; }
   const placed: Placed[] = [];
   const boxes: { name: string; type: string; box: ReturnType<typeof footprint> }[] = [];
@@ -196,12 +206,12 @@ function checkItems(items: unknown, zone: [number, number, number, number], byCo
     const box = footprint(p, e, zone);
     const tolerance = 30;
     if (box.x1 < zone[0] - tolerance || box.y1 < zone[1] - tolerance || box.x2 > zone[2] + tolerance || box.y2 > zone[3] + tolerance)
-      errors.push(`${label} ${p.code}（${e.name}）超出了房间范围，请调整 along / gap 或换小一号的家具`);
+      found.soft.push(`${label} ${p.code}（${e.name}）超出了房间范围（占地 x ${Math.round(box.x1)}–${Math.round(box.x2)}、y ${Math.round(box.y1)}–${Math.round(box.y2)}，房间 0–${Math.round(zone[2])} × 0–${Math.round(zone[3])}），请调整 along / gap`);
     for (const other of boxes) {
       if (e.type === 'rug' || other.type === 'rug') continue;
       const overlap = Math.min(box.x2, other.box.x2) - Math.max(box.x1, other.box.x1);
       const overlapY = Math.min(box.y2, other.box.y2) - Math.max(box.y1, other.box.y1);
-      if (overlap > 50 && overlapY > 50) errors.push(`${label} ${p.code}（${e.name}）与 ${other.name} 重叠`);
+      if (overlap > 50 && overlapY > 50) found.soft.push(`${label} ${p.code}（${e.name}）与 ${other.name} 重叠 ${Math.round(overlap)}×${Math.round(overlapY)} mm`);
     }
     boxes.push({ name: e.name, type: e.type, box });
     placed.push({ code: p.code, back: p.back, ...(p.along !== undefined ? { along: p.along } : {}), ...(p.gap !== undefined ? { gap: p.gap } : {}) });
@@ -209,13 +219,13 @@ function checkItems(items: unknown, zone: [number, number, number, number], byCo
   return placed;
 }
 
-function validateRoom(value: unknown, b: Body): string[] {
-  const errors: string[] = [];
+function validateRoom(value: unknown, b: Body): Issues {
+  const found = issues(), errors = found.hard;
   const byCode = new Map(b.catalog.map((e) => [e.code, e]));
   const v = value as { items?: unknown; summary?: unknown };
   const r = b.room!;
   const zone: [number, number, number, number] = [0, 0, r.zone[2] - r.zone[0], r.zone[3] - r.zone[1]];
-  const placed = checkItems(v?.items, zone, byCode, '家具', errors);
+  const placed = checkItems(v?.items, zone, byCode, '家具', found);
   if (b.required!.length) {
     const counts = new Map<string, number>();
     for (const p of placed) counts.set(p.code, (counts.get(p.code) ?? 0) + 1);
@@ -223,27 +233,27 @@ function validateRoom(value: unknown, b: Body): string[] {
     const allowed = new Set(b.required!.map((q) => q.code));
     for (const code of counts.keys()) if (!allowed.has(code)) errors.push(`不允许使用未指定的家具 ${code}（${byCode.get(code)?.name}）`);
   }
-  return errors;
+  return found;
 }
 
 type Ring = [number, number][];
 const area = (ring: Ring) => Math.abs(ring.reduce((s, a, i) => { const c = ring[(i + 1) % ring.length]; return s + a[0] * c[1] - c[0] * a[1]; }, 0)) / 2;
 
-function validatePlan(value: unknown, b: Body): string[] {
-  const errors: string[] = [];
+function validatePlan(value: unknown, b: Body): Issues {
+  const found = issues(), errors = found.hard;
   const v = value as { width?: unknown; depth?: unknown; walls?: unknown; rooms?: unknown; openings?: unknown; furniture?: unknown };
   const W = b.width ?? (finite(v?.width, 3000, 40000) ? v.width : NaN), D = b.depth ?? (finite(v?.depth, 3000, 40000) ? v.depth : NaN);
-  if (!Number.isFinite(W) || !Number.isFinite(D)) return ['顶层必须输出 width 与 depth（3000–40000 的数字，单位 mm）'];
+  if (!Number.isFinite(W) || !Number.isFinite(D)) return { hard: ['顶层必须输出 width 与 depth（3000–40000 的数字，单位 mm）'], soft: [] };
   const byCode = new Map(b.catalog.map((e) => [e.code, e]));
   const walls = new Map<string, { dir: string; at: number; from: number; to: number }>();
   if (!Array.isArray(v?.walls)) errors.push('walls 必须是数组');
   else v.walls.forEach((raw, i) => {
     const w = raw as { key?: unknown; dir?: unknown; at?: unknown; from?: unknown; to?: unknown };
     const key = typeof w?.key === 'string' ? w.key : '';
-    if (!key || walls.has(key) || ['top', 'right', 'bottom', 'left'].includes(key)) { errors.push(`第 ${i + 1} 面内墙：key 缺失、重复或与外墙同名`); return; }
-    if (w.dir !== 'h' && w.dir !== 'v') { errors.push(`内墙 ${key}：dir 必须是 h 或 v`); return; }
+    if (!key || walls.has(key) || ['top', 'right', 'bottom', 'left'].includes(key)) { found.soft.push(`第 ${i + 1} 面内墙：key 缺失、重复或与外墙同名`); return; }
+    if (w.dir !== 'h' && w.dir !== 'v') { found.soft.push(`内墙 ${key}：dir 必须是 h 或 v`); return; }
     const [across, along] = w.dir === 'h' ? [D, W] : [W, D];
-    if (!finite(w.at, 0, across) || !finite(w.from, 0, along) || !finite(w.to, 0, along) || w.to - w.from < 600) { errors.push(`内墙 ${key}：at/from/to 超出范围或长度不足 600`); return; }
+    if (!finite(w.at, 0, across) || !finite(w.from, 0, along) || !finite(w.to, 0, along) || w.to - w.from < 600) { found.soft.push(`内墙 ${key}：at/from/to 超出范围或长度不足 600`); return; }
     walls.set(key, { dir: w.dir, at: w.at, from: w.from, to: w.to });
   });
   const rooms = new Map<string, [number, number, number, number]>();
@@ -253,7 +263,7 @@ function validatePlan(value: unknown, b: Body): string[] {
     const r = raw as { id?: unknown; name?: unknown; box?: unknown; poly?: unknown };
     const id = typeof r?.id === 'string' ? r.id : '';
     if (!id || rooms.has(id)) { errors.push(`第 ${i + 1} 个房间：id 缺失或重复`); return; }
-    if (!str(r.name, 20)) errors.push(`房间 ${id}：name 必须是 20 字以内的中文名称`);
+    if (!str(r.name, 20)) found.soft.push(`房间 ${id}：name 必须是 20 字以内的中文名称`);
     const ring: Ring | null = Array.isArray(r.box) && r.box.length === 4 && r.box.every((n) => finite(n))
       ? [[r.box[0], r.box[1]], [r.box[2], r.box[1]], [r.box[2], r.box[3]], [r.box[0], r.box[3]]]
       : Array.isArray(r.poly) && r.poly.length >= 4 && r.poly.every((p) => Array.isArray(p) && p.length === 2 && p.every((n) => finite(n)))
@@ -261,36 +271,36 @@ function validatePlan(value: unknown, b: Body): string[] {
         : null;
     if (!ring) { errors.push(`房间 ${id}：需要 box:[x1,y1,x2,y2] 或至少 4 个点的 poly`); return; }
     const xs = ring.map((p) => p[0]), ys = ring.map((p) => p[1]);
-    if (Math.min(...xs) < -1 || Math.min(...ys) < -1 || Math.max(...xs) > W + 1 || Math.max(...ys) > D + 1) errors.push(`房间 ${id}：轮廓超出了 ${W}×${D} 的外轮廓`);
+    if (Math.min(...xs) < -1 || Math.min(...ys) < -1 || Math.max(...xs) > W + 1 || Math.max(...ys) > D + 1) found.soft.push(`房间 ${id}：轮廓超出了 ${W}×${D} 的外轮廓`);
     const a = area(ring);
-    if (a < 1.5e6) errors.push(`房间 ${id}：面积不足 1.5 m²`);
+    if (a < 1.5e6) found.soft.push(`房间 ${id}：面积不足 1.5 m²`);
     total += a;
     rooms.set(id, [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]);
   });
-  if (rooms.size && (total < W * D * 0.85 || total > W * D * 1.05)) errors.push(`所有房间面积之和应约等于整个平面（${(W * D / 1e6).toFixed(1)} m²），当前 ${(total / 1e6).toFixed(1)} m²：房间要铺满平面且互不重叠`);
+  if (rooms.size && (total < W * D * 0.85 || total > W * D * 1.05)) found.soft.push(`所有房间面积之和应约等于整个平面（${(W * D / 1e6).toFixed(1)} m²），当前 ${(total / 1e6).toFixed(1)} m²：房间要铺满平面且互不重叠`);
   let entrance = false;
   if (!Array.isArray(v?.openings)) errors.push('openings 必须是数组');
   else v.openings.forEach((raw, i) => {
     const o = raw as { wall?: unknown; kind?: unknown; at?: unknown; width?: unknown };
     const wall = typeof o?.wall === 'string' ? o.wall : '';
     const outer = ['top', 'right', 'bottom', 'left'].includes(wall);
-    if (!outer && !walls.has(wall)) { errors.push(`第 ${i + 1} 个门窗：wall=${wall} 既不是外墙名也不是内墙 key`); return; }
-    if (o.kind !== 'door' && o.kind !== 'window') { errors.push(`第 ${i + 1} 个门窗：kind 必须是 door 或 window`); return; }
-    if (!finite(o.at) || !finite(o.width, 500, 4000)) { errors.push(`第 ${i + 1} 个门窗：at / width 无效`); return; }
-    if (o.kind === 'window' && !outer) errors.push(`第 ${i + 1} 个门窗：窗只能开在外墙上`);
+    if (!outer && !walls.has(wall)) { found.soft.push(`第 ${i + 1} 个门窗：wall=${wall} 既不是外墙名也不是内墙 key`); return; }
+    if (o.kind !== 'door' && o.kind !== 'window') { found.soft.push(`第 ${i + 1} 个门窗：kind 必须是 door 或 window`); return; }
+    if (!finite(o.at) || !finite(o.width, 500, 4000)) { found.soft.push(`第 ${i + 1} 个门窗：at / width 无效`); return; }
+    if (o.kind === 'window' && !outer) found.soft.push(`第 ${i + 1} 个门窗：窗只能开在外墙上`);
     const [from, to] = outer ? [0, wall === 'top' || wall === 'bottom' ? W : D] : [walls.get(wall)!.from, walls.get(wall)!.to];
-    if (o.at - o.width / 2 < from || o.at + o.width / 2 > to) errors.push(`第 ${i + 1} 个门窗：洞口超出了墙 ${wall} 的范围`);
+    if (o.at - o.width / 2 < from || o.at + o.width / 2 > to) found.soft.push(`第 ${i + 1} 个门窗：洞口超出了墙 ${wall} 的范围`);
     if (o.kind === 'door' && outer) entrance = true;
   });
-  if (Array.isArray(v?.openings) && !entrance) errors.push('缺少开在外墙上的入户门');
+  if (Array.isArray(v?.openings) && !entrance) found.soft.push('缺少开在外墙上的入户门');
   if (!Array.isArray(v?.furniture) || !v.furniture.length) errors.push('furniture 至少要为主要房间布置家具');
   else v.furniture.forEach((raw, i) => {
     const g = raw as { room?: unknown; items?: unknown };
     const box = typeof g?.room === 'string' ? rooms.get(g.room) : undefined;
-    if (!box) { errors.push(`第 ${i + 1} 组家具：room 必须引用房间 id`); return; }
-    checkItems(g.items, [0, 0, box[2] - box[0], box[3] - box[1]], byCode, `房间 ${g.room} 的家具`, errors);
+    if (!box) { found.soft.push(`第 ${i + 1} 组家具：room 必须引用房间 id`); return; }
+    checkItems(g.items, [0, 0, box[2] - box[0], box[3] - box[1]], byCode, `房间 ${g.room} 的家具`, found);
   });
-  return errors;
+  return found;
 }
 
 /** 落库前把代号换成 catalogId：代号只在单次请求内有效。 */
@@ -338,8 +348,9 @@ Deno.serve(async (req) => {
   const started = Date.now();
   let generationId = '';
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-  const fail = async (status: number, message: string) => {
-    if (generationId) await admin.from('interior_ai_generations').update({ status: 'failed', error: message.slice(0, 1000) }).eq('id', generationId).eq('status', 'running');
+  /** detail 是给排查用的技术原因，只写进生成记录，不返回给界面。 */
+  const fail = async (status: number, message: string, detail?: string) => {
+    if (generationId) await admin.from('interior_ai_generations').update({ status: 'failed', error: (detail ? `${message}｜${detail}` : message).slice(0, 1000) }).eq('id', generationId).eq('status', 'running');
     return json(status, { success: false, message });
   };
   try {
@@ -374,27 +385,33 @@ Deno.serve(async (req) => {
     const system = [body.mode === 'room' ? ROOM_CONTRACT : PLAN_CONTRACT, agent?.instructions ? `补充要求：${agent.instructions}` : ''].filter(Boolean).join(NL + NL);
     const messages: unknown[] = [{ role: 'user', content: contentOf(body.mode === 'room' ? roomPrompt(body) : planPrompt(body), body.images) }];
     const session = req.headers.get('x-session-id')?.trim() || body.generationId;
-    let result: unknown = null;
-    let errors: string[] = [];
+    // 每轮保留「hard 最少、其次 soft 最少」的那一版：修复轮偶尔会改坏，不能被最后一轮覆盖。
+    let best: { result: unknown; found: Issues } | null = null;
     for (let round = 0; round <= repairRounds; round++) {
       if (round > 0 && Date.now() - started > REPAIR_BUDGET_MS) break;
       const text = await callModel(token, session, system, messages);
+      let result: unknown = null, found: Issues;
       try {
         result = extractJson(text);
-        errors = body.mode === 'room' ? validateRoom(result, body) : validatePlan(result, body);
+        found = body.mode === 'room' ? validateRoom(result, body) : validatePlan(result, body);
       } catch (e) {
-        result = null;
-        errors = [`输出不是合法 JSON：${e instanceof Error ? e.message : String(e)}`];
+        found = { hard: [`输出不是合法 JSON：${e instanceof Error ? e.message : String(e)}`], soft: [] };
       }
-      console.log(JSON.stringify({ generationId, index: body.index, mode: body.mode, round, errors: errors.slice(0, 8) }));
-      if (!errors.length) break;
+      console.log(JSON.stringify({ generationId, index: body.index, mode: body.mode, round, ms: Date.now() - started, hard: found.hard.slice(0, 6), soft: found.soft.slice(0, 6) }));
+      if (result !== null && (!best || found.hard.length < best.found.hard.length || (found.hard.length === best.found.hard.length && found.soft.length < best.found.soft.length))) best = { result, found };
+      if (!found.hard.length && !found.soft.length) break;
       messages.push({ role: 'assistant', content: text });
-      messages.push({ role: 'user', content: `上面的输出没有通过校验，请逐条修正后重新输出完整的 JSON（只输出 JSON）：${NL}${errors.slice(0, 20).map((e, i) => `${i + 1}. ${e}`).join(NL)}` });
+      messages.push({ role: 'user', content: `上面的输出没有通过校验，请逐条修正后重新输出完整的 JSON（只输出 JSON）：${NL}${[...found.hard, ...found.soft].slice(0, 20).map((e, i) => `${i + 1}. ${e}`).join(NL)}` });
     }
-    if (errors.length || !result) {
-      console.error('validation failed', JSON.stringify(errors.slice(0, 10)));
-      return await fail(422, '这个方案没有通过布局检查，请重新生成或把描述写得更具体');
+    if (!best || best.found.hard.length) {
+      const detail = best?.found.hard ?? ['模型没有输出可解析的 JSON'];
+      console.error('validation failed', JSON.stringify(detail.slice(0, 10)));
+      return await fail(422, best && detail.some((e) => e.startsWith('指定家具') || e.startsWith('不允许使用'))
+        ? '这个方案没有按指定的家具清单布置，请重新生成'
+        : '这个方案没有通过布局检查，请重新生成或把描述写得更具体', detail.slice(0, 5).join('；'));
     }
+    const result = best.result;
+    const warnings = best.found.soft.length;
 
     const summary = typeof (result as { summary?: unknown }).summary === 'string' ? String((result as { summary: string }).summary).slice(0, 60) : '';
     const byCode = new Map(body.catalog.map((e) => [e.code, e]));
@@ -403,7 +420,7 @@ Deno.serve(async (req) => {
     }, { onConflict: 'generation_id,idx' }).select('id').single();
     if (insertError) throw insertError;
     await admin.from('interior_ai_generations').update({ status: 'succeeded', error: null }).eq('id', generationId);
-    return json(200, { success: true, model: MODEL, candidate: { candidateId: row.id, index: body.index, summary, result } });
+    return json(200, { success: true, model: MODEL, candidate: { candidateId: row.id, index: body.index, summary, result, warnings } });
   } catch (e) {
     console.error('interior-ai-design error', e);
     if (e instanceof UpstreamError) return await fail([402, 403, 429].includes(e.status) ? e.status : 502, e.message);

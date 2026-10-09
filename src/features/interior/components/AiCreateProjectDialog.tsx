@@ -71,7 +71,7 @@ export function AiCreateProjectForm({ pending, onClose, onSubmit }: { pending: b
         generationId, index, description, images: request.images, catalog: aiCatalog.entries, hints, width: request.width, depth: request.depth,
       });
       const spec = sanitizePlan(candidate!.result, { width: request.width, depth: request.depth, catalog: aiCatalog });
-      return { id: candidate!.candidateId, index, summary: candidate!.summary, result: { design: planToDesign(spec, aiCatalog) } };
+      return { id: candidate!.candidateId, index, summary: candidate!.summary, warnings: candidate!.warnings, result: { design: planToDesign(spec, aiCatalog) } };
     });
     relaunch.current = launch;
     launch();

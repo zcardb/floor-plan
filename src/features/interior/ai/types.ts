@@ -60,6 +60,8 @@ export interface AiCandidate<T> {
   index: number;
   summary: string;
   result: T;
+  /** 方案能落地但有需要微调的地方（尺寸或间距）。 */
+  warnings?: number;
 }
 
 /** 单个候选的生成状态：先完成的先出现。 */

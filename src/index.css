@@ -3644,7 +3644,7 @@ button.room-cost-row:hover {
   color: hsl(var(--primary-foreground));
   font-variant-numeric: tabular-nums;
 }
-.tool-tooltip {
+.tool-tooltip { z-index: 90;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -3988,6 +3988,15 @@ button.ai-candidate:hover { border-color: hsl(var(--primary) / 0.5); }
 .ai-advanced-body { display: grid; gap: 10px; padding: 4px 12px 12px; }
 .ai-advanced-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .ai-advanced-row.is-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-/* 参考图大图预览 */
-.image-preview-dialog { width: auto; max-width: min(960px, calc(100vw - 32px)) !important; padding: 12px !important; background: hsl(var(--card)); }
-.image-preview-dialog img { display: block; max-width: 100%; max-height: calc(100dvh - 96px); margin: 0 auto; border-radius: var(--ctl-radius-in); object-fit: contain; }
+/* 参考图全屏预览：深色遮罩铺满，图片等比适配屏幕、无边框；右上角下载 / 关闭 */
+.image-lightbox-overlay { position: fixed; inset: 0; z-index: 80; background: hsl(var(--foreground) / 0.92); animation: lightbox-fade .18s ease-out; }
+.image-lightbox { position: fixed; inset: 0; z-index: 81; display: grid; place-items: center; padding: 56px 24px 24px; outline: none; animation: lightbox-fade .18s ease-out; }
+.image-lightbox > img { max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; }
+.image-lightbox-actions { position: absolute; top: 12px; right: 12px; display: flex; gap: 8px; }
+.image-lightbox-actions button { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: hsl(var(--background) / 0.14); color: hsl(var(--background)); transition: background .15s ease; }
+.image-lightbox-actions button:hover:not(:disabled) { background: hsl(var(--background) / 0.26); }
+.image-lightbox-actions button:focus-visible { outline: 2px solid hsl(var(--background)); outline-offset: 2px; }
+.image-lightbox-actions button:disabled { cursor: progress; }
+@keyframes lightbox-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .image-lightbox, .image-lightbox-overlay { animation: none; } }
+@media (max-width: 600px) { .image-lightbox { padding: 56px 0 0; } }
