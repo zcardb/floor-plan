@@ -1,4 +1,4 @@
-# AI 辅助生成户型 / 布局 / 家具（数据库 + Agent + 模型 + 弱入口 UI）
+# AI 辅助生成户型 / 布局 / 家具（数据库 + Agent + Opus 5.5 + 弱入口 UI）
 
 ## Context
 
@@ -15,12 +15,12 @@
 
 本次按「**弱化 AI 入口**」做两处入口（不加常驻面板 / tab）：
 
-1. **选中房间 → visual editor 工具条上的「AI 布局」**：点击弹出输入框（描述 + 参考图 + 模型 + 数量），生成完成后输入框原地换成候选方案，可「返回」重新输入，选中一个后 `应用` 生效。
+1. **选中房间 → visual editor 工具条上的「AI 布局」**：点击弹出输入框（描述 + 参考图 + 指定家具 + 数量），生成完成后输入框原地换成候选方案，可「返回」重新输入，选中一个后 `应用` 生效。
 2. **新建项目 → 新增「AI 创建」**：必填长宽 + 描述（可选媒体），弹窗内 loading 生成整户户型 + 门窗，一次出多张，选中一张确认后进入项目详情。
 
 约束：家具只能从现有素材库 / 我的家具库中选（保证可计价、可 3D 渲染、可导出）；整户生成时外墙严格等于输入的长 × 宽（矩形），AI 只负责内墙分割、门窗与家具。
 
-**关于「agent」的取舍**：本方案把 agent 落成两样东西 —— ① `interior_ai_agents` 表（可调的任务说明/风格偏好/模型/修复轮数，改配置不重新部署）；② 后端一个有界「生成 → 校验 → 修复」循环。硬性的 DSL 契约留在代码里（必须与渲染器一致）。若你指的是用 Builder 里的自定义 Agent 来承载提示词，那只需把 ② 的提示词来源换成自定义 Agent 调用，其余不变。
+**关于「agent」的取舍**：本方案把 agent 落成两样东西 —— ① `interior_ai_agents` 表（可调的任务说明/风格偏好/温度/修复轮数，改配置不重新部署）；② 后端一个有界「生成 → 校验 → 修复」循环。硬性的 DSL 契约留在代码里（必须与渲染器一致）。若你指的是用 Builder 里的自定义 Agent 来承载提示词，那只需把 ② 的提示词来源换成自定义 Agent 调用，其余不变。
 
 ## 零、扩展性：家具目录 = 动态注册表 + 代号
 
@@ -48,19 +48,16 @@
 - 两种模式：`mode="single"`（选中即关闭，回传一项）与 `mode="add"`（选中即追加一项并关闭，已选过的仍可再选）。
 - **两处共用**：① 房间 AI 布局的「指定家具」（`mode="add"`）；② 新建家具弹窗 `CustomFurnitureDialog.tsx` 里现在的「参考类型」下拉（第 120 行的 `Select`，选项来自 `furnitureTypes`，约 45 项且不可搜索）替换为 `FurniturePicker mode="single"`，保留顶部「自动匹配 · xxx」项。参考类型的数据源是「类型」而不是具体家具，因此选择器接受通用的 `items: PickerItem[]`（`{ id, label, category?, hint?, visual? }`），由调用方各自映射。
 
-## 一、可用模型（AI All）
+## 一、模型（AI All）
 
-只用**同一协议** `openai_chat_completions` 的模型，让 agent 保持单一代码路径（Gemini / Anthropic 系协议不同，暂不纳入可选档）：
+**固定使用 Claude Opus 5.5（`anthropic/claude-opus-5.5`），用户不能选模型**，两处入口都不出现模型下拉。
 
-| UI 档位 | 显示名 | 模型 id | 为什么 |
-| --- | --- | --- | --- |
-| 自动（默认） | DeepSeek V4 Pro | `deepseek/deepseek-v4-pro` | 成本低、推理强、1M 上下文，结构化输出稳 |
-| 快速 | Qwen 3.7 Plus | `alibaba/qwen-3.7-plus` | 低延迟、多模态（能读参考图） |
-| 更强 | GLM 5.2 | `z-ai/glm-5.2` | 1M 上下文，复杂户型/多约束更稳 |
-| 带图时自动切换 | Kimi K2.5 | `moonshotai/kimi-k2.5` | 原生多模态；选了不带视觉的档位又传了图时，忽略图片并在结果里提示 |
-
-- UI 只展示「自动 / 快速 / 更强」，**不暴露模型 id**；映射写在后端函数顶部一个 `MODEL_TIERS` 常量，便于更换。
-- 「数量」= 并行发 N 次请求（1–4），每次 `temperature` 与措辞略不同以获得不同方案；逐个清洗，全部非法才报错。
+- 协议 `anthropic_messages`，端点是 `POST https://api.enter.pro/code/api/v1/ai/messages`（**不是** `chat/completions`），body `{ model, messages, stream:false, max_tokens: 8192, temperature }`；header 用 `Authorization: Bearer ${Deno.env.get('AI_API_TOKEN_eba6e37b0b3d')}` + `X-Enter-Project-ID: eba6e37b0b3d4d608b63a3efedec61a3` + 透传的 `X-Session-ID`。协议不匹配会直接 400 `model protocol does not match route`。
+- `stream:false` 时错误信封是 JSON `{"type":"error","error":{"type","message"},"request_id"}`；错误码 `invalid_request_error` / `authentication_error` / `permission_error` / `insufficient_credits`(402) / `rate_limit_error` / `overloaded_error` / `api_error`。
+- 模型 id 写在后端函数顶部一个 `const MODEL = 'anthropic/claude-opus-5.5'`，便于以后更换。
+- Opus 5.5 支持视觉 ⇒ 参考图直接以 `{type:'image', source:{type:'url', url}}` 形式塞进该条 user message 的 `content` 数组（Anthropic 形状，不是 OpenAI 的 `image_url`），无需切换模型。
+- 「数量」= 并行发 N 次请求（1–4），每次 `temperature` 与措辞略不同以获得不同方案（`temperature` 取值 0–1）；逐个清洗，全部非法才报错。
+- Opus 是最高成本档：候选默认 2，上限 4；`max_tokens` 用 8192，户型 DSL 不会更长。
 
 ## 二、数据库
 
@@ -73,7 +70,7 @@ interior_ai_agents                       -- agent 配置（不写 UI，改配置
   kind          text 'plan'|'room'
   name          text
   instructions  text                   -- 任务说明 / 风格偏好 / 额外约束（DSL 契约仍在代码里）
-  model         text                   -- 空表示用档位默认
+  model         text                   -- 空表示用固定模型 anthropic/claude-opus-5.5
   temperature   numeric 0–1
   repair_rounds int 0–3 default 1
   enabled       bool default true
@@ -89,7 +86,6 @@ interior_ai_generations                  -- 一次生成（= 一次「数量 N�
   prompt       text  check 1–2000
   images       jsonb default '[]'      -- 参考图公开 URL 数组，≤4
   model        text                    -- 实际使用的模型 id
-  model_tier   text 'auto'|'fast'|'quality'
   status       text 'succeeded'|'failed'
   error        text
   created_at
@@ -100,7 +96,7 @@ interior_ai_candidates                   -- 每个候选方案
   generation_id uuid not null references interior_ai_generations(id) on delete cascade
   owner_id      uuid not null default auth.uid()
   idx           int                     -- 候选序号 0..N-1
-  payload       jsonb not null          -- PlanSpec 或 FurnitureSpec[]，≤120KB
+  payload       jsonb not null          -- 解析后的方案（家具存 catalogId）≤120KB
   summary       text                    -- 一句话方案说明（生成列表里显示）
   applied_at    timestamptz null        -- 被「应用」时写入
   created_at
@@ -119,8 +115,8 @@ RLS：两张表都 `enable row level security`，`FOR SELECT` / `FOR UPDATE`（�
 请求 → 鉴权(401) → 入参守卫 → 读 agent 配置(owner 覆盖 → 全局默认)
      → 组装 messages（硬契约 + agent.instructions + 目录 + few-shot + 本轮需求）
      → 循环 round = 0 .. repair_rounds：
-          调 POST {API_BASE}/code/api/v1/ai/chat/completions  (stream:false)
-          提取 JSON（去 ``` 围栏，取首个 { 到最后一个 }）
+          调 POST {API_BASE}/code/api/v1/ai/messages  (model: anthropic/claude-opus-5.5, stream:false)
+          取 response.content 里所有 type='text' 块拼接 → 提取 JSON（去 ``` 围栏，取首个 { 到最后一个 }）
           结构校验：字段/枚举/数值范围/引用完整性（开口必须落在已声明墙上、家具代号必须在本次目录里、
                     room 模式下 required 的每个代号出现次数满足要求、onlyRequired 时不得出现其他代号）
           通过 → 跳出
@@ -130,8 +126,9 @@ RLS：两张表都 `enable row level security`，`FOR SELECT` / `FOR UPDATE`（�
 ```
 
 - 头部：`Authorization: Bearer ${Deno.env.get('AI_API_TOKEN_eba6e37b0b3d')}`、`X-Enter-Project-ID: eba6e37b0b3d4d608b63a3efedec61a3`、透传 `X-Session-ID`。
-- 有参考图时该条 user 消息用 `content: [{type:'text',text}, ...images.map(url=>({type:'image_url',image_url:{url}}))]`；模型不支持视觉则丢弃图片并在结果里带 `note`。
-- 非 2xx：读 `{"error":{"message"}}` 回传 `{ success:false, message }`（402/403 原样透出）。
+- 系统提示走 Anthropic 的顶层 `system` 字段（不放进 `messages`）；修复轮把上一次输出作为 `assistant`、校验报错作为 `user` 追加。
+- 有参考图时该条 user 消息用 `content: [{type:'text',text}, ...images.map(url=>({type:'image',source:{type:'url',url}}))]`。
+- 非 2xx：读 `{"type":"error","error":{"type","message"}}` 回传 `{ success:false, message }`（402/403 原样透出）。
 - 后端只做**结构级**校验；几何级修复（坐标夹取、区间/重叠、去重命名）在前端 `sanitize.ts`。
 
 「生成 → 校验 → 修复」是本功能的成败点：第一反应是改提示词与 few-shot，而不是加更多兜底分支。
@@ -175,7 +172,7 @@ RLS：两张表都 `enable row level security`，`FOR SELECT` / `FOR UPDATE`（�
   │  └────────────────────────────────────────────────────────┘  │
   │  [＋ 添加家具]                                                │
   │ ──────────────────────────────────────────────────────────── │
-  │  [ ＋ ]                      模型 自动 ▾   数量 2 ▾    ( ↑ ) │
+  │  [ ＋ ]                                    数量 2 ▾    ( ↑ ) │
   │  ○ 保留现有家具（2 件）                                       │
   └──────────────────────────────────────────────────────────────┘
 ```
@@ -241,7 +238,7 @@ RLS：两张表都 `enable row level security`，`FOR SELECT` / `FOR UPDATE`（�
   │ │ [，开放式厨房，原木风 ] │ │  三室两厅 · 90 m²            │  │
   │ │ 参考图片（可选）        │ │  ✓ 已选                      │  │
   │ │ [＋] [🖼 参考.png ✕]    │ │ ┌────────┐  ← WallLayoutPreview│
-  │ │ 模型 自动 ▾  数量 2 ▾   │ │ │ ░░░░░░ │    生成中           │  │
+  │ │ 数量 2 ▾                │ │ │ ░░░░░░ │    生成中           │  │
   │ │ [ ✦ AI 生成户型 ]       │ │ └────────┘                    │  │
   │ └─────────────────────────┘ └──────────────────────────────┘  │
   │                        [取消]   [重新生成]   [确认保存 →]     │
@@ -255,7 +252,6 @@ RLS：两张表都 `enable row level security`，`FOR SELECT` / `FOR UPDATE`（�
 ```ts
 // 目录条目：代号只在本次请求内有效；映射表留在前端
 type AiCatalogEntry = { code: string; name: string; category: string; type: string; w: number; d: number };
-type AiModelTier = 'auto' | 'fast' | 'quality';
 type AiRoomContext = {
   roomId: string; name: string; mat: string; area: number;
   zone: [number, number, number, number];   // 房间净空矩形（绝对 mm）= 摆放分区
@@ -264,11 +260,11 @@ type AiRoomContext = {
   windows: { edge: 'up'|'down'|'left'|'right'; at: number; width: number }[];
   existing: { code: string; name: string; cx: number; cy: number; w: number; d: number; rot: number }[];
 };
-// plan: { width, depth, description, images?, catalog, modelTier, projectId? }
+// plan: { width, depth, description, images?, catalog, count, projectId? }
 //       → { success, generationId, candidates: { id, index, plan: PlanSpec, summary }[] }
 // room: { room: AiRoomContext, roomKind, description, images?, catalog, keepExisting,
 //         required: { code: string; count: number }[], onlyRequired: boolean,
-//         modelTier, projectId? }
+//         count, projectId? }
 //       → { success, generationId, candidates: { id, index, items: PlacedSpec[], note }[] }
 //       PlacedSpec = { code, back:'up'|'down'|'left'|'right', along?, gap?, w?, d? }
 ```
@@ -313,12 +309,12 @@ type AiRoomContext = {
 - [ ] `ai/sanitize.ts`：`sanitizePlanSpec` / `sanitizeRoomItems`（代号解析与未知代号丢弃、required 数量校验、id 命名空间化、坐标夹取、开口过滤、全非法时抛错）。
 - [ ] `ai/apply.ts`：`applyPlanToDesign`、`applyRoomFurniture`（replace/keep + 自定义目录登记）、`applied_at` 回写。
 - [ ] `ai/preview.ts`：候选 → 预览用 `Design`。
-- [ ] `ai/client.ts`：两个薄封装、`modelTier` 传参、统一错误提取。
-- [ ] `supabase/functions/interior-ai-design/index.ts`：鉴权、入参守卫、读 agent 配置、修复循环、模型档位与视觉模型切换、结构校验、写 generations + candidates、错误封装。
-- [ ] `components/aiComposer.tsx`：图片 chip + `＋` 上传（≤4）+ 快捷标签 + 模型/数量下拉 + 发送，两处入口共用。
+- [ ] `ai/client.ts`：两个薄封装（不传模型参数）、统一错误提取。
+- [ ] `supabase/functions/interior-ai-design/index.ts`：鉴权、入参守卫（`count` 1–4）、读 agent 配置、固定 `anthropic/claude-opus-5.5` 走 `/v1/ai/messages`（顶层 `system`、`max_tokens: 8192`、`stream:false`、图片用 Anthropic `image` 块）、修复循环、结构校验、写 generations + candidates、Anthropic 错误信封解析。
+- [ ] `components/aiComposer.tsx`：图片 chip + `＋` 上传（≤4）+ 快捷标签 + 数量下拉 + 发送，两处入口共用；**无模型选择**。
 - [ ] `components/AiRoomDialog.tsx`：输入态 → 生成中 → 候选网格（`PlanThumbnail`）→ 返回/应用；含「保留现有家具」开关。
 - [ ] `components/SelectionEditor.tsx`：房间工具项新增「AI 布局」并接线（`aiEnabled` 控制可见）。
-- [ ] `components/AiGenerateDialog.tsx` + `NewProjectDialog.tsx`：AI 创建模式（必填长宽 + 描述 + 图片 + 模型/数量）→ 多候选择一 → `NewProjectInput.design`。
+- [ ] `components/AiGenerateDialog.tsx` + `NewProjectDialog.tsx`：AI 创建模式（必填长宽 + 描述 + 图片 + 数量）→ 多候选择一 → `NewProjectInput.design`。
 - [ ] `components/ProjectManager.tsx`：`createProject(..., input.design)`。
 - [ ] `components/Workbench.tsx`：传 `aiEnabled`；AI 户型标签与重置提示。
 - [ ] `src/index.css`：AI 对话框与候选网格样式使用语义 token，明暗对比度正常。
