@@ -3798,8 +3798,17 @@ button.room-cost-row:hover {
 .project-menu { width:min(360px,calc(100vw - 24px)); }
 .project-menu-create { font-weight:600; color:hsl(var(--primary)); }
 .project-menu-create:focus,.project-menu-create[data-state="open"] { color:hsl(var(--primary)); }
+/* 菜单条目统一尺度：父级菜单、新建子菜单、导出、账号共用一套行高与 14px 图标，避免 24px 与 16px 混用 */
+.project-menu [role="menuitem"]:not(.project-menu-option),
+.create-menu [role="menuitem"],
+.export-menu [role="menuitem"],
+.account-menu [role="menuitem"] { min-height:32px; gap:8px; padding:0 10px; border-radius:6px; font-size:13px; }
+.project-menu [role="menuitem"]:not(.project-menu-option)>svg,
+.create-menu [role="menuitem"]>svg,
+.export-menu [role="menuitem"]>svg,
+.account-menu [role="menuitem"]>svg { width:14px; height:14px; flex:none; }
 .project-menu-list { max-height:min(360px,calc(var(--radix-dropdown-menu-content-available-height) - 60px)); overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }
-.project-menu-option { display:grid; grid-template-columns:minmax(0,1fr) auto 16px; gap:12px; min-height:40px; }
+.project-menu-option { display:grid; grid-template-columns:minmax(0,1fr) auto 16px; gap:12px; min-height:32px; }
 .project-menu-option[aria-current="true"] { font-weight:600; }
 .project-menu-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .project-menu-date { display:flex; align-items:center; font-size:11px; color:hsl(var(--muted-foreground)); font-variant-numeric:tabular-nums; }
@@ -3816,7 +3825,7 @@ button.room-cost-row:hover {
 .export-button:hover,.export-button[data-state="open"] { background:hsl(var(--primary) / 0.08); border-color:hsl(var(--primary)); color:hsl(var(--primary)); }
 .export-button .export-button-caret { width:14px; height:14px; opacity:.7; }
 .toolbar-right>.export-button { margin:0 4px; }
-.export-menu,.create-menu { min-width:184px; }
+.export-menu,.create-menu { min-width:200px; }
 .account-trigger { display:grid; place-items:center; flex:none; width:40px; height:40px; border-radius:50%; }
 .account-trigger .account-avatar { transition:box-shadow .2s ease; }
 .account-trigger:hover .account-avatar,.account-trigger[data-state="open"] .account-avatar { box-shadow:0 0 0 3px hsl(var(--secondary)),0 0 0 4px hsl(var(--border)); }
@@ -4015,11 +4024,11 @@ button.room-cost-row:hover {
 .ai-candidate > span small { font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
 button.ai-candidate:hover { border-color: hsl(var(--primary) / 0.5); }
 .ai-candidate.is-selected { border-color: hsl(var(--primary)); box-shadow: 0 0 0 2px hsl(var(--primary) / 0.25); }
-.ai-candidate.is-failed { color: hsl(var(--destructive)); }
-button.ai-candidate.is-failed .ai-candidate-preview { align-content: center; gap: 8px; }
-.ai-candidate-retry { display: inline-flex; align-items: center; gap: 4px; height: var(--ctl-sm); padding: 0 12px; border-radius: 999px; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: var(--fs-control); transition: color .15s ease, border-color .15s ease; }
-button.ai-candidate.is-failed:hover { border-color: hsl(var(--destructive) / 0.5); }
-button.ai-candidate.is-failed:hover .ai-candidate-retry { border-color: hsl(var(--primary) / 0.5); color: hsl(var(--primary)); }
+.ai-candidate.is-failed { color: hsl(var(--destructive)); grid-template-rows: 1fr; }
+.ai-candidate.is-failed .ai-candidate-preview { align-content: center; aspect-ratio: auto; }
+.ai-candidate-retry { display: inline-flex; align-items: center; gap: 4px; height: var(--ctl-sm); padding: 0 12px; border-radius: 999px; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: var(--fs-control); box-shadow: 0 1px 4px hsl(var(--foreground) / 0.12); transition: color .15s ease, border-color .15s ease; }
+.ai-candidate-retry:hover { border-color: hsl(var(--primary) / 0.6); color: hsl(var(--primary)); }
+.ai-candidate-retry:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
 .ai-candidate-error { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ai-candidate.is-pending > span { color: hsl(var(--muted-foreground)); }
 .ai-candidate-preview { position: relative; display: grid; place-items: center; aspect-ratio: 1; border-radius: var(--ctl-radius-in); background: var(--plan-paper); overflow: hidden; color: hsl(var(--muted-foreground)); }
@@ -4072,19 +4081,6 @@ button.ai-candidate.is-failed:hover .ai-candidate-retry { border-color: hsl(var(
 .ai-size-editor-save { height: var(--ctl-sm); padding: 0 14px; border-radius: var(--ctl-radius-in); background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); font-size: var(--fs-control); }
 .ai-size-editor-save:hover:not(:disabled) { background: hsl(var(--primary) / 0.9); }
 .ai-size-editor-save:disabled { opacity: .45; cursor: not-allowed; }
-/* AI 创建：高级设计（默认收起，选填） */
-.ai-advanced { border: 1px solid hsl(var(--border)); border-radius: var(--ctl-radius); background: hsl(var(--card)); }
-.ai-advanced-toggle { display: flex; align-items: center; gap: 8px; width: 100%; min-height: var(--ctl-lg); padding: 0 12px; font-size: var(--fs-control); color: hsl(var(--foreground)); text-align: left; border-radius: inherit; }
-.ai-advanced-toggle > svg:first-child { color: hsl(var(--muted-foreground)); flex: none; }
-.ai-advanced-toggle > span { font-weight: 600; flex: none; }
-.ai-advanced-toggle > small { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
-.ai-advanced-toggle:hover { background: hsl(var(--accent) / 0.6); }
-.ai-advanced-toggle:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
-.ai-advanced-caret { flex: none; color: hsl(var(--muted-foreground)); transition: transform .2s ease; }
-.ai-advanced.is-open .ai-advanced-caret { transform: rotate(180deg); }
-.ai-advanced-body { display: grid; gap: 10px; padding: 4px 12px 12px; }
-.ai-advanced-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.ai-advanced-row.is-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 /* 参考图全屏预览：深色遮罩铺满，图片等比适配屏幕、无边框；右上角下载 / 关闭 */
 .image-lightbox-overlay { position: fixed; inset: 0; z-index: 80; background: hsl(var(--foreground) / 0.92); animation: lightbox-fade .18s ease-out; }
 .image-lightbox { position: fixed; inset: 0; z-index: 81; display: grid; place-items: center; padding: 72px 80px 56px; outline: none; animation: lightbox-fade .18s ease-out; }
@@ -4107,9 +4103,14 @@ button.ai-candidate.is-failed:hover .ai-candidate-retry { border-color: hsl(var(
 /* 小助手头像：6 种色调，基于主题色板 */
 .assistant-avatar { display: inline-grid; place-items: center; flex: none; border-radius: 30%; overflow: hidden; background: hsl(var(--accent)); color: hsl(var(--primary)); }
 .assistant-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.avatar-figure { width: 92%; height: 92%; overflow: visible; }
+.avatar-ink { fill: hsl(var(--foreground)); }
+.avatar-ink-line { fill: none; stroke: hsl(var(--foreground)); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.avatar-eye { fill: hsl(var(--background)); }
 .assistant-avatar[data-tone="2"] { background: hsl(var(--success) / 0.14); color: hsl(var(--success)); }
 .assistant-avatar[data-tone="3"] { background: hsl(var(--warning) / 0.16); color: hsl(var(--warning)); }
 .assistant-avatar[data-tone="4"] { background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); }
+.assistant-avatar[data-tone="4"] .avatar-figure { color: hsl(var(--accent-foreground) / .75); }
 .assistant-avatar[data-tone="5"] { background: hsl(var(--destructive) / 0.12); color: hsl(var(--destructive)); }
 .assistant-avatar[data-tone="6"] { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
 
@@ -4117,6 +4118,8 @@ button.ai-candidate.is-failed:hover .ai-candidate-retry { border-color: hsl(var(
 .ai-engine-trigger { max-width: 200px; gap: 6px; }
 .ai-engine-trigger > span:not(.assistant-avatar) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .furniture-picker-check { flex: none; color: hsl(var(--primary)); }
+.furniture-picker-action { display: flex; align-items: center; gap: 6px; width: 100%; font: inherit; color: inherit; text-align: left; }
+.furniture-picker-action:hover { color: hsl(var(--foreground)); }
 .furniture-picker-footer { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-top: 1px solid hsl(var(--border)); font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); }
 .ai-composer-notice { margin: -2px 4px 0; font-size: var(--fs-meta); color: hsl(var(--warning)); }
 
@@ -4148,11 +4151,24 @@ button.ai-candidate.is-failed:hover .ai-candidate-retry { border-color: hsl(var(
 .assistant-avatar-option.is-selected { border-color: hsl(var(--primary)); }
 .assistant-avatar-option:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
 .assistant-avatar-check { position: absolute; right: -4px; bottom: -4px; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
-.assistant-prompt { display: grid; gap: 8px; }
+/* 与 SelectTrigger 同外观的按钮，用于弹出可搜索选择器。 */
+.picker-select-trigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; height: 36px; padding: 6px 12px; border: 1px solid hsl(var(--input)); border-radius: var(--radius-lg, 8px); background: hsl(var(--background)); font-size: 13px; color: hsl(var(--foreground)); text-align: left; transition: border-color .15s ease, box-shadow .15s ease; }
+.picker-select-trigger > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker-select-trigger > svg { flex: none; opacity: .6; }
+.picker-select-trigger:focus-visible, .picker-select-trigger[data-state="open"] { outline: none; border-color: hsl(var(--ring)); box-shadow: 0 0 0 4px hsl(var(--ring) / .12); }
+/* Prompt：通用的「编辑 / 预览」写法——标签页贴在编辑框顶部、左对齐、下划线表示当前页，与内容共用一个边框。 */
+.assistant-prompt { display: grid; border: 1px solid hsl(var(--input)); border-radius: var(--ctl-radius); background: hsl(var(--background)); overflow: hidden; }
+.assistant-prompt:focus-within { border-color: hsl(var(--ring)); box-shadow: 0 0 0 4px hsl(var(--ring) / .12); }
+.assistant-prompt-tabs.assistant-prompt-tabs { justify-content: flex-start; gap: 4px; height: auto; padding: 0 8px; border-bottom: 1px solid hsl(var(--border)); border-radius: 0; background: hsl(var(--muted) / .5); }
+.assistant-prompt-tabs [role="tab"] { position: relative; padding: 9px 10px; border-radius: 0; background: transparent; box-shadow: none; font-size: var(--fs-control); color: hsl(var(--muted-foreground)); }
+.assistant-prompt-tabs [role="tab"]:hover { color: hsl(var(--foreground)); }
+.assistant-prompt-tabs [role="tab"][data-state="active"] { background: transparent; box-shadow: none; color: hsl(var(--foreground)); }
+.assistant-prompt-tabs [role="tab"][data-state="active"]::after { content: ""; position: absolute; left: 6px; right: 6px; bottom: -1px; height: 2px; border-radius: 2px; background: hsl(var(--primary)); }
 .assistant-prompt [role="tabpanel"] { position: relative; margin-top: 0; }
-.assistant-prompt textarea { min-height: 220px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs-control); line-height: 1.7; resize: vertical; }
+.assistant-prompt textarea { display: block; min-height: 220px; border: 0; border-radius: 0; background: transparent; box-shadow: none; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs-control); line-height: 1.7; resize: vertical; }
+.assistant-prompt textarea:focus, .assistant-prompt textarea:focus-visible { border: 0; box-shadow: none; outline: none; --tw-ring-shadow: 0 0 #0000; }
 .assistant-prompt-count { position: absolute; right: 10px; bottom: 8px; font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; pointer-events: none; }
-.assistant-markdown { min-height: 220px; max-height: 360px; overflow: auto; padding: 12px 14px; border: 1px solid hsl(var(--border)); border-radius: var(--ctl-radius); background: hsl(var(--background)); font-size: 13px; line-height: 1.7; color: hsl(var(--foreground)); }
+.assistant-markdown { min-height: 220px; max-height: 360px; overflow: auto; padding: 12px 14px; font-size: 13px; line-height: 1.7; color: hsl(var(--foreground)); }
 .assistant-markdown > * + * { margin-top: .6em; }
 .assistant-markdown h1 { font-size: 18px; font-weight: 650; }
 .assistant-markdown h2 { font-size: 16px; font-weight: 600; }

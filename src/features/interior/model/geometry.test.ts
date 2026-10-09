@@ -9,6 +9,7 @@ import {
   rect,
   resizeBlank,
   snapMove,
+  blockFurnitureMove,
 } from "./geometry";
 import { validateDesign } from "./validation";
 import { materials } from "../data/catalog";
@@ -140,5 +141,27 @@ describe("户型几何与输入保护", () => {
     expect(snapMove(f, [151, 162], d, false)).toEqual([150, 150]);
     expect(snapMove(f, [176, 124], d, false)).toEqual([200, 100]);
     expect(length(d.walls[0])).toBe(6240);
+  });
+  describe("家具移动被墙挡住", () => {
+    // 净空范围是 0..width / 0..depth，墙体在这个范围之外。
+    const d = blankDesign();
+    const f = { id: "f", type: "bed", name: "床", cx: 2000, cy: 2000, w: 1800, d: 2000, rot: 0, color: "#d8b88a" };
+    it("目标位置嵌进右墙时停在墙面上（贴墙），另一轴照常移动", () => {
+      expect(blockFurnitureMove(f, [2000, 2000], [d.width - 500, 2300], d)).toEqual([d.width - 900, 2300]);
+    });
+    it("目标位置嵌进墙角时两个方向都贴墙", () => {
+      expect(blockFurnitureMove(f, [2000, 2000], [d.width, d.depth], d)).toEqual([d.width - 900, d.depth - 1000]);
+    });
+    it("旋转 90° 后按旋转后的外包尺寸贴墙", () => {
+      const [x] = blockFurnitureMove({ ...f, rot: 90 }, [2000, 2000], [-300, 2000], d);
+      expect(x).toBeCloseTo(1000, 3);
+    });
+    it("目标位置不碰墙时原样返回", () => {
+      expect(blockFurnitureMove(f, [2000, 2000], [2500, 2600], d)).toEqual([2500, 2600]);
+    });
+    it("已拆除的墙不挡家具", () => {
+      const open = { ...d, demolished: d.walls.map((w) => w.id) };
+      expect(blockFurnitureMove(f, [2000, 2000], [d.width, 2000], open)).toEqual([d.width, 2000]);
+    });
   });
 });

@@ -12,7 +12,7 @@ export interface AiEcho {
 
 /**
  * 候选方案网格：顶部回显本次请求；每个格子先是生成中，完成即显示真实几何预览，
- * 失败的格子写明原因。进度只统计真实完成的请求。
+ * 失败的格子只留一个重试按钮。进度只统计真实完成的请求。
  */
 export function AiResults<T>({ echo, slots, selected, onSelect, preview, caption, onRegenerate, onRetry }: {
   echo: AiEcho;
@@ -56,12 +56,13 @@ export function AiResults<T>({ echo, slots, selected, onSelect, preview, caption
     <div className="ai-candidate-grid" role="radiogroup" aria-label="候选方案">
       {slots.map((slot, i) => {
         if (slot.status === "pending") return <div key={i} className="ai-candidate is-pending" aria-busy="true"><div className="ai-candidate-preview"><Loader2 size={15} className="animate-spin" /></div><span>方案 {i + 1} · 生成中</span></div>;
-        if (slot.status === "failed") return onRetry
-          ? <button key={i} type="button" className="ai-candidate is-failed" title={slot.error} aria-label={`方案 ${i + 1} 生成失败：${slot.error}。点击重试`} onClick={() => onRetry(i)}>
-              <div className="ai-candidate-preview"><AlertCircle size={15} /><span className="ai-candidate-retry"><RotateCw size={12} />重试</span></div>
-              <span className="ai-candidate-error">方案 {i + 1} 生成失败</span>
-            </button>
-          : <div key={i} className="ai-candidate is-failed"><div className="ai-candidate-preview"><AlertCircle size={15} /></div><span className="ai-candidate-error" title={slot.error}>方案 {i + 1} 生成失败</span></div>;
+        // 失败只用重试按钮表达：错误原因放在 title / aria-label 里，界面上不再显示图标与说明。
+        if (slot.status === "failed") return <div key={i} className="ai-candidate is-failed">
+          <div className="ai-candidate-preview">
+            {onRetry && <button type="button" className="ai-candidate-retry" title={slot.error} aria-label={`方案 ${i + 1} 生成失败：${slot.error}。点击重试`} onClick={() => onRetry(i)}><RotateCw size={13} />重试</button>}
+          </div>
+          {!onRetry && <span className="ai-candidate-error" title={slot.error}>方案 {i + 1} 生成失败</span>}
+        </div>;
         const active = selected === i;
         // 选中与放大是两个独立按钮（按钮不能嵌套）：点卡片选中，点左上角放大查看。
         return <div key={i} className="ai-candidate-cell">

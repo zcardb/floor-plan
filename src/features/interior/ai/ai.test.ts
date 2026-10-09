@@ -132,6 +132,8 @@ describe("整户户型候选清洗与落地", () => {
   const bed = codeOf(catalog, "双人床 1.5m"), sofa = codeOf(catalog, "三人沙发");
   const plan = {
     summary: "两室",
+    width: 8000,
+    depth: 9000,
     walls: [
       { key: "spine", dir: "h", at: 4000, from: 0, to: 8000 },
       { key: "bottom", dir: "h", at: 2000, from: 0, to: 8000 },
@@ -157,7 +159,7 @@ describe("整户户型候选清洗与落地", () => {
     ],
   };
   it("内墙 key 重新命名、门窗跟着映射；与外墙同名的内墙、碎墙、越界 / 重叠 / 悬空的门窗、过小房间都被丢弃", () => {
-    const spec = sanitizePlan(plan, { width: 8000, depth: 9000, catalog });
+    const spec = sanitizePlan(plan, { catalog });
     expect(spec.walls.map((w) => w.key)).toEqual(["w-1", "w-2"]);
     expect(spec.rooms.map((r) => r.name)).toEqual(["客厅", "主卧", "次卧"]);
     expect(spec.rooms.find((r) => r.name === "次卧")!.mat).toBe("wood");
@@ -166,7 +168,7 @@ describe("整户户型候选清洗与落地", () => {
     expect(spec.furniture.flatMap((z) => z.items)).toHaveLength(2);
   });
   it("落地为 AI 户型：结构可编辑、可通过校验、家具都在各自房间内、不能视为初始模板", () => {
-    const design = planToDesign(sanitizePlan(plan, { width: 8000, depth: 9000, catalog }), catalog);
+    const design = planToDesign(sanitizePlan(plan, { catalog }), catalog);
     expect(design).toMatchObject({ templateId: "ai", width: 8000, depth: 9000, structureUnlocked: true });
     expect(() => validateDesign(design)).not.toThrow();
     expect(design.rooms.reduce((s, r) => s + area(r), 0)).toBeGreaterThan(65);
@@ -177,7 +179,7 @@ describe("整户户型候选清洗与落地", () => {
     expect(project.state.rooms).toEqual(design.rooms);
   });
   it("落地时默认清空分割：门窗所在墙比洞口长，可以沿墙拖动", () => {
-    const design = planToDesign(sanitizePlan(plan, { width: 8000, depth: 9000, catalog }), catalog);
+    const design = planToDesign(sanitizePlan(plan, { catalog }), catalog);
     expect(design.walls.some((w) => w.id.startsWith("opening-wall-"))).toBe(false);
     for (const o of design.openings) {
       const wall = design.walls.find((w) => w.id === o.wallId)!;
@@ -185,7 +187,7 @@ describe("整户户型候选清洗与落地", () => {
     }
   });
   it("房间全部不可用时抛错", () => {
-    expect(() => sanitizePlan({ ...plan, rooms: [{ id: "x", box: [0, 0, 10, 10] }] }, { width: 8000, depth: 9000, catalog })).toThrow("房间");
+    expect(() => sanitizePlan({ ...plan, rooms: [{ id: "x", box: [0, 0, 10, 10] }] }, { catalog })).toThrow("房间");
   });
 });
 
@@ -214,9 +216,9 @@ describe("AI 决定户型尺寸", () => {
   const bed = catalog.entries.find((e) => e.name === "双人床 1.5m")!.code;
   const plan = { width: 7000, depth: 8000, walls: [], openings: [{ wall: "bottom", kind: "door", at: 3000, width: 1000 }],
     rooms: [{ id: "a", name: "卧室", box: [0, 0, 7000, 8000] }], furniture: [{ room: "a", items: [{ code: bed, back: "up" }] }] };
-  it("没填长宽时取模型给的尺寸；填了以填的为准；都没有时报错", () => {
+  it("取模型按描述给出的尺寸，超出范围时夹到 3000–40000；没有尺寸时报错", () => {
     expect(sanitizePlan(plan, { catalog })).toMatchObject({ width: 7000, depth: 8000 });
-    expect(sanitizePlan(plan, { catalog, width: 9000 })).toMatchObject({ width: 9000, depth: 8000 });
+    expect(sanitizePlan({ ...plan, width: 100000, depth: 1000 }, { catalog })).toMatchObject({ width: 40000, depth: 3000 });
     expect(() => sanitizePlan({ ...plan, width: undefined }, { catalog })).toThrow("尺寸");
   });
 });

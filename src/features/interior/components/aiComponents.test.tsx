@@ -4,8 +4,7 @@ import { describe, expect, it } from "vitest";
 import { library } from "../data/catalog";
 import { furnitureTypes } from "../model/furnitureAppearance";
 import { AiResults } from "./AiResults";
-import { AiCreateProjectForm } from "./AiCreateProjectDialog";
-import { advancedLabel, planHints } from "../ai/planFields";
+import { AiCreateProjectForm, DEFAULT_PLAN_PROMPT } from "./AiCreateProjectDialog";
 import { filterPickerItems, furniturePickerItems, groupPickerItems, typePickerItems } from "./pickerItems";
 import type { LibraryItem } from "../model/types";
 
@@ -62,6 +61,8 @@ describe("候选方案网格", () => {
     }));
     expect(html).toContain("方案 1 生成失败：AI 服务繁忙。点击重试");
     expect(html).toContain("重试");
+    // 失败格子里只留重试按钮：不渲染说明文字（原因在 title / aria-label 里）。
+    expect(html).not.toContain("ai-candidate-error");
     expect(html).toContain('aria-label="放大查看动静分区"');
   });
   it("全部失败时给出错误提示", () => {
@@ -75,22 +76,13 @@ describe("候选方案网格", () => {
 
 describe("AI 创建户型表单", () => {
   const html = renderToStaticMarkup(createElement(AiCreateProjectForm, { pending: false, onClose: () => {}, onSubmit: () => {} }));
-  it("长宽与几室几厅几卫收在「高级设计」里（默认收起、选填）；描述为空时不能发送；数量默认 2；模型默认 DeepSeek V4 Flash", () => {
-    expect(html).toContain("高级设计");
-    expect(html).toContain('aria-expanded="false"');
+  it("需求描述默认填入示例（含长宽、几室几厅几卫），可编辑可直接发送；没有「高级设计」；数量默认 2；模型默认 DeepSeek V4 Flash", () => {
+    expect(html).not.toContain("高级设计");
     expect(html).not.toContain('id="ai-project-width"');
-    expect(html).toMatch(/aria-label="生成"[^>]*disabled/);
+    expect(html).toContain(DEFAULT_PLAN_PROMPT);
+    expect(html).toContain("长 12 m × 宽 10 m");
+    expect(html).not.toMatch(/aria-label="生成"[^>]*disabled/);
     expect(html).toContain("2 个方案");
     expect(html).toContain("DeepSeek V4 Flash");
-  });
-});
-
-describe("高级设计参数", () => {
-  it("填写的内容生成摘要与提示词；留空不生成", () => {
-    const rooms = { bedrooms: "3", livingRooms: "2", bathrooms: "" };
-    expect(advancedLabel({ width: 10000, depth: NaN }, rooms)).toBe("长 10.00 m · 3 卧 2 厅");
-    expect(planHints(rooms)).toEqual(["房间数量必须是：卧室 3 间，厅 2 个（客厅、餐厅等）；房间名称与功能对应"]);
-    expect(planHints({ bedrooms: "", livingRooms: "", bathrooms: "" })).toEqual([]);
-    expect(advancedLabel({ width: NaN, depth: NaN }, { bedrooms: "", livingRooms: "", bathrooms: "" })).toBe("");
   });
 });

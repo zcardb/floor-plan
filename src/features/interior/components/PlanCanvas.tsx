@@ -17,6 +17,7 @@ import {
   nearestOnWall,
   norm,
   roomPath,
+  blockFurnitureMove,
 } from "../model/geometry";
 import { snapFurniture, sameGuides, type AlignmentGuide } from '../model/furnitureAlignment';
 import { AlignmentGuides } from './AlignmentGuides';
@@ -553,8 +554,10 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           wall = next.walls.find((w) => w.id === dr.id);
         if (f) {
           if (dr.kind === "move") {
+            // 先吸附，再把结果裁到墙面内侧：家具既贴墙对齐，也不会嵌进或越过墙。
             const snapped = snapFurniture(f, [p[0] - dr.offset![0], p[1] - dr.offset![1]], next, layers.snap, 8 / view.s);
-            [f.cx, f.cy] = snapped.point;
+            const last = current.current.furniture.find((o) => o.id === f.id) ?? f;
+            [f.cx, f.cy] = blockFurnitureMove(f, [last.cx, last.cy], snapped.point, next);
             showGuides(snapped.guides);
           }
           if (dr.kind === "rot") {

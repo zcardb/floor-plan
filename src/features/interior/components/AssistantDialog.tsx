@@ -1,21 +1,29 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Check } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { errorMessage } from "@/lib/notify";
 import { AssistantAvatarView } from "./AssistantAvatarView";
-import { ASSISTANT_AVATARS, DEFAULT_ASSISTANT_AVATAR } from "../ai/assistantAvatars";
-import { AI_MODELS, DEFAULT_AI_MODEL, modelOf } from "../ai/models";
+import { FurniturePicker } from "./FurniturePicker";
+import type { PickerItem } from "./pickerItems";
+import { ASSISTANT_AVATARS, DEFAULT_ASSISTANT_AVATAR, avatarOf } from "../ai/assistantAvatars";
+import { AI_MODELS, DEFAULT_AI_MODEL, modelName, modelOf } from "../ai/models";
 import { ASSISTANT_LIMITS, type Assistant, type AssistantInput } from "../cloud/useAssistants";
 
-const MODEL_GROUPS = [...new Set(AI_MODELS.map((m) => m.group))];
+/** 模型平铺成一列（不分组），靠搜索定位；厂商名仍可搜到。 */
+const MODEL_ITEMS: PickerItem[] = AI_MODELS.map((m) => ({
+  id: m.id,
+  label: m.name,
+  group: "模型",
+  hint: m.vision ? "可读图" : undefined,
+  keywords: [m.id, m.group],
+}));
 
 /** 新建 / 编辑小助手：头像、名称、模型、Prompt（Markdown 编辑 + 预览）。 */
 export function AssistantDialog({ open, initial, onClose, onSave }: {
@@ -36,7 +44,8 @@ export function AssistantDialog({ open, initial, onClose, onSave }: {
 }
 
 function AssistantForm({ initial, onClose, onSave }: { initial?: Assistant; onClose: () => void; onSave: (input: AssistantInput) => Promise<void> }) {
-  const [avatar, setAvatar] = useState(initial?.avatar ?? DEFAULT_ASSISTANT_AVATAR);
+  // 旧版图标头像的 key 会映射到对应的新插画，编辑时也能正确选中。
+  const [avatar, setAvatar] = useState(initial ? avatarOf(initial.avatar).key : DEFAULT_ASSISTANT_AVATAR);
   const [name, setName] = useState(initial?.name ?? "");
   const [model, setModel] = useState(modelOf(initial?.model) ? initial!.model : DEFAULT_AI_MODEL);
   const [prompt, setPrompt] = useState(initial?.prompt ?? "");
@@ -59,7 +68,7 @@ function AssistantForm({ initial, onClose, onSave }: { initial?: Assistant; onCl
     <fieldset className="assistant-avatars">
       <legend>头像</legend>
       <div role="radiogroup" aria-label="选择头像">
-        {ASSISTANT_AVATARS.map((a) => <button key={a.key} type="button" role="radio" aria-checked={avatar === a.key} aria-label={`头像 ${a.key}`}
+        {ASSISTANT_AVATARS.map((a, index) => <button key={a.key} type="button" role="radio" aria-checked={avatar === a.key} aria-label={`头像 ${index + 1}`}
           className={"assistant-avatar-option" + (avatar === a.key ? " is-selected" : "")} onClick={() => setAvatar(a.key)}>
           <AssistantAvatarView avatar={a.key} size={40} />
           {avatar === a.key && <span className="assistant-avatar-check"><Check size={10} /></span>}
@@ -69,21 +78,17 @@ function AssistantForm({ initial, onClose, onSave }: { initial?: Assistant; onCl
     <div className="assistant-form-row">
       <div className="cms-field"><Label htmlFor="assistant-name">名称</Label><Input id="assistant-name" maxLength={ASSISTANT_LIMITS.name} placeholder="例如：北欧风布局师" value={name} onChange={(e) => setName(e.target.value)} autoFocus /></div>
       <div className="cms-field"><Label htmlFor="assistant-model">模型</Label>
-        <Select value={model} onValueChange={setModel}>
-          <SelectTrigger id="assistant-model"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {MODEL_GROUPS.map((group) => <SelectGroup key={group}>
-              <SelectLabel>{group}</SelectLabel>
-              {AI_MODELS.filter((m) => m.group === group).map((m) => <SelectItem key={m.id} value={m.id}>{m.name}{m.vision ? " · 可读图" : ""}</SelectItem>)}
-            </SelectGroup>)}
-          </SelectContent>
-        </Select>
+        <FurniturePicker items={MODEL_ITEMS} grouped={false} label="选择模型" placeholder="搜索模型…" selectedId={model} onPick={(item) => setModel(item.id)}>
+          <button type="button" id="assistant-model" className="picker-select-trigger" aria-label={`模型：${modelName(model)}，点击切换`}>
+            <span>{modelName(model)}</span><ChevronDown size={16} />
+          </button>
+        </FurniturePicker>
       </div>
     </div>
     <div className="cms-field">
       <Label htmlFor="assistant-prompt">Prompt</Label>
       <Tabs defaultValue="edit" className="assistant-prompt">
-        <TabsList><TabsTrigger value="edit">编辑</TabsTrigger><TabsTrigger value="preview">预览</TabsTrigger></TabsList>
+        <TabsList className="assistant-prompt-tabs"><TabsTrigger value="edit">编辑</TabsTrigger><TabsTrigger value="preview">预览</TabsTrigger></TabsList>
         <TabsContent value="edit">
           <Textarea id="assistant-prompt" maxLength={ASSISTANT_LIMITS.prompt} rows={10} value={prompt} onChange={(e) => setPrompt(e.target.value)}
             placeholder={"支持 Markdown，例如：\n## 风格\n- 偏好北欧原木风\n- 客厅留出 1.2 m 以上的通道"} />

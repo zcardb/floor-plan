@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from "react";
-import { ArrowLeft, ChevronDown, SlidersHorizontal } from "lucide-react";
+import { useRef, useState } from "react";
+import { ArrowLeft } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,12 +17,13 @@ import { DEFAULT_AI_COUNT } from "../ai/useRoomAi";
 import { DEFAULT_AI_ENGINE, engineFields } from "../ai/models";
 import { AI_TEMPLATE_ID } from "../data/templates";
 import { area } from "../model/geometry";
-import { parseMeterDraft } from "../model/lengthUnits";
 import type { Design } from "../model/types";
-import { AI_ROOM_LIMITS, AI_SIZE_LIMITS, advancedLabel, planHints } from "../ai/planFields";
 import type { NewProjectInput } from "./NewProjectDialog";
 
-interface PlanRequest { description: string; images: string[]; width?: number; depth?: number; hints: string[]; label: string }
+/** 默认填入的示例需求：长宽、几室几厅几卫都写在描述里由模型读取，用户可直接改。 */
+export const DEFAULT_PLAN_PROMPT = "长 12 m × 宽 10 m，三室两厅两卫，主卧朝南带卫生间，开放式厨房，原木风";
+
+interface PlanRequest { description: string; images: string[] }
 
 /** 新建项目 →「AI 创建」：开着就保留输入；关掉弹窗会停止未完成的生成。 */
 export function AiCreateProjectDialog({ open, pending, onClose, onSubmit }: {
@@ -35,7 +36,7 @@ export function AiCreateProjectDialog({ open, pending, onClose, onSubmit }: {
     <DialogContent className="ai-dialog">
       <DialogHeader>
         <DialogTitle>AI 创建户型</DialogTitle>
-        <DialogDescription>描述需求，AI 生成带门窗与家具的整套户型；选中一个方案后创建项目。</DialogDescription>
+        <DialogDescription>描述需求（长宽、几室几厅几卫都写在描述里），AI 生成带门窗与家具的整套户型；选中一个方案后创建项目。</DialogDescription>
       </DialogHeader>
       {open && <AiCreateProjectForm pending={pending} onClose={onClose} onSubmit={onSubmit} />}
     </DialogContent>
@@ -44,34 +45,22 @@ export function AiCreateProjectDialog({ open, pending, onClose, onSubmit }: {
 
 export function AiCreateProjectForm({ pending, onClose, onSubmit }: { pending: boolean; onClose: () => void; onSubmit: (input: NewProjectInput) => void }) {
   const [name, setName] = useState("");
-  const [advanced, setAdvanced] = useState(false);
-  const [width, setWidth] = useState(""), [depth, setDepth] = useState("");
-  const [rooms, setRooms] = useState({ bedrooms: "", livingRooms: "", bathrooms: "" });
-  const [composer, setComposer] = useState<AiComposerValue>({ description: "", images: [], count: DEFAULT_AI_COUNT, engine: DEFAULT_AI_ENGINE });
+  const [composer, setComposer] = useState<AiComposerValue>({ description: DEFAULT_PLAN_PROMPT, images: [], count: DEFAULT_AI_COUNT, engine: DEFAULT_AI_ENGINE });
   const [view, setView] = useState<"input" | "results">("input"), [picked, setPicked] = useState<number | null>(null);
   const { catalog } = useAiCatalog(undefined, true);
   const ai = useAiBatch<PlanRequest, { design: Design }>();
-  const size = useMemo(() => ({ width: parseMeterDraft(width), depth: parseMeterDraft(depth) }), [width, depth]);
-  const badSize = [size.width, size.depth].some((n) => Number.isFinite(n) && (n < AI_SIZE_LIMITS.min || n > AI_SIZE_LIMITS.max));
-  const summary = advancedLabel(size, rooms);
-  const sizeError = badSize ? `长、宽需在 ${AI_SIZE_LIMITS.min / 1000}–${AI_SIZE_LIMITS.max / 1000} m 之间，或留空由 AI 决定` : "";
   const relaunch = useRef<(() => void) | null>(null);
 
   const send = () => {
     const description = composer.description.trim();
-    if (!description || badSize) return;
-    const hints = planHints(rooms);
-    const request: PlanRequest = {
-      description, images: readyImageUrls(composer.images), hints, label: summary,
-      ...(Number.isFinite(size.width) ? { width: Math.round(size.width) } : {}),
-      ...(Number.isFinite(size.depth) ? { depth: Math.round(size.depth) } : {}),
-    };
+    if (!description) return;
+    const request: PlanRequest = { description, images: readyImageUrls(composer.images) };
     const aiCatalog = catalog, count = composer.count, engine = engineFields(composer.engine);
     const launch = () => ai.start(request, count, async (index, generationId) => {
       const { candidate } = await generatePlanCandidate({
-        generationId, index, description, images: request.images, catalog: aiCatalog.entries, hints, width: request.width, depth: request.depth, ...engine,
+        generationId, index, description, images: request.images, catalog: aiCatalog.entries, ...engine,
       });
-      const spec = sanitizePlan(candidate!.result, { width: request.width, depth: request.depth, catalog: aiCatalog });
+      const spec = sanitizePlan(candidate!.result, { catalog: aiCatalog });
       return { id: candidate!.candidateId, index, summary: candidate!.summary, warnings: candidate!.warnings, result: { design: planToDesign(spec, aiCatalog) } };
     });
     relaunch.current = launch;
@@ -89,7 +78,7 @@ export function AiCreateProjectForm({ pending, onClose, onSubmit }: { pending: b
     void markCandidateApplied(chosen.candidate.id).catch(() => undefined);
     onSubmit({ name: name.trim() || chosen.candidate.summary || "AI 户型", template: AI_TEMPLATE_ID, design: chosen.candidate.result.design });
   };
-  const echo = ai.batch && { description: ai.batch.request.description, images: ai.batch.request.images, details: ai.batch.request.label };
+  const echo = ai.batch && { description: ai.batch.request.description, images: ai.batch.request.images };
 
   if (view === "results" && ai.batch && echo) return <div className="ai-create-results">
     <AiResults
@@ -115,33 +104,12 @@ export function AiCreateProjectForm({ pending, onClose, onSubmit }: { pending: b
     {ai.batch && <button type="button" className="ai-link" onClick={() => setView("results")}>查看上一次的 {ai.batch.slots.length} 个方案</button>}
     <AiComposer
       value={composer}
-      placeholder="描述户型需求，例如：三室两厅两卫，主卧朝南带卫生间，开放式厨房，原木风"
-      blocked={badSize ? "高级设计里的长、宽有误，请修改或清空" : undefined}
+      placeholder={`描述户型需求，例如：${DEFAULT_PLAN_PROMPT}`}
       onDescription={(description) => setComposer((c) => ({ ...c, description }))}
       onImages={(fn) => setComposer((c) => ({ ...c, images: fn(c.images) }))}
       onCount={(count) => setComposer((c) => ({ ...c, count }))}
       onEngine={(engine) => setComposer((c) => ({ ...c, engine }))}
       onSend={send}
     />
-    <section className={"ai-advanced" + (advanced ? " is-open" : "")}>
-      <button type="button" className="ai-advanced-toggle" aria-expanded={advanced} onClick={() => setAdvanced((open) => !open)}>
-        <SlidersHorizontal size={15} />
-        <span>高级设计</span>
-        <small>{summary || "选填 · 长宽、几室几厅几卫"}</small>
-        <ChevronDown size={15} className="ai-advanced-caret" />
-      </button>
-      {advanced && <div className="ai-advanced-body">
-        <div className="ai-advanced-row">
-          <div className="cms-field"><Label htmlFor="ai-project-width">长 / m</Label><Input id="ai-project-width" type="number" inputMode="decimal" step={0.1} min={AI_SIZE_LIMITS.min / 1000} max={AI_SIZE_LIMITS.max / 1000} placeholder="留空由 AI 决定" aria-invalid={badSize || undefined} value={width} onChange={(e) => setWidth(e.target.value)} /></div>
-          <div className="cms-field"><Label htmlFor="ai-project-depth">宽 / m</Label><Input id="ai-project-depth" type="number" inputMode="decimal" step={0.1} min={AI_SIZE_LIMITS.min / 1000} max={AI_SIZE_LIMITS.max / 1000} placeholder="留空由 AI 决定" aria-invalid={badSize || undefined} value={depth} onChange={(e) => setDepth(e.target.value)} /></div>
-        </div>
-        <div className="ai-advanced-row is-three">
-          {([["bedrooms", "卧室", AI_ROOM_LIMITS.bedrooms], ["livingRooms", "厅", AI_ROOM_LIMITS.livingRooms], ["bathrooms", "卫生间", AI_ROOM_LIMITS.bathrooms]] as const).map(([key, label, max]) =>
-            <div className="cms-field" key={key}><Label htmlFor={`ai-project-${key}`}>{label}</Label><Input id={`ai-project-${key}`} type="number" inputMode="numeric" min={1} max={max} placeholder="不限" value={rooms[key]} onChange={(e) => setRooms((current) => ({ ...current, [key]: e.target.value }))} /></div>)}
-        </div>
-        {sizeError ? <p className="ai-size-hint is-error" role="alert">{sizeError}</p> : <p className="ai-note">填写的内容会一并交给 AI；留空则由 AI 按描述决定。</p>}
-      </div>}
-    </section>
   </div>;
 }
-
