@@ -84,7 +84,7 @@ import {
   type Selection,
   type Tool,
 } from "../model/types";
-import { blankDesign, referenceDesign, designForTemplate, presetById, isAiDesign } from "../data/templates";
+import { blankDesign, designForTemplate, presetById, isAiDesign } from "../data/templates";
 import { useRoomAi } from "../ai/useRoomAi";
 import { useAiCatalog } from "../ai/useAiCatalog";
 import { AiRoomDialog } from "./AiRoomDialog";
@@ -626,7 +626,7 @@ export function Workbench(p: Props) {
     });
     if (!ok) return;
     change((d) => ({
-      ...(d.template === "blank" ? blankDesign() : d.templateId ? designForTemplate(d.templateId) : referenceDesign()),
+      ...(d.template === "blank" ? blankDesign() : d.templateId ? designForTemplate(d.templateId) : designForTemplate("reference")),
       ...(d.structureUnlocked ? { structureUnlocked: true } : {}),
     }));
     setSelection(null);

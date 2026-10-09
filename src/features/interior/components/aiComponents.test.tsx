@@ -75,13 +75,13 @@ describe("候选方案网格", () => {
 
 describe("AI 创建户型表单", () => {
   const html = renderToStaticMarkup(createElement(AiCreateProjectForm, { pending: false, onClose: () => {}, onSubmit: () => {} }));
-  it("长宽与几室几厅几卫收在「高级设计」里（默认收起、选填）；描述为空时不能发送；数量默认 2；没有模型选择", () => {
+  it("长宽与几室几厅几卫收在「高级设计」里（默认收起、选填）；描述为空时不能发送；数量默认 2；模型默认 DeepSeek V4 Flash", () => {
     expect(html).toContain("高级设计");
     expect(html).toContain('aria-expanded="false"');
     expect(html).not.toContain('id="ai-project-width"');
     expect(html).toMatch(/aria-label="生成"[^>]*disabled/);
     expect(html).toContain("2 个方案");
-    expect(html).not.toContain("模型");
+    expect(html).toContain("DeepSeek V4 Flash");
   });
 });
 

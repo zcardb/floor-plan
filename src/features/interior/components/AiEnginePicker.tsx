@@ -6,6 +6,7 @@ import { AI_MODELS, modelName, type AiEngine } from "../ai/models";
 import type { Assistant } from "../cloud/useAssistants";
 
 const ASSISTANT_GROUP = "我的小助手";
+const MODEL_GROUP = "模型";
 const keyOf = (engine: AiEngine) => `${engine.kind}:${engine.id}`;
 
 /** 小助手在上、模型在下，按分组展示；复用家具选择器（可搜索、分组）。 */
@@ -22,9 +23,9 @@ function engineItems(assistants: Assistant[]): PickerItem[] {
     ...AI_MODELS.map((m) => ({
       id: keyOf({ kind: "model", id: m.id }),
       label: m.name,
-      group: m.group,
+      group: MODEL_GROUP,
       hint: m.vision ? "可读图" : undefined,
-      keywords: [m.id],
+      keywords: [m.id, m.group],
     })),
   ];
 }

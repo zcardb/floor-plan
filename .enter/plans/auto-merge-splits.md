@@ -15,17 +15,17 @@
 不改动：拖动逻辑（`openingDrag.ts`）、AI 后端函数、用户已经保存的项目（打开已有项目不会自动合并，需要时仍可手动点「清空分割」）。
 
 ## Implementation checklist
-- [ ] `wallBulk.ts` `chainBase`：计算类型优先级时排除「门窗满宽墙段」（`openings` 中 `wallId` 指向该墙且 `|width - length(wall)| < tolerance`）；整条线都是这类墙段时退回全部墙段
-- [ ] `templates.ts`：`TEMPLATE_PRESETS` 每一项的 `build` 改为返回 `mergeAllSplits(原 build()).design`
-- [ ] `ai/apply.ts` `planToDesign`：`buildPlan` 后先执行 `mergeAllSplits(...).design`，再加 AI 标记并走 `validateDesign`
-- [ ] 新增测试：`createProject('reference')` 和每个 `NEW_TEMPLATE_PRESETS` 的 `splitPointCount` 为 0 或只剩因门窗冲突跳过的墙段；门窗满宽墙段消失，门窗两侧距离大于 0
-- [ ] 新增测试：「原木之家」里室内门所在的那条隔墙合并后仍是 `partition`/`bearing`，不会变成 `exterior`
-- [ ] 新增测试：`planToDesign` 输出的门窗所在墙长度大于门窗宽度，`dragOpening` 可以改变门窗的 `offset`
+- [x] `wallBulk.ts` `chainBase`：计算类型优先级时排除「门窗满宽墙段」（`openings` 中 `wallId` 指向该墙且 `|width - length(wall)| < tolerance`）；整条线都是这类墙段时退回全部墙段
+- [x] `templates.ts`：`TEMPLATE_PRESETS` 每一项的 `build` 改为返回 `mergeAllSplits(原 build()).design`
+- [x] `ai/apply.ts` `planToDesign`：`buildPlan` 后先执行 `mergeAllSplits(...).design`，再加 AI 标记并走 `validateDesign`
+- [x] 新增测试：`createProject('reference')` 和每个 `NEW_TEMPLATE_PRESETS` 的 `splitPointCount` 为 0 或只剩因门窗冲突跳过的墙段；门窗满宽墙段消失，门窗两侧距离大于 0
+- [x] 新增测试：「原木之家」里室内门所在的那条隔墙合并后仍是 `partition`/`bearing`，不会变成 `exterior`
+- [x] 新增测试：`planToDesign` 输出的门窗所在墙长度大于门窗宽度，`dragOpening` 可以改变门窗的 `offset`
 
 ## Verification checklist
-- [ ] 正常情况：复刻「原木之家」和任一新模板后，选中一扇门，可以沿墙拖动，两侧距离标注不再是 0.00 m
-- [ ] 正常情况：AI 生成的户型创建后，门窗可以沿墙拖动
-- [ ] 回归：`templatePresets.test.ts` 里的 `isPristineDesign(createProject(id).state)` 仍为 true；「重置方案」后的户型和刚复刻出来的一致
-- [ ] 负面情况：空白户型（`blankDesign`）不受影响（四个角的墙不共线，合并结果为空）
-- [ ] 边界情况：合并会导致门窗重叠或越界的直线保持原样（沿用 `mergeAllSplits` 的跳过逻辑），不报错
-- [ ] 执行 `pnpm vitest run src/features/interior`、`pnpm run lint`、`pnpm run build`
+- [x] 正常情况：复刻「原木之家」和任一新模板后，选中一扇门，可以沿墙拖动，两侧距离标注不再是 0.00 m
+- [x] 正常情况：AI 生成的户型创建后，门窗可以沿墙拖动
+- [x] 回归：`templatePresets.test.ts` 里的 `isPristineDesign(createProject(id).state)` 仍为 true；「重置方案」后的户型和刚复刻出来的一致
+- [x] 负面情况：空白户型（`blankDesign`）不受影响（四个角的墙不共线，合并结果为空）
+- [x] 边界情况：合并会导致门窗重叠或越界的直线保持原样（沿用 `mergeAllSplits` 的跳过逻辑），不报错
+- [x] 执行 `pnpm vitest run src/features/interior`、`pnpm run lint`、`pnpm run build`
