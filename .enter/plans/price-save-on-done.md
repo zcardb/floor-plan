@@ -19,4 +19,5 @@
 - [ ] 改几何/有新图后点「完成」→ 保存并关闭
 - [ ] 无修改点「完成」→ 直接关闭，无请求
 - [ ] 非法价格点「完成」→ 不关闭并提示
-- [ ] `pnpm test`、`pnpm run lint`、`pnpm run build` 通过
+- [x] `pnpm run build` 通过；改动的 3 个文件 eslint 通过
+- [ ] `pnpm test`：450 通过 / 6 失败，失败项在 guestStore / useProjects（模板功能提交 444549d 引入，非本次改动）
