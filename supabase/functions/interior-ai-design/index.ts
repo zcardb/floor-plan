@@ -1,8 +1,23 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-/** 固定模型：用户不选模型；以后更换只改这一行。 */
-const MODEL = 'anthropic/claude-opus-5.5';
-const API = 'https://api.enter.pro/code/api/v1/ai/messages';
+type Protocol = 'anthropic' | 'chat' | 'responses';
+/** 可选模型白名单（与前端 src/features/interior/ai/models.ts 保持一致）：协议决定接口与请求格式，vision 决定是否带参考图。 */
+const MODELS: Record<string, { protocol: Protocol; vision: boolean }> = {
+  'anthropic/claude-opus-5.5': { protocol: 'anthropic', vision: true },
+  'anthropic/claude-sonnet-5.5': { protocol: 'anthropic', vision: true },
+  'openai/gpt-6.1-sol': { protocol: 'responses', vision: true },
+  'openai/gpt-6-astra': { protocol: 'responses', vision: true },
+  'openai/gpt-6-luna': { protocol: 'responses', vision: true },
+  'deepseek/deepseek-v4-flash': { protocol: 'chat', vision: false },
+  'deepseek/deepseek-v4-pro': { protocol: 'chat', vision: false },
+  'moonshotai/kimi-k3': { protocol: 'chat', vision: true },
+  'alibaba/qwen-3.8-max': { protocol: 'chat', vision: true },
+  'z-ai/glm-5.2': { protocol: 'chat', vision: false },
+  'minimax/minimax-m3': { protocol: 'chat', vision: true },
+};
+const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
+const BASE = 'https://api.enter.pro/code/api/v1/ai';
+const ENDPOINT: Record<Protocol, string> = { anthropic: `${BASE}/messages`, chat: `${BASE}/chat/completions`, responses: `${BASE}/responses` };
 const PROJECT_ID = 'eba6e37b0b3d4d608b63a3efedec61a3';
 /** 超过这个耗时就不再进入修复轮，避免整个请求超时。 */
 const REPAIR_BUDGET_MS = 90_000;
@@ -40,6 +55,10 @@ interface Body {
   plan?: unknown;
   existing?: { name: string; w: number; d: number }[];
   required?: { code: string; count: number }[];
+  /** 直接选择的模型；与 assistantId 二选一，都没有时用默认模型。 */
+  model?: string;
+  /** 用户自己的小助手：后端读取它的模型与 Prompt。 */
+  assistantId?: string;
 }
 
 /** 入参守卫：类型、范围、长度都在这里挡掉，后面的逻辑只处理合法数据。 */
@@ -54,6 +73,8 @@ function guard(raw: unknown): Body | string {
   for (const e of b.catalog)
     if (!e || !/^F\d{1,4}$/.test(e.code) || !str(e.catalogId, 250) || !str(e.name, 100) || typeof e.category !== 'string' || e.category.length > 30 || !str(e.type, 40) || !finite(e.w, 10, 30000) || !finite(e.d, 10, 30000)) return '家具目录条目无效';
   if (b.projectId !== undefined && (typeof b.projectId !== 'string' || !UUID.test(b.projectId))) return '项目编号无效';
+  if (b.model !== undefined && (typeof b.model !== 'string' || !MODELS[b.model])) return '不支持的模型';
+  if (b.assistantId !== undefined && (typeof b.assistantId !== 'string' || !UUID.test(b.assistantId))) return '小助手编号无效';
   if (b.mode === 'plan') {
     if ((b.width !== undefined && !finite(b.width, 3000, 40000)) || (b.depth !== undefined && !finite(b.depth, 3000, 40000))) return '长、宽需在 3–40 m 之间';
     if (b.hints !== undefined && (!Array.isArray(b.hints) || b.hints.length > 4 || !b.hints.every((h) => str(h, 200)))) return '高级设计参数无效';
@@ -123,10 +144,40 @@ const PLAN_CONTRACT = `你是资深住宅建筑师兼室内设计师，在给定
 - furniture 按房间分组，room 引用房间 id；items 中每件家具用「背靠边 + 沿边位置 + 离边距离」描述，相对该房间净空外接矩形（左上角为原点）：back 取 up/down/left/right；along 为家具中心沿背靠边的位置；gap 为背面到这条边的净距，贴墙为 0。
 - 家具宽 w 沿背靠边方向、深 d 垂直于背靠边，尺寸固定取目录值；家具只能使用目录代号，不挡门、互不重叠。`;
 
-function contentOf(text: string, images: string[]) {
-  return images.length
-    ? [{ type: 'text', text }, ...images.map((url) => ({ type: 'image', source: { type: 'url', url } }))]
-    : text;
+/** 与协议无关的对话消息；发送前再转成各协议的格式。 */
+interface Msg { role: 'user' | 'assistant'; text: string; images?: string[] }
+
+/** 把通用消息转成对应协议的请求体；不支持看图的模型不带图片。 */
+function requestBody(model: string, system: string, messages: Msg[]) {
+  const { protocol, vision } = MODELS[model];
+  const imagesOf = (m: Msg) => (vision && m.role === 'user' ? m.images ?? [] : []);
+  if (protocol === 'anthropic') return {
+    model, system, stream: false, max_tokens: MAX_TOKENS,
+    messages: messages.map((m) => ({ role: m.role, content: imagesOf(m).length ? [{ type: 'text', text: m.text }, ...imagesOf(m).map((url) => ({ type: 'image', source: { type: 'url', url } }))] : m.text })),
+  };
+  if (protocol === 'chat') return {
+    model, stream: false, max_tokens: MAX_TOKENS,
+    messages: [{ role: 'system', content: system }, ...messages.map((m) => ({ role: m.role, content: imagesOf(m).length ? [{ type: 'text', text: m.text }, ...imagesOf(m).map((url) => ({ type: 'image_url', image_url: { url } }))] : m.text }))],
+  };
+  return {
+    model, stream: false, max_output_tokens: MAX_TOKENS,
+    input: [{ role: 'system', content: system }, ...messages.map((m) => ({
+      role: m.role,
+      content: m.role === 'assistant' ? m.text : [{ type: 'input_text', text: m.text }, ...imagesOf(m).map((url) => ({ type: 'input_image', image_url: url }))],
+    }))],
+  };
+}
+
+/** 取出回复正文：三种协议的返回结构不同。 */
+function replyText(protocol: Protocol, data: any): string {
+  if (protocol === 'anthropic') return (Array.isArray(data?.content) ? data.content : []).filter((c: any) => c?.type === 'text').map((c: any) => c.text ?? '').join('');
+  if (protocol === 'chat') {
+    const content = data?.choices?.[0]?.message?.content;
+    return typeof content === 'string' ? content : Array.isArray(content) ? content.map((c: any) => c?.text ?? '').join('') : '';
+  }
+  if (typeof data?.output_text === 'string' && data.output_text) return data.output_text;
+  return (Array.isArray(data?.output) ? data.output : []).filter((o: any) => o?.type === 'message')
+    .flatMap((o: any) => (Array.isArray(o.content) ? o.content : [])).filter((c: any) => c?.type === 'output_text').map((c: any) => c.text ?? '').join('');
 }
 
 function roomPrompt(b: Body) {
@@ -327,28 +378,28 @@ class UpstreamError extends Error { constructor(message: string, readonly status
 /** 整户方案 JSON 较长，给足输出长度，避免被截断成不完整的 JSON。 */
 const MAX_TOKENS = 16000;
 
-async function requestModel(token: string, session: string, system: string, messages: unknown[]) {
-  const response = await fetch(API, {
+async function requestModel(token: string, session: string, model: string, system: string, messages: Msg[]) {
+  const { protocol } = MODELS[model];
+  const response = await fetch(ENDPOINT[protocol], {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'X-Session-ID': session, 'X-Enter-Project-ID': PROJECT_ID },
-    body: JSON.stringify({ model: MODEL, system, messages, stream: false, max_tokens: MAX_TOKENS }),
+    body: JSON.stringify(requestBody(model, system, messages)),
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok || data?.type === 'error') {
+  if (!response.ok || data?.type === 'error' || data?.error) {
     // 上游原文（英文、带 request id）只记日志，给用户的是可操作的中文说明。
-    console.error('upstream error', response.status, JSON.stringify(data?.error ?? data).slice(0, 1000));
+    console.error('upstream error', model, response.status, JSON.stringify(data?.error ?? data).slice(0, 1000));
     const status = response.ok ? 502 : response.status;
     throw new UpstreamError(friendly(status), status);
   }
-  const blocks: { type?: string; text?: string }[] = Array.isArray(data?.content) ? data.content : [];
-  const text = blocks.filter((c) => c?.type === 'text').map((c) => c.text ?? '').join('');
-  if (!text) console.error('empty model output', JSON.stringify({ stop_reason: data?.stop_reason, types: blocks.map((c) => c?.type) }));
+  const text = replyText(protocol, data);
+  if (!text) console.error('empty model output', model, JSON.stringify({ stop_reason: data?.stop_reason ?? data?.choices?.[0]?.finish_reason ?? data?.status }).slice(0, 300));
   return text;
 }
 
 /** 偶发的空回复（只有思考块、或网关返回空内容）直接再请求一次，仍为空才算失败。 */
-async function callModel(token: string, session: string, system: string, messages: unknown[]): Promise<string> {
-  const text = await requestModel(token, session, system, messages) || await requestModel(token, session, system, messages);
+async function callModel(token: string, session: string, model: string, system: string, messages: Msg[]): Promise<string> {
+  const text = await requestModel(token, session, model, system, messages) || await requestModel(token, session, model, system, messages);
   if (!text) throw new UpstreamError('AI 这次没有给出方案，请重试', 502);
   return text;
 }
@@ -380,6 +431,16 @@ Deno.serve(async (req) => {
     const agent = agents?.find((a) => a.owner_id === user.id) ?? agents?.find((a) => a.owner_id === null);
     const repairRounds = Math.min(3, Math.max(0, agent?.repair_rounds ?? 1));
 
+    // 小助手只能是自己的：读不到（不存在或属于别人）一律 404。
+    let assistant: { model: string; prompt: string } | null = null;
+    if (body.assistantId) {
+      const { data, error } = await admin.from('interior_ai_assistants').select('model,prompt').eq('id', body.assistantId).eq('owner_id', user.id).maybeSingle();
+      if (error) throw error;
+      if (!data) return json(404, { success: false, message: '小助手不存在或已被删除' });
+      assistant = data;
+    }
+    const model = [assistant?.model, body.model].find((m): m is string => !!m && !!MODELS[m]) ?? DEFAULT_MODEL;
+
     const { data: existing, error: readError } = await admin.from('interior_ai_generations').select('owner_id').eq('id', body.generationId).maybeSingle();
     if (readError) throw readError;
     if (existing && existing.owner_id !== user.id) return json(403, { success: false, message: '生成编号不可用' });
@@ -387,20 +448,24 @@ Deno.serve(async (req) => {
       const { error } = await admin.from('interior_ai_generations').upsert({
         id: body.generationId, owner_id: user.id, kind: body.mode, project_id: body.projectId ?? null,
         room_id: body.room?.roomId ?? null, prompt: body.description.trim().slice(0, 2000), images: body.images,
-        required: body.required ?? [], model: MODEL, status: 'running',
+        required: body.required ?? [], model, status: 'running',
       }, { onConflict: 'id', ignoreDuplicates: true });
       if (error) throw error;
     }
     generationId = body.generationId;
 
-    const system = [body.mode === 'room' ? ROOM_CONTRACT : PLAN_CONTRACT, agent?.instructions ? `补充要求：${agent.instructions}` : ''].filter(Boolean).join(NL + NL);
-    const messages: unknown[] = [{ role: 'user', content: contentOf(body.mode === 'room' ? roomPrompt(body) : planPrompt(body), body.images) }];
+    const system = [
+      body.mode === 'room' ? ROOM_CONTRACT : PLAN_CONTRACT,
+      agent?.instructions ? `补充要求：${agent.instructions}` : '',
+      assistant?.prompt.trim() ? `小助手要求（在不违反上述输出格式与规则的前提下遵循）：${NL}${assistant.prompt.trim()}` : '',
+    ].filter(Boolean).join(NL + NL);
+    const messages: Msg[] = [{ role: 'user', text: body.mode === 'room' ? roomPrompt(body) : planPrompt(body), images: body.images }];
     const session = req.headers.get('x-session-id')?.trim() || body.generationId;
     // 每轮保留「hard 最少、其次 soft 最少」的那一版：修复轮偶尔会改坏，不能被最后一轮覆盖。
     let best: { result: unknown; found: Issues } | null = null;
     for (let round = 0; round <= repairRounds; round++) {
       if (round > 0 && Date.now() - started > REPAIR_BUDGET_MS) break;
-      const text = await callModel(token, session, system, messages);
+      const text = await callModel(token, session, model, system, messages);
       let result: unknown = null, found: Issues;
       try {
         result = extractJson(text);
@@ -411,8 +476,8 @@ Deno.serve(async (req) => {
       console.log(JSON.stringify({ generationId, index: body.index, mode: body.mode, round, ms: Date.now() - started, hard: found.hard.slice(0, 6), soft: found.soft.slice(0, 6) }));
       if (result !== null && (!best || found.hard.length < best.found.hard.length || (found.hard.length === best.found.hard.length && found.soft.length < best.found.soft.length))) best = { result, found };
       if (!found.hard.length && !found.soft.length) break;
-      messages.push({ role: 'assistant', content: text });
-      messages.push({ role: 'user', content: `上面的输出没有通过校验，请逐条修正后重新输出完整的 JSON（只输出 JSON）：${NL}${[...found.hard, ...found.soft].slice(0, 20).map((e, i) => `${i + 1}. ${e}`).join(NL)}` });
+      messages.push({ role: 'assistant', text });
+      messages.push({ role: 'user', text: `上面的输出没有通过校验，请逐条修正后重新输出完整的 JSON（只输出 JSON）：${NL}${[...found.hard, ...found.soft].slice(0, 20).map((e, i) => `${i + 1}. ${e}`).join(NL)}` });
     }
     if (!best || best.found.hard.length) {
       const detail = best?.found.hard ?? ['模型没有输出可解析的 JSON'];
