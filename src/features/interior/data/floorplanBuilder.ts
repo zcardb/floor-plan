@@ -4,7 +4,6 @@ import {
   uid,
   type Design,
   type Furniture,
-  type LibraryItem,
   type Opening,
   type Point,
   type Room,
@@ -220,22 +219,18 @@ export function buildStructure(spec: PlanSpec): { walls: Wall[]; openings: Openi
   return { walls, openings };
 }
 
-/** 素材解析器：默认查内置素材库，可换成项目目录 / 账号家具库。 */
-export type CatalogResolver = (type: string, name?: string) => LibraryItem | null;
-
-const builtinCatalogOf = (type: string, name?: string) =>
+const catalogOf = (type: string, name?: string) =>
   (name ? library.find((i) => i.type === type && i.name === name) : undefined) ??
-  library.find((i) => i.type === type) ??
-  null;
+  library.find((i) => i.type === type);
 
 /** 背靠方向 → 旋转角，与参考户型一致：0 靠上、90 靠右、180 靠下、270 靠左。 */
 const ROT: Record<Side, number> = { up: 0, right: 90, down: 180, left: 270 };
 
 /** 把家具简写解析成实际坐标。 */
-export function placeFurniture({ zone, items }: FurnitureZone, resolve: CatalogResolver = builtinCatalogOf): Furniture[] {
+export function placeFurniture({ zone, items }: FurnitureZone): Furniture[] {
   const [x1, y1, x2, y2] = zone;
   return items.map((s) => {
-    const item = resolve(s.type, s.name);
+    const item = catalogOf(s.type, s.name);
     if (!item) throw new Error(`素材库里没有 ${s.type}${s.name ? " / " + s.name : ""}`);
     const w = s.w ?? item.w;
     const d = s.d ?? item.d;
@@ -267,7 +262,7 @@ export function placeFurniture({ zone, items }: FurnitureZone, resolve: CatalogR
 }
 
 /** 由一份户型描述装配出完整方案。 */
-export function buildPlan(spec: PlanSpec, resolve?: CatalogResolver): Design {
+export function buildPlan(spec: PlanSpec): Design {
   const { walls, openings } = buildStructure(spec);
   const rooms: Room[] = spec.rooms.map((r) => {
     const ring = r.poly ?? (r.box ? boxPoly(r.box) : null);
@@ -291,7 +286,7 @@ export function buildPlan(spec: PlanSpec, resolve?: CatalogResolver): Design {
     walls,
     openings,
     rooms,
-    furniture: spec.furniture.flatMap((zone) => placeFurniture(zone, resolve)),
+    furniture: spec.furniture.flatMap(placeFurniture),
     demolished: [],
   };
 }

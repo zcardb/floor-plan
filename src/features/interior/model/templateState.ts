@@ -1,4 +1,4 @@
-import { blankDesign, designForTemplate, isAiTemplate } from "../data/templates";
+import { blankDesign, designForTemplate } from "../data/templates";
 import type { Design, Furniture, Room } from "./types";
 
 /** 家具 id 由 uid() 生成，同一个模版每次实例化都不同，比较前先剔除。 */
@@ -45,7 +45,7 @@ const templateFingerprint = (template: string) => {
 
 /** 当前方案是否仍等于系统给的初始模版（重置方案、一路撤销回到起点都算）。 */
 export const isPristineDesign = (design: Design): boolean =>
-  !isAiTemplate(design) && fingerprint(design) === templateFingerprint(design.templateId ?? design.template);
+  fingerprint(design) === templateFingerprint(design.templateId ?? design.template);
 
 /**
  * 游客提示条的版本号：回到初始模版就归零（提示条随之消失），

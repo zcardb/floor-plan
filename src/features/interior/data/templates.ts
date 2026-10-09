@@ -322,32 +322,19 @@ export const TEMPLATE_PRESETS: TemplatePreset[] = [
 export const presetById = (id: string) => TEMPLATE_PRESETS.find(p => p.id === id);
 export const designForTemplate = (id: string): Design => (presetById(id) ?? TEMPLATE_PRESETS[0]).build();
 
-/** AI 生成的户型：没有可重建的初始模板，重置方案不适用。 */
-export const AI_TEMPLATE_ID = 'ai';
-export const isAiTemplate = (design: Pick<Design, 'templateId'>) => design.templateId === AI_TEMPLATE_ID;
-
 export function createProject(
   template: string = "blank",
   name?: string,
   size?: BlankSize,
-  aiDesign?: Design,
 ): Project {
-  const state =
-    template === AI_TEMPLATE_ID
-      ? aiDesign ?? blankDesign(size)
-      : template === 'blank'
-        ? blankDesign(size)
-        : designForTemplate(template);
   return {
     id: uid(),
     name:
-      name ||
-      (template === AI_TEMPLATE_ID
-        ? 'AI 生成户型'
-        : template === "blank"
-          ? "未命名户型"
-          : presetById(template)?.name ?? TEMPLATE_PRESETS[0].name),
-    state: { ...state, ...(template === AI_TEMPLATE_ID ? { templateId: AI_TEMPLATE_ID } : {}), structureUnlocked: true },
+      name || (template === "blank" ? "未命名户型" : presetById(template)?.name ?? TEMPLATE_PRESETS[0].name),
+    state: {
+      ...(template === "blank" ? blankDesign(size) : designForTemplate(template)),
+      structureUnlocked: true,
+    },
     updatedAt: new Date().toISOString(),
     revision: 0,
   };
