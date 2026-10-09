@@ -34,7 +34,8 @@ import type { CustomFloor, CustomOpening, CustomWall, Design, Selection } from "
 import { openingName, openingPriceKey } from "../model/hardMaterials";
 import { OpeningVariantSelect } from "./OpeningVariantSelect";
 import { RoomSurfacePanel } from "./RoomSurfacePanel";
-import { RoomSidesEditor } from "./RoomSidesEditor";
+import { RoomSidesDiagram } from "./RoomSidesDiagram";
+import { roomSides } from "../model/roomSides";
 import { cardPrice } from "../model/priceLabel";
 import { ColorSwatches } from "./ColorSwatches";
 import { PanelHint, ShortcutList } from "./PanelHint";
@@ -322,8 +323,8 @@ export function PropertyPanel({
               })),
             )}
           </div>
-          <h4 className="property-subtitle">房间尺寸</h4>
-          <RoomSidesEditor key={r.id} design={d} roomId={r.id} transaction={transaction} />
+          <h4 className="property-subtitle">房间尺寸 <small>单位 m</small></h4>
+          <RoomSidesDiagram sides={roomSides(d, r.id)} labels="length" className="is-summary" />
           <div className="stat-grid">
             <div>
               <small>净使用面积</small>

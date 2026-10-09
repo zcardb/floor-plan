@@ -2664,37 +2664,64 @@
   align-items: center;
   gap: 7px;
 }
-/* 房间逐边尺寸：示意图 + 逐边长度行（工具条弹层与右侧属性面板共用） */
-.room-sides { display: grid; gap: var(--sp-row); margin-top: var(--sp-row); }
+/* 房间逐边尺寸：工具条弹层为「左预览 + 右输入」，属性面板只读标注边长 */
+.room-size-popover { width: 456px; }
+.room-sides { display: grid; grid-template-columns: minmax(0, 1fr) 168px; gap: 12px; align-items: start; }
+.room-sides-preview { display: grid; gap: 8px; min-width: 0; }
 .room-sides-diagram {
+  display: block;
   width: 100%;
-  height: 156px;
-  padding: 4px;
+  height: 220px;
   border: 1px solid hsl(var(--border));
   border-radius: var(--ctl-radius);
   background: hsl(var(--secondary) / 0.45);
 }
-.room-sides-shape { fill: hsl(var(--primary) / 0.08); }
-.room-sides-edge { stroke: hsl(var(--border)); stroke-width: 2; vector-effect: non-scaling-stroke; }
-.room-sides-edge.is-active { stroke: var(--plan-selection); }
-.room-sides-edge.is-locked { stroke-dasharray: 4 4; }
-.room-sides-marker { cursor: pointer; }
-.room-sides-marker circle { fill: hsl(var(--muted)); stroke: hsl(var(--border)); vector-effect: non-scaling-stroke; }
+.room-sides-diagram.is-summary { height: 180px; margin-bottom: var(--sp-row); }
+.room-sides-shape { fill: hsl(var(--primary) / 0.07); }
+.room-sides-edge { stroke: hsl(var(--muted-foreground) / 0.55); stroke-width: 2; vector-effect: non-scaling-stroke; fill: none; }
+.room-sides-side.is-locked .room-sides-edge { stroke-dasharray: 4 3; }
+.room-sides-side.is-active .room-sides-edge { stroke: var(--plan-selection); stroke-width: 4; stroke-dasharray: none; }
+.room-sides-hit { stroke: transparent; }
+.room-sides-side.is-pickable { cursor: pointer; }
+.room-sides-side.is-pickable:hover .room-sides-edge { stroke: var(--plan-selection); }
+.room-sides-marker circle { fill: hsl(var(--card)); stroke: hsl(var(--border)); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .room-sides-marker text { fill: hsl(var(--muted-foreground)); font-weight: 600; pointer-events: none; }
-.room-sides-marker.is-active circle { fill: hsl(var(--primary)); stroke: hsl(var(--primary)); }
-.room-sides-marker.is-active text { fill: hsl(var(--primary-foreground)); }
-.room-sides-rows { display: grid; gap: var(--sp-row); }
+.room-sides-side.is-active .room-sides-marker circle { fill: var(--plan-selection); stroke: var(--plan-selection); }
+.room-sides-side.is-active .room-sides-marker text { fill: hsl(var(--primary-foreground)); }
+.room-sides-length { fill: hsl(var(--foreground)); stroke: hsl(var(--card)); paint-order: stroke; stroke-linejoin: round; font-variant-numeric: tabular-nums; }
+.room-sides-anchor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  color: hsl(var(--muted-foreground));
+  font-size: var(--fs-meta);
+  line-height: 1.4;
+}
+.room-sides-anchor-group { display: contents; }
+.room-sides-anchor-toggle { display: inline-flex; padding: 2px; border-radius: var(--ctl-radius-in); background: hsl(var(--muted)); }
+.room-sides-anchor-toggle > button {
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 4px;
+  color: hsl(var(--muted-foreground));
+  font-size: var(--fs-meta);
+}
+.room-sides-anchor-toggle > button[aria-pressed="true"] { background: hsl(var(--card)); color: hsl(var(--foreground)); box-shadow: 0 1px 2px hsl(var(--foreground) / 0.08); }
+.room-sides-list { display: grid; align-content: start; gap: 4px; max-height: 252px; overflow-y: auto; padding-right: 2px; }
+.room-sides-banner { display: flex; gap: 5px; margin: 0 0 4px; color: hsl(var(--muted-foreground)); font-size: var(--fs-meta); line-height: 1.45; }
+.room-sides-banner svg { flex: 0 0 auto; margin-top: 2px; }
 .room-sides-row {
   display: grid;
-  grid-template-columns: auto minmax(34px, max-content) 1fr;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
   align-items: center;
   gap: 6px;
-  padding: 5px 7px;
-  border: 1px solid transparent;
+  padding: 3px 6px 3px 4px;
   border-radius: var(--ctl-radius-in);
   font-size: var(--fs-control);
 }
-.room-sides-row.is-active { border-color: hsl(var(--primary) / 0.55); background: hsl(var(--accent) / 0.35); }
+.room-sides-row.is-active { background: hsl(var(--accent) / 0.55); }
 .room-sides-badge {
   display: inline-flex;
   align-items: center;
@@ -2702,58 +2729,25 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
   color: hsl(var(--muted-foreground));
   font-size: var(--fs-meta);
   font-weight: 600;
 }
-.room-sides-row.is-active .room-sides-badge { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
-.room-sides-label { color: hsl(var(--muted-foreground)); font-size: var(--fs-label); }
-.room-sides-field { display: flex; align-items: center; gap: 4px; min-width: 0; }
-.room-sides-input { width: 100%; min-width: 66px; }
+.room-sides-row.is-active .room-sides-badge { border-color: var(--plan-selection); background: var(--plan-selection); color: hsl(var(--primary-foreground)); }
+.room-sides-input { height: var(--ctl-sm); min-width: 0; font-variant-numeric: tabular-nums; }
+.room-sides-row.is-active .room-sides-input { border-color: var(--plan-selection); }
 .room-sides-input[aria-invalid="true"] { border-color: hsl(var(--destructive)); }
-.room-sides-steps { display: flex; align-items: center; gap: 2px; }
-.room-sides-steps > button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--ctl-radius-in);
-  background: hsl(var(--card));
-  color: hsl(var(--foreground));
-}
-.room-sides-steps > button:hover:not(:disabled) { background: hsl(var(--accent)); }
-.room-sides-steps > button:disabled { opacity: 0.45; cursor: not-allowed; }
-.room-sides-anchor {
-  grid-column: 2 / -1;
-  justify-self: start;
-  padding: 0 7px;
-  min-height: 22px;
-  border: 1px dashed hsl(var(--border));
-  border-radius: var(--ctl-radius-in);
-  background: transparent;
-  color: hsl(var(--muted-foreground));
-  font-size: var(--fs-meta);
-  line-height: 20px;
-}
-.room-sides-anchor:hover:not(:disabled) { background: hsl(var(--accent)); }
-.room-sides-anchor.is-static { border-style: none; padding-left: 0; cursor: default; }
-.room-sides-value { color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
-.room-sides-locked {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  justify-self: start;
-  color: hsl(var(--muted-foreground));
-  font-size: var(--fs-meta);
-}
-.room-sides-error { grid-column: 2 / -1; margin: 0; }
-.room-size-popover { width: 320px; }
+.room-sides-value { display: inline-flex; align-items: center; gap: 5px; min-height: var(--ctl-sm); padding: 0 9px; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
+.room-sides-unit { color: hsl(var(--muted-foreground)); font-size: var(--fs-meta); }
+.room-sides-error { grid-column: 2 / -1; margin: 0; font-size: var(--fs-meta); }
 @media (max-width: 600px) {
-  .room-sides-steps > button { width: 34px; height: 34px; }
-  .room-sides-anchor { min-height: 34px; line-height: 32px; }
+  .room-sides { grid-template-columns: 1fr; }
+  .room-sides-diagram { height: 170px; }
+  .room-sides-list { max-height: 220px; }
+  .room-sides-input, .room-sides-value { min-height: 34px; height: 34px; }
+  .room-sides-anchor-toggle > button { min-height: 34px; }
 }
 .visual-cost-link {
   display: block;
