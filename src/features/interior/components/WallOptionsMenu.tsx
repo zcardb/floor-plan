@@ -20,7 +20,7 @@ export function WallOptionsMenu({ design, wall, change, splitWall, mergeWall, re
   };
   const removeHint = bearing ? '承重墙不可删除，请先取消承重标记' : removeWall ? '删除这面墙及墙上门窗，可撤销' : '请在 2D 选择模式操作';
   return <DropdownMenu>
-    <DropdownMenuTrigger asChild><Button type="button" size="sm" variant="ghost" className="wall-options-trigger" aria-label="墙选项">墙选项<ChevronDown size={14} /></Button></DropdownMenuTrigger>
+    <DropdownMenuTrigger asChild><Button type="button" size="sm" variant="ghost" className="wall-options-trigger" aria-label="墙选项">墙选项<ChevronDown size={12} /></Button></DropdownMenuTrigger>
     <DropdownMenuContent align="start" sideOffset={8} collisionPadding={12} className="wall-options-menu">
       <DropdownMenuLabel className="wall-options-section">墙段编辑</DropdownMenuLabel>
       <DropdownMenuItem className="wall-options-item" aria-label="分割墙段" disabled={!splitWall} onSelect={() => splitWall?.(wall.id)}>

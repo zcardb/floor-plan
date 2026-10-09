@@ -19,6 +19,7 @@
 .toaster [data-close-button] { display: none; }
 
 .wall-options-trigger { height: 30px; padding: 5px 7px; gap: 5px; border: 0; background: none; color: hsl(var(--foreground)); font-size: 12px; font-weight: 400; box-shadow: none; }
+.wall-options-trigger svg { width: 12px; height: 12px; }
 .wall-options-trigger[data-state="open"] { background: hsl(var(--accent)); }
 .wall-options-menu { width: 260px; max-width: calc(100vw - 24px); padding: 6px; border-radius: 10px; background: hsl(var(--popover)); border-color: hsl(var(--border)); box-shadow: 0 8px 24px hsl(var(--foreground) / 0.1); }
 .wall-options-section { display: flex; align-items: center; justify-content: space-between; padding: 8px 9px 5px; color: hsl(var(--muted-foreground)); font-size: 10px; font-weight: 500; letter-spacing: 0.04em; user-select: none; }
@@ -2488,6 +2489,12 @@
   padding: 0 8px;
   border-radius: var(--ctl-radius-in);
 }
+.visual-selection-editor .wall-options-trigger {
+  height: auto;
+  min-height: var(--ctl-md);
+  padding: 0 8px;
+  font-size: inherit;
+}
 .visual-selection-editor button:hover {
   background: hsl(var(--accent));
 }
@@ -3046,7 +3053,7 @@ button.room-cost-row:hover {
   margin-right: 4px;
 }
 .visual-cost-trigger span {
-  font-size: 10px;
+  font-size: var(--fs-meta);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -3234,7 +3241,8 @@ button.room-cost-row:hover {
     border-radius: 10px;
     max-width: calc(100% - 20px);
   }
-  .visual-selection-editor > button {
+  .visual-selection-editor > button,
+  .visual-selection-editor .wall-options-trigger {
     min-height: 34px;
   }
   .visual-object-name {

@@ -332,7 +332,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         )}
         {o?.kind === 'door' && <Popover open={open === 'direction'} onOpenChange={value => setPanel(value, 'direction')}>
           <EditorTooltip label="门开向">
-            <PopoverTrigger asChild><Button type="button" variant="ghost" size="sm" className="visual-door-direction" aria-label="调整门开向"><DoorOpen size={15} />开向<ChevronDown size={12} /></Button></PopoverTrigger>
+            <PopoverTrigger asChild><button type="button" aria-label="调整门开向"><DoorOpen size={15} />开向<ChevronDown size={12} /></button></PopoverTrigger>
           </EditorTooltip>
           <PopoverContent className="visual-editor-popover"><h3>门开向</h3><DoorOrientationControls door={o} onChange={patch => p.change(d => changeDoorOrientation(d, o.id, patch))} /></PopoverContent>
         </Popover>}
@@ -353,7 +353,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
                   <span className={cost?.amount === null ? "is-unpriced" : ""}>
                     {costLabel}
                   </span>
-                  <ChevronDown size={11} />
+                  <ChevronDown size={12} />
                 </button>
               </PopoverTrigger>
             </EditorTooltip>
@@ -407,7 +407,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         )}
         <EditorTooltip label="详细属性">
           <button type="button" aria-label="详细属性" onClick={p.details}>
-            <Settings2 size={16} />
+            <Settings2 size={15} />
           </button>
         </EditorTooltip>
         <EditorTooltip label="取消选择" shortcut="Esc">
