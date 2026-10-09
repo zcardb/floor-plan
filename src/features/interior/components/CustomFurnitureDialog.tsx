@@ -1,5 +1,7 @@
 import { useEffect,useRef,useState } from 'react';
-import { Plus,Loader2,Cloud } from 'lucide-react';
+import { Plus,Loader2,Cloud,ChevronDown } from 'lucide-react';
+import { FurniturePicker } from './FurniturePicker';
+import { typePickerItems } from './pickerItems';
 import { LoadError } from './LoadError';
 import { Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -28,7 +30,7 @@ import { parseMeterDraft } from '../model/lengthUnits';
 import { useFurnitureImage } from '../cloud/useFurnitureImage';
 import { useFurnitureCatalog } from '../cloud/useFurnitureCatalog';
 import { FurnitureShape } from './FurnitureShape';
-import { furnitureTypes, resolvedFurnitureType, appearanceDimensions, needsParameterOnly, type FurnitureOutline } from '../model/furnitureAppearance';
+import { furnitureTypes, matchFurnitureType, resolvedFurnitureType, appearanceDimensions, needsParameterOnly, type FurnitureOutline } from '../model/furnitureAppearance';
 import { notify } from '@/lib/notify';
 type Props = { open:boolean; onOpenChange:(v:boolean)=>void; loggedIn:boolean; login:()=>void; onCreate:(i:LibraryItem)=>void; onImport:(i:LibraryItem)=>void; onCreateFloor?:(f:CustomFloor)=>void; onCreateWall?:(w:CustomWall)=>void; onCreateOpening?:(o:CustomOpening)=>void; onCreateRoof?:(r:CustomWall)=>void; onCreateCeiling?:(c:CustomWall)=>void; ownerKey:string; accountOnly?:boolean; initialCategory?:string };
 const tabTrigger = 'gap-[5px] rounded px-2.5 py-1.5 text-[11px] max-[700px]:px-[7px] max-[700px]:text-[10px]';
@@ -43,6 +45,7 @@ export function CustomFurnitureDialog({open,onOpenChange,loggedIn,login,onCreate
   const [typeChoice,setTypeChoice]=useState('auto'),[shape,setShape]=useState<FurnitureOutline>('reference');
   const type=resolvedFurnitureType(name,typeChoice);
   const parametersRequired=needsParameterOnly({type,shape});
+  const typeItems=typePickerItems(furnitureTypes,furnitureTypes.find(option=>option.value=== matchFurnitureType(name))?.label??'通用物件');
   const finish=async(item:LibraryItem,run:number)=>{
     if(run!==epoch.current||!latest.current.open)return;
     setSaving(true);
@@ -117,7 +120,7 @@ export function CustomFurnitureDialog({open,onOpenChange,loggedIn,login,onCreate
           <Input id="furniture-name" aria-label="家具名称" maxLength={100} required value={name} disabled={locked} onChange={e=>setName(e.target.value)}/>
         </div>
         {categoryField}
-        <div className="custom-field"><Label htmlFor="furniture-type">参考类型</Label><Select value={typeChoice} onValueChange={setTypeChoice} disabled={locked}><SelectTrigger id="furniture-type"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="auto">自动匹配 · {furnitureTypes.find(option=>option.value===type)?.label}</SelectItem>{furnitureTypes.map(option=><SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div>
+        <div className="custom-field"><Label htmlFor="furniture-type">参考类型</Label><FurniturePicker items={typeItems} label="选择参考类型" placeholder="搜索类型或家具名称…" disabled={locked} onPick={item=>setTypeChoice(item.id)}><button type="button" id="furniture-type" className="picker-trigger" disabled={locked} aria-label={`参考类型：${typeItems.find(item=>item.id===typeChoice)?.label??''}`}><span>{typeItems.find(item=>item.id===typeChoice)?.label}</span><ChevronDown size={12}/></button></FurniturePicker></div>
         <div className="custom-field"><Label htmlFor="furniture-outline">外形</Label><Select value={shape} onValueChange={value=>setShape(value as FurnitureOutline)} disabled={locked}><SelectTrigger id="furniture-outline"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="reference">参考原形</SelectItem><SelectItem value="rectangle">方形</SelectItem><SelectItem value="circle">圆形</SelectItem></SelectContent></Select></div>
         <div className="custom-dimensions">{dimensions.map(([label,fieldId,value,setter])=><div className="custom-field" key={fieldId}><Label htmlFor={fieldId}>{label}</Label><Input id={fieldId} type="number" step={0.01} min={0.05} max={fieldId==='furniture-height'?8:20} value={value} disabled={locked} onChange={e=>setter(e.target.value)}/></div>)}</div>
         <div className="custom-field">

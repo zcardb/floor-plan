@@ -4,6 +4,7 @@ import {
   uid,
   type Design,
   type Furniture,
+  type LibraryItem,
   type Opening,
   type Point,
   type Room,
@@ -56,6 +57,8 @@ export interface RoomSpec {
  */
 export interface FurnitureSpec {
   type: string;
+  /** 指定素材条目（账号 / 项目家具）：由外部解析器按 catalogId 取尺寸与外观。 */
+  catalogId?: string;
   /** 素材库里的名字，用于精确取尺寸与颜色；只给 type 时取该类型的第一件。 */
   name?: string;
   /** 显示名（与素材库不同时使用，例如把「橱柜台面」叫作「吊柜」）。 */
@@ -219,7 +222,10 @@ export function buildStructure(spec: PlanSpec): { walls: Wall[]; openings: Openi
   return { walls, openings };
 }
 
-const catalogOf = (type: string, name?: string) =>
+/** 家具简写 → 素材条目。默认查内置素材库；AI 方案会传入包含账号 / 项目家具的解析器。 */
+export type CatalogResolver = (spec: FurnitureSpec) => LibraryItem | undefined;
+
+export const libraryResolver: CatalogResolver = ({ type, name }) =>
   (name ? library.find((i) => i.type === type && i.name === name) : undefined) ??
   library.find((i) => i.type === type);
 
@@ -227,10 +233,10 @@ const catalogOf = (type: string, name?: string) =>
 const ROT: Record<Side, number> = { up: 0, right: 90, down: 180, left: 270 };
 
 /** 把家具简写解析成实际坐标。 */
-export function placeFurniture({ zone, items }: FurnitureZone): Furniture[] {
+export function placeFurniture({ zone, items }: FurnitureZone, resolve: CatalogResolver = libraryResolver): Furniture[] {
   const [x1, y1, x2, y2] = zone;
   return items.map((s) => {
-    const item = catalogOf(s.type, s.name);
+    const item = resolve(s);
     if (!item) throw new Error(`素材库里没有 ${s.type}${s.name ? " / " + s.name : ""}`);
     const w = s.w ?? item.w;
     const d = s.d ?? item.d;
@@ -257,12 +263,20 @@ export function placeFurniture({ zone, items }: FurnitureZone): Furniture[] {
       d,
       rot: ROT[s.back],
       color: s.color || item.color,
+      ...(s.catalogId && item.catalogId
+        ? {
+            catalogId: item.catalogId,
+            ...(item.shape ? { shape: item.shape } : {}),
+            ...(item.height ? { height: item.height } : {}),
+            ...(item.imageUrl ? { imageUrl: item.imageUrl } : {}),
+          }
+        : {}),
     });
   });
 }
 
 /** 由一份户型描述装配出完整方案。 */
-export function buildPlan(spec: PlanSpec): Design {
+export function buildPlan(spec: PlanSpec, resolve: CatalogResolver = libraryResolver): Design {
   const { walls, openings } = buildStructure(spec);
   const rooms: Room[] = spec.rooms.map((r) => {
     const ring = r.poly ?? (r.box ? boxPoly(r.box) : null);
@@ -286,7 +300,7 @@ export function buildPlan(spec: PlanSpec): Design {
     walls,
     openings,
     rooms,
-    furniture: spec.furniture.flatMap(placeFurniture),
+    furniture: spec.furniture.flatMap((zone) => placeFurniture(zone, resolve)),
     demolished: [],
   };
 }

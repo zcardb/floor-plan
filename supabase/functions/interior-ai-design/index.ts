@@ -1,0 +1,392 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+/** 固定模型：用户不选模型；以后更换只改这一行。 */
+const MODEL = 'anthropic/claude-opus-5.5';
+const API = 'https://api.enter.pro/code/api/v1/ai/messages';
+const PROJECT_ID = 'eba6e37b0b3d4d608b63a3efedec61a3';
+/** 超过这个耗时就不再进入修复轮，避免整个请求超时。 */
+const REPAIR_BUDGET_MS = 75_000;
+const NL = String.fromCharCode(10);
+
+const cors = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-session-id',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+const json = (status: number, body: unknown) =>
+  new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
+
+type Side = 'up' | 'down' | 'left' | 'right';
+const SIDES: Side[] = ['up', 'down', 'left', 'right'];
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const finite = (v: unknown, min = -1e6, max = 1e6): v is number => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
+const str = (v: unknown, max: number): v is string => typeof v === 'string' && v.trim().length > 0 && v.length <= max;
+
+interface Entry { code: string; catalogId: string; name: string; category: string; type: string; w: number; d: number }
+interface Placed { code: string; back: Side; along?: number; gap?: number }
+interface Body {
+  mode: 'plan' | 'room';
+  generationId: string;
+  index: number;
+  temperature?: number;
+  description: string;
+  images: string[];
+  catalog: Entry[];
+  projectId?: string;
+  width?: number;
+  depth?: number;
+  room?: { roomId: string; name: string; area: number; zone: [number, number, number, number]; openings: unknown[] };
+  plan?: unknown;
+  existing?: { name: string; w: number; d: number }[];
+  required?: { code: string; count: number }[];
+}
+
+/** 入参守卫：类型、范围、长度都在这里挡掉，后面的逻辑只处理合法数据。 */
+function guard(raw: unknown): Body | string {
+  const b = raw as Body;
+  if (!b || (b.mode !== 'plan' && b.mode !== 'room')) return '生成模式无效';
+  if (typeof b.generationId !== 'string' || !UUID.test(b.generationId)) return '生成编号无效';
+  if (!Number.isInteger(b.index) || b.index < 0 || b.index > 3) return '候选序号无效';
+  if (b.temperature !== undefined && !finite(b.temperature, 0, 1)) return '温度无效';
+  if (!str(b.description, 2000)) return '请填写需求描述（2000 字以内）';
+  if (!Array.isArray(b.images) || b.images.length > 4 || !b.images.every((u) => typeof u === 'string' && /^https:\/\//.test(u) && u.length <= 1000)) return '参考图最多 4 张';
+  if (!Array.isArray(b.catalog) || !b.catalog.length || b.catalog.length > 800) return '家具目录无效';
+  for (const e of b.catalog)
+    if (!e || !/^F\d{1,4}$/.test(e.code) || !str(e.catalogId, 250) || !str(e.name, 100) || typeof e.category !== 'string' || e.category.length > 30 || !str(e.type, 40) || !finite(e.w, 10, 30000) || !finite(e.d, 10, 30000)) return '家具目录条目无效';
+  if (b.projectId !== undefined && (typeof b.projectId !== 'string' || !UUID.test(b.projectId))) return '项目编号无效';
+  if (b.mode === 'plan') {
+    if (!finite(b.width, 3000, 40000) || !finite(b.depth, 3000, 40000)) return '长、宽需在 3–40 m 之间';
+  } else {
+    const r = b.room;
+    if (!r || !str(r.roomId, 100) || !str(r.name, 100) || !Array.isArray(r.zone) || r.zone.length !== 4 || !r.zone.every((n) => finite(n)) || !Array.isArray(r.openings)) return '房间信息无效';
+    if (!b.plan || typeof b.plan !== 'object' || JSON.stringify(b.plan).length > 200_000) return '户型快照无效或过大';
+    if (!Array.isArray(b.existing) || b.existing.length > 80) return '现有家具清单无效';
+    const codes = new Set(b.catalog.map((e) => e.code));
+    if (!Array.isArray(b.required) || b.required.length > 40 || !b.required.every((q) => q && codes.has(q.code) && Number.isInteger(q.count) && q.count >= 1 && q.count <= 20)) return '指定家具无效';
+  }
+  return b;
+}
+
+const catalogText = (catalog: Entry[]) =>
+  catalog.map((e) => `${e.code} ${e.name} | ${e.category || '其他'} | ${e.type} | ${Math.round(e.w)}×${Math.round(e.d)}`).join(NL);
+
+const DIRECTIONS = ['常规舒适：优先动线与使用习惯', '收纳优先：尽量多布置收纳', '开阔通透：留出更多活动空间', '功能分区：明确划分功能区域'];
+
+const ROOM_CONTRACT = `你是资深室内设计师，为一套户型中的「目标房间」布置家具。只输出一个 JSON 对象，不要输出解释或 Markdown。
+
+坐标约定：单位 mm；原点在户型室内净轮廓左上角；x 向右，y 向下（下方为南）。
+目标房间的摆放分区 zone = [x1, y1, x2, y2]（绝对坐标）。每件家具用「背靠边 + 沿边位置 + 离边距离」描述，全部相对 zone：
+- back：家具背面朝哪条边，取 up / down / left / right。
+- along：家具中心沿这条边的位置；back 为 up/down 时从 zone 左边 x1 量起，back 为 left/right 时从 zone 上边 y1 量起。
+- gap：家具背面到这条边的净距；贴墙为 0，放在房间中部的家具（床尾凳、茶几、餐桌、地毯、岛台）用较大的 gap。
+- 家具宽 w 沿背靠边方向，深 d 垂直于背靠边，尺寸固定取目录值，不能改。
+家具只能使用目录里的代号 code，禁止编造代号。
+
+输出格式：
+{"summary":"一句话方案说明，20 字以内","items":[{"code":"F3","back":"up","along":1800,"gap":0}]}
+
+布置规则：
+1. 家具之间互不重叠（地毯除外），全部落在 zone 内。
+2. 不挡门：门洞前留出至少 800mm 通行空间；高家具（衣柜、书架、冰箱）不要挡窗。
+3. 主通道净宽至少 700mm。
+4. 结合整套户型：门连通哪些房间、相邻房间的功能与现有家具，保持风格一致、动线顺畅。
+5. 「指定家具」不为空时，只能使用指定的代号，且每个代号的件数必须与指定件数完全相同，不得增减或加入其他家具；为空时由你从目录中挑选适合该房间功能的家具。`;
+
+const PLAN_CONTRACT = `你是资深住宅建筑师兼室内设计师，在给定的矩形外轮廓内设计整套户型：内墙分割、门窗、房间与家具。只输出一个 JSON 对象，不要输出解释或 Markdown。
+
+坐标约定：单位 mm；原点在室内净轮廓左上角；x 向右，y 向下（下方为南，上方为北）。室内净尺寸为 width × depth。
+外墙由系统按长宽自动生成，名字固定为 top / right / bottom / left，不要输出外墙。
+
+输出格式：
+{
+  "summary": "一句话方案说明，20 字以内",
+  "walls": [{"key":"a","dir":"h","at":4200,"from":0,"to":6000}],
+  "rooms": [{"id":"living","name":"客厅","mat":"tile800","box":[0,4200,6000,9000]}],
+  "openings": [{"wall":"bottom","kind":"window","at":3000,"width":1800},{"wall":"a","kind":"door","at":1500,"width":900,"into":"up"}],
+  "furniture": [{"room":"living","items":[{"code":"F12","back":"down","along":2000,"gap":0}]}]
+}
+
+墙：
+- dir=h 为横墙：at 为 y，from/to 为 x 范围；dir=v 为竖墙：at 为 x，from/to 为 y 范围。坐标是墙中心线，内墙厚 120。
+- 墙端点要落在外墙内侧（0、width 或 depth）或另一面内墙的中心线上，不留缺口；key 唯一。
+房间：
+- 轮廓沿墙中心线或外墙内侧给出（系统会自动扣掉半个墙厚）。矩形用 box:[x1,y1,x2,y2]，L 形用 poly（横平竖直的顶点数组）。
+- 房间之间不重叠，合起来铺满整个平面；每个房间四周都被墙或外墙围合；id 唯一，name 用中文（如 主卧、次卧、客厅、餐厅、厨房、卫生间、阳台、过道）。
+- mat 取：wood（卧室、书房）、walnut、tile800（客厅、餐厅、过道）、tile600（厨房）、antislip（卫生间、阳台）、marble、terrazzo、carpet。
+门窗：
+- 门 kind=door：宽 800–1000（入户门 1000–1200，客厅到阳台的推拉门可到 1800）；wall 引用内墙 key 或外墙名；at 为门洞中心沿墙方向的坐标（横墙给 x，竖墙给 y）；into 为门扇开向（横墙 up/down，竖墙 left/right），一般开向房间内。
+- 每个房间至少一扇门连通过道或客厅；必须有一扇入户门开在外墙上。
+- 窗 kind=window：只开在外墙上，宽 900–3000；卧室、客厅、厨房都要有窗，卫生间尽量有窗。
+- 同一面墙上的门窗互不重叠，离墙端至少 100。
+家具：
+- furniture 按房间分组，room 引用房间 id；items 中每件家具用「背靠边 + 沿边位置 + 离边距离」描述，相对该房间净空外接矩形（左上角为原点）：back 取 up/down/left/right；along 为家具中心沿背靠边的位置；gap 为背面到这条边的净距，贴墙为 0。
+- 家具宽 w 沿背靠边方向、深 d 垂直于背靠边，尺寸固定取目录值；家具只能使用目录代号，不挡门、互不重叠。`;
+
+function contentOf(text: string, images: string[]) {
+  return images.length
+    ? [{ type: 'text', text }, ...images.map((url) => ({ type: 'image', source: { type: 'url', url } }))]
+    : text;
+}
+
+function roomPrompt(b: Body) {
+  const names = new Map(b.catalog.map((e) => [e.code, e.name]));
+  const required = b.required!.length
+    ? JSON.stringify(b.required!.map((q) => ({ code: q.code, name: names.get(q.code), count: q.count })))
+    : '无（由你从目录中挑选）';
+  return [
+    `目标房间：${JSON.stringify(b.room)}`,
+    `目标房间现有家具：${b.existing!.length ? JSON.stringify(b.existing) : '无'}`,
+    `指定家具：${required}`,
+    `整套户型（墙 a→b、门窗中心 at 与连通房间 rooms、房间轮廓 ring、其他房间家具）：${JSON.stringify(b.plan)}`,
+    `家具目录（代号 名称 | 分类 | 类型 | 宽×深 mm）：${NL}${catalogText(b.catalog)}`,
+    `用户需求：${b.description.trim()}`,
+    b.images.length ? '附有参考图，请参考其中的风格与布局意图，但家具仍只能来自目录。' : '',
+    `这是同一批里的第 ${b.index + 1} 个方案，思路：${DIRECTIONS[b.index % DIRECTIONS.length]}。`,
+  ].filter(Boolean).join(NL + NL);
+}
+
+function planPrompt(b: Body) {
+  return [
+    `室内净尺寸：width=${Math.round(b.width!)}，depth=${Math.round(b.depth!)}（mm）。`,
+    `家具目录（代号 名称 | 分类 | 类型 | 宽×深 mm）：${NL}${catalogText(b.catalog)}`,
+    `用户需求：${b.description.trim()}`,
+    b.images.length ? '附有参考图（可能是户型图或风格图），请参考其中的布局与风格意图。' : '',
+    `这是同一批里的第 ${b.index + 1} 个方案，请给出与常见做法略有不同的分区思路：${DIRECTIONS[b.index % DIRECTIONS.length]}。`,
+  ].filter(Boolean).join(NL + NL);
+}
+
+/** 从模型回复里取出 JSON：去掉代码围栏，取第一个 { 到最后一个 }。 */
+function extractJson(text: string): unknown {
+  const start = text.indexOf('{'), end = text.lastIndexOf('}');
+  if (start < 0 || end <= start) throw new Error('回复里没有 JSON 对象');
+  return JSON.parse(text.slice(start, end + 1));
+}
+
+const footprint = (p: Placed, e: Entry, zone: [number, number, number, number]) => {
+  const [x1, y1, x2, y2] = zone;
+  const horizontal = p.back === 'up' || p.back === 'down';
+  const along = p.along ?? (horizontal ? x2 - x1 : y2 - y1) / 2;
+  const gap = p.gap ?? 0;
+  const [w, d] = horizontal ? [e.w, e.d] : [e.d, e.w];
+  const cx = horizontal ? x1 + along : p.back === 'left' ? x1 + gap + e.d / 2 : x2 - gap - e.d / 2;
+  const cy = !horizontal ? y1 + along : p.back === 'up' ? y1 + gap + e.d / 2 : y2 - gap - e.d / 2;
+  return { x1: cx - w / 2, y1: cy - d / 2, x2: cx + w / 2, y2: cy + d / 2 };
+};
+
+/** 一组家具的结构 + 几何校验：代号、方向、是否出界、是否互相重叠。 */
+function checkItems(items: unknown, zone: [number, number, number, number], byCode: Map<string, Entry>, label: string, errors: string[]): Placed[] {
+  if (!Array.isArray(items) || !items.length) { errors.push(`${label}：items 必须是非空数组`); return []; }
+  const placed: Placed[] = [];
+  const boxes: { name: string; type: string; box: ReturnType<typeof footprint> }[] = [];
+  items.forEach((raw, i) => {
+    const p = raw as Placed;
+    const e = byCode.get(p?.code);
+    if (!e) { errors.push(`${label} 第 ${i + 1} 件：代号 ${String(p?.code)} 不在目录中`); return; }
+    if (!SIDES.includes(p.back)) { errors.push(`${label} ${p.code}：back 必须是 up/down/left/right`); return; }
+    if ((p.along !== undefined && !finite(p.along)) || (p.gap !== undefined && !finite(p.gap, 0))) { errors.push(`${label} ${p.code}：along / gap 必须是数字且 gap ≥ 0`); return; }
+    const box = footprint(p, e, zone);
+    const tolerance = 30;
+    if (box.x1 < zone[0] - tolerance || box.y1 < zone[1] - tolerance || box.x2 > zone[2] + tolerance || box.y2 > zone[3] + tolerance)
+      errors.push(`${label} ${p.code}（${e.name}）超出了房间范围，请调整 along / gap 或换小一号的家具`);
+    for (const other of boxes) {
+      if (e.type === 'rug' || other.type === 'rug') continue;
+      const overlap = Math.min(box.x2, other.box.x2) - Math.max(box.x1, other.box.x1);
+      const overlapY = Math.min(box.y2, other.box.y2) - Math.max(box.y1, other.box.y1);
+      if (overlap > 50 && overlapY > 50) errors.push(`${label} ${p.code}（${e.name}）与 ${other.name} 重叠`);
+    }
+    boxes.push({ name: e.name, type: e.type, box });
+    placed.push({ code: p.code, back: p.back, ...(p.along !== undefined ? { along: p.along } : {}), ...(p.gap !== undefined ? { gap: p.gap } : {}) });
+  });
+  return placed;
+}
+
+function validateRoom(value: unknown, b: Body): string[] {
+  const errors: string[] = [];
+  const byCode = new Map(b.catalog.map((e) => [e.code, e]));
+  const v = value as { items?: unknown; summary?: unknown };
+  const r = b.room!;
+  const zone: [number, number, number, number] = [0, 0, r.zone[2] - r.zone[0], r.zone[3] - r.zone[1]];
+  const placed = checkItems(v?.items, zone, byCode, '家具', errors);
+  if (b.required!.length) {
+    const counts = new Map<string, number>();
+    for (const p of placed) counts.set(p.code, (counts.get(p.code) ?? 0) + 1);
+    for (const q of b.required!) if ((counts.get(q.code) ?? 0) !== q.count) errors.push(`指定家具 ${q.code}（${byCode.get(q.code)?.name}）需要恰好 ${q.count} 件，当前 ${counts.get(q.code) ?? 0} 件`);
+    const allowed = new Set(b.required!.map((q) => q.code));
+    for (const code of counts.keys()) if (!allowed.has(code)) errors.push(`不允许使用未指定的家具 ${code}（${byCode.get(code)?.name}）`);
+  }
+  return errors;
+}
+
+type Ring = [number, number][];
+const area = (ring: Ring) => Math.abs(ring.reduce((s, a, i) => { const c = ring[(i + 1) % ring.length]; return s + a[0] * c[1] - c[0] * a[1]; }, 0)) / 2;
+
+function validatePlan(value: unknown, b: Body): string[] {
+  const errors: string[] = [];
+  const W = b.width!, D = b.depth!;
+  const v = value as { walls?: unknown; rooms?: unknown; openings?: unknown; furniture?: unknown };
+  const byCode = new Map(b.catalog.map((e) => [e.code, e]));
+  const walls = new Map<string, { dir: string; at: number; from: number; to: number }>();
+  if (!Array.isArray(v?.walls)) errors.push('walls 必须是数组');
+  else v.walls.forEach((raw, i) => {
+    const w = raw as { key?: unknown; dir?: unknown; at?: unknown; from?: unknown; to?: unknown };
+    const key = typeof w?.key === 'string' ? w.key : '';
+    if (!key || walls.has(key) || ['top', 'right', 'bottom', 'left'].includes(key)) { errors.push(`第 ${i + 1} 面内墙：key 缺失、重复或与外墙同名`); return; }
+    if (w.dir !== 'h' && w.dir !== 'v') { errors.push(`内墙 ${key}：dir 必须是 h 或 v`); return; }
+    const [across, along] = w.dir === 'h' ? [D, W] : [W, D];
+    if (!finite(w.at, 0, across) || !finite(w.from, 0, along) || !finite(w.to, 0, along) || w.to - w.from < 600) { errors.push(`内墙 ${key}：at/from/to 超出范围或长度不足 600`); return; }
+    walls.set(key, { dir: w.dir, at: w.at, from: w.from, to: w.to });
+  });
+  const rooms = new Map<string, [number, number, number, number]>();
+  let total = 0;
+  if (!Array.isArray(v?.rooms) || v.rooms.length < 2) errors.push('rooms 至少需要 2 个房间');
+  else v.rooms.forEach((raw, i) => {
+    const r = raw as { id?: unknown; name?: unknown; box?: unknown; poly?: unknown };
+    const id = typeof r?.id === 'string' ? r.id : '';
+    if (!id || rooms.has(id)) { errors.push(`第 ${i + 1} 个房间：id 缺失或重复`); return; }
+    if (!str(r.name, 20)) errors.push(`房间 ${id}：name 必须是 20 字以内的中文名称`);
+    const ring: Ring | null = Array.isArray(r.box) && r.box.length === 4 && r.box.every((n) => finite(n))
+      ? [[r.box[0], r.box[1]], [r.box[2], r.box[1]], [r.box[2], r.box[3]], [r.box[0], r.box[3]]]
+      : Array.isArray(r.poly) && r.poly.length >= 4 && r.poly.every((p) => Array.isArray(p) && p.length === 2 && p.every((n) => finite(n)))
+        ? (r.poly as Ring)
+        : null;
+    if (!ring) { errors.push(`房间 ${id}：需要 box:[x1,y1,x2,y2] 或至少 4 个点的 poly`); return; }
+    const xs = ring.map((p) => p[0]), ys = ring.map((p) => p[1]);
+    if (Math.min(...xs) < -1 || Math.min(...ys) < -1 || Math.max(...xs) > W + 1 || Math.max(...ys) > D + 1) errors.push(`房间 ${id}：轮廓超出了 ${W}×${D} 的外轮廓`);
+    const a = area(ring);
+    if (a < 1.5e6) errors.push(`房间 ${id}：面积不足 1.5 m²`);
+    total += a;
+    rooms.set(id, [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]);
+  });
+  if (rooms.size && (total < W * D * 0.85 || total > W * D * 1.05)) errors.push(`所有房间面积之和应约等于整个平面（${(W * D / 1e6).toFixed(1)} m²），当前 ${(total / 1e6).toFixed(1)} m²：房间要铺满平面且互不重叠`);
+  let entrance = false;
+  if (!Array.isArray(v?.openings)) errors.push('openings 必须是数组');
+  else v.openings.forEach((raw, i) => {
+    const o = raw as { wall?: unknown; kind?: unknown; at?: unknown; width?: unknown };
+    const wall = typeof o?.wall === 'string' ? o.wall : '';
+    const outer = ['top', 'right', 'bottom', 'left'].includes(wall);
+    if (!outer && !walls.has(wall)) { errors.push(`第 ${i + 1} 个门窗：wall=${wall} 既不是外墙名也不是内墙 key`); return; }
+    if (o.kind !== 'door' && o.kind !== 'window') { errors.push(`第 ${i + 1} 个门窗：kind 必须是 door 或 window`); return; }
+    if (!finite(o.at) || !finite(o.width, 500, 4000)) { errors.push(`第 ${i + 1} 个门窗：at / width 无效`); return; }
+    if (o.kind === 'window' && !outer) errors.push(`第 ${i + 1} 个门窗：窗只能开在外墙上`);
+    const [from, to] = outer ? [0, wall === 'top' || wall === 'bottom' ? W : D] : [walls.get(wall)!.from, walls.get(wall)!.to];
+    if (o.at - o.width / 2 < from || o.at + o.width / 2 > to) errors.push(`第 ${i + 1} 个门窗：洞口超出了墙 ${wall} 的范围`);
+    if (o.kind === 'door' && outer) entrance = true;
+  });
+  if (Array.isArray(v?.openings) && !entrance) errors.push('缺少开在外墙上的入户门');
+  if (!Array.isArray(v?.furniture) || !v.furniture.length) errors.push('furniture 至少要为主要房间布置家具');
+  else v.furniture.forEach((raw, i) => {
+    const g = raw as { room?: unknown; items?: unknown };
+    const box = typeof g?.room === 'string' ? rooms.get(g.room) : undefined;
+    if (!box) { errors.push(`第 ${i + 1} 组家具：room 必须引用房间 id`); return; }
+    checkItems(g.items, [0, 0, box[2] - box[0], box[3] - box[1]], byCode, `房间 ${g.room} 的家具`, errors);
+  });
+  return errors;
+}
+
+/** 落库前把代号换成 catalogId：代号只在单次请求内有效。 */
+function resolveCodes(value: unknown, byCode: Map<string, Entry>): unknown {
+  if (Array.isArray(value)) return value.map((v) => resolveCodes(v, byCode));
+  if (!value || typeof value !== 'object') return value;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value)) {
+    if (k === 'code' && typeof v === 'string' && byCode.has(v)) out.catalogId = byCode.get(v)!.catalogId;
+    else out[k] = resolveCodes(v, byCode);
+  }
+  return out;
+}
+
+class UpstreamError extends Error { constructor(message: string, readonly status: number) { super(message); } }
+
+async function callModel(token: string, session: string, system: string, messages: unknown[], temperature: number): Promise<string> {
+  const response = await fetch(API, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'X-Session-ID': session, 'X-Enter-Project-ID': PROJECT_ID },
+    body: JSON.stringify({ model: MODEL, system, messages, stream: false, max_tokens: 8192, temperature }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data?.type === 'error') {
+    const message = data?.error?.message || `AI 服务错误（${response.status}）`;
+    throw new UpstreamError(message, response.ok ? 502 : response.status);
+  }
+  const text = (Array.isArray(data?.content) ? data.content : []).filter((c: { type?: string }) => c?.type === 'text').map((c: { text?: string }) => c.text ?? '').join('');
+  if (!text) throw new UpstreamError('AI 没有返回内容', 502);
+  return text;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+  if (req.method !== 'POST') return json(405, { success: false, message: '仅支持 POST' });
+  const started = Date.now();
+  let generationId = '';
+  const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  const fail = async (status: number, message: string) => {
+    if (generationId) await admin.from('interior_ai_generations').update({ status: 'failed', error: message.slice(0, 1000) }).eq('id', generationId).eq('status', 'running');
+    return json(status, { success: false, message });
+  };
+  try {
+    const client = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: req.headers.get('authorization') || '' } } });
+    const { data: { user } } = await client.auth.getUser();
+    if (!user) return json(401, { success: false, message: '请登录后使用 AI 设计' });
+    const body = guard(await req.json().catch(() => null));
+    if (typeof body === 'string') return json(400, { success: false, message: body });
+    const token = Deno.env.get('AI_API_TOKEN_eba6e37b0b3d');
+    if (!token) return json(500, { success: false, message: 'AI 服务尚未配置' });
+
+    const { data: agents, error: agentError } = await admin.from('interior_ai_agents')
+      .select('owner_id,instructions,model,temperature,repair_rounds')
+      .eq('kind', body.mode).eq('enabled', true).or(`owner_id.eq.${user.id},owner_id.is.null`);
+    if (agentError) throw agentError;
+    const agent = agents?.find((a) => a.owner_id === user.id) ?? agents?.find((a) => a.owner_id === null);
+    const repairRounds = Math.min(3, Math.max(0, agent?.repair_rounds ?? 1));
+    const baseTemperature = Number(agent?.temperature ?? 0.4);
+    const temperature = Math.min(1, Math.max(0, body.temperature ?? baseTemperature + body.index * 0.12));
+
+    const { data: existing, error: readError } = await admin.from('interior_ai_generations').select('owner_id').eq('id', body.generationId).maybeSingle();
+    if (readError) throw readError;
+    if (existing && existing.owner_id !== user.id) return json(403, { success: false, message: '生成编号不可用' });
+    if (!existing) {
+      const { error } = await admin.from('interior_ai_generations').upsert({
+        id: body.generationId, owner_id: user.id, kind: body.mode, project_id: body.projectId ?? null,
+        room_id: body.room?.roomId ?? null, prompt: body.description.trim().slice(0, 2000), images: body.images,
+        required: body.required ?? [], model: MODEL, status: 'running',
+      }, { onConflict: 'id', ignoreDuplicates: true });
+      if (error) throw error;
+    }
+    generationId = body.generationId;
+
+    const system = [body.mode === 'room' ? ROOM_CONTRACT : PLAN_CONTRACT, agent?.instructions ? `补充要求：${agent.instructions}` : ''].filter(Boolean).join(NL + NL);
+    const messages: unknown[] = [{ role: 'user', content: contentOf(body.mode === 'room' ? roomPrompt(body) : planPrompt(body), body.images) }];
+    const session = req.headers.get('x-session-id')?.trim() || body.generationId;
+    let result: unknown = null;
+    let errors: string[] = [];
+    for (let round = 0; round <= repairRounds; round++) {
+      if (round > 0 && Date.now() - started > REPAIR_BUDGET_MS) break;
+      const text = await callModel(token, session, system, messages, temperature);
+      try {
+        result = extractJson(text);
+        errors = body.mode === 'room' ? validateRoom(result, body) : validatePlan(result, body);
+      } catch (e) {
+        result = null;
+        errors = [`输出不是合法 JSON：${e instanceof Error ? e.message : String(e)}`];
+      }
+      console.log(JSON.stringify({ generationId, index: body.index, mode: body.mode, round, errors: errors.slice(0, 8) }));
+      if (!errors.length) break;
+      messages.push({ role: 'assistant', content: text });
+      messages.push({ role: 'user', content: `上面的输出没有通过校验，请逐条修正后重新输出完整的 JSON（只输出 JSON）：${NL}${errors.slice(0, 20).map((e, i) => `${i + 1}. ${e}`).join(NL)}` });
+    }
+    if (errors.length || !result) return await fail(422, `方案未通过校验：${errors[0] ?? '没有可用的输出'}`);
+
+    const summary = typeof (result as { summary?: unknown }).summary === 'string' ? String((result as { summary: string }).summary).slice(0, 60) : '';
+    const byCode = new Map(body.catalog.map((e) => [e.code, e]));
+    const { data: row, error: insertError } = await admin.from('interior_ai_candidates').upsert({
+      generation_id: generationId, owner_id: user.id, idx: body.index, payload: resolveCodes(result, byCode), summary,
+    }, { onConflict: 'generation_id,idx' }).select('id').single();
+    if (insertError) throw insertError;
+    await admin.from('interior_ai_generations').update({ status: 'succeeded', error: null }).eq('id', generationId);
+    return json(200, { success: true, model: MODEL, candidate: { candidateId: row.id, index: body.index, summary, result } });
+  } catch (e) {
+    console.error('interior-ai-design error', e);
+    if (e instanceof UpstreamError) return await fail([402, 403, 429].includes(e.status) ? e.status : 502, e.message);
+    return await fail(500, e instanceof Error ? e.message : 'AI 设计服务错误，请重试');
+  }
+});

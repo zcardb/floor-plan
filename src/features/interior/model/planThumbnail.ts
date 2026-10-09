@@ -41,8 +41,15 @@ export function readThumbnail(value: unknown): ThumbnailDesign | null {
 const PAD = 400;
 
 /** 按真实几何算外框：导入的图纸坐标常有偏移，只用 width/depth 会裁掉或留大片空白。 */
-export function thumbnailBounds(d: ThumbnailDesign) {
+export function thumbnailBounds(d: ThumbnailDesign, focusRoomId?: string) {
   const xs: number[] = [], ys: number[] = [];
+  // 聚焦某个房间：只取该房间轮廓，其余房间仍会画出但在视野外或被裁到边缘。
+  const focus = focusRoomId ? d.rooms.find(r => r.id === focusRoomId) : undefined;
+  if (focus?.rings[0]?.length) {
+    for (const [x, y] of focus.rings[0]) { xs.push(x); ys.push(y); }
+    const x = Math.min(...xs) - PAD, y = Math.min(...ys) - PAD;
+    return { x, y, w: Math.max(...xs) - x + PAD, h: Math.max(...ys) - y + PAD };
+  }
   for (const w of d.walls) { xs.push(w.a[0], w.b[0]); ys.push(w.a[1], w.b[1]); }
   for (const r of d.rooms) for (const [x, y] of r.rings[0] ?? []) { xs.push(x); ys.push(y); }
   for (const f of d.furniture) { const e = Math.max(f.w, f.d) / 2; xs.push(f.cx - e, f.cx + e); ys.push(f.cy - e, f.cy + e); }

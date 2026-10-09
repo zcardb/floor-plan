@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { ManagementLoading, ProjectCardsSkeleton } from './ManagementLoading';
 import { LoadError } from './LoadError';
-import { Plus, LayoutTemplate, LayoutGrid, RefreshCw, Loader2, ChevronDown, FilePlus2, FileUp, Search, X } from 'lucide-react';
+import { Plus, LayoutTemplate, LayoutGrid, RefreshCw, Loader2, ChevronDown, FilePlus2, FileUp, Search, Sparkles, X } from 'lucide-react';
 import { CmsPageHeader } from './CmsPageHeader';
 import { CmsSearchField } from './CmsSearchField';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { EditorTooltip } from '@/components/ui/editor-tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ProjectRenameDialog, ProjectDeleteDialog } from './ProjectDialogs';
 import { NewProjectDialog, type NewProjectInput } from './NewProjectDialog';
+import { AiCreateProjectDialog } from './AiCreateProjectDialog';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { notify } from '@/lib/notify';
 import { createProject, TEMPLATE_PRESETS } from '../data/templates';
@@ -32,7 +33,7 @@ type RowKind = 'open' | 'duplicate' | 'remove' | 'copyTemplate';
 const BUSY_LABEL: Record<RowKind, string> = { open: '正在打开…', duplicate: '正在复制…', remove: '正在删除…', copyTemplate: '正在复制…' };
 
 export function ProjectManager({ projects, opened }: { projects: Projects; opened: () => void }) {
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState(false), [aiCreating, setAiCreating] = useState(false);
   const [rename, setRename] = useState<ProjectSummary | null>(null), [deleting, setDeleting] = useState<ProjectSummary | null>(null);
   const [scope, setScopeState] = useState<ProjectScope>('all'), [query, setQueryState] = useState('');
   const [visible, setVisible] = useState(PAGE_SIZE), [refreshing, setRefreshing] = useState(false);
@@ -87,9 +88,9 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
     },
     (kind, row) => kind + ':' + row.id,
   );
-  const submit = useAsyncAction(async ({ template, name, size }: NewProjectInput) => {
-    const project = createProject(template, name, size);
-    if (await projects.create(project, true)) { setCreating(false); notify.success('已创建项目「' + project.name + '」'); opened(); }
+  const submit = useAsyncAction(async ({ template, name, size, design }: NewProjectInput) => {
+    const project = createProject(template, name, size, design);
+    if (await projects.create(project, true)) { setCreating(false); setAiCreating(false); notify.success('已创建项目「' + project.name + '」'); opened(); }
   });
   const file = useRef<HTMLInputElement>(null);
   const imports = useProjectImport(projects, opened);
@@ -115,6 +116,7 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="create-menu">
             <DropdownMenuItem onSelect={() => setCreating(true)}><FilePlus2 />新建项目</DropdownMenuItem>
+            {projects.session && <DropdownMenuItem onSelect={() => setAiCreating(true)}><Sparkles />AI 创建…</DropdownMenuItem>}
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={pickFile}><FileUp />导入 DXF 图纸…</DropdownMenuItem>
             <SoftwareSoonItem label="从其他软件导入" />
@@ -166,6 +168,7 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
       </>}
 
     <NewProjectDialog open={creating} pending={submit.pending} onClose={() => setCreating(false)} onSubmit={input => void submit.run(input)} />
+    {projects.session && <AiCreateProjectDialog open={aiCreating} pending={submit.pending} onClose={() => setAiCreating(false)} onSubmit={input => void submit.run(input)} />}
 
     {imports.drawing && <DxfImportDialog source={imports.drawing.source} defaultName={imports.drawing.name} pending={imports.saving}
       onImport={imports.confirmDrawing} onClose={imports.closeDrawing} />}

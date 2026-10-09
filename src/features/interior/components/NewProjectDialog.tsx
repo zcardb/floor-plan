@@ -7,8 +7,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { BLANK_SIZE_LIMITS, DEFAULT_BLANK_SIZE, blankDesign, presetById, TEMPLATE_PRESETS, type BlankSize } from '../data/templates';
 import { formatMeters, meterDraft, parseMeterDraft } from '../model/lengthUnits';
 import { WallLayoutPreview } from './WallLayoutPreview';
+import type { Design } from '../model/types';
 
-export interface NewProjectInput { name: string; template: string; size?: BlankSize }
+/** 新建项目的输入；design 为现成方案（AI 创建）时直接使用。 */
+export interface NewProjectInput { name: string; template: string; size?: BlankSize; design?: Design }
 
 const inRange = (mm: number) => Number.isFinite(mm) && mm >= BLANK_SIZE_LIMITS.min && mm <= BLANK_SIZE_LIMITS.max;
 const RANGE_HINT = `长、宽需在 ${formatMeters(BLANK_SIZE_LIMITS.min)}–${formatMeters(BLANK_SIZE_LIMITS.max)} m 之间`;

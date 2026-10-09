@@ -84,7 +84,10 @@ import {
   type Selection,
   type Tool,
 } from "../model/types";
-import { blankDesign, referenceDesign, designForTemplate, presetById } from "../data/templates";
+import { blankDesign, referenceDesign, designForTemplate, presetById, isAiDesign } from "../data/templates";
+import { useRoomAi } from "../ai/useRoomAi";
+import { useAiCatalog } from "../ai/useAiCatalog";
+import { AiRoomDialog } from "./AiRoomDialog";
 import { library } from "../data/catalog";
 import { Library } from "./Library";
 import { RoomList } from "./RoomList";
@@ -266,6 +269,10 @@ export function Workbench(p: Props) {
     if (!p.loggedIn || customOpen) return;
     void loadAccountFurniture(); void loadAccountFloors(); void loadAccountWalls(); void loadAccountOpenings(); void loadAccountRoofs(); void loadAccountCeilings();
   }, [p.loggedIn, customOpen, loadAccountFurniture, loadAccountFloors, loadAccountWalls, loadAccountOpenings, loadAccountRoofs, loadAccountCeilings]);
+  // AI 布局：登录且可编辑时才有入口；目录 = 内置 + 项目 + 账号家具，新建家具弹窗关闭后刷新。
+  const aiEnabled = p.loggedIn && !readOnly;
+  const aiCatalog = useAiCatalog(d.customCatalog, aiEnabled && !customOpen);
+  const roomAi = useRoomAi({ design: d, catalog: aiCatalog.catalog, projectId: p.project.cloud ? p.project.id : undefined, change });
   const saveCustom = (item: LibraryItem) => {
     if (!p.loggedIn) return;
     change((d) => d.customCatalog?.some((i) => i.catalogId === item.catalogId)
@@ -606,9 +613,9 @@ export function Workbench(p: Props) {
   ];
   const resetDesign = async () => {
     if (readOnly) return;
-    // CAD 导入的户型没有内置的初始模板，重置会把它换成参考户型。
-    if (d.templateId === DXF_TEMPLATE_ID) {
-      notify.fail("CAD 导入的户型没有初始模板，请用撤销逐步恢复");
+    // CAD 导入、AI 生成的户型没有内置的初始模板，重置会把它换成参考户型。
+    if (d.templateId === DXF_TEMPLATE_ID || isAiDesign(d)) {
+      notify.fail(`${isAiDesign(d) ? "AI 生成" : "CAD 导入"}的户型没有初始模板，请用撤销逐步恢复`);
       return;
     }
     const ok = await confirm({
@@ -935,7 +942,7 @@ export function Workbench(p: Props) {
             <span className="context-dot" />
             {view === "2d" ? "平面布置图" : "立体空间预览"}
             <span>
-              /{d.template === "blank" ? " 自定义户型" : d.templateId === DXF_TEMPLATE_ID ? " CAD 导入户型" : ` ${presetById(d.templateId ?? 'reference')?.layout ?? '参考户型'}`}
+              /{isAiDesign(d) ? " AI 生成户型" : d.template === "blank" ? " 自定义户型" : d.templateId === DXF_TEMPLATE_ID ? " CAD 导入户型" : ` ${presetById(d.templateId ?? 'reference')?.layout ?? '参考户型'}`}
             </span>
           </div>
           <div className="stage-pane-buttons">
@@ -1142,6 +1149,7 @@ export function Workbench(p: Props) {
           transaction={sizeTransaction} showCosts={p.loggedIn}
           accountFloors={accountFloors} accountWalls={accountWalls} accountOpenings={accountOpenings}
           accountRoofs={accountRoofs} accountCeilings={accountCeilings}
+          roomAi={aiEnabled && selection?.kind === "room" ? { tone: roomAi.toneOf(selection.id), open: () => roomAi.open(selection.id) } : undefined}
           hidden={readOnly || tool !== 'select' || !!drawer || (view === "3d" && sceneOptions.mode === "walk")}
           details={() => {
             setPanelMode("props");
@@ -1245,6 +1253,7 @@ export function Workbench(p: Props) {
         onCreateWall={saveCustomWall}
         onCreateOpening={saveCustomOpening}
       />}
+      {aiEnabled && <AiRoomDialog ai={roomAi} furniture={aiCatalog.items} />}
       <SaveFileDialog file={pendingFile} onClose={() => setPendingFile(null)} />
     </div>
     </div>

@@ -18,6 +18,8 @@ import {
   LockKeyhole,
   GripVertical,
   DoorOpen,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import {
   Popover,
@@ -52,6 +54,7 @@ import { EditorTooltip } from '@/components/ui/editor-tooltip';
 import { DoorOrientationControls } from './DoorOrientationControls';
 import { changeDoorOrientation } from '../model/doorOrientation';
 import { useEditorDrag } from './useEditorDrag';
+import type { AiEntryTone } from '../ai/useRoomAi';
 export interface SelectionEditorHandle {
   update: (r: ScreenRect | null) => void;
 }
@@ -81,6 +84,8 @@ interface Props {
   mergeWall?: (wallId: string) => void;
   /** 删除墙体（与属性面板的「删除隔墙」共用同一实现）。 */
   removeWall?: (wallId: string) => void;
+  /** 房间「AI 布局」入口；未登录或只读时不传，入口不显示。 */
+  roomAi?: { tone: AiEntryTone; open: () => void };
 }
 export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
   function SelectionEditor(p, ref) {
@@ -329,6 +334,15 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
               <RoomSurfaceFields design={p.design} room={r} change={p.change} accountRoofs={p.accountRoofs || []} accountCeilings={p.accountCeilings || []} />
             </PopoverContent>
           </Popover>
+        )}
+        {r && p.roomAi && (
+          <EditorTooltip label={p.roomAi.tone === "running" ? "AI 布局生成中 · 点击查看进度" : p.roomAi.tone === "unseen" ? "AI 布局已生成 · 点击查看" : "AI 布局"}>
+            <button type="button" className="visual-ai-trigger" data-tone={p.roomAi.tone} aria-label={p.roomAi.tone === "running" ? "AI 布局生成中" : p.roomAi.tone === "unseen" ? "AI 布局已生成，未查看" : "AI 布局"} aria-busy={p.roomAi.tone === "running" || undefined} onClick={p.roomAi.open}>
+              {p.roomAi.tone === "running" ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+              AI 布局
+              {p.roomAi.tone === "unseen" && <span className="visual-ai-dot" aria-hidden="true" />}
+            </button>
+          </EditorTooltip>
         )}
         {o?.kind === 'door' && <Popover open={open === 'direction'} onOpenChange={value => setPanel(value, 'direction')}>
           <EditorTooltip label="门开向">

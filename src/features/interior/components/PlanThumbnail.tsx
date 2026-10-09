@@ -10,10 +10,10 @@ const Segment = ({ s }: { s: ThumbnailSegment }) =>
  * 户型平面缩略图：房间底色 + 家具 + 墙体（门留洞、窗画线）。
  * 内置模板、本机项目和云端保存的瘦身快照共用同一份渲染。
  */
-export function PlanThumbnail({ design, label }: { design: ThumbnailDesign; label: string }) {
-  const { box, pieces } = useMemo(() => ({ box: thumbnailBounds(design), pieces: wallPieces(design) }), [design]);
+export function PlanThumbnail({ design, label, focusRoomId }: { design: ThumbnailDesign; label: string; focusRoomId?: string }) {
+  const { box, pieces } = useMemo(() => ({ box: thumbnailBounds(design, focusRoomId), pieces: wallPieces(design) }), [design, focusRoomId]);
   return <svg className="plan-thumbnail" viewBox={`${box.x} ${box.y} ${box.w} ${box.h}`} preserveAspectRatio="xMidYMid meet" aria-label={label} role="img">
-    <g className="plan-thumbnail-rooms">{design.rooms.map(r => <polygon key={r.id} points={(r.rings[0] ?? []).map(p => p.join(',')).join(' ')} />)}</g>
+    <g className="plan-thumbnail-rooms">{design.rooms.map(r => <polygon key={r.id} className={focusRoomId && r.id !== focusRoomId ? 'is-dim' : undefined} points={(r.rings[0] ?? []).map(p => p.join(',')).join(' ')} />)}</g>
     <g>{design.furniture.map(f => <g key={f.id} transform={`translate(${f.cx},${f.cy}) rotate(${f.rot})`}><FurnitureShape f={f} /></g>)}</g>
     <g className="plan-thumbnail-walls">{pieces.walls.map(s => <Segment key={s.key} s={s} />)}</g>
     <g className="plan-thumbnail-windows">{pieces.windows.map(s => <Segment key={s.key} s={s} />)}</g>

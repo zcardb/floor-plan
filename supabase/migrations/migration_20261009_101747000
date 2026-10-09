@@ -1,0 +1,2 @@
+create policy "ai_all_media_upload_images_authenticated" on storage.objects for insert to authenticated
+with check (bucket_id = 'images' and name like 'ai-all/%');

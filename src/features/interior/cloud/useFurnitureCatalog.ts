@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { furnitureFromRow } from '../ai/furnitureRow';
 import { categories } from '../data/catalog';
 import type { LibraryItem } from '../model/types';
 import { validFurnitureType, validFurnitureOutline } from '../model/furnitureAppearance';
@@ -21,7 +22,7 @@ export function useFurnitureCatalog() {
     if(run!==epoch.current)return;
     setLoading(false);
     if(page.error || stats instanceof Error){setError(page.error?.message || (stats as Error).message);return;}
-    const mapped=(page.data||[]).map(r=>({catalogId:r.catalog_id,name:r.name,category:r.category,type:r.type,shape:r.shape as LibraryItem['shape'],w:Number(r.width),d:Number(r.depth),height:Number(r.height),color:r.color,price:r.price===null?null:Number(r.price),imageUrl:r.image_url||undefined}));
+    const mapped=(page.data||[]).map(furnitureFromRow);
     offset.current=start+mapped.length; setItems(old=>more?[...old,...mapped]:mapped); setCount(page.count||0); setCounts(Object.fromEntries(stats)); setHasMore(offset.current<(page.count||0));
     } catch(cause) {
       if(run!==epoch.current)return;
