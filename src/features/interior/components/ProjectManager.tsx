@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { ManagementLoading } from './ManagementLoading';
+import { ManagementLoading, ProjectCardsSkeleton } from './ManagementLoading';
 import { LoadError } from './LoadError';
 import { Plus, LayoutTemplate, LayoutGrid, RefreshCw, Loader2, ChevronDown, FilePlus2, FileUp, Search, X } from 'lucide-react';
 import { CmsPageHeader } from './CmsPageHeader';
@@ -127,7 +127,7 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
         }} />
       </>} />
     {refreshing
-      ? <ManagementLoading label="刷新项目列表" />
+      ? <ManagementLoading variant="projects" label="刷新项目列表" />
       : <>
         <div className="cost-controls project-filter-panel">
           <div className="cost-toolbar">
@@ -145,7 +145,7 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
             : <span>按修改时间排序</span>}
         </div>
         {scope !== 'builtin' && projects.listError && <LoadError title="云端项目读取失败" message={projects.listError} retrying={projects.loading} onRetry={() => void refresh()} />}
-        {scope !== 'builtin' && !searching && projects.loading && !list.length && <ManagementLoading label="加载项目" />}
+        {scope !== 'builtin' && !searching && projects.loading && !list.length && <div className="cms-loading-placeholder" role="status" aria-label="加载项目" aria-busy="true"><ProjectCardsSkeleton count={4} /></div>}
         {scope !== 'builtin' && !searching && !projects.loading && !projects.listError && !list.length && <div className="cms-empty"><LayoutTemplate size={36} /><h2>还没有设计项目</h2><p>{scope === 'all' ? '新建空白户型，或从下方内置模板开始。' : '新建空白户型，开始规划你的空间。'}</p></div>}
         {searching && !entries.length && !loadingList && <div className="cms-empty"><Search size={30} /><h2>没有匹配的项目</h2><p>{more ? '已加载的项目中没有匹配项，向下滚动会继续加载更多，或换个关键词。' : '换个分类，或清空搜索再试。'}</p><Button variant="outline" onClick={resetFilter}>清空筛选</Button></div>}
         <div className="cms-project-grid">{shown.items.map(entry => {

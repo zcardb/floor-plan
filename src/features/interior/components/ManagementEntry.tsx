@@ -3,7 +3,7 @@ import { ManagementLoading } from './ManagementLoading';
 
 // Key this boundary by menu: initial reads block entry, subsequent reads keep drafts mounted.
 export function ManagementEntry({ loading, label, load, reset, variant = 'cards', children }: {
-  loading: boolean; label: string; load?: () => Promise<void>; reset?: () => void; variant?: 'cards' | 'library'; children: ReactNode;
+  loading: boolean; label: string; load?: () => Promise<void>; reset?: () => void; variant?: 'cards' | 'projects' | 'library'; children: ReactNode;
 }) {
   const [settled, setSettled] = useState(!load);
   const [displayed, setDisplayed] = useState(false);

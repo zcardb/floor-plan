@@ -493,31 +493,36 @@
   .cms-skeleton-title { width:65%; height:20px; }
   .cms-skeleton-description { width:45%; height:12px; }
   .cms-skeleton-icon { width:32px; height:32px; margin-bottom:4px; }
-  /* 账号家具库骨架：页头、搜索与分类胶囊面板、结果行、价格卡片网格 */
-  .cms-loading-heading--library { display:flex; align-items:center; justify-content:space-between; gap:20px; margin-bottom:20px; padding:0; }
-  .cms-loading-heading-text { display:grid; flex:1 1 auto; gap:10px; min-width:0; }
-  .cms-loading-heading--library .cms-skeleton-title { width:34%; height:26px; }
-  .cms-loading-heading--library .cms-skeleton-description { width:52%; }
-  .cms-skeleton-eyebrow { width:88px; height:10px; }
-  .cms-loading-panel { display:grid; gap:16px; padding:20px; border:1px solid hsl(var(--border)); border-radius:14px; background:hsl(var(--card)); }
-  .cms-loading-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:18px; border-bottom:1px solid hsl(var(--border)); }
-  .cms-skeleton-search { flex:1 1 auto; height:44px; border-radius:10px; }
-  .cms-skeleton-action { flex:0 0 112px; height:36px; border-radius:8px; }
+  /* 管理页骨架（项目管理 / 账号家具库）：页头、搜索与分类胶囊面板、结果行、卡片网格，尺寸对齐真实页面 */
+  .cms-loading-heading--page { display:flex; align-items:center; justify-content:space-between; gap:20px; margin-bottom:20px; padding:0; }
+  .cms-loading-heading-text { display:grid; flex:1 1 auto; gap:9px; min-width:0; }
+  .cms-loading-heading--page .cms-skeleton-title { width:min(180px,40%); height:24px; }
+  .cms-loading-heading--page .cms-skeleton-description { width:min(360px,70%); }
+  .cms-loading-actions { display:flex; align-items:center; gap:8px; }
+  .cms-skeleton-icon-action { width:36px; height:36px; border-radius:8px; }
+  .cms-skeleton-eyebrow { width:72px; height:10px; }
+  .cms-loading-panel { display:grid; gap:16px; padding:18px; border:1px solid hsl(var(--border)); border-radius:12px; background:hsl(var(--card)); }
+  .cms-loading-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:16px; border-bottom:1px solid hsl(var(--border)); }
+  .cms-skeleton-search { flex:1 1 auto; height:40px; border-radius:10px; }
+  .cms-skeleton-action { flex:0 0 112px; width:112px; height:36px; border-radius:8px; }
   .cms-loading-group { display:grid; grid-template-columns:90px minmax(0,1fr); align-items:center; gap:14px; min-width:0; }
   .cms-loading-group + .cms-loading-group { padding-top:16px; border-top:1px solid hsl(var(--border)); }
-  .cms-skeleton-group-label { width:64px; height:14px; }
+  .cms-skeleton-group-label { width:64px; height:12px; }
   .cms-loading-chips { display:flex; gap:8px; min-width:0; overflow:hidden; }
-  .cms-loading-chips .cms-skeleton { flex:0 0 auto; width:74px; height:40px; border-radius:999px; }
+  .cms-loading-chips .cms-skeleton { flex:0 0 auto; width:74px; height:32px; border-radius:999px; }
   .cms-loading-chips .cms-skeleton:nth-child(2n) { width:92px; }
   .cms-loading-chips .cms-skeleton:nth-child(3n) { width:64px; }
   .cms-loading-results { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:28px 0 14px; }
   .cms-skeleton-subtitle { width:120px; height:16px; }
-  .cms-skeleton-note { width:160px; height:12px; }
-  .cms-loading-block { display:grid; gap:15px; }
+  .cms-skeleton-note { width:96px; height:11px; }
+  .cms-loading-project { display:flex; flex-direction:column; gap:10px; min-width:0; }
+  .cms-loading-project-thumb { width:100%; aspect-ratio:4/3; border-radius:12px; }
+  .cms-loading-project .cms-skeleton-item-name { width:58%; margin-left:2px; }
+  .cms-loading-block { display:grid; gap:15px; margin-bottom:32px; }
   .cms-skeleton-block-title { width:96px; height:15px; }
   .cms-loading-items { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; }
-  .cms-loading-item { display:grid; gap:8px; padding:12px; border:1px solid hsl(var(--border)); border-radius:14px; background:hsl(var(--card)); }
-  .cms-loading-item-visual { width:100%; height:124px; border-radius:10px; }
+  .cms-loading-item { display:grid; gap:8px; padding:12px; border:1px solid hsl(var(--border)); border-radius:12px; background:hsl(var(--card)); }
+  .cms-loading-item-visual { width:100%; height:124px; margin-bottom:4px; border-radius:10px; }
   .cms-skeleton-item-name { width:70%; height:13px; }
   .cms-skeleton-item-meta { width:52%; height:11px; }
   .cms-skeleton-item-price { width:38%; height:12px; }
@@ -530,8 +535,13 @@
     .cms-loading-grid { grid-template-columns:minmax(0,1fr); }
     .cms-loading-toolbar { flex-wrap:wrap; gap:10px; padding-bottom:14px; }
     .cms-skeleton-search { flex:1 1 100%; }
-    .cms-skeleton-action { flex:0 0 104px; height:38px; }
+    .cms-skeleton-action { flex:0 0 104px; width:104px; height:38px; }
+    .cms-skeleton-icon-action { width:38px; height:38px; }
+    .cms-loading-heading--page { flex-wrap:wrap; gap:14px; }
+    .cms-loading-actions { margin-left:auto; }
+    .cms-loading-panel { padding:14px 12px; }
     .cms-loading-group { grid-template-columns:76px minmax(0,1fr); gap:8px; }
+    .cms-loading-chips .cms-skeleton { height:44px; }
     .cms-loading-items { grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; }
     .cms-loading-item-visual { height:104px; }
   }

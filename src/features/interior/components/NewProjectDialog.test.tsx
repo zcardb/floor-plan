@@ -37,6 +37,19 @@ describe('新建项目表单', () => {
   it('名称为空时禁用提交', () => {
     expect(html).toMatch(/<button[^>]*disabled/);
   });
+  it('选择模板时显示模板长宽，输入框只读不可修改，预览同步标注', () => {
+    const preset = TEMPLATE_PRESETS[1], design = preset.build();
+    const tpl = renderToStaticMarkup(createElement(NewProjectForm, { pending: false, onSubmit: () => {}, defaultTemplate: preset.id }));
+    for (const [id, mm] of [['project-width', design.width], ['project-depth', design.depth]] as const) {
+      const input = tpl.match(new RegExp(`<input[^>]*id="${id}"[^>]*>`))![0];
+      expect(input).toContain(`value="${(mm / 1000).toFixed(2)}"`);
+      expect(input).toMatch(/readonly/i);
+      expect(input).toContain('disabled');
+    }
+    expect(tpl).toContain(`长 ${(design.width / 1000).toFixed(2)} m`);
+    expect(tpl).toContain(`宽 ${(design.depth / 1000).toFixed(2)} m`);
+    expect(tpl).toContain('模板尺寸不可修改');
+  });
 });
 
 describe('户型墙体预览', () => {

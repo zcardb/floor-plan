@@ -47,24 +47,24 @@
 - `WallSplitDialog.tsx`：去掉「原始承重墙：分割后所有子段保持锁定」，统一用 `isBearingWall` 判断，提示两种文字之一。
 
 ## Implementation checklist
-- [ ] `isBearingWall` 改为 `loadBearing ?? kind === 'bearing'`
-- [ ] `setWallBearing` 允许原始承重墙取消标记，不再检查拆除状态
-- [ ] 新增 `canDeleteWall`，删除 `canDemolishWall`
-- [ ] `removeWall` 改用 `canDeleteWall`，并拒绝删除最后一面墙
-- [ ] 删除 `toggleWallDemolition`，新增 `purgeDemolished`
-- [ ] `validateDesign` 加载时删掉已拆除的墙和墙上门窗，去掉旧的拆除校验
-- [ ] `resizeBlank` 在外围墙被删除后拒绝重设尺寸
-- [ ] `WallOptionsMenu` 只保留四个选项，按上表处理不可用条件和说明文字
-- [ ] `Workbench` / `SelectionEditor` / `PropertyPanel` / `WallSplitDialog` 按第 6 节修改
-- [ ] 代码中搜不到 `toggleWallDemolition`、`canDemolishWall`、`标记拆除`
+- [x] `isBearingWall` 改为 `loadBearing ?? kind === 'bearing'`
+- [x] `setWallBearing` 允许原始承重墙取消标记，不再检查拆除状态
+- [x] 新增 `canDeleteWall`，删除 `canDemolishWall`
+- [x] `removeWall` 改用 `canDeleteWall`，并拒绝删除最后一面墙
+- [x] 删除 `toggleWallDemolition`，新增 `purgeDemolished`
+- [x] `validateDesign` 加载时删掉已拆除的墙和墙上门窗，去掉旧的拆除校验
+- [x] `resizeBlank` 在外围墙被删除后拒绝重设尺寸
+- [x] `WallOptionsMenu` 只保留四个选项，按上表处理不可用条件和说明文字
+- [x] `Workbench` / `SelectionEditor` / `PropertyPanel` / `WallSplitDialog` 按第 6 节修改
+- [x] 代码中搜不到 `toggleWallDemolition`、`canDemolishWall`、`标记拆除`
 
 ## Verification checklist
-- [ ] 正向：参考户型的原始承重墙可以「取消标记承重」，之后 `isBearingWall` 为 false，可以删除；再次标记后又不能删除
-- [ ] 正向：参考户型的隔墙、外墙，以及空白户型的外围墙都可以删除，墙上的门窗一并删掉；删除后再保存、加载（JSON 往返）能通过校验
-- [ ] 负向：手动标记承重的墙、原始承重墙，删除选项都不可用，提示「请先取消承重标记」；`removeWall` 会报错；Workbench 中选中这类墙按删除键不会提交修改
-- [ ] 边界：只剩一面墙时 `removeWall` 拒绝删除
-- [ ] 迁移：`validateDesign({ ...design, demolished: [墙id] })` 返回的方案里没有这面墙和它上面的门窗，`demolished` 为空；`demolished` 里有不存在的 id 时直接忽略
-- [ ] 菜单：只有「分割墙段 / 取消分割 / 标记(取消)承重 / 删除当前墙」四个选项，没有拆除相关选项；分割后取消分割可用，单段墙时不可用
-- [ ] 外围墙：删掉 `outer-0` 以后，`resizeBlank` 改尺寸会报错，尺寸不变时不报错
-- [ ] 更新相关测试：`wallPolicy.test.ts`、`wallRemoval.test.ts`、`validation.test.ts`、`geometry.test.ts`（`demolished: ['outer-0']` 由报错改为迁移）、`wallSplit.test.ts`、`wallMerge.test.ts`、`WallOptionsMenu.test.tsx`、`wallSplitEntries.test.tsx`、`Workbench.test.tsx`
-- [ ] `pnpm test`（src/features/interior）、`pnpm lint`、`pnpm exec tsc --noEmit`、`pnpm run build` 全部通过
+- [x] 正向：参考户型的原始承重墙可以「取消标记承重」，之后 `isBearingWall` 为 false，可以删除；再次标记后又不能删除
+- [x] 正向：参考户型的隔墙、外墙，以及空白户型的外围墙都可以删除，墙上的门窗一并删掉；删除后再保存、加载（JSON 往返）能通过校验
+- [x] 负向：手动标记承重的墙、原始承重墙，删除选项都不可用，提示「请先取消承重标记」；`removeWall` 会报错；Workbench 中选中这类墙按删除键不会提交修改
+- [x] 边界：只剩一面墙时 `removeWall` 拒绝删除
+- [x] 迁移：`validateDesign({ ...design, demolished: [墙id] })` 返回的方案里没有这面墙和它上面的门窗，`demolished` 为空；`demolished` 里有不存在的 id 时直接忽略
+- [x] 菜单：只有「分割墙段 / 取消分割 / 标记(取消)承重 / 删除当前墙」四个选项，没有拆除相关选项；分割后取消分割可用，单段墙时不可用
+- [x] 外围墙：删掉 `outer-0` 以后，`resizeBlank` 改尺寸会报错，尺寸不变时不报错
+- [x] 更新相关测试：`wallPolicy.test.ts`、`wallRemoval.test.ts`、`validation.test.ts`、`geometry.test.ts`（`demolished: ['outer-0']` 由报错改为迁移）、`wallSplit.test.ts`、`wallMerge.test.ts`、`WallOptionsMenu.test.tsx`、`wallSplitEntries.test.tsx`、`Workbench.test.tsx`
+- [x] `pnpm test`（src/features/interior）、`pnpm lint`、`pnpm exec tsc --noEmit`、`pnpm run build` 全部通过

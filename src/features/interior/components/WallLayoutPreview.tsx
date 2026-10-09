@@ -5,7 +5,7 @@ import type { Design } from '../model/types';
 
 const PAD_RATIO = 0.08;
 
-/** 新建项目弹窗的户型预览：只画墙体（不画门窗、家具）；传入 size 时在外框标注长、宽。 */
+/** 新建项目弹窗的户型预览：只画墙体（不画门窗、家具）；传入 size 时在外框标注长、宽（空白户型与模板都显示）。 */
 export function WallLayoutPreview({ design, size, label }: {
   design: Pick<Design, 'walls' | 'demolished'>;
   size?: { width: number; depth: number };

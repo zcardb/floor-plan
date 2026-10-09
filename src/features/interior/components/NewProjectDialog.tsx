@@ -29,8 +29,8 @@ export function NewProjectDialog({ open, pending, onClose, onSubmit }: {
   </Dialog>;
 }
 
-export function NewProjectForm({ pending, onSubmit }: { pending: boolean; onSubmit: (input: NewProjectInput) => void }) {
-  const [name, setName] = useState(''), [template, setTemplate] = useState('blank');
+export function NewProjectForm({ pending, onSubmit, defaultTemplate = 'blank' }: { pending: boolean; onSubmit: (input: NewProjectInput) => void; defaultTemplate?: string }) {
+  const [name, setName] = useState(''), [template, setTemplate] = useState(defaultTemplate);
   const [width, setWidth] = useState(meterDraft(DEFAULT_BLANK_SIZE.width)), [depth, setDepth] = useState(meterDraft(DEFAULT_BLANK_SIZE.depth));
   const blank = template === 'blank';
   const size = useMemo(() => ({ width: parseMeterDraft(width), depth: parseMeterDraft(depth) }), [width, depth]);
@@ -40,10 +40,18 @@ export function NewProjectForm({ pending, onSubmit }: { pending: boolean; onSubm
     if (!blank) return preset?.build() ?? null;
     return sizeValid ? blankDesign(size) : null;
   }, [blank, preset, size, sizeValid]);
+  // 模板的长宽只展示，不可修改。
+  const shownSize = blank ? size : preview ? { width: preview.width, depth: preview.depth } : undefined;
   const summary = blank
     ? (sizeValid ? `${formatMeters(size.width)} × ${formatMeters(size.depth)} m · ${(size.width * size.depth / 1e6).toFixed(2)} m²` : RANGE_HINT)
-    : preset ? `${preset.layout} · ${preset.area} m²` : '';
+    : preset ? `${preset.layout} · ${preset.area} m² · 模板尺寸不可修改` : '';
   const canSubmit = !!name.trim() && (!blank || sizeValid);
+  const sizeInput = (id: string, label: string, draft: string, set: (v: string) => void, mm: number | undefined) =>
+    <div className="cms-field"><Label htmlFor={id}>{label}</Label>
+      {blank
+        ? <Input id={id} type="number" inputMode="decimal" step={0.01} min={BLANK_SIZE_LIMITS.min / 1000} max={BLANK_SIZE_LIMITS.max / 1000} aria-invalid={!inRange(parseMeterDraft(draft))} value={draft} onChange={e => set(e.target.value)} />
+        : <Input id={id} readOnly disabled value={mm === undefined ? '' : meterDraft(mm)} title="模板尺寸不可修改" />}
+    </div>;
   return <form className="cms-form" onSubmit={e => { e.preventDefault(); if (canSubmit) onSubmit({ name, template, ...(blank ? { size } : {}) }); }}>
     <fieldset className="contents" disabled={pending}>
       <div className="cms-field"><Label htmlFor="project-name">项目名称</Label><Input id="project-name" required maxLength={100} value={name} onChange={e => setName(e.target.value)} /></div>
@@ -53,13 +61,13 @@ export function NewProjectForm({ pending, onSubmit }: { pending: boolean; onSubm
           <SelectContent><SelectItem value="blank">空白户型</SelectItem>{TEMPLATE_PRESETS.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
         </Select>
       </div>
-      {blank && <div className="new-project-size">
-        <div className="cms-field"><Label htmlFor="project-width">长 / m</Label><Input id="project-width" type="number" inputMode="decimal" step={0.01} min={BLANK_SIZE_LIMITS.min / 1000} max={BLANK_SIZE_LIMITS.max / 1000} aria-invalid={!inRange(size.width)} value={width} onChange={e => setWidth(e.target.value)} /></div>
-        <div className="cms-field"><Label htmlFor="project-depth">宽 / m</Label><Input id="project-depth" type="number" inputMode="decimal" step={0.01} min={BLANK_SIZE_LIMITS.min / 1000} max={BLANK_SIZE_LIMITS.max / 1000} aria-invalid={!inRange(size.depth)} value={depth} onChange={e => setDepth(e.target.value)} /></div>
-      </div>}
+      <div className="new-project-size">
+        {sizeInput('project-width', '长 / m', width, setWidth, shownSize?.width)}
+        {sizeInput('project-depth', '宽 / m', depth, setDepth, shownSize?.depth)}
+      </div>
       <figure className="new-project-preview">
         {preview
-          ? <WallLayoutPreview design={preview} size={blank ? size : undefined} label={blank ? '空白户型墙体预览' : `${preset?.name ?? ''}墙体预览`} />
+          ? <WallLayoutPreview design={preview} size={shownSize} label={blank ? '空白户型墙体预览' : `${preset?.name ?? ''}墙体预览`} />
           : <div className="wall-layout-preview is-empty">输入有效长宽后显示预览</div>}
         <figcaption className={blank && !sizeValid ? 'is-error' : undefined} role={blank && !sizeValid ? 'alert' : undefined}>{summary}</figcaption>
       </figure>

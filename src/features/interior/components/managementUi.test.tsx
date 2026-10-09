@@ -38,6 +38,15 @@ describe('管理端精简与加载分支', () => {
     expect(html).not.toContain('cms-loading-grid');
     expect(html).not.toContain('<button');
   });
+  it('项目管理骨架按项目页版式排布：来源胶囊 + 4:3 项目卡片', () => {
+    const html = render(createElement(ManagementLoading, { heading: true, label: '加载项目', variant: 'projects' }));
+    expect(html).toContain('aria-busy="true"');
+    expect(html).toContain('cms-skeleton-icon-action');
+    expect(html).toContain('cms-loading-chips');
+    expect(html).toContain('cms-loading-project-thumb');
+    expect(html).not.toContain('cms-loading-item-visual');
+    expect(html).not.toContain('<button');
+  });
   const projects = (loading: boolean, cloud: ProjectSummary[] = [project]) => ({ guests: [], cloud, builtins: TEMPLATE_PRESETS.map(p => ({ id: 'builtin-template:' + p.id, name: p.name, revision: 0, updatedAt: '', builtin: true, templateId: p.id })), loading, hasMore: false, reload: () => {}, open: async () => true }) as unknown as ReturnType<typeof useProjects>;
   it('选了外部 DXF 后显示识别确认弹窗；没有待识别图纸时不显示', () => {
     expect(render(createElement(ProjectManager, { projects: projects(false), opened: () => {} }))).not.toContain('data-dxf-import');
