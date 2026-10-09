@@ -38,6 +38,9 @@ export function PriceInput({
     // 已成功应用的草稿：父级 value 尚未刷新（或随 key 重挂载）前，不应再视为未应用。
     [appliedDraft, setAppliedDraft] = useState<string | null>(null);
   const pending = useRef<Promise<boolean> | null>(null);
+  // 正在应用或已应用的草稿。必须在调用 onApply 前同步写入：父级常在 onApply 内
+  // 立即更新价格并通过 key 重挂载本组件，此时还来不及重新渲染。
+  const committed = useRef<string | null>(null);
   const draft = text.trim();
   const dirty = draft !== draftOf(value) && draft !== appliedDraft;
   const apply = (): Promise<boolean> => {
@@ -51,14 +54,16 @@ export function PriceInput({
     }
     setError("");
     setBusy(true);
+    committed.current = draft;
     const run = (async () => {
       try {
         const result = await onApply(v);
-        if (result === false) return false;
+        if (result === false) { committed.current = null; return false; }
         setAppliedDraft(draft);
         notify.success(v === null ? `「${label}」已设为未定价` : `「${label}」已更新为 ${yuanPrecise(v)}`);
         return true;
       } catch (cause) {
+        committed.current = null;
         notify.error(`「${label}」应用失败`, cause);
         return false;
       } finally {
@@ -70,11 +75,12 @@ export function PriceInput({
     return run;
   };
   useImperativeHandle(ref, () => ({ flush: async () => (pending.current ? pending.current : dirty && !disabled ? apply() : true) }));
-  // 卸载（关闭弹层、切换对象）时未应用的修改明确告知已放弃。
-  const unapplied = useRef({ dirty, label });
-  unapplied.current = { dirty: dirty && !busy, label };
+  // 卸载（关闭弹层、切换对象）时未应用的修改明确告知已放弃；正在应用 / 已应用的不算。
+  const unapplied = useRef({ dirty, draft, label });
+  unapplied.current = { dirty, draft, label };
   useEffect(() => () => {
-    if (unapplied.current.dirty) notify.warning(`「${unapplied.current.label}」的修改未应用，已放弃`);
+    const last = unapplied.current;
+    if (last.dirty && last.draft !== committed.current) notify.warning(`「${last.label}」的修改未应用，已放弃`);
   }, []);
   return (
     <div className={"price-entry" + (dirty ? " is-dirty" : "")}>

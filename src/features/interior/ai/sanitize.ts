@@ -15,11 +15,6 @@ export interface AiPlacedItem {
   d?: number;
 }
 
-export interface AiRoomPlan {
-  items: AiPlacedItem[];
-  note: string;
-}
-
 export class AiDesignError extends Error {}
 
 const SIDES: Side[] = ['up', 'down', 'left', 'right'];
@@ -134,7 +129,7 @@ export function sanitizePlanSpec(raw: unknown, { width, depth, catalog }: { widt
     taken.push([center - width / 2, center + width / 2]);
     used.set(key, taken);
     const into = isSide(entry.into) ? entry.into : undefined;
-    openings.push({ wall: key, kind, at: center, width, ...(kind === 'door' && into ? { into: swingSideFor(key, walls, key.startsWith('top') || key === 'bottom' ? 'h' : 'v', into) } : {}) });
+    openings.push({ wall: key, kind, at: center, width, ...(kind === 'door' && into ? { into: legalSwing(key, walls, into) } : {}) });
   }
 
   const furniture: PlanSpec['furniture'] = [];
@@ -159,7 +154,10 @@ export function sanitizePlanSpec(raw: unknown, { width, depth, catalog }: { widt
   return { id: 'ai', width: w, depth: d, thickness: 240, height: 2800, walls, openings, rooms, furniture };
 }
 
-/** 房间布局：只返回目标房间内的家具。 */
+/**
+ * 房间布局：只返回目标房间内的家具。
+ * 指定了家具清单时，代号与数量必须完全一致，不满足就当作无效候选。
+ */
 export function sanitizeRoomPlan(raw: unknown, { zone, catalog, required }: { zone: Box; catalog: AiCatalog; required: { code: string; count: number }[] }): AiPlacedItem[] {
   const source = (raw ?? {}) as { items?: unknown };
   const items: AiPlacedItem[] = [];
@@ -169,6 +167,7 @@ export function sanitizeRoomPlan(raw: unknown, { zone, catalog, required }: { zo
     if (placed) items.push(placed);
   }
   if (!items.length) throw new AiDesignError('AI 没有给出可用的家具方案，请重试');
+  if (!matchesRequired(items, required)) throw new AiDesignError('AI 方案与指定的家具清单不一致，请重试');
   return items;
 }
 
@@ -200,11 +199,6 @@ function placedItemOf(raw: unknown, zone: Box, catalog: AiCatalog): AiPlacedItem
   const along = clamp(num(entry.along) === null ? span / 2 : snap(num(entry.along)!), depth, Math.max(depth, span - depth));
   const gap = clamp(num(entry.gap) === null ? 0 : snap(num(entry.gap)!), 0, 600);
   return { code: catalogEntry.code, back, along, gap, w, d };
-}
-
-/** 把代号解析回家具素材（摆放时用），代号无效返回 null。 */
-export function entryFor(catalog: AiCatalog, code: string) {
-  return resolveCode(catalog, code);
 }
 
 const slug = (name: string) => {
@@ -279,10 +273,11 @@ function axisOf(key: string, walls: WallSpec[], w: number, d: number): [number, 
   return wall ? [wall.from, wall.to] : null;
 }
 
-/** 门开向：外墙与内墙的合法方向不同，非法时退回一个可用方向。 */
-function swingSideFor(key: string, walls: WallSpec[], fallbackDir: 'h' | 'v', into: Side): Side {
-  const dir = OUTER_WALLS.includes(key) ? (key === 'top' || key === 'bottom' ? 'h' : 'v') : walls.find((x) => x.key === key)?.dir ?? fallbackDir;
+/** 门开向必须垂直于墙；非法时退回朝室内的方向。 */
+function legalSwing(key: string, walls: WallSpec[], into: Side): Side {
+  const dir = key === 'top' || key === 'bottom' ? 'h' : key === 'left' || key === 'right' ? 'v' : walls.find((x) => x.key === key)?.dir ?? 'h';
   const legal: Side[] = dir === 'h' ? ['up', 'down'] : ['left', 'right'];
   if (legal.includes(into)) return into;
-  return dir === 'h' ? (key === 'top' ? 'down' : 'up') : key === 'left' ? 'right' : 'left';
+  if (dir === 'h') return key === 'bottom' ? 'up' : 'down';
+  return key === 'right' ? 'left' : 'right';
 }
