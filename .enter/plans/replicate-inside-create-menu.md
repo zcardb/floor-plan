@@ -1,4 +1,4 @@
-# 复刻项目并入「新建项目」子菜单 + 菜单尺度（图标/行高）整体统一
+# 复刻项目并入「新建项目」子菜单（首项改「手动创建」）+ 菜单尺度（图标/行高）整体统一
 
 ## Context（为什么改）
 
@@ -12,15 +12,17 @@
 
 参照来源：用户给的 Growth.Design 案例页与心理学法则库（information / memory 两册）。
 
-用户已确认三点：**「复制当前项目」移进「新建项目」子菜单**（图 2 的箭头）；**子菜单里的图标偏大要缩小**（图 2 红框）；**「新建项目」触发器上的 `Plus` 也要一起缩小**。因此图标统一取 **14px**，沿用仓库里已有的密度基准 `.project-card-menu-content [role=menuitem] svg { width:14px; height:14px }`，不再出现 24px / 16px 混用。
+用户已确认四点：**「复制当前项目」移进「新建项目」子菜单**（图 2 的箭头）；**子菜单里的图标偏大要缩小**（图 2 红框）；**「新建项目」触发器上的 `Plus` 也要一起缩小**；**子菜单第一项文案「新建项目」改成「手动创建」（图 3 红框，所有出现处都改）**。因此图标统一取 **14px**，沿用仓库里已有的密度基准 `.project-card-menu-content [role=menuitem] svg { width:14px; height:14px }`，不再出现 24px / 16px 混用。
 
-「复刻当前项目」放在子菜单第一组第二位（`新建项目` 之后、`AI 创建…` 之前）——同属"拿到一个新方案"的心智，`Serial Position` 上紧随最常用的第一项；它不是"用模板新建"，所以不放进导入那一组。
+文案命名依据：父级入口叫「新建项目」，子项若也叫「新建项目」是同一个词在两个层级重复（`Recognition Over Recall` 💾 失效——用户无法从字面分辨"选哪个"）。改成「手动创建」后，子菜单四项各自说明"怎么来"：手动创建 / 复刻当前项目 / AI 创建 / 导入图纸，互相区分明确。
+
+「复刻当前项目」放在子菜单第一组第二位（「手动创建」之后、`AI 创建…` 之前）——同属"拿到一个新方案"的心智，`Serial Position` 上紧随最常用的第一项；它不是"用模板新建"，所以不放进导入那一组。
 
 ## 目标结构（工作台「项目」下拉，图标统一 14px、行高 32px）
 
 ```
 返回项目管理          ArrowLeft 14px
-新建项目   ›   ┌ 新建项目            FilePlus2 14px
+新建项目   ›   ┌ 手动创建            FilePlus2 14px   ← 文案由「新建项目」改来
               │ 复刻当前项目         CopyPlus 14px   ← 新增（原一级「复制当前项目」移入）
               │ ─────────────
               │ AI 创建…            Sparkles 14px   （仅登录）
@@ -39,10 +41,10 @@
 ### 1. `src/features/interior/components/CreateProjectMenuItems.tsx`
 
 - `CreateProjectActions` 增加可选 `duplicate?: () => void`。
-- 在「新建项目」之后渲染复刻项（图标 `CopyPlus`，与行内操作按钮的 `Copy` 区分开，语义是"复刻/克隆"）：
+- 第一项文案 `新建项目` → `手动创建`（图 3 要求）；在它之后渲染复刻项（图标 `CopyPlus`，与行内操作按钮的 `Copy` 区分开，语义是"复刻/克隆"）：
 
 ```tsx
-<DropdownMenuItem onSelect={actions.blank}><FilePlus2 />新建项目</DropdownMenuItem>
+<DropdownMenuItem onSelect={actions.blank}><FilePlus2 />手动创建</DropdownMenuItem>
 {actions.duplicate && <DropdownMenuItem onSelect={actions.duplicate}><CopyPlus />复刻当前项目</DropdownMenuItem>}
 {actions.ai && <DropdownMenuItem onSelect={actions.ai}><Sparkles />AI 创建…</DropdownMenuItem>}
 <DropdownMenuSeparator />
@@ -50,7 +52,9 @@
 <SoftwareSoonItem label="从其他软件导入" />
 ```
 
-- 该组件仍被项目管理页与工作台共用，行为与文案保持一致。
+- 该组件仍被项目管理页与工作台共用，所以**两处入口的「手动创建」文案与图标尺寸一次改到位**（"都要改"）。
+- 同步更新组件顶部注释（「「新建项目」菜单的选项」保持描述父子关系即可）。
+- 保持不变的文案：父级入口/触发器仍是「新建项目」（`ProjectManager.tsx` 的 `cms-create-button` 与 `ProjectMenu.tsx` 的 `project-menu-create`），`NewProjectDialog` 的标题仍是「新建项目」——它同时服务「手动创建」与「AI 创建」两条路径。
 
 ### 2. `src/features/interior/components/useProjectCreation.tsx`
 
@@ -106,13 +110,15 @@ const creation = useProjectCreation({
 
 ### 5. `src/features/interior/components/toolbarMenus.test.tsx`
 
-- 「共享的新建选项」用例：断言标签顺序为 `['新建项目', '复刻当前项目', 'AI 创建…', '导入 DXF 图纸…']`（传 `duplicate` 时），不传 `duplicate` 时不出现「复刻当前项目」，并断言点击该项调用 `actions.duplicate`。
+- 「共享的新建选项」用例：断言标签顺序为 `['手动创建', '复刻当前项目', 'AI 创建…', '导入 DXF 图纸…']`（传 `duplicate` 时），不传 `duplicate` 时不出现「复刻当前项目」，并断言点击第一项调用 `actions.blank`、点击复刻项调用 `actions.duplicate`。
+- 「新建项目为悬停子菜单…」用例：触发器文案仍断言 `'新建项目'`（父级不变），补充 `menu({ onCreateProject, onDuplicate })` 时子菜单内的 `CreateProjectMenuItems` 收到 `duplicate` 函数。
 - 原「复制当前项目：登录且可复制时显示」用例改写：一级项不再有「复制当前项目」；`onDuplicate` 存在时子菜单里出现「复刻当前项目」，点击后以当前项目调用 `onDuplicate`；未登录时不出现。
-- 「新建项目为悬停子菜单…」用例补充：`menu({ onCreateProject, onDuplicate })` 时子菜单内的 `CreateProjectMenuItems` 收到 `duplicate` 函数。
+- 不动 `managementUi.test.tsx`：它断言的是项目管理页 HEADER 的 `新建项目` 按钮（`cms-create-button`），该文案保持不变。
 
 ## Implementation checklist
 
-- [ ] `CreateProjectActions` 增加 `duplicate?: () => void`，`CreateProjectMenuItems` 在「新建项目」后渲染「复刻当前项目」（`CopyPlus`，条件渲染）。
+- [ ] `CreateProjectActions` 增加 `duplicate?: () => void`，`CreateProjectMenuItems` 第一项文案改为「手动创建」，并在其后渲染「复刻当前项目」（`CopyPlus`，条件渲染）。
+- [ ] 全文检索 `新建项目`，确认除子菜单项外的出现处（`ProjectManager` 触发器、`ProjectMenu` 子菜单触发器、`NewProjectDialog` 标题、注释）均保持原样，只有 `CreateProjectMenuItems` 的那一项改成「手动创建」。
 - [ ] `useProjectCreation` 接受可选 `duplicate` 并写入 `actions`。
 - [ ] `ProjectMenu` 移除一级「复制当前项目」项与 `Copy` 引入，改为把 `p.onDuplicate ? () => void duplicate() : undefined` 传给 hook，触发器 busy/`Loader2` 行为不变；子菜单触发器 `<Plus size={16} />` 改为 `size={14}`。
 - [ ] `ProjectManager` 不传 `duplicate`（该页无"当前项目"，卡片级「复制」已覆盖），确认其「新建项目」下拉仍渲染 3 项。
@@ -125,7 +131,8 @@ const creation = useProjectCreation({
 - [ ] `pnpm exec vitest run src/features/interior/components/toolbarMenus.test.tsx` 全绿。
 - [ ] `pnpm exec vitest run src/features/interior`（`pnpm test`）无回归。
 - [ ] `pnpm run check`（eslint + tsc）与 `pnpm run build` 通过。
-- [ ] 正向：登录后工作台「项目」下拉 → 一级只有「返回项目管理」「新建项目」；悬停「新建项目」出现子菜单，「复刻当前项目」在第二项；点击后生成「… · 副本」并进入副本（沿用 `Index.tsx` 的 `duplicateProject`，内置模板走「用模板创建」）。
+- [ ] 正向：登录后工作台「项目」下拉 → 一级只有「返回项目管理」「新建项目」；悬停「新建项目」出现子菜单，依次为「手动创建」「复刻当前项目」「AI 创建…」「导入 DXF 图纸…」「从其他软件导入」；点「手动创建」打开新建弹窗，点「复刻当前项目」生成「… · 副本」并进入副本（沿用 `Index.tsx` 的 `duplicateProject`，内置模板走「用模板创建」）。
+- [ ] 正向：项目管理页右上「新建项目」下拉的第一项同样显示「手动创建」（共享组件，两处文案一致）。
 - [ ] 负向/默认：未登录（访客）时下拉无「新建项目」子菜单、无复刻项，仅显示模板列表；`onDuplicate` 未传时子菜单不出现复刻项。
 - [ ] 边界：复制进行中触发器显示 `Loader2`，子菜单触发器 disabled，无法重复触发；子菜单内「从其他软件导入」仍为禁用 + Coming soon 提示，无子菜单展开。
 - [ ] 视觉：`website_screenshot` 取工作台路由 desktop_1280 与 mobile_390 各一张，确认父级与子菜单图标同为 14px（含「新建项目」触发器上的 `Plus`）、菜单项行高一致、窄屏（≤600px）无溢出。
