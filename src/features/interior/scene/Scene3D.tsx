@@ -25,6 +25,7 @@ import {
   center,
   length,
   snapMove,
+  blockFurnitureMove,
   wallPoly,
 } from "../model/geometry";
 import type {
@@ -498,15 +499,16 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
             f = fdrag.before.furniture.find((f) => f.id === fdrag!.id);
           if (p && f) {
             fdrag.moved = true;
-            const q = snapMove(
+            const obj = furn.children.find((o) => o.userData.fid === f.id);
+            const snapped = snapMove(
               f,
               [p[0] - fdrag.offset[0], p[1] - fdrag.offset[1]],
               fdrag.before,
               latest.current.layers.snap,
             );
-            furn.children
-              .find((o) => o.userData.fid === f.id)
-              ?.position.set(q[0] / 1000, 0, q[1] / 1000);
+            // 与 2D 一致：吸附后的位置再裁到墙面内侧，不嵌进墙里。
+            const q = blockFurnitureMove(f, obj ? [obj.position.x * 1000, obj.position.z * 1000] : [f.cx, f.cy], snapped, fdrag.before);
+            obj?.position.set(q[0] / 1000, 0, q[1] / 1000);
             renderer.shadowMap.needsUpdate = true;
             invalidate();
           }

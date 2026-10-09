@@ -48,7 +48,9 @@ export function useAssistants() {
   const create = useCallback(async (input: AssistantInput) => {
     const { data, error: writeError } = await (await table()).insert(toRow(input)).select("id,name,avatar,model,prompt,updated_at").single();
     if (writeError) throw new Error(writeError.message);
-    setItems((all) => [fromRow(data as Row), ...all]);
+    const created = fromRow(data as Row);
+    setItems((all) => [created, ...all]);
+    return created;
   }, []);
   const update = useCallback(async (id: string, input: AssistantInput) => {
     const { data, error: writeError } = await (await table()).update({ ...toRow(input), updated_at: new Date().toISOString() }).eq("id", id).select("id,name,avatar,model,prompt,updated_at").single();

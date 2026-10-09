@@ -279,6 +279,38 @@ export function pushOut(f: Furniture, d: Design) {
   }
   return f;
 }
+/**
+ * 家具不会嵌进墙里：目标位置与墙重叠时，从上一帧位置 `from` 按「先 X 后 Y」逐轴推进，
+ * 碰到墙就停在墙面上（= 贴墙吸附），另一轴继续走，所以贴着墙拖会顺墙滑行。
+ */
+export function blockFurnitureMove(f: Furniture, from: Point, to: Point, d: Design): Point {
+  const { hw, hh } = aabb(f), EPS = 0.5;
+  // 只处理横平竖直的墙：斜墙用包围盒阻挡会误判，仍交给贴墙吸附。
+  const walls = d.walls
+    .filter((w) => !d.demolished.includes(w.id) && (Math.abs(w.b[1] - w.a[1]) < 0.5 || Math.abs(w.b[0] - w.a[0]) < 0.5))
+    .map((w) => bbox(wallPoly(w)));
+  const hits = (b: ReturnType<typeof bbox>, p: Point) =>
+    Math.min(p[0] + hw, b.x2) - Math.max(p[0] - hw, b.x) > EPS && Math.min(p[1] + hh, b.y2) - Math.max(p[1] - hh, b.y) > EPS;
+  // 目标位置完全在墙外就直接放行：整件拖过墙到另一个房间仍然可以，只是不会停在墙里。
+  if (!walls.some((b) => hits(b, to))) return to;
+  const p: Point = [from[0], from[1]];
+  for (const axis of [0, 1] as const) {
+    const half = axis === 0 ? hw : hh, target = to[axis];
+    if (target === p[axis]) continue;
+    // 这一步会挡住去路的墙：起点不重叠已是前提，所以到目标点的位置上有重叠即为挡路。
+    const blocked = walls.filter((b) => hits(b, axis === 0 ? [target, p[1]] : [p[0], target]));
+    if (!blocked.length) { p[axis] = target; continue; }
+    let best = target;
+    for (const b of blocked) {
+      const [lo, hi] = axis === 0 ? [b.x - half, b.x2 + half] : [b.y - half, b.y2 + half];
+      best = target > p[axis] ? Math.min(best, lo) : Math.max(best, hi);
+    }
+    p[axis] = best;
+  }
+  // 逐轴裁剪在墙角处可能仍留下极小重叠，兜底再推一次，保证最终在墙外。
+  if (walls.some((b) => hits(b, p))) { const pushed = pushOut({ ...f, cx: p[0], cy: p[1] }, d); p[0] = pushed.cx; p[1] = pushed.cy; }
+  return p;
+}
 export function snapPoint(p: Point, d: Design, tol = 120): Point {
   let out: Point = [Math.round(p[0] / 10) * 10, Math.round(p[1] / 10) * 10];
   let dist = tol;

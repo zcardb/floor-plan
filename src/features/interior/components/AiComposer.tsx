@@ -108,7 +108,7 @@ export function AiComposer({ value, onDescription, onImages, onCount, onEngine, 
       <input ref={file} type="file" accept={IMAGE_ACCEPT} multiple hidden aria-hidden="true" tabIndex={-1}
         onChange={(e) => { const files = fromList(e.target.files); e.target.value = ""; if (files.length) images.add(files); }} />
       <span className="ai-composer-spacer" />
-      <AiEnginePicker engine={value.engine} assistants={assistants.items} onChange={onEngine} />
+      <AiEnginePicker engine={value.engine} assistants={assistants.items} onChange={onEngine} onCreate={assistants.create} />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button type="button" className="ai-composer-count" aria-label={`方案数量，当前 ${value.count} 个`}>{value.count} 个方案<ChevronDown size={12} /></button>

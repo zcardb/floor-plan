@@ -4107,9 +4107,14 @@ button.ai-candidate.is-failed:hover .ai-candidate-retry { border-color: hsl(var(
 /* 小助手头像：6 种色调，基于主题色板 */
 .assistant-avatar { display: inline-grid; place-items: center; flex: none; border-radius: 30%; overflow: hidden; background: hsl(var(--accent)); color: hsl(var(--primary)); }
 .assistant-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.avatar-figure { width: 92%; height: 92%; overflow: visible; }
+.avatar-ink { fill: hsl(var(--foreground)); }
+.avatar-ink-line { fill: none; stroke: hsl(var(--foreground)); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.avatar-eye { fill: hsl(var(--background)); }
 .assistant-avatar[data-tone="2"] { background: hsl(var(--success) / 0.14); color: hsl(var(--success)); }
 .assistant-avatar[data-tone="3"] { background: hsl(var(--warning) / 0.16); color: hsl(var(--warning)); }
 .assistant-avatar[data-tone="4"] { background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); }
+.assistant-avatar[data-tone="4"] .avatar-figure { color: hsl(var(--accent-foreground) / .75); }
 .assistant-avatar[data-tone="5"] { background: hsl(var(--destructive) / 0.12); color: hsl(var(--destructive)); }
 .assistant-avatar[data-tone="6"] { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
 
@@ -4117,6 +4122,8 @@ button.ai-candidate.is-failed:hover .ai-candidate-retry { border-color: hsl(var(
 .ai-engine-trigger { max-width: 200px; gap: 6px; }
 .ai-engine-trigger > span:not(.assistant-avatar) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .furniture-picker-check { flex: none; color: hsl(var(--primary)); }
+.furniture-picker-action { display: flex; align-items: center; gap: 6px; width: 100%; font: inherit; color: inherit; text-align: left; }
+.furniture-picker-action:hover { color: hsl(var(--foreground)); }
 .furniture-picker-footer { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-top: 1px solid hsl(var(--border)); font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); }
 .ai-composer-notice { margin: -2px 4px 0; font-size: var(--fs-meta); color: hsl(var(--warning)); }
 
@@ -4148,11 +4155,24 @@ button.ai-candidate.is-failed:hover .ai-candidate-retry { border-color: hsl(var(
 .assistant-avatar-option.is-selected { border-color: hsl(var(--primary)); }
 .assistant-avatar-option:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
 .assistant-avatar-check { position: absolute; right: -4px; bottom: -4px; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
-.assistant-prompt { display: grid; gap: 8px; }
+/* 与 SelectTrigger 同外观的按钮，用于弹出可搜索选择器。 */
+.picker-select-trigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; height: 36px; padding: 6px 12px; border: 1px solid hsl(var(--input)); border-radius: var(--radius-lg, 8px); background: hsl(var(--background)); font-size: 13px; color: hsl(var(--foreground)); text-align: left; transition: border-color .15s ease, box-shadow .15s ease; }
+.picker-select-trigger > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker-select-trigger > svg { flex: none; opacity: .6; }
+.picker-select-trigger:focus-visible, .picker-select-trigger[data-state="open"] { outline: none; border-color: hsl(var(--ring)); box-shadow: 0 0 0 4px hsl(var(--ring) / .12); }
+/* Prompt：通用的「编辑 / 预览」写法——标签页贴在编辑框顶部、左对齐、下划线表示当前页，与内容共用一个边框。 */
+.assistant-prompt { display: grid; border: 1px solid hsl(var(--input)); border-radius: var(--ctl-radius); background: hsl(var(--background)); overflow: hidden; }
+.assistant-prompt:focus-within { border-color: hsl(var(--ring)); box-shadow: 0 0 0 4px hsl(var(--ring) / .12); }
+.assistant-prompt-tabs.assistant-prompt-tabs { justify-content: flex-start; gap: 4px; height: auto; padding: 0 8px; border-bottom: 1px solid hsl(var(--border)); border-radius: 0; background: hsl(var(--muted) / .5); }
+.assistant-prompt-tabs [role="tab"] { position: relative; padding: 9px 10px; border-radius: 0; background: transparent; box-shadow: none; font-size: var(--fs-control); color: hsl(var(--muted-foreground)); }
+.assistant-prompt-tabs [role="tab"]:hover { color: hsl(var(--foreground)); }
+.assistant-prompt-tabs [role="tab"][data-state="active"] { background: transparent; box-shadow: none; color: hsl(var(--foreground)); }
+.assistant-prompt-tabs [role="tab"][data-state="active"]::after { content: ""; position: absolute; left: 6px; right: 6px; bottom: -1px; height: 2px; border-radius: 2px; background: hsl(var(--primary)); }
 .assistant-prompt [role="tabpanel"] { position: relative; margin-top: 0; }
-.assistant-prompt textarea { min-height: 220px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs-control); line-height: 1.7; resize: vertical; }
+.assistant-prompt textarea { display: block; min-height: 220px; border: 0; border-radius: 0; background: transparent; box-shadow: none; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs-control); line-height: 1.7; resize: vertical; }
+.assistant-prompt textarea:focus, .assistant-prompt textarea:focus-visible { border: 0; box-shadow: none; outline: none; --tw-ring-shadow: 0 0 #0000; }
 .assistant-prompt-count { position: absolute; right: 10px; bottom: 8px; font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; pointer-events: none; }
-.assistant-markdown { min-height: 220px; max-height: 360px; overflow: auto; padding: 12px 14px; border: 1px solid hsl(var(--border)); border-radius: var(--ctl-radius); background: hsl(var(--background)); font-size: 13px; line-height: 1.7; color: hsl(var(--foreground)); }
+.assistant-markdown { min-height: 220px; max-height: 360px; overflow: auto; padding: 12px 14px; font-size: 13px; line-height: 1.7; color: hsl(var(--foreground)); }
 .assistant-markdown > * + * { margin-top: .6em; }
 .assistant-markdown h1 { font-size: 18px; font-weight: 650; }
 .assistant-markdown h2 { font-size: 16px; font-weight: 600; }
