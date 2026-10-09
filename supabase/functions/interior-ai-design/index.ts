@@ -126,8 +126,10 @@ const PLAN_CONTRACT = `你是资深住宅建筑师兼室内设计师，在给定
 - dir=h 为横墙：at 为 y，from/to 为 x 范围；dir=v 为竖墙：at 为 x，from/to 为 y 范围。坐标是墙中心线，内墙厚 120。
 - 墙端点要落在外墙内侧（0、width 或 depth）或另一面内墙的中心线上，不留缺口；key 唯一。
 房间：
-- 轮廓沿墙中心线或外墙内侧给出（系统会自动扣掉半个墙厚）。矩形用 box:[x1,y1,x2,y2]，L 形用 poly（横平竖直的顶点数组）。
-- 房间之间不重叠，合起来铺满整个平面；每个房间四周都被墙或外墙围合；id 唯一，name 用中文（如 主卧、次卧、客厅、餐厅、厨房、卫生间、阳台、过道）。
+- 轮廓沿墙中心线或外墙内侧给出（系统会自动扣掉半个墙厚）。矩形用 box:[x1,y1,x2,y2]，L 形用 poly（横平竖直的顶点数组）。外墙固定是矩形。
+- 房间之间不重叠即可，不必铺满整个平面：剩下的零碎空间留作过道、储物或干脆空着都可以，不要为了填满而硬造房间、也不要把不规则空间补齐成方方正正的矩形。
+- 有参考户型图时按原图的关系与形状来，保持原有的房间进深与轮廓。
+- 每个房间四周都被墙或外墙围合；id 唯一，name 用中文（如 主卧、次卧、客厅、餐厅、厨房、卫生间、阳台、过道）。
 - mat 取：wood（卧室、书房）、walnut、tile800（客厅、餐厅、过道）、tile600（厨房）、antislip（卫生间、阳台）、marble、terrazzo、carpet。
 门窗：
 - 门 kind=door：宽 800–1000（入户门 1000–1200，客厅到阳台的推拉门可到 1800）；wall 引用内墙 key 或外墙名；at 为门洞中心沿墙方向的坐标（横墙给 x，竖墙给 y）；into 为门扇开向（横墙 up/down，竖墙 left/right），一般开向房间内。
@@ -302,7 +304,6 @@ function validatePlan(value: unknown, b: Body): Issues {
     walls.set(key, { dir: w.dir, at: w.at, from: w.from, to: w.to });
   });
   const rooms = new Map<string, [number, number, number, number]>();
-  let total = 0;
   if (!Array.isArray(v?.rooms) || v.rooms.length < 2) errors.push('rooms 至少需要 2 个房间');
   else v.rooms.forEach((raw, i) => {
     const r = raw as { id?: unknown; name?: unknown; box?: unknown; poly?: unknown };
@@ -319,10 +320,9 @@ function validatePlan(value: unknown, b: Body): Issues {
     if (Math.min(...xs) < -1 || Math.min(...ys) < -1 || Math.max(...xs) > W + 1 || Math.max(...ys) > D + 1) found.soft.push(`房间 ${id}：轮廓超出了 ${W}×${D} 的外轮廓`);
     const a = area(ring);
     if (a < 1.5e6) found.soft.push(`房间 ${id}：面积不足 1.5 m²`);
-    total += a;
     rooms.set(id, [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]);
   });
-  if (rooms.size && (total < W * D * 0.85 || total > W * D * 1.05)) found.soft.push(`所有房间面积之和应约等于整个平面（${(W * D / 1e6).toFixed(1)} m²），当前 ${(total / 1e6).toFixed(1)} m²：房间要铺满平面且互不重叠`);
+  // 房间不必铺满整个平面（留白交给模型按原户型关系决定），也不在这里按面积和反推重叠：L 形轮廓会误判。
   let entrance = false;
   if (!Array.isArray(v?.openings)) errors.push('openings 必须是数组');
   else v.openings.forEach((raw, i) => {

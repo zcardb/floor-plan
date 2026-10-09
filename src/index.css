@@ -4024,11 +4024,11 @@ button.room-cost-row:hover {
 .ai-candidate > span small { font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
 button.ai-candidate:hover { border-color: hsl(var(--primary) / 0.5); }
 .ai-candidate.is-selected { border-color: hsl(var(--primary)); box-shadow: 0 0 0 2px hsl(var(--primary) / 0.25); }
-.ai-candidate.is-failed { color: hsl(var(--destructive)); }
-button.ai-candidate.is-failed .ai-candidate-preview { align-content: center; gap: 8px; }
-.ai-candidate-retry { display: inline-flex; align-items: center; gap: 4px; height: var(--ctl-sm); padding: 0 12px; border-radius: 999px; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: var(--fs-control); transition: color .15s ease, border-color .15s ease; }
-button.ai-candidate.is-failed:hover { border-color: hsl(var(--destructive) / 0.5); }
-button.ai-candidate.is-failed:hover .ai-candidate-retry { border-color: hsl(var(--primary) / 0.5); color: hsl(var(--primary)); }
+.ai-candidate.is-failed { color: hsl(var(--destructive)); grid-template-rows: 1fr; }
+.ai-candidate.is-failed .ai-candidate-preview { align-content: center; aspect-ratio: auto; }
+.ai-candidate-retry { display: inline-flex; align-items: center; gap: 4px; height: var(--ctl-sm); padding: 0 12px; border-radius: 999px; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: var(--fs-control); box-shadow: 0 1px 4px hsl(var(--foreground) / 0.12); transition: color .15s ease, border-color .15s ease; }
+.ai-candidate-retry:hover { border-color: hsl(var(--primary) / 0.6); color: hsl(var(--primary)); }
+.ai-candidate-retry:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
 .ai-candidate-error { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ai-candidate.is-pending > span { color: hsl(var(--muted-foreground)); }
 .ai-candidate-preview { position: relative; display: grid; place-items: center; aspect-ratio: 1; border-radius: var(--ctl-radius-in); background: var(--plan-paper); overflow: hidden; color: hsl(var(--muted-foreground)); }

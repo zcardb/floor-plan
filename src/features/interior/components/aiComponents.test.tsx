@@ -61,6 +61,8 @@ describe("候选方案网格", () => {
     }));
     expect(html).toContain("方案 1 生成失败：AI 服务繁忙。点击重试");
     expect(html).toContain("重试");
+    // 失败格子里只留重试按钮：不渲染说明文字（原因在 title / aria-label 里）。
+    expect(html).not.toContain("ai-candidate-error");
     expect(html).toContain('aria-label="放大查看动静分区"');
   });
   it("全部失败时给出错误提示", () => {
