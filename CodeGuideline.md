@@ -38,7 +38,7 @@ project-root/
   - `config.ts` is the runtime entry: imports the manifest via `util.ts`, initializes i18next (HTTP backend, language detector, react binding), syncs `<html lang/dir>`, and re-exports the helpers. Importing this file for its side effect boots i18next.
   - `util.ts` holds pure helpers parsed from the manifest: `fallbackLng`, `supportedLngs`, `languageOptions`, `normalizeLanguage`, `getLanguageDirection`, plus types.
   - Components use the official `useTranslation()` from `react-i18next` directly; there is no project-specific `useT` wrapper.
-- **src/features/**: Feature modules. `interior/` UI must follow `src/features/interior/UI_GUIDELINES.md` (font scale, control heights, toolbar and icon sizes).
+- **src/features/**: Feature modules. `interior/` UI must follow `src/features/interior/UI_GUIDELINES.md` (font scale, control heights, toolbar and icon sizes, plus the interaction and UX-psychology rules in sections 5–7: no fake progress, always keep an exit path, one primary action per view).
 - **src/lib/**: Utility functions and libraries that are not React components or hooks.
 - **src/pages/**: All route-level pages.  
   - *Each page should have its own subdirectory if it contains more than a single file or has related logic/components.*
