@@ -67,10 +67,21 @@ export function followWallFurniture(before: Design, after: Design): Design;
 - 端点拖动（改变墙长或角度）不带家具。
 - 接入：`PlanCanvas` 的 `wallmove` 预览每一帧都按 `dr.before` 算（拖动中能实时看到家具跟着走，撤销一次全部还原）；`Workbench` 按尺寸改墙提交前也套一次。
 
+### 5. 浮动编辑栏不再盖住门窗的距离标注
+
+现状（截图：选中门，编辑栏压住了右侧的墙端距离）：`SelectionEditor` 的 `position()` 只把舞台上的工具栏（`.stage-topline`、`.canvas-zoom` 等）当障碍物，交给 `placeEditor`（`model/selectionAnchor.ts`）打分。门窗两侧的距离标注（`OpeningDistances` → `WallRangeDimensions`）是画在 SVG 里的，不在障碍物列表里，所以编辑栏会落在它上面。
+
+- `WallRangeDimensions` 新增 `keepVisible` 参数，开启时在根 `<g>` 上加 `data-editor-keep-visible`。`OpeningDistances` 开启它；悬停测距不开（它跟着鼠标走，是临时显示，编辑栏不必为它挪位置）。
+- `SelectionEditor.position()`：额外收集舞台里所有 `[data-editor-keep-visible]` 的屏幕矩形（SVG 元素也能取 `getBoundingClientRect`），作为第 5 个参数 `keepVisible` 传给 `placeEditor`。
+- `placeEditor(object, viewport, size, obstacles, keepVisible = [])`：
+  - 除了原有的 5 个候选位置，再围绕「选中对象 ∪ keepVisible」的外接矩形生成同样的 5 个候选位置（标注在门下方时，编辑栏可以放到标注的下方或上方）。
+  - 与 keepVisible 重叠按与障碍物相同的权重（×10）计分，所以只要有不重叠的位置就一定选它；原有候选排序与边界裁剪规则不变。
+- 编辑栏的位置在选中对象、视图缩放或平移、尺寸变化时会重新计算（现有的 `onAnchor` 链路）。标注与选中状态在同一次渲染里生成，计算位置时已经能读到。
+
 ## 关键文件
 
 - 新增：`src/features/interior/model/roomFurniture.ts`、`src/features/interior/model/furnitureFollow.ts`，以及对应的 `*.test.ts`
-- 修改：`model/wallAutoSplit.ts`（`splitAtJunctionsOf`）、`model/wallRemoval.ts`、`model/roomFollow.ts`（`syncRooms`）、`components/PlanCanvas.tsx`、`components/useSegmentDrawing.ts`、`components/WallHoverOverlay.tsx`、`components/SelectionEditor.tsx`、`components/Workbench.tsx`
+- 修改：`model/wallAutoSplit.ts`（`splitAtJunctionsOf`）、`model/wallRemoval.ts`、`model/roomFollow.ts`（`syncRooms`）、`model/selectionAnchor.ts`（`placeEditor`）、`components/PlanCanvas.tsx`、`components/useSegmentDrawing.ts`、`components/WallHoverOverlay.tsx`、`components/WallRangeDimensions.tsx`、`components/OpeningDistances.tsx`、`components/SelectionEditor.tsx`、`components/Workbench.tsx`
 - 复用：`splitAtJunctions`、`dropOpenRooms`、`mergeRoomsAcrossWall`、`inRoom`、`resolveWallPoint`、`length`、`nearestOnWall`
 - 不动：`wallFaces.ts`、`roomEnclosure.ts` 内部逻辑（另一个会话在改）
 
@@ -87,6 +98,9 @@ export function followWallFurniture(before: Design, after: Design): Design;
 - [ ] `PlanCanvas` 的 `wallmove` 预览接入 `followWallFurniture`
 - [ ] `useSegmentDrawing.start(p)`；`PlanCanvas` 的 `startWallTool` prop；选择模式单击墙身（≤ 5 px）进入绘墙并以吸附点为起点
 - [ ] 选择模式悬停点改用 `resolveWallPoint`，`WallHoverOverlay` 显示「点击开始绘墙」
+- [ ] `WallRangeDimensions` 新增 `keepVisible` → `data-editor-keep-visible`；`OpeningDistances` 开启它
+- [ ] `placeEditor` 新增 `keepVisible` 参数：围绕「对象 ∪ 标注」增加候选位置，与标注重叠按 ×10 计分
+- [ ] `SelectionEditor.position()` 收集 `[data-editor-keep-visible]` 的矩形，传给 `placeEditor`
 
 ## Verification checklist
 
@@ -96,5 +110,7 @@ export function followWallFurniture(before: Design, after: Design): Design;
 - [ ] 单测 `furnitureFollow`：贴墙家具（两侧都试）跟着平移相同的法向距离；离墙 100 mm 的家具、沿墙方向滑动墙、端点拖动都不带家具
 - [ ] 组件测试 `PlanCanvas.test.tsx`：选择模式单击墙身进入绘墙且草稿起点是吸附点；拖动墙身仍是移动墙，且贴墙家具一起移动
 - [ ] 组件测试 `SelectionEditor.test.tsx`：选中房间时出现「删除对象」按钮
+- [ ] 单测 `selectionAnchor.test.ts`：按截图布局（门在墙上方，两段标注在墙下方，原来的首选位置压住右侧标注），新结果与两段标注都不重叠且仍在视口内；不传 `keepVisible` 时结果与原来一致（回归）
+- [ ] 视觉：preview 在 desktop_1280 下选中一扇门，截图确认编辑栏与两侧距离标注都完整可见
 - [ ] 全量 `pnpm exec vitest run src/features/interior`：除另一个会话的 `dimensionWallEdit` 既有红灯外无新增失败；`pnpm lint` 0 error；`pnpm run build` 通过
 - [ ] 未验证（需人工点击）：真实指针下悬停标签、单击开画、双击回到选中，以及拖墙时家具跟随的手感
