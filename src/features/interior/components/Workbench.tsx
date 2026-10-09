@@ -3,6 +3,7 @@ import { formatMeters } from '../model/lengthUnits';
 import { canEditWall, openingIsLocked } from '../model/wallPolicy';
 import { ExportMenu, type ExportFormat } from './ExportMenu';
 import { ProjectMenu, type ProjectNavigation } from './ProjectMenu';
+import { WorkbenchBanner } from './WorkbenchBanner';
 import { AccountMenu } from './AccountMenu';
 import { DimensionEditDialog } from './DimensionEditDialog';
 import { WallSplitDialog } from './WallSplitDialog';
@@ -20,7 +21,6 @@ import {
   Armchair,
   Check,
   ChevronDown,
-  Cloud,
   Copy,
   DoorOpen,
   Expand,
@@ -47,7 +47,6 @@ import {
   SquareDashed,
   Sun,
   Trash2,
-  TriangleAlert,
   Undo2,
   UserRound,
   X,
@@ -571,33 +570,33 @@ export function Workbench(p: Props) {
           : "拖入家具，开始规划你的理想空间";
   return (
     <div className="workbench-shell">
-      {showGuestBanner && (
-        <div className="guest-cloud-banner" role="status" aria-label="模版已更改">
-          <span className="guest-cloud-banner-badge"><TriangleAlert size={14} /></span>
-          <span className="guest-cloud-banner-copy">
-            <b>模版已经更改</b>
-            <span>登录后即可保存到云端，换设备也能继续编辑</span>
-          </span>
-          <Button
-            size="sm"
-            className="guest-cloud-banner-save"
-            loading={cloudSave.pending}
-            onClick={() => { sizeTransaction.cancel(); void cloudSave.run(); }}
-          >
-            <Cloud size={14} />
-            <span>登录并保存</span>
+      {readOnly && (
+        <WorkbenchBanner label="只读预览" description="内置模板仅供预览，用此模板新建后即可自由编辑并保存">
+          <Button size="sm" className="workbench-banner-action" loading={templateCreate.pending} onClick={() => void templateCreate.run()}>
+            用此模板新建
           </Button>
+        </WorkbenchBanner>
+      )}
+      {showGuestBanner && (
+        <WorkbenchBanner label="模版已更改" description="模版已更改，登录后即可保存到云端，换设备也能继续编辑">
           <Button
             size="sm"
             variant="ghost"
-            className="guest-cloud-banner-dismiss"
+            className="workbench-banner-dismiss"
             disabled={cloudSave.pending}
             onClick={() => setBannerClosed(p.guestEdits)}
           >
-            <X size={14} />
-            <span>暂不保存</span>
+            暂不保存
           </Button>
-        </div>
+          <Button
+            size="sm"
+            className="workbench-banner-action"
+            loading={cloudSave.pending}
+            onClick={() => { sizeTransaction.cancel(); void cloudSave.run(); }}
+          >
+            登录并保存
+          </Button>
+        </WorkbenchBanner>
       )}
     <div
       className={
@@ -854,7 +853,6 @@ export function Workbench(p: Props) {
         />
       </aside>
       <main className="stage" ref={stage}>
-        {readOnly && <div className="template-readonly-banner"><span>内置模板 · 只读预览</span><Button size="sm" loading={templateCreate.pending} onClick={() => void templateCreate.run()}>用此模板新建</Button></div>}
         <div className="stage-topline">
           <div className="canvas-context">
             <span className="context-dot" />
