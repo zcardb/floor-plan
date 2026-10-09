@@ -7,7 +7,7 @@ import {
   useState,
 } from "react";
 import { errorMessage, notify } from "@/lib/notify";
-import { canResizeWall, isBearingWall, openingIsLocked, BEARING_WALL_WARNING } from '../model/wallPolicy';
+import { canResizeWall, isBearingWall, isOnBearingWall, BEARING_WALL_WARNING } from '../model/wallPolicy';
 import { syncRooms } from '../model/roomFollow';
 import {
   area,
@@ -295,7 +295,10 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     if (dr.kind === 'openingmove') {
       const original = dr.before.openings.find(o => o.id === dr.id);
       const moved = d.openings.find(o => o.id === dr.id);
-      if (dr.moved && original && moved && original.offset !== moved.offset) commit(d, dr.before);
+      if (dr.moved && original && moved && original.offset !== moved.offset) {
+        commit(d, dr.before);
+        if (isOnBearingWall(d, moved.wallId)) notify.warning(BEARING_WALL_WARNING);
+      }
       return;
     }
     if (["move", "rot", "size", "wallmove", "endpoint"].includes(dr.kind)) {
@@ -315,7 +318,8 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         if (next.rooms.length !== dr.before.rooms.length)
           notify.info("房间划分已更新，请检查名称与地面材质");
         const wall = wallEdit ? next.walls.find((w) => w.id === dr.id) : undefined;
-        if (wall && isBearingWall(wall) && next.template !== "blank")
+        const opening = next.openings.find((o) => o.id === dr.id);
+        if ((wall && isBearingWall(wall) && next.template !== "blank") || (opening && isOnBearingWall(next, opening.wallId)))
           notify.warning(BEARING_WALL_WARNING);
       }
       return;
@@ -447,8 +451,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           return;
         } else if (handle && selection) {
           const selectedWall = selection.kind === 'wall' ? design.walls.find(w => w.id === selection.id) : null;
-          const selectedOpening = selection.kind === 'opening' ? design.openings.find(o => o.id === selection.id) : null;
-          if ((selectedWall && !canResizeWall(design, selectedWall)) || (selectedOpening && openingIsLocked(design, selectedOpening.wallId))) return;
+          if (selectedWall && !canResizeWall(design, selectedWall)) return;
           base.kind = handle === "a" || handle === "b" ? "endpoint" : handle;
           base.id = selection.id;
           base.room = handle;
@@ -461,8 +464,6 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         } else if (oid) {
           select({ kind: "opening", id: oid });
           if (tool === 'door' || tool === 'window') finishTool();
-          const opening = design.openings.find(o => o.id === oid);
-          if (opening && openingIsLocked(design, opening.wallId)) return;
           base.kind = 'openingmove';
           base.id = oid;
         } else if (wid && tool === "select") {

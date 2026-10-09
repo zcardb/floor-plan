@@ -59,10 +59,10 @@ describe('PlanCanvas 承重保护', () => {
     h.handlers.onPointerMove!(event(3000)); h.handlers.onPointerUp!(event(3000));
     expect(h.commit).not.toHaveBeenCalled(); expect(h.preview).not.toHaveBeenCalled();
   });
-  it('已有开口仍可选中但不能拖动', () => {
+  it('承重墙上的已有开口可以拖动', () => {
     const h = harness(); h.design.walls[0].loadBearing = true;
     h.handlers.onPointerDown!(event(2000)); h.handlers.onPointerMove!(event(3000)); h.handlers.onPointerUp!(event(3000));
-    expect(h.select).toHaveBeenCalledWith({ kind: 'opening', id: 'opening' }); expect(h.commit).not.toHaveBeenCalled(); expect(h.preview).not.toHaveBeenCalled();
+    expect(h.select).toHaveBeenCalledWith({ kind: 'opening', id: 'opening' }); expect(h.commit).toHaveBeenCalledOnce();
   });
 });
 describe('PlanCanvas 绘墙完成事件链', () => {

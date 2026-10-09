@@ -43,17 +43,20 @@ describe('墙体尺寸面板：复制/新建项目的结构解锁', () => {
     expect(html).toContain(LOCKED_TEXT);
   });
 
-  it('承重墙上的门窗洞口锁定文案保持独立', () => {
+  it('承重墙上的门窗可编辑尺寸，并显示承重提醒', () => {
     const design = createProject('reference').state;
     const opening = design.openings.find(o => {
       const wall = design.walls.find(w => w.id === o.wallId);
       return wall && !isBearingWall(wall);
     });
     expect(opening).toBeDefined();
-    expect(render(design, { kind: 'opening', id: opening!.id })).not.toContain('门窗洞口已锁定');
+    const plain = render(design, { kind: 'opening', id: opening!.id });
+    expect(plain).toContain('<input');
+    expect(plain).not.toContain(BEARING_WALL_WARNING);
     const bearing = setWallBearing(design, opening!.wallId, true);
     const html = render(bearing, { kind: 'opening', id: opening!.id });
-    expect(html).toContain('门窗洞口已锁定');
+    expect(html).toContain('<input');
+    expect(html).toContain(BEARING_WALL_WARNING);
     expect(html).not.toContain(LOCKED_TEXT);
   });
 });

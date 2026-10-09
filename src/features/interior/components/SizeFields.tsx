@@ -1,6 +1,6 @@
 import { useEffect,useRef,useState } from 'react';
 import { length } from '../model/geometry';
-import { canResizeWall, isBearingWall, openingIsLocked, BEARING_WALL_WARNING } from '../model/wallPolicy';
+import { canResizeWall, isBearingWall, isOnBearingWall, BEARING_WALL_WARNING } from '../model/wallPolicy';
 import { RotationControls } from './RotationControls';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -41,9 +41,8 @@ export function SizeFields({design,selection,transaction,close}:{design:Design;s
   const furniture=selection?.kind==='furniture'?design.furniture.find(f=>f.id===selection.id):null;
   const wall=selection?.kind==='wall'?design.walls.find(w=>w.id===selection.id):null;
   const opening=selection?.kind==='opening'?design.openings.find(o=>o.id===selection.id):null;
-  const bearingWarning=wall&&design.template!=='blank'&&isBearingWall(wall);
+  const bearingWarning=(wall&&design.template!=='blank'&&isBearingWall(wall))||(opening&&isOnBearingWall(design,opening.wallId));
   if(wall&&!canResizeWall(design,wall))return <p className="visual-locked">此项目创建时锁定了结构尺寸，复制该项目后副本可自由调整。</p>;
-  if(opening&&openingIsLocked(design,opening.wallId))return <p className="visual-locked">承重墙上的门窗洞口已锁定，不能修改尺寸。</p>;
   return <div onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cancel();}}}>{bearingWarning&&<p className="muted-note" role="note">{BEARING_WALL_WARNING}。</p>}<div className="visual-size-fields">{fields.current.map(([key,label])=><Label key={key} className="field-label">{label}<Input className="editor-control" aria-label={label} type="number" step={key==='rot'?1:0.01} value={draft[key]??''} onChange={e=>{
     if(!token.current||!transaction.isActive(token.current)){token.current=transaction.begin(selection);edited.current.clear();}
     edited.current.add(key);

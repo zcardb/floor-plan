@@ -25,7 +25,7 @@ import { yuan } from "../model/money";
 import { useCostDesign } from './CostDefaultsContext';
 import { SizeFields } from './SizeFields';
 import { WallOptionsMenu } from './WallOptionsMenu';
-import { canEditWall, canResizeWall, openingIsLocked, wallKindName } from '../model/wallPolicy';
+import { canEditWall, canResizeWall, wallKindName } from '../model/wallPolicy';
 import { DimensionSettings } from './DimensionSettings';
 import { NorthSettings } from './NorthSettings';
 import type { SizeTransaction } from '../model/sizeTransaction';
@@ -442,7 +442,6 @@ export function PropertyPanel({
     );
   }
   if (o) {
-    const locked = openingIsLocked(design, o.wallId);
     const name = openingName(design, o);
     const kindName = o.kind === "door" ? "门" : "窗";
     return (
@@ -464,7 +463,7 @@ export function PropertyPanel({
               </small>
             </div>
           </div>
-          <OpeningVariantSelect design={design} opening={o} accountOpenings={accountOpenings} change={change} disabled={locked} />
+          <OpeningVariantSelect design={design} opening={o} accountOpenings={accountOpenings} change={change} />
           <h4 className="property-subtitle">尺寸与位置</h4>
           <SizeFields key={o.id} design={design} selection={s} transaction={transaction}/>
           {o.kind === 'door' && <>
@@ -474,11 +473,8 @@ export function PropertyPanel({
         </section>
         {priceSection("openingPrices", openingPriceKey(o), name, "m²")}
         <section>
-          <EditorTooltip
-            label={locked ? "承重墙上的门窗已锁定" : `删除这${o.kind === "door" ? "扇门" : "扇窗"}，可撤销`}
-            disabled={locked}
-          >
-            <Button variant="outline" size="sm" disabled={locked} onClick={remove}>
+          <EditorTooltip label={`删除这${o.kind === "door" ? "扇门" : "扇窗"}，可撤销`}>
+            <Button variant="outline" size="sm" onClick={remove}>
               <Trash2 />
               删除{kindName}
             </Button>

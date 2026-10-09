@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatMeters } from '../model/lengthUnits';
-import { canEditWall, openingIsLocked } from '../model/wallPolicy';
+import { canEditWall } from '../model/wallPolicy';
 import { ExportMenu, type ExportFormat } from './ExportMenu';
 import { ProjectMenu, type ProjectNavigation } from './ProjectMenu';
 import { WorkbenchBanner } from './WorkbenchBanner';
@@ -430,7 +430,6 @@ export function Workbench(p: Props) {
     }
     else if (s.kind === "opening") {
       const opening = d.openings.find(o => o.id === s.id);
-      if (opening && openingIsLocked(d, opening.wallId)) return notify.fail('承重墙上的门窗洞口不可删除');
       change((d) => ({ ...d, openings: d.openings.filter((o) => o.id !== s.id) }));
       if (opening) notify.success(`已删除${opening.kind === "door" ? "门" : "窗"}，可撤销恢复`);
     }

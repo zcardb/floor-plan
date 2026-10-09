@@ -5,7 +5,7 @@ import { area, length, rebuildRooms, resizeBlank, ringArea } from './geometry';
 import { splitMaxCuts, splitWall } from './wallSplit';
 import { connectedWallPoly, wallSectionPolygons } from './wallConnections';
 import { validateDesign } from './validation';
-import { setWallBearing, canEditWall, openingIsLocked } from './wallPolicy';
+import { setWallBearing, canEditWall, isOnBearingWall } from './wallPolicy';
 import { dimensionBinding } from './dimensionBinding';
 import { dimensionEditPolicy } from './dimensionWallEdit';
 import { calculateCosts } from './costs';
@@ -34,7 +34,7 @@ describe('图纸墙段分割', () => {
       const next = splitWall(d, 'p', cuts).design, o = next.openings[0], w = next.walls.find(w => w.id === o.wallId)!;
       expect(w.a[1] + o.offset).toBe(1500);
       expect(o).toMatchObject({ id: 'door', width: 900, hinge: 'end', swingSide: -1, height: 2100 });
-      const marked = setWallBearing(next, w.id, true); expect(openingIsLocked(marked, w.id)).toBe(true);
+      const marked = setWallBearing(next, w.id, true); expect(isOnBearingWall(marked, w.id)).toBe(true);
       expect(calculateCosts(next)).toEqual(calculateCosts(d));
       const layers = { dims: true, labels: true, furn: true, bearing: true, grid: false, snap: true };
       expect(createDrawingDocument(next, layers).entities.filter(e => e.layer === 'OPENINGS')).toEqual(createDrawingDocument(d, layers).entities.filter(e => e.layer === 'OPENINGS'));

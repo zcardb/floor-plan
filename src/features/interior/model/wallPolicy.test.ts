@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { blankDesign, createProject, referenceDesign } from '../data/templates';
-import { canDemolishWall, canEditWall, canResizeWall, isBearingWall, setWallBearing, wallKindName } from './wallPolicy';
+import { canDemolishWall, canEditWall, canResizeWall, isBearingWall, isOnBearingWall, setWallBearing, wallKindName } from './wallPolicy';
 import { rebuildRooms, resizeBlank } from './geometry';
 import { calculateCosts } from './costs';
 import { editSelection } from './selectionEdits';
@@ -25,13 +25,23 @@ describe('承重墙标记策略', () => {
     const restored = setWallBearing(next, partition.id, false);
     expect(canEditWall(restored, restored.walls[restored.walls.length - 1]!)).toBe(true);
   });
-  it('保留既有洞口并保护墙尺寸及洞口尺寸', () => {
+  it('保留既有洞口并保护墙尺寸；承重墙上的门窗仍可编辑', () => {
     const before = fixture(); before.openings.push({ id: 'door', wallId: partition.id, kind: 'door', offset: 2000, width: 900 });
     const next = setWallBearing(before, partition.id, true);
     expect(next.openings).toEqual(before.openings);
+    expect(isOnBearingWall(next, partition.id)).toBe(true);
     expect(() => editSelection(next, { kind: 'wall', id: partition.id }, { length: 5000 })).toThrow('锁定');
-    expect(() => editSelection(next, { kind: 'opening', id: 'door' }, { offset: 3000 })).toThrow('锁定');
-    expect(editSelection(setWallBearing(next, partition.id, false), { kind: 'opening', id: 'door' }, { offset: 3000 }).openings[0].offset).toBe(3000);
+    expect(editSelection(next, { kind: 'opening', id: 'door' }, { offset: 3000 }).openings[0].offset).toBe(3000);
+    expect(() => editSelection(next, { kind: 'opening', id: 'door' }, { offset: 5800 })).toThrow('超出');
+  });
+  it('参考户型（旧项目与新建项目）标记承重后，墙上的门窗仍可移动', () => {
+    for (const base of [referenceDesign(), createProject('reference').state]) {
+      const o = base.openings.find(o => base.walls.find(w => w.id === o.wallId)!.kind === 'partition')!;
+      const d = setWallBearing(base, o.wallId, true);
+      expect(isOnBearingWall(d, o.wallId)).toBe(true);
+      const next = editSelection(d, { kind: 'opening', id: o.id }, { width: o.width - 100 });
+      expect(next.openings.find(x => x.id === o.id)!.width).toBe(o.width - 100);
+    }
   });
   it('原始承重、已拆墙和不存在的墙拒绝操作', () => {
     const demo = referenceDesign(), original = demo.walls.find(w => w.kind === 'bearing')!;

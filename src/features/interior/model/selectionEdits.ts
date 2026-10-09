@@ -1,5 +1,5 @@
 import { length, norm } from "./geometry";
-import { canResizeWall, openingIsLocked } from './wallPolicy';
+import { canResizeWall } from './wallPolicy';
 import { syncRooms } from './roomFollow';
 import type { Design, Selection } from "./types";
 export function editSelection(
@@ -78,7 +78,6 @@ export function editSelection(
     const o = d.openings.find((o) => o.id === s.id),
       w = d.walls.find((w) => w.id === o?.wallId);
     if (!o || !w) return d;
-    if (openingIsLocked(d, w.id)) throw new Error('承重墙上的门窗洞口已锁定');
     const n = { ...o, ...values }, L = length(w);
     if (n.width > L) throw new Error("门窗宽度超过所在墙段长度");
     // 只改宽度时以中心为基准；碰到墙端则整体平移，保证宽度改动立即生效。

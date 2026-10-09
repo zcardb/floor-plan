@@ -111,13 +111,14 @@ describe('分割墙段共享入口及快照提交', () => {
   });
 });
 describe('承重墙删除保护', () => {
-  it('选中用户标记墙或其洞口后删除均不提交', () => {
+  it('用户标记的承重墙删除不提交，墙上的门窗可以删除', () => {
     const d = blankDesign(); d.walls.push({ id: 'bearing', kind: 'partition', a: [3000, 0], b: [3000, 6000], thickness: 240, loadBearing: true });
     d.openings.push({ id: 'door', wallId: 'bearing', kind: 'door', offset: 2000, width: 900 }); state.design = d;
-    for (const selection of [{ kind: 'wall', id: 'bearing' }, { kind: 'opening', id: 'door' }]) {
+    for (const [selection, removed] of [[{ kind: 'wall', id: 'bearing' }, false], [{ kind: 'opening', id: 'door' }, true]] as const) {
+      state.change.mockClear();
       const canvas = render().find(n => n.type === PlanCanvas)!; (canvas.props.select as (s: unknown) => void)(selection);
       const editor = render().find(n => n.props.remove && n.props.selection)!; (editor.props.remove as () => void)();
-      expect(state.change).not.toHaveBeenCalled();
+      expect(state.change.mock.calls.length > 0).toBe(removed);
     }
   });
 });

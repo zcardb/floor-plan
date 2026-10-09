@@ -9,7 +9,8 @@ export const canResizeWall = (design: Design, wall: Wall) =>
   canEditWall(design, wall) ||
   (design.structureUnlocked === true && design.template !== 'blank' && !design.demolished.includes(wall.id));
 export const canDemolishWall = (wall: Wall) => !isBearingWall(wall) && (wall.kind === 'partition' || wall.kind === 'low');
-export const openingIsLocked = (design: Design, wallId: string) => design.walls.some(w => w.id === wallId && isBearingWall(w));
+/** 门窗始终可编辑；开在承重墙上时只做风险提醒。 */
+export const isOnBearingWall = (design: Design, wallId: string) => design.walls.some(w => w.id === wallId && isBearingWall(w));
 export const wallKindName = (wall: Wall) => wall.kind === 'bearing' ? '承重墙' : wall.kind === 'exterior' ? '外围墙' : wall.kind === 'low' ? '矮墙' : '隔墙';
 
 export function setWallBearing(design: Design, id: string, value: boolean): Design {
