@@ -32,7 +32,8 @@ describe('共享连续取点状态机（绘墙）', () => {
     d.down([1000, 1800], 1, [20, 20]); d.up([1000, 1800], 1, [20, 20]);
     d.down([3000, 1800], 1, [30, 20]); d.up([3000, 1800], 1, [30, 20]);
     expect(h.commit).toHaveBeenCalledTimes(2);
-    expect(h.design.current.walls.slice(1).map(s => [s.a, s.b])).toEqual([[[1000, 0], [1000, 1800]], [[1000, 1800], [3000, 1800]]]);
+    // 交接点默认分割：target 在 (1000,0) 被切成两段，其后是新画的两段。
+    expect(h.design.current.walls.map(s => [s.a, s.b])).toEqual([[[0, 0], [1000, 0]], [[1000, 0], [6000, 0]], [[1000, 0], [1000, 1800]], [[1000, 1800], [3000, 1800]]]);
     d.clear(); d.up([4000, 1800], 1, [40, 20]);
     expect(h.commit).toHaveBeenCalledTimes(2); expect(h.render().draft).toBeNull();
   });
@@ -48,7 +49,7 @@ describe('共享连续取点状态机（绘墙）', () => {
   it('无吸附取点保留原始坐标，闭合回起点后结束且无重复提交', () => {
     const h = harness(false), d = h.render();
     d.down([1000, 50], 1, [0, 0]); d.up([1000, 2000], 1, [10, 0]);
-    expect(h.design.current.walls[1].a).toEqual([1000, 50]);
+    expect(h.design.current.walls[h.design.current.walls.length - 1]!.a).toEqual([1000, 50]);
     d.down([1000, 2000], 1, [20, 20]); d.up([3000, 2000], 1, [30, 20]);
     d.down([3000, 2000], 1, [40, 20]); d.up([3000, 50], 1, [50, 20]);
     d.down([3000, 50], 1, [60, 20]); d.up([1000, 50], 1, [70, 20]);

@@ -91,7 +91,7 @@ describe('接触点分割', () => {
   it('门窗洞口两侧边缘各成一个接触点，说明是哪一侧；换向按新 A 说明', () => {
     const h = harness(junctions(), 'host');
     h.click('接触点分割');
-    const sides = () => h.render().filter(n => n.type === 'small').map(n => n.props.children).filter(c => typeof c === 'string');
+    const sides = () => h.render().filter(n => n.type === 'small').map(n => n.props.children).filter(c => typeof c === 'string' && c.includes('洞口近'));
     expect(sides()).toEqual(['窗洞口近 A 侧边缘', '窗洞口近 B 侧边缘']);
     h.click('交换 A/B');
     expect(sides()).toEqual(['窗洞口近 B 侧边缘', '窗洞口近 A 侧边缘']);

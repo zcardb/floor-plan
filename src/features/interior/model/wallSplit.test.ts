@@ -74,6 +74,17 @@ describe('图纸墙段分割', () => {
     expect(calculateCosts(result.design)).toEqual(calculateCosts(d));
     expect(() => splitWall(d, 'p', [...cuts, 5800])).toThrow(`1–${splitMaxCuts}`);
   });
+  it('洞口边不是整厘米时，两位小数的距离输入吸附到洞口边', () => {
+    const d = fixture(); d.openings = [{ id: 'door', wallId: 'p', kind: 'door', offset: 2500, width: 850 }];
+    // 洞口边在 2075 / 2925；2.08 m 落在吸附窗口内，切成 2075。
+    const next = splitWall(d, 'p', [2080]).design, segments = next.walls.slice(-2);
+    expect(length(segments[0]!)).toBe(2075);
+    expect(segments[0]!.b).toEqual([1000, 2075]);
+    const o = next.openings[0]!;
+    expect(o.width).toBe(850);
+    expect(next.walls.find(w => w.id === o.wallId)!.a[1] + o.offset).toBe(2500);
+    expect(() => splitWall(d, 'p', [2500])).toThrow('洞口内部');
+  });
   it('洞口内部、已拆、未知墙、无效选中及2000上限', () => {
     const d = fixture(); d.openings = [{ id: 'o', wallId: 'p', kind: 'window', offset: 1500, width: 1000 }];
     expect(() => splitWall(d, 'p', [1500])).toThrow('洞口内部'); expect(() => splitWall(d, 'missing', [300])).toThrow();

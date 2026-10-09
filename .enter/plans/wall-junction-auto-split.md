@@ -105,25 +105,27 @@ commit(split.template === 'blank' ? rebuildRooms(split) : split);
 
 ## Implementation checklist
 
-- [ ] `wallContacts.ts`：`WallContact.kind` 增加 `'opening'` 与可选 `opening: { id, kind, edge }` 字段
-- [ ] `wallContacts.ts`：`blocked` 改用未取整 offset 且忽略距洞口边 ≤ `splitEdgeSnap` 的情形
-- [ ] `wallContacts.ts`：为每个洞口的两个边缘追加不取整的 `'opening'` 接触点，并施加「距墙端 / 距已保留接触点 ≥ 50 mm」的间距规则，结果按 offset 升序且 offset 唯一
-- [ ] `wallSplit.ts`：导出 `splitEdgeSnap = 10` 并用于 `wallSplitIntervals` 的切点吸附；`splitTolerance` 语义与使用点不变
-- [ ] `wallDrawing.ts`：`WallSnap.target.kind` 增加 `'opening'`，遍历洞口边缘生成候选，优先级 endpoint → opening → intersection
-- [ ] 新增 `wallAutoSplit.ts`：`junctionCuts`（bbox 预筛 + `wallContacts` 复用 + 空白外围墙排除）与 `splitAtJunctions`（逐切点从大到小调用 `splitWall`，失败跳过）
-- [ ] `useWallDrawing.ts`：先 `splitRoomsWithWall`/`added` 再 `splitAtJunctions`，空白户型最后 `rebuildRooms`，仍只 `commit` 一次
-- [ ] `WallSplitDialog.tsx`：门窗边接触点显示「门/窗洞 · 近 A/近 B 侧边缘」，并按 `reversed` 翻转显示侧
-- [ ] 上述六个测试文件按新行为更新/新增并通过
+- [x] `wallContacts.ts`：`WallContact.kind` 增加 `'opening'` 与可选 `opening: { id, kind, edge }` 字段
+- [x] `wallContacts.ts`：`blocked` 改用未取整 offset 且忽略距洞口边 ≤ `splitEdgeSnap` 的情形
+- [x] `wallContacts.ts`：为每个洞口的两个边缘追加不取整的 `'opening'` 接触点，并施加「距墙端 / 距已保留接触点 ≥ 50 mm」的间距规则，结果按 offset 升序且 offset 唯一
+- [x] `wallSplit.ts`：导出 `splitEdgeSnap = 10` 并用于 `wallSplitIntervals` 的切点吸附；`splitTolerance` 语义与使用点不变
+- [x] `wallDrawing.ts`：`WallSnap.target.kind` 增加 `'opening'`，遍历洞口边缘生成候选，优先级 endpoint → opening → intersection
+- [x] 新增 `wallAutoSplit.ts`：`junctionCuts`（bbox 预筛 + `wallContacts` 复用 + 空白外围墙排除）与 `splitAtJunctions`（逐切点从大到小调用 `splitWall`，失败跳过）
+- [x] `useWallDrawing.ts`：先 `splitRoomsWithWall`/`added` 再 `splitAtJunctions`，空白户型最后 `rebuildRooms`，仍只 `commit` 一次
+- [x] `WallSplitDialog.tsx`：门窗边接触点显示「门/窗洞 · 近 A/近 B 侧边缘」，并按 `reversed` 翻转显示侧
+- [x] 上述六个测试文件按新行为更新/新增并通过
 
 ## Verification checklist
 
-- [ ] 正向：`pnpm exec vitest run src/features/interior` 全绿（含新增 `wallAutoSplit.test.ts` 与四个扩展用例）
-- [ ] 正向：参考户型中选一面带窗的墙打开「分割墙段」，「接触点分割」除交接点外还列出窗洞两侧边缘，勾选窗边后 `intervals` 的切点与洞口边完全一致，应用后门窗仍挂在新墙段上
-- [ ] 正向：单点/两点模式下点洞口边快捷标签，输入框出现两位小数距离，预览切点吸到洞口边而不是落进洞口
-- [ ] 正向：画一段隔墙，端点吸附到另一面墙上的门/窗洞口边后松开，宿主墙立即在该交接点分成两段（墙列表、每段长度、房间划分与分割前一致）
-- [ ] 正向：画一段横穿已有墙的墙，两墙都在交点处分成独立墙段；画一段端点停在已有墙角（L 形）时不产生分割
-- [ ] 负向：交接点位于洞口内部且距两边 > 10 mm 时该墙不自动分割，也不出现新的碎段；对话框中该项仍禁用并提示「位于门窗洞口内部」
-- [ ] 边界：洞口边距墙端 < 50 mm、或距交接点 < 50 mm 时不列为接触点；`wallSplitIntervals` 的 1–12 点上限、每段 ≥ 0.05 m 校验保持有效
-- [ ] 边界：空白户型中画隔墙后「整体重设外围尺寸」仍可用（外围墙未被自动分割）
-- [ ] 回归：`splitWall`、`wallContacts`、`wallConnections`、`wallMerge`、房间重建、费用与导出既有用例全部通过；`pnpm lint`、`pnpm exec tsc -p tsconfig.app.json --noEmit`、`pnpm run build` 通过
-- [ ] 视觉：在 preview 中以 desktop_1280 打开参考户型，画一段带交接的隔墙并复查「分割墙段」对话框（接触点列表、门窗边文案、预览标记）不溢出（未在移动端宽度验证时如实说明）
+- [x] 正向：`pnpm exec vitest run src/features/interior` → 615 通过、2 个失败，失败项在 `dimensionWallEdit.test.ts` 与 `wallRemoval.test.ts`，属于另一个会话正在改的 `roomEnclosure.ts` / `roomFollow.ts` / `wallFaces.ts` 工作流；已用「把本次改动的 3 个模型文件还原到 `55d35b1` 后单独跑这两个用例仍失败」的方式确认与本次改动无关
+- [x] 正向：`WallSplitDialog.test.tsx` 覆盖带窗墙体「接触点分割」列出窗洞两侧边缘、勾选后 `intervals` 切点等于洞口边、应用时传递的 cuts 与该边完全一致
+- [x] 正向：`WallSplitDialog.test.tsx` 覆盖单点/两点模式下点洞口边快捷标签写入两位小数距离（2.05 m），`WallSplit.test.ts` 覆盖 2.08 m 输入吸附到 2075 洞口边且门窗完整迁移
+- [x] 正向：`useWallDrawing.test.ts` + `wallAutoSplit.test.ts` 覆盖「画墙端点停在已有墙身上 → 宿主墙按交点切成两段」与「端点停在墙面上（半墙厚内）也切」
+- [x] 正向：`wallAutoSplit.test.ts` 覆盖十字穿过时宿主墙与新墙都切成独立墙段；L 形转角、平行/隔开的墙不产生分割且返回同一设计
+- [x] 负向：`wallAutoSplit.test.ts` 覆盖交接点落在洞口内部（距洞口边超过吸附窗口）时不分割、设计原样返回；对话框仍把该项置灰并提示「位于门窗洞口内部」
+- [x] 边界：`wallContacts.test.ts` 覆盖洞口边距墙端 < 50 mm、距交接点 < 50 mm 时不出现在列表；`wallSplit.test.ts` 既有 1–12 点上限与每段 ≥ 0.05 m 用例继续通过
+- [x] 边界：`wallAutoSplit.test.ts` 断言画墙后空白户型外框未被分割，`resizeBlank` 仍能整体重设外围尺寸
+- [x] 回归：`splitWall`、`wallContacts`、`wallConnections`、`wallMerge`、房间重建、费用与导出既有用例全部通过；`pnpm lint` 0 error（3 个既有 warning）、`pnpm run build` 通过；`pnpm exec tsc -p tsconfig.app.json --noEmit` 仅剩另一个会话 `wallFaces.ts:37` 的 `side0` 未定义（该文件当前无人引用，本次未改动）
+- [x] 视觉：preview 在 desktop_1280 下打开 `/`，参考户型二维画布、尺寸标注与房间统计正常渲染，未出现白屏或报错
+- [ ] 未验证：真实指针在画布上画墙、以及打开「分割墙段」对话框查看门窗边接触点的交互效果，尚未在浏览器中实测（本次只有单测与截图证据）；移动端宽度未验证
+
