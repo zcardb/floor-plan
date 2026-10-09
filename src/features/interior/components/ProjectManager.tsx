@@ -13,7 +13,8 @@ import { ProjectRenameDialog, ProjectDeleteDialog } from './ProjectDialogs';
 import { ProjectRowActions } from './ProjectRowActions';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { notify } from '@/lib/notify';
-import { createProject } from '../data/templates';
+import { createProject, TEMPLATE_PRESETS, presetById } from '../data/templates';
+import { BuiltinTemplates } from './BuiltinTemplates';
 import { IMPORT_ACCEPT } from '../model/designImport';
 import { DxfImportDialog } from './DxfImportDialog';
 import { useProjectImport } from './useProjectImport';
@@ -23,7 +24,7 @@ import type { useProjects, ProjectSummary } from '../cloud/useProjects';
 type Projects = ReturnType<typeof useProjects>;
 
 export function ProjectManager({ projects, opened }: { projects: Projects; opened: () => void }) {
-  const [creating, setCreating] = useState(false), [name, setName] = useState(''), [template, setTemplate] = useState<'blank' | 'reference'>('blank');
+  const [creating, setCreating] = useState(false), [name, setName] = useState(''), [template, setTemplate] = useState<string>('blank');
   const [rename, setRename] = useState<ProjectSummary | null>(null), [deleting, setDeleting] = useState<ProjectSummary | null>(null);
   const list: ProjectSummary[] = [
     ...projects.guests.map(g => ({ id: g.id, name: g.name, updatedAt: g.updatedAt, revision: g.revision, cloud: false, system: g.system === true })),
@@ -76,6 +77,8 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
         }} />
       </div>
     </div>
+    <BuiltinTemplates pending={createBusy || submit.pending} onPreview={id => { const row = projects.builtins.find(r => r.templateId === id); if (row) void rowAction.run('open', row); }} onCreate={id => { setTemplate(id); setName(presetById(id)?.name ?? ''); setCreating(true); }} />
+    <h2 className="builtin-heading">我的项目</h2>
     {projects.listError && <LoadError title="云端项目读取失败" message={projects.listError} retrying={projects.loading} onRetry={() => void projects.reload()} />}
     {projects.loading && !list.length && <ManagementLoading label="加载项目" />}
     {!projects.loading && !projects.listError && !list.length && <div className="cms-empty"><LayoutTemplate size={36} /><h2>还没有设计项目</h2><p>新建空白户型，开始规划你的空间。</p></div>}
@@ -102,7 +105,7 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
         <form className="cms-form" onSubmit={e => { e.preventDefault(); void submit.run(); }}>
           <fieldset className="contents" disabled={submit.pending}>
             <div className="cms-field"><Label htmlFor="project-name">项目名称</Label><Input id="project-name" required maxLength={100} value={name} onChange={e => setName(e.target.value)} /></div>
-            <div className="cms-field"><Label htmlFor="project-template">户型模板</Label><Select value={template} onValueChange={v => setTemplate(v as typeof template)} disabled={submit.pending}><SelectTrigger id="project-template"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="blank">空白户型</SelectItem><SelectItem value="reference">参考户型</SelectItem></SelectContent></Select></div>
+            <div className="cms-field"><Label htmlFor="project-template">户型模板</Label><Select value={template} onValueChange={v => setTemplate(v as typeof template)} disabled={submit.pending}><SelectTrigger id="project-template"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="blank">空白户型</SelectItem>{TEMPLATE_PRESETS.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></div>
           </fieldset>
           <Button loading={submit.pending} disabled={!name.trim()}>{submit.pending ? '正在保存…' : '确认保存'}</Button>
         </form>

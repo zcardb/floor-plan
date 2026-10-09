@@ -72,10 +72,10 @@ export function readGuestDefault(templateId = lastGuestTemplate()): Project {
     const raw = localStorage.getItem(guestKeyFor(templateId));
     if (raw) {
       const p = JSON.parse(raw) as Project;
-      return { ...p, cloud: false, state: validateDesign(p.state) };
+      return { ...p, cloud: false, builtin: false, templateId, state: validateDesign(p.state) };
     }
   } catch { /* 读取失败时回落到新方案，不覆盖已有内容。 */ }
-  return createProject(templateId);
+  return { ...createProject(templateId), templateId };
 }
 
 /** 只负责写存储并如实返回结果；调用方拿到 ok 之后才更新界面状态。 */

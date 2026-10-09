@@ -12,7 +12,7 @@ export function bedroomFurniture(zone: Box, master = false): FurnitureZone {
     item('nightstand', 'up', center - bedWidth / 2 - 250),
     item('nightstand', 'up', center + bedWidth / 2 + 250),
     item('wardrobe', 'down', 650, 0, { name: '小衣柜' }),
-    ...(depth >= 3700 ? [item('desk', 'left', depth - 650, 0, { w: 1100 }), item('chair', 'right', depth - 650, width - 1180)] : []),
+    ...(depth >= 3700 ? [item('desk', 'left', 2600, 0, { w: 1000 }), item('chair', 'right', 2600, width - 1180)] : []),
   ] };
 }
 
@@ -30,7 +30,7 @@ export function kitchenFurniture(zone: Box): FurnitureZone {
     item('counter', 'down', (width + 600) / 2, 0, { w: width - 600, d: 600 }),
     item('stove', 'left', 850, 75),
     item('ksink', 'down', width - 650, 75),
-    item('fridge', 'up', width - 400),
+    item('fridge', 'up', 950),
   ] };
 }
 
@@ -38,7 +38,7 @@ export function livingFurniture(zone: Box, large = false): FurnitureZone {
   const width = zone[2] - zone[0], depth = zone[3] - zone[1];
   const loungeWidth = Math.min(width, 4400), center = loungeWidth / 2;
   const items: FurnitureSpec[] = [
-    item('sofa', 'left', depth / 2, 0, { name: '三人沙发' }),
+    item('sofa', 'left', depth / 2, 0, { name: depth < 2400 ? '双人沙发' : '三人沙发' }),
     item('tvstand', 'right', depth / 2, width - loungeWidth, { w: Math.min(2200, depth - 200) }),
     item('coffeetable', 'left', depth / 2, loungeWidth / 2 - 325, { w: 1100 }),
     item('rug', 'left', depth / 2, center - 800, { w: Math.min(2300, depth - 100), d: 1600 }),
@@ -62,5 +62,5 @@ export function livingFurniture(zone: Box, large = false): FurnitureZone {
 
 export function balconyFurniture(zone: Box): FurnitureZone {
   const width = zone[2] - zone[0];
-  return { zone, items: [item('washer', 'left', 350), item('vanity', 'left', 1000, 0, { name: '洗衣池' }), item('plant', 'right', 350), item('armchair', 'down', width - 1400, 0, { w: 700, d: 700 })] };
+  return { zone, items: [item('washer', 'left', 350), item('vanity', 'up', 1000, 0, { name: '洗衣池' }), item('plant', 'right', 350), item('armchair', 'down', width - 1400, 0, { w: 700, d: 700 })] };
 }

@@ -199,10 +199,10 @@ export function buildStructure(spec: PlanSpec): { walls: Wall[]; openings: Openi
         throw new Error(`户型模板 ${spec.id}：墙 ${axis.key} 上的开口越界或互相重叠`);
       if (start - cursor >= MIN_PIER) walls.push(segment(`${axis.key}-${i}`, cursor, start));
       const id = `${cut.kind}-${axis.key}-${i}`;
-      walls.push(segment(id, start, end));
+      walls.push(segment('opening-wall-' + id, start, end));
       openings.push({
         id,
-        wallId: id,
+        wallId: 'opening-wall-' + id,
         kind: cut.kind,
         offset: cut.width / 2,
         width: cut.width,

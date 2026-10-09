@@ -51,6 +51,7 @@ export interface SceneOptions {
   mode: "orbit" | "walk";
 }
 interface Props {
+  readOnly?: boolean;
   design: Design;
   selection: Selection;
   select: (s: Selection) => void;
@@ -412,6 +413,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
           start: Point;
         } | null = null;
       const capture = (e: PointerEvent) => {
+        if (latest.current.readOnly) return;
         if (
           latest.current.options.mode !== "orbit" ||
           e.target !== renderer.domElement
@@ -1034,6 +1036,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault();
+          if (props.readOnly) return;
           const p = ground(e.clientX, e.clientY);
           if (!p) return;
           try {

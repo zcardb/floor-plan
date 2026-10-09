@@ -85,12 +85,13 @@ describe('ProjectMenu', () => {
     expect(sentinel.props.onVisible).toBe(props.onLoadMore);
     expect(menu({ hasMore: true, listLoading: true }).tree.some(n => n.props.className === 'project-menu-loading')).toBe(true);
   });
-  it('访客显示“参考户型”，下拉只剩当前方案一行，没有云保存与返回项目管理', () => {
+  it('访客显示当前户型名称，可切换传入的模板，没有云保存与返回项目管理', () => {
     const { tree } = menu({ loggedIn: false });
-    expect(text(tree.find(n => n.props.className === 'project-menu-trigger')!.props.children as ReactNode)).toBe('参考户型');
+    expect(text(tree.find(n => n.props.className === 'project-menu-trigger')!.props.children as ReactNode)).toBe(current.name);
     const labels = items(tree).map(n => text(n.props.children as ReactNode));
-    expect(labels).toHaveLength(1);
-    expect(labels[0]).toContain('参考户型');
+    expect(labels).toHaveLength(2);
+    expect(labels[0]).toContain(current.name);
+    expect(labels[1]).toContain(other.name);
     expect(labels).not.toContain('保存到云端');
     expect(labels).not.toContain('返回项目管理');
     expect(actions(tree)).toHaveLength(0);

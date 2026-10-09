@@ -50,6 +50,7 @@ export interface CanvasHandle {
   exportImage: () => void;
 }
 interface Props {
+  readOnly?: boolean;
   design: Design;
   selection: Selection;
   select: (s: Selection) => void;
@@ -81,6 +82,7 @@ interface Drag {
 export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
   {
     design,
+    readOnly = false,
     selection,
     select,
     tool,
@@ -347,6 +349,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault();
+        if (readOnly) return;
         try {
           add(
             JSON.parse(e.dataTransfer.getData("application/interior-item")),
@@ -392,6 +395,14 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           wid = wallEl?.getAttribute("data-wall"),
           oid = el.closest("[data-opening]")?.getAttribute("data-opening"),
           handle = el.closest("[data-handle]")?.getAttribute("data-handle");
+        if (readOnly) {
+          if (fid) select({ kind: 'furniture', id: fid });
+          else if (oid) select({ kind: 'opening', id: oid });
+          else if (wid) select({ kind: 'wall', id: wid });
+          else base.room = el.closest('[data-room]')?.getAttribute('data-room') || undefined;
+          drag.current = base;
+          return;
+        }
         if (tool === 'wall') {
           if (design.template !== 'blank') return;
           select(null); wallDrawing.down(p, e.pointerId, [e.clientX, e.clientY]); return;

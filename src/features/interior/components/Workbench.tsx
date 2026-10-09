@@ -78,7 +78,7 @@ import {
   type Selection,
   type Tool,
 } from "../model/types";
-import { blankDesign, referenceDesign } from "../data/templates";
+import { blankDesign, referenceDesign, designForTemplate, presetById } from "../data/templates";
 import { library } from "../data/catalog";
 import { Library } from "./Library";
 import { RoomList } from "./RoomList";
@@ -119,6 +119,7 @@ interface Props {
   logout: () => void;
   loggingOut?: boolean;
   cloudSave: () => Promise<boolean>;
+  createFromTemplate?: (templateId: string) => Promise<boolean>;
   /** 游客模式下对当前方案的编辑次数：>0 表示模版已被改动，顶部出现「登录并保存到云端」提示条。 */
   guestEdits: number;
 }
@@ -156,7 +157,8 @@ function ToolButton({
 }
 export function Workbench(p: Props) {
   const confirm = useConfirm();
-  const model = useDesign(p.project.state, p.update),
+  const readOnly = !!p.project.builtin;
+  const model = useDesign(p.project.state, p.update, readOnly),
     { design: d, change, commit, preview, undo, redo, counts, sizeTransaction } = model;
   const [selection, setSelection] = useState<Selection>(null),
     [tool, setTool] = useState<Tool>("select"),
@@ -438,6 +440,7 @@ export function Workbench(p: Props) {
   }, [d, selection, change, removeWall]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
+      if (readOnly && !['t', 'f', 'escape'].includes(e.key.toLowerCase())) return;
       if (
         (e.target as HTMLElement).matches("input,textarea,select") ||
         sceneOptions.mode === "walk"
@@ -498,6 +501,7 @@ export function Workbench(p: Props) {
     else setHidePanel((v) => !v);
   };
   const cloudSave = useAsyncAction(p.cloudSave);
+  const templateCreate = useAsyncAction(async () => { if (p.createFromTemplate) await p.createFromTemplate(p.project.templateId ?? 'reference'); });
   // 游客改过模版才提示登录保存；「暂不保存」只关掉当前这一版，再改一次会重新出现。
   const [bannerClosed, setBannerClosed] = useState(0);
   const showGuestBanner = !p.loggedIn && p.guestEdits > 0 && p.guestEdits !== bannerClosed;
@@ -522,6 +526,7 @@ export function Workbench(p: Props) {
     void exportAction.run(format);
   };
   const clearFurniture = async () => {
+    if (readOnly) return;
     if (!d.furniture.length) return;
     const ok = await confirm({
       title: "清空所有家具？",
@@ -536,6 +541,7 @@ export function Workbench(p: Props) {
     notify.success(`已清空 ${count} 件家具，可撤销恢复`);
   };
   const resetDesign = async () => {
+    if (readOnly) return;
     // CAD 导入的户型没有内置的初始模板，重置会把它换成参考户型。
     if (d.templateId === DXF_TEMPLATE_ID) {
       notify.fail("CAD 导入的户型没有初始模板，请用撤销逐步恢复");
@@ -549,7 +555,7 @@ export function Workbench(p: Props) {
     });
     if (!ok) return;
     change((d) => ({
-      ...(d.template === "blank" ? blankDesign() : referenceDesign()),
+      ...(d.template === "blank" ? blankDesign() : d.templateId ? designForTemplate(d.templateId) : referenceDesign()),
       ...(d.structureUnlocked ? { structureUnlocked: true } : {}),
     }));
     setSelection(null);
@@ -836,7 +842,8 @@ export function Workbench(p: Props) {
           }}
           blank={d.template === "blank"}
           customItems={[...projectCatalog, ...accountFurniture]}
-          onNew={p.loggedIn ? () => setCustomOpen(true) : undefined}
+          onNew={p.loggedIn && !readOnly ? () => setCustomOpen(true) : undefined}
+          readOnly={readOnly}
           rooms={
             <RoomList
               rooms={d.rooms}
@@ -847,12 +854,13 @@ export function Workbench(p: Props) {
         />
       </aside>
       <main className="stage" ref={stage}>
+        {readOnly && <div className="template-readonly-banner"><span>内置模板 · 只读预览</span><Button size="sm" loading={templateCreate.pending} onClick={() => void templateCreate.run()}>用此模板新建</Button></div>}
         <div className="stage-topline">
           <div className="canvas-context">
             <span className="context-dot" />
             {view === "2d" ? "平面布置图" : "立体空间预览"}
             <span>
-              /{d.template === "blank" ? " 自定义户型" : d.templateId === DXF_TEMPLATE_ID ? " CAD 导入户型" : " 三室两厅两卫"}
+              /{d.template === "blank" ? " 自定义户型" : d.templateId === DXF_TEMPLATE_ID ? " CAD 导入户型" : ` ${presetById(d.templateId ?? 'reference')?.layout ?? '参考户型'}`}
             </span>
           </div>
           <div className="stage-pane-buttons">
@@ -878,6 +886,7 @@ export function Workbench(p: Props) {
         </div>
         {view === "2d" ? (
           <PlanCanvas
+            readOnly={readOnly}
             ref={canvas}
             design={d}
             selection={selection}
@@ -897,6 +906,7 @@ export function Workbench(p: Props) {
           />
         ) : Scene ? (
           <Scene
+            readOnly={readOnly}
             ref={scene}
             design={d}
             selection={selection}
@@ -1058,7 +1068,7 @@ export function Workbench(p: Props) {
           transaction={sizeTransaction} showCosts={p.loggedIn}
           accountFloors={accountFloors} accountWalls={accountWalls} accountOpenings={accountOpenings}
           accountRoofs={accountRoofs} accountCeilings={accountCeilings}
-          hidden={tool !== 'select' || !!drawer || (view === "3d" && sceneOptions.mode === "walk")}
+          hidden={readOnly || tool !== 'select' || !!drawer || (view === "3d" && sceneOptions.mode === "walk")}
           details={() => {
             setPanelMode("props");
             if (matchMedia("(max-width:1100px)").matches) setDrawer("panel");
@@ -1090,6 +1100,7 @@ export function Workbench(p: Props) {
           />
         )}
         <div className="panel-scroll">
+          <fieldset className="contents" disabled={readOnly}>
           {p.loggedIn && panelMode === "cost" ? (
             <CostPanel
               design={d}
@@ -1116,6 +1127,7 @@ export function Workbench(p: Props) {
               openCosts={() => setPanelMode("cost")}
             />
           )}
+          </fieldset>
         </div>
       </aside>
       {drawer && (

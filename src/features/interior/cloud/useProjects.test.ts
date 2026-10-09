@@ -6,7 +6,7 @@ vi.mock('react', async (original) => ({
   ...(await original<typeof import('react')>()),
   useState(initial: unknown) {
     const index = harness.cursor++;
-    if (!(index in harness.slots)) harness.slots[index] = initial;
+    if (!(index in harness.slots)) harness.slots[index] = typeof initial === 'function' ? initial() : initial;
     return [
       harness.slots[index],
       (next: unknown) => {

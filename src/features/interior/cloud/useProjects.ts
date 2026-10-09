@@ -280,13 +280,13 @@ export function useProjects() {
   const open = useCallback(
     async (p: ProjectSummary) => {
       if (!(await save())) return false;
-      const templateId = p.templateId ?? (isBuiltinId(p.id) ? p.id.slice('builtin-template:'.length) : undefined);
+      const templateId = p.builtin || isBuiltinId(p.id) ? p.templateId ?? p.id.slice('builtin-template:'.length) : undefined;
       if (templateId && isPresetId(templateId)) {
         const preset = presetById(templateId)!;
         const next = sessionRef.current ? builtinProject(preset) : readGuestDefault(templateId);
         if (!sessionRef.current && !writeGuestDefault(next).ok) { setStatus(STATUS.localFailed); return false; }
         epoch.current++; dirty.current = false;
-        activeRef.current = next; setActive(next); setGuestEdits(0);
+        activeRef.current = next; setActive(next); setGuestEdits(nextGuestEditCount(0, next.state));
         setStatus(sessionRef.current ? { kind: 'saved', label: '内置模板 · 只读' } : STATUS.local);
         return true;
       }

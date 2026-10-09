@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createProject } from '../data/templates';
 vi.mock('@/lib/notify', () => ({ notify: { error: vi.fn(), fail: vi.fn(), success: vi.fn(), info: vi.fn(), warning: vi.fn() } }));
-import { GUEST_KEY, purgeRecoveryCopies, readGuests, writeGuests } from './guestStore';
+import { GUEST_KEY, purgeRecoveryCopies, readGuests, writeGuests, systemProject, readGuestDefault, writeGuestDefault } from './guestStore';
 
 /** 最小 Storage 替身：可注入读/写抛错，用来模拟无权限与配额不足。 */
 function fakeStorage(options: { throwOnRead?: boolean; throwOnWrite?: boolean } = {}) {
@@ -30,16 +30,17 @@ const use = (storage: ReturnType<typeof fakeStorage>) => {
 describe('本机方案存储', () => {
   beforeEach(() => vi.unstubAllGlobals());
 
-  it('首次运行播种一份参考户型方案', () => {
+  it('首次运行内置模板不占用我的项目列表', () => {
     use(fakeStorage());
-    expect(readGuests()).toHaveLength(1);
+    expect(readGuests()).toHaveLength(0);
   });
 
   it('播种的默认方案带系统标记，用户新建的本机项目不带', () => {
     use(fakeStorage());
-    expect(readGuests()[0].system).toBe(true);
+    const seeded = systemProject();
+    expect(seeded.system).toBe(true);
     const mine = createProject('blank');
-    writeGuests([mine, readGuests()[0]]);
+    writeGuests([mine, seeded]);
     const list = readGuests();
     expect(list.find(p => p.id === mine.id)!.system).toBeUndefined();
     expect(list.filter(p => p.system === true)).toHaveLength(1);
@@ -77,12 +78,22 @@ describe('本机方案存储', () => {
     use(fakeStorage({ throwOnWrite: true }));
     expect(writeGuests([]).ok).toBe(false);
     expect(storage.map.get(GUEST_KEY)).toBe(before);
-    expect(readGuests()).toHaveLength(1);
+    expect(readGuests()).toHaveLength(0);
   });
 
   it('存储不可读时不凭空造项目', () => {
     use(fakeStorage({ throwOnRead: true }));
     expect(readGuests()).toEqual([]);
+  });
+
+  it('不同模板各自保留改动，刷新恢复最后选择', () => {
+    use(fakeStorage());
+    const a=createProject('studio'), b=createProject('two-bed');
+    a.state.furniture[0].cx+=100;b.state.furniture[0].cy+=200;
+    expect(writeGuestDefault(a).ok).toBe(true);expect(writeGuestDefault(b).ok).toBe(true);
+    expect(readGuestDefault('studio').state.furniture[0].cx).toBe(a.state.furniture[0].cx);
+    expect(readGuestDefault().state.templateId).toBe('two-bed');
+    expect(readGuestDefault().state.furniture[0].cy).toBe(b.state.furniture[0].cy);
   });
 
   it('清理历史恢复副本，保留其它键', () => {

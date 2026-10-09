@@ -51,8 +51,8 @@ export function ProjectMenu(p: Props) {
     setPending(row.id);
     try { await p.onOpen(row); } finally { opening.current = false; setPending(null); }
   };
-  const name = p.loggedIn ? p.project.name : '参考户型';
-  const rows = p.loggedIn ? p.projectList : [p.project];
+  const name = p.project.name;
+  const rows = p.projectList;
   return <>
     <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
       <DropdownMenuTrigger asChild>
@@ -67,12 +67,12 @@ export function ProjectMenu(p: Props) {
         </>}
         <div className="project-menu-list" role="group" aria-label="项目列表">
           {rows.map(row => {
-            const current = row.id === p.project.id;
+            const current = row.id === p.project.id || (!p.loggedIn && row.templateId === p.project.templateId);
             return <div key={row.id} className="project-menu-row">
               <DropdownMenuItem className="project-menu-option" aria-current={current ? 'true' : undefined}
                 disabled={!!pending && !current} onSelect={event => { if (current) event.preventDefault(); else void open(row); }}>
-                <span className="project-menu-name">{p.loggedIn ? row.name : name}</span>
-                <span className="project-menu-date">{pending === row.id ? <Loader2 className="animate-spin" size={13} /> : shortDate(row.updatedAt)}</span>
+                <span className="project-menu-name">{row.name}</span>
+                <span className="project-menu-date">{pending === row.id ? <Loader2 className="animate-spin" size={13} /> : row.builtin ? '内置模板' : shortDate(row.updatedAt)}</span>
                 <span className="project-menu-check">{current && <Check size={15} aria-label="当前项目" />}</span>
               </DropdownMenuItem>
               {/* 与项目管理卡片复用同一套操作按钮；先收起下拉再开弹窗，避免两层焦点陷阱冲突。 */}

@@ -27,7 +27,9 @@ export function Library({
   customItems = [],
   onNew,
   rooms,
+  readOnly = false,
 }: {
+  readOnly?: boolean;
   add: (i: LibraryItem) => void;
   setTool: (t: Tool) => void;
   blank: boolean;
@@ -125,7 +127,8 @@ export function Library({
           >
             <button
               className="library-item"
-              draggable
+              draggable={!readOnly}
+              disabled={readOnly}
               onDragStart={(e) =>
                 e.dataTransfer.setData(
                   "application/interior-item",
