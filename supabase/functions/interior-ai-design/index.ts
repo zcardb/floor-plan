@@ -496,7 +496,7 @@ Deno.serve(async (req) => {
     }, { onConflict: 'generation_id,idx' }).select('id').single();
     if (insertError) throw insertError;
     await admin.from('interior_ai_generations').update({ status: 'succeeded', error: null }).eq('id', generationId);
-    return json(200, { success: true, model: MODEL, candidate: { candidateId: row.id, index: body.index, summary, result, warnings } });
+    return json(200, { success: true, model, candidate: { candidateId: row.id, index: body.index, summary, result, warnings } });
   } catch (e) {
     console.error('interior-ai-design error', e);
     if (e instanceof UpstreamError) return await fail([402, 403, 429].includes(e.status) ? e.status : 502, e.message);
