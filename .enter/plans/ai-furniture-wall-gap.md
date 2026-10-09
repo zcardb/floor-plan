@@ -54,22 +54,24 @@ const gap = round10(clamp((num(raw.gap) ?? 0) - clearance, 0, Math.max(0, horizo
 
 ## Implementation checklist
 
-- [ ] `sanitize.ts`：`toSpec` 增加 `clearance` 参数（默认 0），`gap` 改为 `clamp(raw - clearance, 0, 分区尺寸)` 后再 `round10`
-- [ ] `sanitize.ts`：`sanitizePlan` 的家具映射传 `INNER_WALL / 2`；`sanitizeRoomItems` 仍传 0（保持 room 模式行为）
-- [ ] `sanitize.ts`：注释说明「模型 gap 量到墙中心线、系统按净空摆放」的换算，并给出 60→0 / 0→0 / 150→90 三个结果
-- [ ] `index.ts`（后端函数）：`PLAN_CONTRACT` 家具段改为「净空矩形 + 贴墙 gap 必须为 0 + 不要压墙」
-- [ ] `ai.test.ts`：新增 plan 用例——`gap: 60` 的房间贴墙家具落地后背面正好落在 `roomZone` 对应边上（缝为 0）
-- [ ] `ai.test.ts`：新增 plan 用例——`gap: 150` → 90、`gap: 0` → 0、负值/超界仍夹进分区
-- [ ] `ai.test.ts`：新增 room 用例——`sanitizeRoomItems` 的 `gap` 不平移（0→0、1500→1500）
-- [ ] 部署后端函数 `interior-ai-design`
+- [x] `sanitize.ts`：`toSpec` 增加 `clearance` 参数（默认 0），`gap` 改为 `clamp(raw - clearance, 0, 分区尺寸)` 后再 `round10`
+- [x] `sanitize.ts`：`sanitizePlan` 的家具映射传 `INNER_WALL / 2`；`sanitizeRoomItems` 仍传 0（保持 room 模式行为）
+- [x] `sanitize.ts`：注释说明「模型 gap 量到墙中心线、系统按净空摆放」的换算，并给出 60→0 / 0→0 / 150→90 三个结果
+- [x] `index.ts`（后端函数）：`PLAN_CONTRACT` 家具段改为「净空矩形 + 贴墙 gap 必须为 0 + 不要压墙」
+- [x] `ai.test.ts`：新增 plan 用例——`gap: 60` 的房间贴墙家具落地后背面正好落在 `roomZone` 对应边上（缝为 0）
+- [x] `ai.test.ts`：新增 plan 用例——`gap: 150` → 90、`gap: 0` → 0、负值/超界仍夹进分区
+- [x] `ai.test.ts`：新增 room 用例——`sanitizeRoomItems` 的 `gap` 不平移（0→0、1500→1500）
+- [x] 部署后端函数 `interior-ai-design`（返回 ACTIVE）
 
 ## Verification checklist
 
-- [ ] 正向：`pnpm exec vitest run src/features/interior` 全绿（含新增用例；`整户户型候选清洗与落地`、`房间布局候选清洗与落地` 的既有断言不变）
-- [ ] 正向（真实数据）：对 `interior_ai_candidates` 里 plan 候选的家具逐件换算「背面到最近墙面」的距离，`gap: 60` 的条目全部由 60 变为 0，`gap: 150` 的变为 90，房间内部件（900/1200/1500/2900）只少 60，量级不变
-- [ ] 正向（端到端脚本）：把一条真实候选 payload 的 `catalogId` 经 `buildAiCatalog` 反映射回 code 后跑 `sanitizePlan` + `planToDesign`，打印每件家具背面到所属房间净空边的距离，确认不再出现 60 mm 的缝（临时脚本，验证后删除，不留在仓库）
-- [ ] 负向：`gap` 远大于分区尺寸（如 99999）、`gap` 为负、`along` 越界时仍夹进分区、件数不丢（现有「指定家具不因放不下而丢件」用例通过）
-- [ ] 边界：`gap` 恰好 60 → 0；`gap < 60`（含 0 与负数）→ 0；外墙边（模型同样给 60）→ 0；room 模式 `gap` 不平移
-- [ ] 回归：`pnpm lint`、`pnpm exec tsc -p tsconfig.app.json --noEmit`、`pnpm run build` 通过
-- [ ] 部署：`supabase_deploy_edge_function interior-ai-design` 成功
-- [ ] 未验证则如实说明：契约改动要真实跑一批 AI 生成才能确认模型已按 `gap: 0` 输出（我无法在界面上触发生成），因此只把它当作「源头修正」，确定性修复由第 1 步的净空换算保证
+- [x] 正向：`pnpm exec vitest run src/features/interior` → 619 通过、2 个失败；失败项是 `dimensionWallEdit.test.ts` 与 `wallRemoval.test.ts`，属另一个会话正在改的 `roomEnclosure/roomFollow/wallFaces` 工作流（本次改动不在这条调用链上），新增的 4 个用例全绿
+- [x] 正向（真实数据）：把截图那一版候选（`b97e9d4f…` / idx 1）的 payload 解析回代号后跑 `sanitizePlan` + `planToDesign`：原始 gap 分布 `[60,150,350,900,1200,1500,2900,3378]` → 落地后 `[0,90,290,840,1140,1440,2840,3320]`，31 件家具全部落地、7 个房间不变，`gap === 60` 的条目从 17 件降到 **0 件**
+- [x] 正向（同一脚本）：贴墙家具（原 60）背面与所属房间净空边的距离为 0；主卧床与床头柜（原 150）为 90；茶几 1440、电视柜 2840 等房间内部件量级不变（临时脚本已按计划删除，未留在仓库）
+- [x] 负向：`gap: 99999` 夹到分区尺寸（3940）、`gap: -40` 夹到 0；`along` 越界与「比房间还大的家具」既有用例继续通过，件数不丢
+- [x] 边界：`gap` 恰好 60 → 0；`gap < 60`（含 0 与负数）→ 0；外墙边（模型同样给 60）→ 0；room 模式 `gap` 不平移（0→0、1500→1500）
+- [x] 把 `clearance` 临时改为 0 反跑新增用例，确认「60 → 0」「150 → 90」两条会失败（用例不是空跑）
+- [x] 回归：`pnpm lint` 0 error（3 个既有 warning）、`pnpm run build` 通过；`pnpm exec tsc -p tsconfig.app.json --noEmit` 仅剩另一个会话 `wallFaces.ts:37` 的 `side0` 未定义（本次未改动该文件）
+- [x] 部署：`supabase_deploy_edge_function interior-ai-design` 返回 ACTIVE；工具说明部署回执只是元数据，未验证源码与实际调用
+- [ ] 未验证：契约改动要真实跑一批 AI 生成才能确认模型已按 `gap: 0` 输出（需要登录后在界面上触发生成，我无法代为执行）；因此确定性修复由净空换算这一步保证，契约只作为源头修正
+

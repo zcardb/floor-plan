@@ -45,8 +45,11 @@ interface RawPlaced {
 /**
  * 模型给的家具条目 → 家具简写。代号在目录里查不到、背靠方向非法、放不进分区的都返回 null。
  * 沿墙位置与离墙距离会夹进分区，保证家具整体落在房间净空内。
+ * `clearance` 是把模型的 gap 换算到净空的偏移：plan 模式下模型按房间「中心线矩形」量，
+ * 贴墙时它会为半个墙厚留 60 mm；这里按净空矩形（房间轮廓已向内收半个内墙厚）摆放，
+ * 所以要扣掉这半个墙厚 —— 贴墙的 60 变成 0，模型按契约给的 0 也仍是 0，想留的真实缝隙（150 → 90）保留。
  */
-function toSpec(raw: RawPlaced, zone: Box, catalog: AiCatalog): FurnitureSpec | null {
+function toSpec(raw: RawPlaced, zone: Box, catalog: AiCatalog, clearance = 0): FurnitureSpec | null {
   if (!raw || typeof raw !== "object") return null;
   const item = catalog.byCode.get(text(raw.code, 20) ?? "");
   if (!item?.catalogId || !isSide(raw.back)) return null;
@@ -55,7 +58,7 @@ function toSpec(raw: RawPlaced, zone: Box, catalog: AiCatalog): FurnitureSpec | 
   // 不因「尺寸超过这一边」或「落点不在轮廓内」丢件：丢件会让指定清单的件数对不上，
   // 直接夹到分区中心即可，用户还能手动调整。
   const along = round10(clamp(num(raw.along) ?? (horizontal ? x2 - x1 : y2 - y1) / 2, 0, Math.max(0, horizontal ? x2 - x1 : y2 - y1)));
-  const gap = round10(clamp(num(raw.gap) ?? 0, 0, Math.max(0, horizontal ? y2 - y1 : x2 - x1)));
+  const gap = round10(clamp((num(raw.gap) ?? 0) - clearance, 0, Math.max(0, horizontal ? y2 - y1 : x2 - x1)));
   return { type: item.type, name: item.name, catalogId: item.catalogId, back: raw.back, along, gap };
 }
 
@@ -260,7 +263,7 @@ export function sanitizePlan(value: unknown, { catalog }: { catalog: AiCatalog }
     if (!target || budget <= 0) continue;
     const items = list(g.items)
       .slice(0, Math.min(MAX_ROOM_ITEMS, budget))
-      .map((item) => toSpec(item as RawPlaced, target.zone, catalog))
+      .map((item) => toSpec(item as RawPlaced, target.zone, catalog, INNER_WALL / 2))
       .filter((spec): spec is FurnitureSpec => !!spec);
     if (!items.length) continue;
     budget -= items.length;

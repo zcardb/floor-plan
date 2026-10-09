@@ -170,7 +170,7 @@ const PLAN_CONTRACT = `你是住宅空间规划与户型设计助手。根据用
 - 墙：dir=h 为横墙（at 是 y，from/to 是 x 范围），dir=v 为竖墙（at 是 x，from/to 是 y 范围）。坐标取墙中心线，内墙厚 120。端点落在外轮廓内侧或另一面内墙的中心线上；key 唯一。
 - 房间：沿墙中心线给轮廓，全部落在外轮廓内。矩形用 box:[x1,y1,x2,y2]，L 形用 poly（横平竖直的顶点数组）。id 唯一，name 用中文。mat 取 wood、walnut、tile800、tile600、antislip、marble、terrazzo、carpet 之一。
 - 门窗：kind 取 door 或 window；wall 引用内墙 key 或外墙名；at 是洞口中心沿墙的位置，width 是洞口宽。门的 into 是开向（横墙填 up/down，竖墙填 left/right）。同一面墙上的洞口互不重叠，离墙端至少 100。
-- 家具：按房间分组，room 引用房间 id。每件家具用 back（背靠哪条边：up/down/left/right）、along（中心沿这条边的位置）、gap（背面到这条边的距离，贴墙为 0）描述，坐标相对该房间外接矩形的左上角。只能用目录里的代号。`;
+- 家具：按房间分组，room 引用房间 id。每件家具用 back（背靠哪条边：up/down/left/right）、along（中心沿这条边的位置）、gap（背面到这条边的距离，贴墙为 0）描述，坐标相对该房间**净空矩形**（房间轮廓向内收半个墙厚后的可用范围）的左上角；贴墙摆放时 gap 必须为 0，不要为墙厚留空隙，也不要把家具压到墙上。只能用目录里的代号。`;
 
 /** 与协议无关的对话消息；发送前再转成各协议的格式。 */
 interface Msg { role: 'user' | 'assistant'; text: string; images?: string[] }

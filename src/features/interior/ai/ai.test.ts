@@ -281,3 +281,54 @@ describe("指定家具不因放不下而丢件", () => {
     expect(items[0].gap).toBe(0);
   });
 });
+
+describe("AI 户型贴墙家具不留半个墙厚的缝", () => {
+  const catalog = buildAiCatalog();
+  const sofa = codeOf(catalog, "三人沙发");
+  /**
+   * 客厅上边是外墙内表面（y = 0），下边是内墙中心线（y = 4000）；净空下边因此是 3940。
+   * 模型按中心线矩形量取，贴墙时给的就是半个内墙厚（60）。
+   */
+  const plan = (gap: number) => ({
+    summary: "贴墙",
+    width: 6000,
+    depth: 6000,
+    walls: [{ key: "spine", dir: "h", at: 4000, from: 0, to: 6000 }],
+    rooms: [
+      { id: "living", name: "客厅", mat: "tile800", box: [0, 0, 6000, 4000] },
+      { id: "rest", name: "储物", mat: "wood", box: [0, 4000, 6000, 6000] },
+    ],
+    openings: [],
+    furniture: [{ room: "living", items: [{ code: sofa, back: "down", along: 3000, gap }] }],
+  });
+  const gapOf = (gap: number) => sanitizePlan(plan(gap), { catalog }).furniture[0]!.items[0]!.gap;
+  /** 落地后沙发背面（back = down 时是 y 的正方向那一边）与房间净空下边的距离。 */
+  const edge = (gap: number) => {
+    const design = planToDesign(sanitizePlan(plan(gap), { catalog }), catalog);
+    const f = design.furniture[0]!;
+    const room = design.rooms.find((r) => r.name === "客厅")!;
+    return { back: f.cy + f.d / 2, face: roomZone(room)[3] };
+  };
+  it("模型为墙厚留的 60 mm 换算成 0：背面正好落在净空边上", () => {
+    expect(gapOf(60)).toBe(0);
+    const { back, face } = edge(60);
+    expect(back).toBe(face);
+  });
+  it("gap 0 仍然贴墙；模型想留的真实缝隙只少半个墙厚（150 → 90）", () => {
+    expect(gapOf(0)).toBe(0);
+    expect(edge(0).back).toBe(edge(0).face);
+    expect(gapOf(150)).toBe(90);
+    const { back, face } = edge(150);
+    expect(face - back).toBe(90);
+  });
+  it("负数与超过分区高度的 gap 仍然夹进分区", () => {
+    expect(gapOf(-40)).toBe(0);
+    // 净空上下高 3940：夹到分区高度后家具贴在另一条边上。
+    expect(gapOf(99999)).toBe(3940);
+  });
+  it("房间布局（room 模式）的 gap 不平移：贴墙 0 仍是 0、真实缝隙 1500 不变", () => {
+    const zone: [number, number, number, number] = [0, 0, 4000, 3000];
+    const specs = sanitizeRoomItems({ items: [{ code: sofa, back: "down", along: 2000, gap: 0 }, { code: sofa, back: "up", along: 2000, gap: 1500 }] }, { zone, catalog });
+    expect(specs.map((s) => s.gap)).toEqual([0, 1500]);
+  });
+});
