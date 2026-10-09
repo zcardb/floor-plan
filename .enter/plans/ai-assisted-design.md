@@ -22,6 +22,32 @@
 
 **关于「agent」的取舍**：本方案把 agent 落成两样东西 —— ① `interior_ai_agents` 表（可调的任务说明/风格偏好/模型/修复轮数，改配置不重新部署）；② 后端一个有界「生成 → 校验 → 修复」循环。硬性的 DSL 契约留在代码里（必须与渲染器一致）。若你指的是用 Builder 里的自定义 Agent 来承载提示词，那只需把 ② 的提示词来源换成自定义 Agent 调用，其余不变。
 
+## 零、扩展性：家具目录 = 动态注册表 + 代号
+
+**目标**：以后不管是往 `data/catalog.ts` 里加内置家具，还是用户在账号库新建家具，AI 生成时都**自动**能用，不改提示词、不改后端、不重新部署。
+
+- **唯一来源**：新增 `ai/catalog.ts: buildAiCatalog({ design, accountFurniture })`，每次请求现算：`library`（内置）+ `design.customCatalog`（项目内）+ 账号家具库，按 `catalogId` 去重。新增的家具只要进了这三处之一，就会进入下一次生成。
+- **代号**：每次请求给目录条目分配短代号 `F1…Fn`（按 `category → name` 稳定排序），连同 `name / category / type / w×d` 一起发给模型。模型**只引用代号**（`{ code:'F7', back:'up', along:1200, gap:0 }`），不再输出 `type/name`：省 token、杜绝模型编造家具名、同名家具（如两张不同「餐桌」）也能区分。
+- **映射回家具**：请求时在前端保留 `code → catalogId → LibraryItem` 的映射表；返回后用它解析代号。解析不到的代号直接丢弃（后端校验也会把「未知代号」当错误让 agent 修一轮）。
+- **后端不写死家具类型**：校验只看「代号是否在本次请求的目录里」，不像 `interior-furniture-image-submit` 那样维护 `allowed` 列表。
+- **候选落库时存 `catalogId` 不存代号**：代号只在单次请求内有效，`interior_ai_candidates.payload` 里存解析后的 `catalogId`，日后目录变化仍可追溯。
+- **新家具类型的渲染**：AI 只决定「放哪个 + 放哪」，2D/3D 形状仍按 `type`（`furnitureAppearance.ts`）渲染；账号家具的 `type` 已由新建家具弹窗决定，无需额外处理。
+
+## 零点五、指定家具（房间布局）+ 统一家具选择器
+
+**指定家具**：房间 AI 布局输入态新增「指定家具」动态列表：
+
+- 「＋ 添加家具」每点一次，弹出家具选择器选一件，追加一行；行尾 `✕` 删除。
+- **同一件家具可重复添加**（选过的仍在列表里可选），重复添加即表示数量（如两张床头柜）；列表按添加顺序展示，相同家具合并显示 `×2` 角标，删除时减一。
+- 可选开关「只用指定家具」：开 = AI 只能用这些家具（数量必须一致）；关（默认）= 必须包含这些家具，其余可由 AI 从完整目录里补。
+- 发送时把指定家具转成代号清单 `required: [{ code:'F7', count:2 }]`；后端校验「每个代号的出现次数 ≥ count（只用指定家具时 = count，且不出现其他代号）」，不满足就把差异作为报错让 agent 修一轮；前端 `sanitizeRoomItems` 再校验一次，不满足的候选丢弃。
+
+**统一家具选择器 `components/FurniturePicker.tsx`**（基于已有 `components/ui/command.tsx`（cmdk）+ `Popover`）：
+
+- 搜索框（按名称 / 分类 / 类型匹配，复用 `filterFurnitureLibrary` 的匹配语义并扩展到 `category`/`type`）、按分类分组、每项显示缩略符号（`FurnitureShape` 或 `imageUrl`）+ 名称 + 尺寸；内置、项目、账号家具带来源角标。
+- 两种模式：`mode="single"`（选中即关闭，回传一项）与 `mode="add"`（选中即追加一项并关闭，已选过的仍可再选）。
+- **两处共用**：① 房间 AI 布局的「指定家具」（`mode="add"`）；② 新建家具弹窗 `CustomFurnitureDialog.tsx` 里现在的「参考类型」下拉（第 120 行的 `Select`，选项来自 `furnitureTypes`，约 45 项且不可搜索）替换为 `FurniturePicker mode="single"`，保留顶部「自动匹配 · xxx」项。参考类型的数据源是「类型」而不是具体家具，因此选择器接受通用的 `items: PickerItem[]`（`{ id, label, category?, hint?, visual? }`），由调用方各自映射。
+
 ## 一、可用模型（AI All）
 
 只用**同一协议** `openai_chat_completions` 的模型，让 agent 保持单一代码路径（Gemini / Anthropic 系协议不同，暂不纳入可选档）：
@@ -199,7 +225,8 @@ RLS：两张表都 `enable row level security`，`FOR SELECT` / `FOR UPDATE`（�
 ## 五、数据契约
 
 ```ts
-type AiCatalogEntry = { type: string; name: string; w: number; d: number; category: string };
+// 目录条目：代号只在本次请求内有效；映射表留在前端
+type AiCatalogEntry = { code: string; name: string; category: string; type: string; w: number; d: number };
 type AiModelTier = 'auto' | 'fast' | 'quality';
 type AiRoomContext = {
   roomId: string; name: string; mat: string; area: number;
@@ -207,15 +234,18 @@ type AiRoomContext = {
   w: number; d: number;
   doors:   { edge: 'up'|'down'|'left'|'right'; at: number; width: number }[];
   windows: { edge: 'up'|'down'|'left'|'right'; at: number; width: number }[];
-  existing: { type: string; name: string; cx: number; cy: number; w: number; d: number; rot: number }[];
+  existing: { code: string; name: string; cx: number; cy: number; w: number; d: number; rot: number }[];
 };
 // plan: { width, depth, description, images?, catalog, modelTier, projectId? }
 //       → { success, generationId, candidates: { id, index, plan: PlanSpec, summary }[] }
-// room: { room: AiRoomContext, roomKind, description, images?, keepExisting, catalog, modelTier, projectId? }
-//       → { success, generationId, candidates: { id, index, items: FurnitureSpec[], note }[] }
+// room: { room: AiRoomContext, roomKind, description, images?, catalog, keepExisting,
+//         required: { code: string; count: number }[], onlyRequired: boolean,
+//         modelTier, projectId? }
+//       → { success, generationId, candidates: { id, index, items: PlacedSpec[], note }[] }
+//       PlacedSpec = { code, back:'up'|'down'|'left'|'right', along?, gap?, w?, d? }
 ```
 
-提示词要讲清 DSL 约定（沿用 `floorplanBuilder.ts` 注释）：单位 mm、原点在室内净轮廓左上角、x 向右 y 向下（下方为南）；**不要输出外墙**（渲染器按长宽自动生成），只输出内墙 `{key,dir,at,from,to}`；房间用 `box:[x1,y1,x2,y2]`（L 形用 `poly`）且互不重叠、铺满平面；开口用 `{wall,kind,at,width,into?}`，`wall` 引用内墙 `key` 或 `top/right/bottom/left`；家具用 `{zone, items:[{type,name,back,along,gap}]}`。附一段真实 few-shot（从 `templatePresets.ts` 两房参数化结果精简）+ JSON-only 要求。
+提示词要讲清 DSL 约定（沿用 `floorplanBuilder.ts` 注释）：单位 mm、原点在室内净轮廓左上角、x 向右 y 向下（下方为南）；**不要输出外墙**（渲染器按长宽自动生成），只输出内墙 `{key,dir,at,from,to}`；房间用 `box:[x1,y1,x2,y2]`（L 形用 `poly`）且互不重叠、铺满平面；开口用 `{wall,kind,at,width,into?}`，`wall` 引用内墙 `key` 或 `top/right/bottom/left`；**家具一律用目录代号** `{zone, items:[{code,back,along,gap}]}`，禁止使用目录以外的代号。附一段真实 few-shot（从 `templatePresets.ts` 两房参数化结果精简，家具改写成代号形式）+ JSON-only 要求。
 
 ## 六、风险与边界
 
