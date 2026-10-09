@@ -169,15 +169,20 @@ function requestBody(model: string, system: string, messages: Msg[]) {
 }
 
 /** 取出回复正文：三种协议的返回结构不同。 */
-function replyText(protocol: Protocol, data: any): string {
-  if (protocol === 'anthropic') return (Array.isArray(data?.content) ? data.content : []).filter((c: any) => c?.type === 'text').map((c: any) => c.text ?? '').join('');
+interface ReplyPart { type?: string; text?: string; content?: unknown }
+interface ReplyData { content?: unknown; choices?: { message?: { content?: unknown } }[]; output_text?: unknown; output?: unknown }
+const parts = (v: unknown): ReplyPart[] => (Array.isArray(v) ? v.filter((x): x is ReplyPart => !!x && typeof x === 'object') : []);
+const joinText = (list: ReplyPart[]) => list.map((c) => c.text ?? '').join('');
+
+function replyText(protocol: Protocol, data: ReplyData | null | undefined): string {
+  if (protocol === 'anthropic') return joinText(parts(data?.content).filter((c) => c.type === 'text'));
   if (protocol === 'chat') {
     const content = data?.choices?.[0]?.message?.content;
-    return typeof content === 'string' ? content : Array.isArray(content) ? content.map((c: any) => c?.text ?? '').join('') : '';
+    return typeof content === 'string' ? content : joinText(parts(content));
   }
   if (typeof data?.output_text === 'string' && data.output_text) return data.output_text;
-  return (Array.isArray(data?.output) ? data.output : []).filter((o: any) => o?.type === 'message')
-    .flatMap((o: any) => (Array.isArray(o.content) ? o.content : [])).filter((c: any) => c?.type === 'output_text').map((c: any) => c.text ?? '').join('');
+  return joinText(parts(data?.output).filter((o) => o.type === 'message')
+    .flatMap((o) => parts(o.content)).filter((c) => c.type === 'output_text'));
 }
 
 function roomPrompt(b: Body) {

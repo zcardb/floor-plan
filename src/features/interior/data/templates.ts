@@ -166,9 +166,8 @@ export function defaultFurniture(): Furniture[] {
     f("plant", "绿植", 11550, 10250, 500, 500),
   ].map(normalizeFurniture);
 }
-/** 参考户型（已执行「清空分割」，与模板列表里的一致）。 */
-export const referenceDesign = (): Design => mergeAllSplits(rawReferenceDesign()).design;
-function rawReferenceDesign(): Design {
+/** 参考户型原始结构（门窗各占一段满宽墙）；新建 / 复刻 / 重置请用 designForTemplate('reference')。 */
+export function referenceDesign(): Design {
   const data: [string, string, Point[], string, boolean?][] = [
     ["master", "主卧室", rect(6600, 0, 3670, 3370), "wood"],
     ["mbath", "主卫浴", rect(4820, 0, 1540, 2080), "antislip"],
