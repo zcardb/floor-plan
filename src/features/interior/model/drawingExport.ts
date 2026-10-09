@@ -37,15 +37,12 @@ async function drawingBlob(design: Design, format: DrawingFormat, name: string):
 }
 
 const fileName = (name: string, extension: string) => `${name.replace(/[\\/:*?"<>|]/g, '-') || '平面图'}.${extension}`;
-function downloadBlob(blob: Blob, name: string) {
-  const url = URL.createObjectURL(blob);
-  try { const link = document.createElement('a'); link.href = url; link.download = name; link.click(); }
-  finally { setTimeout(() => URL.revokeObjectURL(url), 1000); }
-}
+export interface ExportFile { blob: Blob; name: string }
 
-export async function downloadDrawing(design: Design, format: DrawingFormat, name: string) {
-  downloadBlob(await drawingBlob(design, format, name), fileName(name, format));
+/** 只生成文件；保存方式（直接下载 / 微信长按保存）由调用方统一决定。 */
+export async function drawingFile(design: Design, format: DrawingFormat, name: string): Promise<ExportFile> {
+  return { blob: await drawingBlob(design, format, name), name: fileName(name, format) };
 }
-export function downloadProjectJson(design: Design, name: string) {
-  downloadBlob(new Blob([serializeProjectJson(design, name)], { type: MIME.json }), fileName(name, 'json'));
+export function projectJsonFile(design: Design, name: string): ExportFile {
+  return { blob: new Blob([serializeProjectJson(design, name)], { type: MIME.json }), name: fileName(name, 'json') };
 }

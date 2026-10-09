@@ -77,41 +77,41 @@ iPhone 点 3D 后整页白屏，之后我重新逐项核对了代码，确认的
 - 删除：`scene/pointerLock.ts` 和对应的测试（迁移到平台层）
 
 ## Implementation checklist
-- [ ] `capabilities.ts`：实现 4 个能力判断，都支持传入 `env`
-- [ ] `pointerLock.ts` 迁移到平台层，新增 `tryPointerLock`，删除 `scene/pointerLock.*`
-- [ ] `saveFile.ts`：微信返回 `blocked`；其他浏览器下载后返回 `downloaded`
-- [ ] `canvasLimits.ts`：`rasterSize` 保证宽、高都不超过 `maxSide`，面积不超过 `maxArea`，并且保持宽高比
-- [ ] `eslint.config.js`：加 3 条 `no-restricted-syntax`，`src/lib/platform/**` 除外
-- [ ] `shot` / `exportImage` 改为返回 `Promise<Blob>`，内部不再有 `<a>` 和提示
-- [ ] `PlanCanvas` 导出用 `rasterSize`；`getContext` 返回 null 时 reject
-- [ ] `drawingExport.ts` 改为输出 `{blob,name}`，删除 `downloadBlob`
-- [ ] `Workbench.exportAction` 所有格式都走 `saveFile`；`blocked` 时打开 `SaveFileDialog`
-- [ ] `SaveFileDialog`：图片显示预览和长按提示；其他格式提示在浏览器打开；只用设计系统的 token
-- [ ] `useSceneLifecycle` reducer 实现，Workbench 接入，两段重复的失败处理删除
-- [ ] `ErrorBoundary` 增加 `fallback` / `onError`；`<Scene key={generation}>` 外面包上它
-- [ ] `listeners.ts` 实现；Scene3D 的所有事件监听都改用登记表，cleanup 用 `disposeAll()`
-- [ ] 渲染循环出错时停止，并 `onError('crash')`
-- [ ] 监听 `webglcontextlost`，然后 `onError('context-lost')`
-- [ ] cleanup 最后调用 `forceContextLoss()`
-- [ ] `start()` 改用平台层的函数，删除本地 `coarse`
-- [ ] 加入 `invalidate()` 机制，只在需要时调用 `renderer.render`；循环内不再新建 `Box3`
-- [ ] 加 `--fs-input` token，并在 `(pointer:coarse)` 下设为 16px；所有输入框都改用它
-- [ ] `useProjects` 在 `pagehide` / 页面隐藏时立即保存；Workbench 先 flush 尺寸输入
-- [ ] 全局搜索 `.download =`、`exitPointerLock`、`pointer:coarse`，确认只出现在 `src/lib/platform/`
+- [x] `capabilities.ts`：实现 4 个能力判断，都支持传入 `env`
+- [x] `pointerLock.ts` 迁移到平台层，新增 `tryPointerLock`，删除 `scene/pointerLock.*`
+- [x] `saveFile.ts`：微信返回 `blocked`；其他浏览器下载后返回 `downloaded`
+- [x] `canvasLimits.ts`：`rasterSize` 保证宽、高都不超过 `maxSide`，面积不超过 `maxArea`，并且保持宽高比
+- [x] `eslint.config.js`：加 3 条 `no-restricted-syntax`，`src/lib/platform/**` 除外
+- [x] `shot` / `exportImage` 改为返回 `Promise<Blob>`，内部不再有 `<a>` 和提示
+- [x] `PlanCanvas` 导出用 `rasterSize`；`getContext` 返回 null 时 reject
+- [x] `drawingExport.ts` 改为输出 `{blob,name}`，删除 `downloadBlob`
+- [x] `Workbench.exportAction` 所有格式都走 `saveFile`；`blocked` 时打开 `SaveFileDialog`
+- [x] `SaveFileDialog`：图片显示预览和长按提示；其他格式提示在浏览器打开；只用设计系统的 token
+- [x] `useSceneLifecycle` reducer 实现，Workbench 接入，两段重复的失败处理删除
+- [x] `ErrorBoundary` 增加 `fallback` / `onError`；`<Scene key={generation}>` 外面包上它
+- [x] `listeners.ts` 实现；Scene3D 的所有事件监听都改用登记表，cleanup 用 `disposeAll()`
+- [x] 渲染循环出错时停止，并 `onError('crash')`
+- [x] 监听 `webglcontextlost`，然后 `onError('context-lost')`
+- [x] cleanup 最后调用 `forceContextLoss()`
+- [x] `start()` 改用平台层的函数，删除本地 `coarse`
+- [x] 加入 `invalidate()` 机制，只在需要时调用 `renderer.render`；循环内不再新建 `Box3`
+- [x] 加 `--fs-input` token，并在 `(pointer:coarse)` 下设为 16px；所有输入框都改用它（同时删除了散落的 `max-width` 下 16px 补丁规则，并在 base 层给未设字号的文本输入兜底）
+- [x] `useProjects` 在 `pagehide` / 页面隐藏时立即保存；Workbench 先 flush 尺寸输入（实现补充：新增 `src/lib/platform/pageLifecycle.ts` 的 `onPageHide(handler, "flush" | "persist")`，按阶段保证先 flush 再保存，不依赖监听注册顺序；附 `pageLifecycle.test.ts`）
+- [x] 全局搜索 `.download =`、`exitPointerLock`、`pointer:coarse`，确认只出现在 `src/lib/platform/`
 
 ## Verification checklist
-- [ ] `capabilities.test.ts`：微信 UA 时 `canDownloadDirectly` 为 false；没有 `exitPointerLock` 时 `supportsPointerLock` 为 false
-- [ ] `pointerLock.test.ts`：iOS 环境下不抛异常；未锁定时不 unlock；桌面端已锁定时 unlock 一次；`tryPointerLock` 被拒绝时返回 false
-- [ ] `saveFile.test.ts`：微信时返回 `blocked`，并且没有创建 `<a>`；普通浏览器时返回 `downloaded`，并 click 一次
-- [ ] `canvasLimits.test.ts`：3200×6400 的输入，面积会被压到不超过 16777216 且比例不变；小尺寸保持 3200 宽；极端的 1:20 比例时边长不超过 4096
-- [ ] `useSceneLifecycle.test.ts`：第一次 context-lost 时 generation+1 并保持 3D；第二次切回 2D；crash / renderer / module 直接切回 2D；open 后恢复次数归零
-- [ ] `listeners.test.ts`：回调抛错时调用 `onFatal` 一次；`disposeAll` 之后再派发事件不会触发回调
-- [ ] `ErrorBoundary` 测试：传了 props 时会调用 `onError` 并渲染 `fallback`；不传时仍显示原来的整页提示
-- [ ] `useProjects` 测试：保存在等待中时派发 `pagehide`，会立即保存一次；没有待保存内容时不保存
-- [ ] `drawingExport.test.ts` 改为断言返回 `{blob,name}`，并且通过
-- [ ] 运行 `pnpm vitest run`（全量）并通过
-- [ ] 运行 `pnpm run lint` 并通过；临时在业务文件里写一次 `a.download='x'`，确认 lint 报错，然后撤掉
-- [ ] 运行 `pnpm run build` 并通过
+- [x] `capabilities.test.ts`：微信 UA 时 `canDownloadDirectly` 为 false；没有 `exitPointerLock` 时 `supportsPointerLock` 为 false
+- [x] `pointerLock.test.ts`：iOS 环境下不抛异常；未锁定时不 unlock；桌面端已锁定时 unlock 一次；`tryPointerLock` 被拒绝时返回 false
+- [x] `saveFile.test.ts`：微信时返回 `blocked`，并且没有创建 `<a>`；普通浏览器时返回 `downloaded`，并 click 一次
+- [x] `canvasLimits.test.ts`：3200×6400 的输入，面积会被压到不超过 16777216 且比例不变；小尺寸保持 3200 宽；极端的 1:20 比例时边长不超过 4096
+- [x] `useSceneLifecycle.test.ts`：第一次 context-lost 时 generation+1 并保持 3D；第二次切回 2D；crash / renderer / module 直接切回 2D；open 后恢复次数归零
+- [x] `listeners.test.ts`：回调抛错时调用 `onFatal` 一次；`disposeAll` 之后再派发事件不会触发回调
+- [x] `ErrorBoundary` 测试：传了 props 时会调用 `onError` 并渲染 `fallback`；不传时仍显示原来的整页提示
+- [x] `useProjects` 测试：保存在等待中时派发 `pagehide`，会立即保存一次；没有待保存内容时不保存
+- [x] `drawingExport.test.ts` 改为断言返回 `{blob,name}`，并且通过
+- [x] 运行 `pnpm vitest run`（全量）并通过
+- [x] 运行 `pnpm run lint` 并通过；临时在业务文件里写一次 `a.download='x'`，确认 lint 报错，然后撤掉
+- [x] 运行 `pnpm run build` 并通过
 - [ ] 真机，需要你来验：
   - iPhone Safari / 微信：进出 3D 各 10 次，不白屏；切后台再回来，3D 能自动恢复；
   - 3D 静止时手机不再持续发热；

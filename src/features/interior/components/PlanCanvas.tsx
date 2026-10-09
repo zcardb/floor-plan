@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import { errorMessage, notify } from "@/lib/notify";
+import { rasterSize } from "@/lib/platform";
 import { canResizeWall, isBearingWall, isOnBearingWall, BEARING_WALL_WARNING } from '../model/wallPolicy';
 import { syncRooms } from '../model/roomFollow';
 import {
@@ -47,7 +48,8 @@ export interface CanvasHandle {
   zoom: (k: number) => void;
   fit: () => void;
   ratio: (r: number) => void;
-  exportImage: () => void;
+  /** 生成 2D 平面图 PNG；保存与提示由调用方统一处理。 */
+  exportImage: () => Promise<Blob>;
 }
 interface Props {
   readOnly?: boolean;
@@ -247,10 +249,11 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         b = planDrawingBounds(d, layers.dims),
         m = 1200,
         w = b.x2 - b.x + m * 2,
-        h = b.y2 - b.y + m * 2;
+        h = b.y2 - b.y + m * 2,
+        size = rasterSize(w, h);
       clone.setAttribute("viewBox", `${b.x - m} ${b.y - m} ${w} ${h}`);
-      clone.setAttribute("width", "3200");
-      clone.setAttribute("height", String(Math.round((3200 * h) / w)));
+      clone.setAttribute("width", String(size.width));
+      clone.setAttribute("height", String(size.height));
       clone.querySelectorAll("[data-export-hide]").forEach((e) => e.remove());
       clone.querySelectorAll('.dimension-selected').forEach(e => e.classList.remove('dimension-selected'));
       const vars = getComputedStyle(document.documentElement);
@@ -262,33 +265,25 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         "</svg>",
         "<style>text{font-family:Arial,sans-serif}.furniture-drawing{stroke:#514a40;stroke-width:1;vector-effect:non-scaling-stroke}.furniture-drawing>*{vector-effect:non-scaling-stroke}.plan-room-name{fill:#2b2824;stroke:#fffdf9;stroke-width:40;paint-order:stroke;font-weight:600}.plan-room-area{fill:#665d50;stroke:#fffdf9;stroke-width:35;paint-order:stroke}.dimension{fill:none;stroke:#887b69;stroke-width:1;vector-effect:non-scaling-stroke}.dimension-text{fill:#887b69;stroke:none}.furn-label{fill:#514a40;stroke:#fffdf9;stroke-width:20;paint-order:stroke}</style></svg>",
       );
-      const url = URL.createObjectURL(
-          new Blob([text], { type: "image/svg+xml" }),
-        ),
-        img = new Image();
-      img.onload = () => {
-        const c = document.createElement("canvas");
-        c.width = 3200;
-        c.height = Math.round((3200 * h) / w);
-        c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
-        c.toBlob((blob) => {
-          if (blob) {
-            const a = document.createElement("a"),
-              u = URL.createObjectURL(blob);
-            a.href = u;
-            a.download = "户型方案-2D.png";
-            a.click();
-            setTimeout(() => URL.revokeObjectURL(u), 1000);
-            notify.success("2D 图片已下载");
-          } else notify.error("2D 图片导出失败", "浏览器未能生成图片，请重试");
+      return new Promise<Blob>((resolve, reject) => {
+        const url = URL.createObjectURL(new Blob([text], { type: "image/svg+xml" })),
+          img = new Image();
+        img.onload = () => {
           URL.revokeObjectURL(url);
-        });
-      };
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
-        notify.error("2D 图片导出失败", "图纸渲染失败，请重试");
-      };
-      img.src = url;
+          const c = document.createElement("canvas");
+          c.width = size.width;
+          c.height = size.height;
+          const ctx = c.getContext("2d");
+          if (!ctx) return reject(new Error("设备画布内存不足，无法生成图片"));
+          ctx.drawImage(img, 0, 0, c.width, c.height);
+          c.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("浏览器未能生成图片，请重试"))), "image/png");
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error("图纸渲染失败，请重试"));
+        };
+        img.src = url;
+      });
     },
   }));
   const finish = (cancel = false) => {

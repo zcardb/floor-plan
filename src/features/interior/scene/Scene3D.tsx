@@ -15,7 +15,9 @@ import {
 import { notify } from "@/lib/notify";
 import { floorMaterialOf } from "../model/floorMaterials";
 import { floorTexture } from "./floorTexture";
-import { releasePointerLock } from "./pointerLock";
+import { isCoarsePointer, releasePointerLock, tryPointerLock } from "@/lib/platform";
+import { createListenerRegistry } from "./listeners";
+import type { SceneFailure } from "../components/useSceneLifecycle";
 import { doorOrientation } from '../model/doorOrientation';
 import {
   area,
@@ -37,7 +39,8 @@ import { openingDimensions } from "../model/costs";
 import { connectedWallPoly, wallSectionPolygons } from '../model/wallConnections';
 import type { ScreenRect } from "../model/selectionAnchor";
 export interface SceneHandle {
-  shot: () => void;
+  /** 生成当前视角 PNG；保存与提示由调用方统一处理。 */
+  shot: () => Promise<Blob>;
   top: () => void;
   iso: () => void;
   /** 鸟瞰时平滑飞到房间（"all" 为全屋）；漫游时传送到房间中心。 */
@@ -60,7 +63,8 @@ interface Props {
   layers: Layers;
   commit: (d: Design, before?: Design) => void;
   add: (it: LibraryItem, p: Point) => void;
-  onError: () => void;
+  /** 3D 无法继续运行时上报原因，由生命周期状态机决定恢复或切回 2D。 */
+  onError: (reason: SceneFailure) => void;
   /** 首次构建完成、着色器编译完毕后触发。 */
   onReady: () => void;
   exitWalk: () => void;
@@ -116,6 +120,8 @@ interface Runtime {
   textures: THREE.Texture[];
   fly: Fly | null;
   ready: boolean;
+  /** 有变化待绘制：静止时不渲染，省电、不发热。 */
+  needsRender: boolean;
 }
 function clear(g: THREE.Group) {
   g.traverse((o) => {
@@ -144,7 +150,6 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
       activeLook = useRef<{ id: number; x: number; y: number } | null>(null),
       freeRef = useRef(false);
     freeRef.current = free;
-    const coarse = () => matchMedia("(pointer:coarse)").matches;
     /** 鸟瞰机位：[target, position]，方向沿用当前视角方位。 */
     const viewOf = (top = false, roomId?: string): [THREE.Vector3, THREE.Vector3] | null => {
       const r = runtime.current;
@@ -175,6 +180,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
       r.orbit.target.copy(view[0]);
       r.camera.position.copy(view[1]);
       r.camera.lookAt(r.orbit.target);
+      r.needsRender = true;
     };
     const fly = (top = false, roomId?: string) => {
       const r = runtime.current,
@@ -192,6 +198,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
       if (!r || !start) return;
       r.camera.position.copy(start.pos);
       r.camera.lookAt(start.look);
+      r.needsRender = true;
     };
     const ground = (x?: number, y?: number): Point | null => {
       const r = runtime.current;
@@ -214,65 +221,58 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
       return [hit.x * 1000, hit.z * 1000];
     };
     useImperativeHandle(ref, () => ({
-      shot: () => {
-        const r = runtime.current;
-        if (!r) return;
-        const helper = r.helper;
-        if (helper) helper.visible = false;
-        r.renderer.render(r.scene, r.camera);
-        r.labels.render(r.scene, r.camera);
-        const c = document.createElement("canvas");
-        c.width = r.renderer.domElement.width;
-        c.height = r.renderer.domElement.height;
-        const ctx = c.getContext("2d")!;
-        ctx.drawImage(r.renderer.domElement, 0, 0);
-        if (
-          latest.current.layers.labels &&
-          latest.current.options.mode === "orbit"
-        ) {
-          const factor = c.width / host.current!.clientWidth;
-          ctx.font = `${Math.round(12 * factor)}px sans-serif`;
-          ctx.textAlign = "center";
-          for (const room of latest.current.design.rooms.filter(
-            (r) => r.counted !== false,
-          )) {
-            const p = center(room),
-              q = new THREE.Vector3(
-                p[0] / 1000,
-                latest.current.options.cut
-                  ? 1.35
-                  : latest.current.design.height / 1000 + 0.15,
-                p[1] / 1000,
-              ).project(r.camera);
-            if (q.z > 1 || q.z < -1) continue;
-            const x = ((q.x + 1) / 2) * c.width,
-              y = ((1 - q.y) / 2) * c.height,
-              text = room.name + " " + area(room).toFixed(1) + "m²",
-              w = ctx.measureText(text).width;
-            ctx.fillStyle = "#fffdf9";
-            ctx.fillRect(
-              x - w / 2 - 8 * factor,
-              y - 12 * factor,
-              w + 16 * factor,
-              20 * factor,
-            );
-            ctx.fillStyle = "#2b2824";
-            ctx.fillText(text, x, y + 2 * factor);
+      shot: () =>
+        new Promise<Blob>((resolve, reject) => {
+          const r = runtime.current;
+          if (!r) return reject(new Error("3D 场景尚未就绪，请稍后重试"));
+          const helper = r.helper;
+          if (helper) helper.visible = false;
+          r.renderer.render(r.scene, r.camera);
+          r.labels.render(r.scene, r.camera);
+          if (helper) helper.visible = true;
+          r.needsRender = true;
+          const c = document.createElement("canvas");
+          c.width = r.renderer.domElement.width;
+          c.height = r.renderer.domElement.height;
+          const ctx = c.getContext("2d");
+          if (!ctx) return reject(new Error("设备画布内存不足，无法生成图片"));
+          ctx.drawImage(r.renderer.domElement, 0, 0);
+          if (
+            latest.current.layers.labels &&
+            latest.current.options.mode === "orbit"
+          ) {
+            const factor = c.width / host.current!.clientWidth;
+            ctx.font = `${Math.round(12 * factor)}px sans-serif`;
+            ctx.textAlign = "center";
+            for (const room of latest.current.design.rooms.filter(
+              (r) => r.counted !== false,
+            )) {
+              const p = center(room),
+                q = new THREE.Vector3(
+                  p[0] / 1000,
+                  latest.current.options.cut
+                    ? 1.35
+                    : latest.current.design.height / 1000 + 0.15,
+                  p[1] / 1000,
+                ).project(r.camera);
+              if (q.z > 1 || q.z < -1) continue;
+              const x = ((q.x + 1) / 2) * c.width,
+                y = ((1 - q.y) / 2) * c.height,
+                text = room.name + " " + area(room).toFixed(1) + "m²",
+                w = ctx.measureText(text).width;
+              ctx.fillStyle = "#fffdf9";
+              ctx.fillRect(
+                x - w / 2 - 8 * factor,
+                y - 12 * factor,
+                w + 16 * factor,
+                20 * factor,
+              );
+              ctx.fillStyle = "#2b2824";
+              ctx.fillText(text, x, y + 2 * factor);
+            }
           }
-        }
-        c.toBlob((blob) => {
-          if (blob) {
-            const a = document.createElement("a"),
-              url = URL.createObjectURL(blob);
-            a.href = url;
-            a.download = "户型方案-3D视角.png";
-            a.click();
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
-            notify.success("3D 视角图片已下载");
-          } else notify.error("3D 图片导出失败", "浏览器未能生成图片，请重试");
-        });
-        if (helper) helper.visible = true;
-      },
+          c.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("浏览器未能生成图片，请重试"))), "image/png");
+        }),
       top: () => fly(true),
       iso: () => fly(),
       flyTo: (id) => {
@@ -286,6 +286,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
             .sub(r.orbit.target)
             .multiplyScalar(1 / k)
             .add(r.orbit.target);
+          r.needsRender = true;
         }
       },
       ground: () => ground(),
@@ -296,7 +297,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
       try {
         renderer = new THREE.WebGLRenderer({ antialias: true });
       } catch {
-        latest.current.onError();
+        latest.current.onError("renderer");
         return;
       }
       renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
@@ -362,18 +363,36 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         textures: [],
         fly: null,
         ready: false,
+        needsRender: true,
       };
       runtime.current = r;
       pose();
-      const observer = new ResizeObserver(() => {
-        const w = el.clientWidth,
-          h = el.clientHeight;
-        if (!w || !h) return;
-        renderer.setSize(w, h);
-        labels.setSize(w, h);
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
-      });
+      let raf = 0,
+        stopped = false;
+      /** 3D 无法继续：停止循环，交给生命周期决定恢复还是切回 2D。只上报一次。 */
+      const fatal = (reason: SceneFailure) => {
+        if (stopped) return;
+        stopped = true;
+        cancelAnimationFrame(raf);
+        latest.current.onError(reason);
+      };
+      // 所有事件都经过登记表：出错统一走 fatal，cleanup 一次 disposeAll() 全部解绑
+      const events = createListenerRegistry(fatal);
+      const invalidate = () => {
+        r.needsRender = true;
+      };
+      const observer = new ResizeObserver(
+        events.guard(() => {
+          const w = el.clientWidth,
+            h = el.clientHeight;
+          if (!w || !h) return;
+          renderer.setSize(w, h);
+          labels.setSize(w, h);
+          camera.aspect = w / h;
+          camera.updateProjectionMatrix();
+          invalidate();
+        }),
+      );
       observer.observe(el);
       const pick = (e?: PointerEvent) => {
         const rc = renderer.domElement.getBoundingClientRect();
@@ -443,7 +462,6 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
           }
         }
       };
-      el.addEventListener("pointerdown", capture, true);
       const pd = (e: PointerEvent) => {
         down = [e.clientX, e.clientY];
         r.fly = null;
@@ -467,6 +485,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
           camera.quaternion.setFromEuler(angles);
           look.x = e.clientX;
           look.y = e.clientY;
+          invalidate();
           return;
         }
         if (fdrag && e.pointerId === fdrag.pid) {
@@ -489,6 +508,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
               .find((o) => o.userData.fid === f.id)
               ?.position.set(q[0] / 1000, 0, q[1] / 1000);
             renderer.shadowMap.needsUpdate = true;
+            invalidate();
           }
         }
       };
@@ -570,16 +590,26 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
           setFree(true);
           setPaused(false);
         };
-      renderer.domElement.addEventListener("pointerdown", pd);
-      renderer.domElement.addEventListener("pointermove", pm);
-      renderer.domElement.addEventListener("pointerup", pu);
-      renderer.domElement.addEventListener("pointercancel", cancel);
-      window.addEventListener("keydown", keydown);
-      window.addEventListener("keyup", keyup);
-      window.addEventListener("blur", blur);
-      document.addEventListener("pointerlockerror", lockError);
-      walk.addEventListener("lock", lock);
-      walk.addEventListener("unlock", unlock);
+      const contextLost = (e: Event) => {
+        // 阻止默认行为才可能恢复；这里直接交给生命周期换代重建，更可靠
+        e.preventDefault();
+        fatal("context-lost");
+      };
+      events.on(el, "pointerdown", capture, true);
+      events.on(renderer.domElement, "pointerdown", pd);
+      events.on(renderer.domElement, "pointermove", pm);
+      events.on(renderer.domElement, "pointerup", pu);
+      events.on(renderer.domElement, "pointercancel", cancel);
+      events.on(renderer.domElement, "webglcontextlost", contextLost);
+      events.on(window, "keydown", keydown);
+      events.on(window, "keyup", keyup);
+      events.on(window, "blur", blur);
+      events.on(document, "pointerlockerror", lockError);
+      events.on(document, "visibilitychange", invalidate);
+      events.on(walk, "lock", lock);
+      events.on(walk, "unlock", unlock);
+      events.on(walk, "change", invalidate);
+      events.on(orbit, "change", invalidate);
       const blocked = (x: number, z: number) => {
         const p: Point = [x * 1000, z * 1000],
           d = latest.current.design;
@@ -613,53 +643,16 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         }
         return false;
       };
-      let raf = 0,
-        last = performance.now();
-      const loop = (time: number) => {
-        raf = requestAnimationFrame(loop);
-        const dt = Math.min((time - last) / 1000, 0.05);
-        last = time;
-        if (document.hidden || !r.ready) return;
-        if (r.fly) {
-          const t = Math.min(1, (time - r.fly.t0) / FLY_MS),
-            k = ease(t);
-          orbit.target.lerpVectors(r.fly.from[0], r.fly.to[0], k);
-          camera.position.lerpVectors(r.fly.from[1], r.fly.to[1], k);
-          camera.lookAt(orbit.target);
-          if (t >= 1) r.fly = null;
-        } else if (latest.current.options.mode === "orbit") orbit.update();
-        else if (walk.isLocked || freeRef.current) {
-          const dir = new THREE.Vector3();
-          camera.getWorldDirection(dir);
-          dir.y = 0;
-          dir.normalize();
-          const right = new THREE.Vector3(-dir.z, 0, dir.x),
-            move = new THREE.Vector3(),
-            held = (...codes: string[]) => codes.some((c) => keys.current.has(c));
-          if (held("KeyW", "ArrowUp")) move.add(dir);
-          if (held("KeyS", "ArrowDown")) move.sub(dir);
-          if (held("KeyA", "ArrowLeft")) move.sub(right);
-          if (held("KeyD", "ArrowRight")) move.add(right);
-          move
-            .addScaledVector(dir, -joy.current.y)
-            .addScaledVector(right, joy.current.x);
-          if (move.length() > 1) move.normalize();
-          move.multiplyScalar(dt * (held("ShiftLeft", "ShiftRight") ? 2.5 : 1.4));
-          if (!blocked(camera.position.x + move.x, camera.position.z))
-            camera.position.x += move.x;
-          if (!blocked(camera.position.x, camera.position.z + move.z))
-            camera.position.z += move.z;
-        }
-        for (const door of r.doors) {
-          const delta =
-            door.angle +
-            (door.open ? door.rotationSign * Math.PI / 2 : 0) -
-            door.group.rotation.y;
-          if (Math.abs(delta) < 1e-4) continue;
-          door.group.rotation.y += delta * Math.min(1, dt * 8);
-          renderer.shadowMap.needsUpdate = true;
-        }
-        r.helper?.update();
+      // 循环外预先分配，渲染时不再每帧新建对象
+      const box = new THREE.Box3(),
+        part = new THREE.Box3(),
+        corner = new THREE.Vector3(),
+        dir = new THREE.Vector3(),
+        right = new THREE.Vector3(),
+        move = new THREE.Vector3();
+      const held = (...codes: string[]) => codes.some((c) => keys.current.has(c));
+      /** 选中物体在屏幕上的包围框，交给浮动编辑条定位。只在本帧确实渲染时计算。 */
+      const updateAnchor = () => {
         const selected = latest.current.selection;
         const objects =
           selected?.kind === "furniture"
@@ -671,62 +664,124 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
                 : selected?.kind === "opening"
                   ? arch.children.filter((o) => o.userData.opening === selected.id)
                   : [];
-        if (
-          objects.length &&
-          !(selected?.kind === "furniture" && !latest.current.layers.furn)
-        ) {
-          scene.updateMatrixWorld(true);
-          camera.updateMatrixWorld(true);
-          const box = new THREE.Box3();
-          for (const object of objects)
-            box.union(new THREE.Box3().setFromObject(object));
-          const pts = [];
-          for (const x of [box.min.x, box.max.x])
-            for (const y of [box.min.y, box.max.y])
-              for (const z of [box.min.z, box.max.z]) {
-                const v = new THREE.Vector3(x, y, z).project(camera);
-                if (v.z >= -1 && v.z <= 1) pts.push(v);
-              }
-          const stageRect=el.closest('.stage')!.getBoundingClientRect(),elRect=el.getBoundingClientRect();
-          const ox=elRect.left-stageRect.left,oy=elRect.top-stageRect.top;
-          let local:ScreenRect['local'];
-          if(selected?.kind==='wall'){const w=latest.current.design.walls.find(w=>w.id===selected.id);if(w){const t=wallClick?.id===w.id?wallClick.fraction:0.5;const p=new THREE.Vector3((w.a[0]+(w.b[0]-w.a[0])*t)/1000,Math.min(latest.current.design.height/2000,1.2),(w.a[1]+(w.b[1]-w.a[1])*t)/1000).project(camera);local={x:ox+Math.max(0,Math.min(el.clientWidth,(p.x+1)/2*el.clientWidth)),y:oy+Math.max(0,Math.min(el.clientHeight,(1-p.y)/2*el.clientHeight))};}}
-          if (pts.length)
-            latest.current.onAnchor({
-              local,
-              left: ox + Math.min(
-                ...pts.map((v) => ((v.x + 1) / 2) * el.clientWidth),
-              ),
-              right: ox + Math.max(
-                ...pts.map((v) => ((v.x + 1) / 2) * el.clientWidth),
-              ),
-              top: oy + Math.min(
-                ...pts.map((v) => ((1 - v.y) / 2) * el.clientHeight),
-              ),
-              bottom: oy + Math.max(
-                ...pts.map((v) => ((1 - v.y) / 2) * el.clientHeight),
-              ),
-            });
-          else latest.current.onAnchor(null);
-        } else latest.current.onAnchor(null);
+        if (!objects.length || (selected?.kind === "furniture" && !latest.current.layers.furn))
+          return latest.current.onAnchor(null);
+        scene.updateMatrixWorld(true);
+        camera.updateMatrixWorld(true);
+        box.makeEmpty();
+        for (const object of objects) box.union(part.setFromObject(object));
+        const w = el.clientWidth,
+          h = el.clientHeight;
+        let left = Infinity,
+          rightEdge = -Infinity,
+          top = Infinity,
+          bottom = -Infinity;
+        for (const x of [box.min.x, box.max.x])
+          for (const y of [box.min.y, box.max.y])
+            for (const z of [box.min.z, box.max.z]) {
+              corner.set(x, y, z).project(camera);
+              if (corner.z < -1 || corner.z > 1) continue;
+              const sx = ((corner.x + 1) / 2) * w,
+                sy = ((1 - corner.y) / 2) * h;
+              left = Math.min(left, sx);
+              rightEdge = Math.max(rightEdge, sx);
+              top = Math.min(top, sy);
+              bottom = Math.max(bottom, sy);
+            }
+        if (left === Infinity) return latest.current.onAnchor(null);
+        const stageRect = el.closest(".stage")!.getBoundingClientRect(),
+          elRect = el.getBoundingClientRect();
+        const ox = elRect.left - stageRect.left,
+          oy = elRect.top - stageRect.top;
+        let local: ScreenRect["local"];
+        if (selected?.kind === "wall") {
+          const wall = latest.current.design.walls.find((x) => x.id === selected.id);
+          if (wall) {
+            const t = wallClick?.id === wall.id ? wallClick.fraction : 0.5;
+            corner
+              .set(
+                (wall.a[0] + (wall.b[0] - wall.a[0]) * t) / 1000,
+                Math.min(latest.current.design.height / 2000, 1.2),
+                (wall.a[1] + (wall.b[1] - wall.a[1]) * t) / 1000,
+              )
+              .project(camera);
+            local = {
+              x: ox + Math.max(0, Math.min(w, ((corner.x + 1) / 2) * w)),
+              y: oy + Math.max(0, Math.min(h, ((1 - corner.y) / 2) * h)),
+            };
+          }
+        }
+        latest.current.onAnchor({ local, left: ox + left, right: ox + rightEdge, top: oy + top, bottom: oy + bottom });
+      };
+      let last = performance.now();
+      const frame = events.guard((time: number) => {
+        const dt = Math.min((time - last) / 1000, 0.05);
+        last = time;
+        if (document.hidden || !r.ready) return;
+        // 只有有变化（invalidate）或正在动画时才渲染，静止时 GPU 空闲
+        let animating = false;
+        if (r.fly) {
+          const t = Math.min(1, (time - r.fly.t0) / FLY_MS),
+            k = ease(t);
+          orbit.target.lerpVectors(r.fly.from[0], r.fly.to[0], k);
+          camera.position.lerpVectors(r.fly.from[1], r.fly.to[1], k);
+          camera.lookAt(orbit.target);
+          if (t >= 1) r.fly = null;
+          animating = true;
+        } else if (latest.current.options.mode === "orbit") {
+          if (orbit.update()) animating = true;
+        } else if (walk.isLocked || freeRef.current) {
+          camera.getWorldDirection(dir);
+          dir.y = 0;
+          dir.normalize();
+          right.set(-dir.z, 0, dir.x);
+          move.set(0, 0, 0);
+          if (held("KeyW", "ArrowUp")) move.add(dir);
+          if (held("KeyS", "ArrowDown")) move.sub(dir);
+          if (held("KeyA", "ArrowLeft")) move.sub(right);
+          if (held("KeyD", "ArrowRight")) move.add(right);
+          move
+            .addScaledVector(dir, -joy.current.y)
+            .addScaledVector(right, joy.current.x);
+          if (move.lengthSq() > 0) {
+            animating = true;
+            if (move.length() > 1) move.normalize();
+            move.multiplyScalar(dt * (held("ShiftLeft", "ShiftRight") ? 2.5 : 1.4));
+            if (!blocked(camera.position.x + move.x, camera.position.z))
+              camera.position.x += move.x;
+            if (!blocked(camera.position.x, camera.position.z + move.z))
+              camera.position.z += move.z;
+          }
+        }
+        for (const door of r.doors) {
+          const delta =
+            door.angle +
+            (door.open ? door.rotationSign * Math.PI / 2 : 0) -
+            door.group.rotation.y;
+          if (Math.abs(delta) < 1e-4) continue;
+          door.group.rotation.y += delta * Math.min(1, dt * 8);
+          renderer.shadowMap.needsUpdate = true;
+          animating = true;
+        }
+        if (!animating && !r.needsRender) return;
+        r.needsRender = false;
+        r.helper?.update();
+        updateAnchor();
         renderer.render(scene, camera);
         labels.render(scene, camera);
+      });
+      const loop = (time: number) => {
+        if (stopped) return;
+        raf = requestAnimationFrame(loop);
+        frame(time);
       };
       raf = requestAnimationFrame(loop);
       return () => {
+        // 顺序：先解绑事件 → 释放场景资源 → 释放渲染器 → 主动交还 GPU 上下文
+        stopped = true;
         cancelAnimationFrame(raf);
+        events.disposeAll();
         observer.disconnect();
-        el.removeEventListener("pointerdown", capture, true);
-        renderer.domElement.removeEventListener("pointerdown", pd);
-        renderer.domElement.removeEventListener("pointermove", pm);
-        renderer.domElement.removeEventListener("pointerup", pu);
-        renderer.domElement.removeEventListener("pointercancel", cancel);
-        window.removeEventListener("keydown", keydown);
-        window.removeEventListener("keyup", keyup);
-        window.removeEventListener("blur", blur);
-        document.removeEventListener("pointerlockerror", lockError);
-        walk.removeEventListener("lock", lock);
-        walk.removeEventListener("unlock", unlock);
         releasePointerLock(walk);
         walk.dispose();
         orbit.dispose();
@@ -744,6 +799,8 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         });
         disposeMaterials();
         renderer.dispose();
+        // 不主动交还，iOS 上反复进出 3D 会累积上下文，最终无法再创建
+        if (!renderer.getContext().isContextLost()) renderer.forceContextLoss();
         renderer.domElement.remove();
         labels.domElement.remove();
         runtime.current = null;
@@ -915,6 +972,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         part(cursor, L, 0, w.kind === "low" ? Math.min(1, H) : H);
       }
       r.renderer.shadowMap.needsUpdate = true;
+      r.needsRender = true;
     }, [
       props.design.walls,
       props.design.rooms,
@@ -930,12 +988,14 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
       clear(r.furn);
       props.design.furniture.forEach((f) => r.furn.add(buildFurniture(f)));
       r.renderer.shadowMap.needsUpdate = true;
+      r.needsRender = true;
     }, [props.design.furniture]);
     useEffect(() => {
       const r = runtime.current;
       if (!r) return;
       r.furn.visible = props.layers.furn;
       r.renderer.shadowMap.needsUpdate = true;
+      r.needsRender = true;
       r.labelGroup.children.forEach(
         (o) =>
           (o.visible = props.layers.labels && props.options.mode === "orbit"),
@@ -976,6 +1036,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
       );
       r.sun.target.position.copy(r.orbit.target);
       r.renderer.shadowMap.needsUpdate = true;
+      r.needsRender = true;
     }, [props.options]);
     useEffect(() => {
       const r = runtime.current;
@@ -993,6 +1054,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         r.orbit.enabled = true;
         fly();
       }
+      r.needsRender = true;
     }, [props.options.mode]);
     // 必须放在所有构建 effect 之后：首帧前异步编译着色器，避免切到 3D 时主线程长时间卡死
     useEffect(() => {
@@ -1002,6 +1064,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
       const done = () => {
         if (!alive || r.ready) return;
         r.ready = true;
+        r.needsRender = true;
         latest.current.onReady();
       };
       r.scene.updateMatrixWorld(true);
@@ -1013,21 +1076,13 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         clearTimeout(timer);
       };
     }, []);
-    const start = () => {
+    /** 开始漫游：触屏或浏览器不给指针锁定（iOS、iframe 沙箱）时改为拖动转向。 */
+    const start = async () => {
       const r = runtime.current;
       if (!r) return;
-      const fallback = () => {
+      if (isCoarsePointer() || !(await tryPointerLock(r.walk.domElement))) {
         setFree(true);
         setPaused(false);
-      };
-      if (coarse()) return fallback();
-      try {
-        const pending = r.walk.domElement?.requestPointerLock() as unknown as
-          | Promise<void>
-          | undefined;
-        pending?.catch?.(fallback);
-      } catch {
-        fallback();
       }
     };
     return (
@@ -1051,7 +1106,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         }}
       >
         {props.options.mode === "walk" && paused && !free && (
-          <div className="walk-overlay" onClick={start}>
+          <div className="walk-overlay" onClick={() => void start()}>
             <div>
               <h3>走进你的设计</h3>
               <p>WASD / 方向键移动 · 鼠标转向 · Shift 加速 · E 开关门</p>
@@ -1063,10 +1118,10 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         {props.options.mode === "walk" && !paused && (
           <>
             <div className="crosshair" />
-            {free && !coarse() && (
+            {free && !isCoarsePointer() && (
               <div className="walk-hint">按住鼠标拖动转向 · WASD / 方向键移动 · 点门开关</div>
             )}
-            {free && coarse() && (
+            {free && isCoarsePointer() && (
               <div
                 className="joystick"
                 onPointerDown={(e) => {

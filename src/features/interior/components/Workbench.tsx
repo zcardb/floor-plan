@@ -55,6 +55,10 @@ import {
   X,
 } from "lucide-react";
 import { notify } from "@/lib/notify";
+import { onPageHide, saveFile } from "@/lib/platform";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { SaveFileDialog, type PendingFile } from "./SaveFileDialog";
+import { useSceneLifecycle } from "./useSceneLifecycle";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -163,16 +167,21 @@ export function Workbench(p: Props) {
   const model = useDesign(p.project.state, p.update, readOnly),
     { design: d, change, commit, preview, undo, redo, counts, sizeTransaction } = model;
   const [selection, setSelection] = useState<Selection>(null),
-    [tool, setTool] = useState<Tool>("select"),
-    [view, setView] = useState<"2d" | "3d">("2d"),
-    [Scene, setScene] = useState<SceneComponent | null>(null),
-    [sceneLoading, setSceneLoading] = useState(false),
+    [tool, setTool] = useState<Tool>("select");
+  // 3D 的打开 / 首帧 / 失败 / 自动恢复全部由这一个状态机决定
+  const lifecycle = useSceneLifecycle(),
+    view = lifecycle.view,
+    sceneLoading = lifecycle.loading;
+  const [Scene, setScene] = useState<SceneComponent | null>(null),
     [roomFocus, setRoomFocus] = useState<string | null>(null),
     [hideLib, setHideLib] = useState(false),
     [hidePanel, setHidePanel] = useState(false),
     [drawer, setDrawer] = useState<"lib" | "panel" | null>(null),
-    [scale, setScale] = useState(0.05);
+    [scale, setScale] = useState(0.05),
+    [pendingFile, setPendingFile] = useState<PendingFile | null>(null);
   useEffect(()=>{ sizeTransaction.flush(); },[selection?.id,tool,view,sizeTransaction]);
+  // 页面被切走前，先把尺寸输入框里未提交的修改并入设计，随后的立即保存才能带上它
+  useEffect(() => onPageHide(() => sizeTransaction.flush(), "flush"), [sizeTransaction]);
   const coordLabel = useRef<HTMLSpanElement>(null);
   const onCoord = useCallback((p: Point) => {
     if (coordLabel.current)
@@ -314,24 +323,15 @@ export function Workbench(p: Props) {
   const toggleView = async (next: "2d" | "3d") => {
     setTool("select");
     if (next === view) return;
-    if (next === "2d") {
-      setView("2d");
-      setSceneLoading(false);
-      return;
-    }
+    if (next === "2d") return lifecycle.close();
     // 先切到 3D 并显示加载遮罩，场景首帧编译完成（onReady）后再撤掉
-    setView("3d");
-    setSceneLoading(true);
+    lifecycle.open();
     if (Scene) return;
     try {
       const m = await loadScene();
       if (mounted.current) setScene(() => m.Scene3D);
     } catch {
-      if (mounted.current) {
-        setView("2d");
-        setSceneLoading(false);
-      }
-      notify.error("3D 引擎加载失败，2D 仍可编辑", "模块加载失败，请检查网络后重试");
+      if (mounted.current) lifecycle.fail("module");
     }
   };
   const focusRoom = (id: string) => {
@@ -508,18 +508,24 @@ export function Workbench(p: Props) {
   // 游客改过模版才提示登录保存；「暂不保存」只关掉当前这一版，再改一次会重新出现。
   const [bannerClosed, setBannerClosed] = useState(0);
   const showGuestBanner = !p.loggedIn && p.guestEdits > 0 && p.guestEdits !== bannerClosed;
+  /** 所有导出的唯一出口：组件只生成文件，这里统一保存和提示。 */
   const exportAction = useAsyncAction(async (format: ExportFormat) => {
-    if (format === "png") {
-      if (view === "2d") canvas.current?.exportImage();
-      else scene.current?.shot();
-      return;
-    }
-    const snapshot = structuredClone(model.current.current);
     try {
-      const { downloadDrawing, downloadProjectJson } = await import("../model/drawingExport");
-      if (format === "json") downloadProjectJson(snapshot, p.project.name);
-      else await downloadDrawing(snapshot, format, p.project.name);
-      notify.success(`已导出 ${format.toUpperCase()} 文件`);
+      let file: PendingFile, label: string;
+      if (format === "png") {
+        const blob = view === "2d" ? await canvas.current?.exportImage() : await scene.current?.shot();
+        if (!blob) return;
+        file = { blob, name: view === "2d" ? "户型方案-2D.png" : "户型方案-3D视角.png" };
+        label = view === "2d" ? "2D 图片" : "3D 视角图片";
+      } else {
+        const snapshot = structuredClone(model.current.current);
+        const { drawingFile, projectJsonFile } = await import("../model/drawingExport");
+        file = format === "json" ? projectJsonFile(snapshot, p.project.name) : await drawingFile(snapshot, format, p.project.name);
+        label = `${format.toUpperCase()} 文件`;
+      }
+      const result = saveFile(file.blob, file.name);
+      if (result.kind === "downloaded") notify.success(`已导出${label}`);
+      else setPendingFile({ blob: result.blob, name: result.name });
     } catch (error) {
       notify.error("导出失败", error);
     }
@@ -975,7 +981,9 @@ export function Workbench(p: Props) {
             selectedDimension={dimensionValid ? dimensionEdit.binding : undefined}
           />
         ) : Scene ? (
+          <ErrorBoundary key={lifecycle.generation} fallback={null} onError={() => lifecycle.fail("crash")}>
           <Scene
+            key={lifecycle.generation}
             readOnly={readOnly}
             ref={scene}
             design={d}
@@ -985,15 +993,12 @@ export function Workbench(p: Props) {
             layers={layers}
             commit={commit}
             add={add}
-            onError={() => {
-              setView("2d");
-              setSceneLoading(false);
-              notify.fail("设备无法启动 3D，请继续使用 2D 编辑");
-            }}
-            onReady={() => setSceneLoading(false)}
+            onError={lifecycle.fail}
+            onReady={lifecycle.ready}
             onAnchor={onAnchor}
             exitWalk={() => setSceneOptions((o) => ({ ...o, mode: "orbit" }))}
           />
+          </ErrorBoundary>
         ) : null}
         {view === "3d" && sceneLoading && (
           <div className="scene-loading">
@@ -1241,6 +1246,7 @@ export function Workbench(p: Props) {
         onCreateWall={saveCustomWall}
         onCreateOpening={saveCustomOpening}
       />}
+      <SaveFileDialog file={pendingFile} onClose={() => setPendingFile(null)} />
     </div>
     </div>
   );

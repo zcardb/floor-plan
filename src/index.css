@@ -7,11 +7,14 @@
 /* 编辑器 UI 刻度：浮动弹层与右侧面板共用。字号只用 11 / 12 / 13 三档。 */
 :root {
   --fs-title: 13px; --fs-group: 12px; --fs-control: 12px; --fs-label: 11px; --fs-meta: 11px;
+  /* 输入框字号：触屏设备至少 16px，否则 iOS 聚焦输入框时会自动放大页面 */
+  --fs-input: var(--fs-control);
   --ctl-lg: 36px; --ctl-md: 32px; --ctl-sm: 28px;
   --ctl-radius: 8px; --ctl-radius-in: 6px;
   --sp-x: 16px; --sp-section: 16px; --sp-group: 16px; --sp-title: 8px; --sp-row: 12px; --sp-col: 8px;
   --shadow-segment: 0 1px 2px hsl(var(--foreground) / 0.08), 0 1px 3px -1px hsl(var(--foreground) / 0.06);
 }
+@media (pointer: coarse) { :root { --fs-input: 16px; } }
 .toaster [data-sonner-toast][data-styled="true"] { background: hsl(var(--toast-surface) / var(--toast-surface-alpha)); box-shadow: 0 8px 24px -6px hsl(var(--foreground) / 0.16), 0 2px 6px hsl(var(--foreground) / 0.06); }
 .toaster [data-close-button] { display: none; }
 
@@ -227,6 +230,12 @@
   input {
     font: inherit;
   }
+  /* 未单独设置字号的文本输入也走 --fs-input（组件类名规则在更高层，会覆盖这里） */
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]),
+  textarea,
+  select {
+    font-size: var(--fs-input);
+  }
   button {
     cursor: pointer;
   }
@@ -304,7 +313,7 @@
   .wall-layout-preview-dims text { fill:hsl(var(--muted-foreground)); font-variant-numeric:tabular-nums; }
   .cms-toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:14px; margin-bottom:24px; }
   .cms-search { display:flex; align-items:center; gap:9px; min-height:36px; padding:8px 14px; border:1px solid hsl(var(--input)); border-radius:999px; background:hsl(var(--card)); color:hsl(var(--muted-foreground)); min-width:240px; }
-  .cms-search input { border:0; background:transparent; color:hsl(var(--foreground)); width:100%; font-size:12px; outline:none; }
+  .cms-search input { border:0; background:transparent; color:hsl(var(--foreground)); width:100%; font-size:var(--fs-input); outline:none; }
   /* 分类胶囊单行横向滚动：两侧渐隐只在该方向仍有内容时出现，提示可滑动。 */
   .cms-filter-bar { --fade-start:0px; --fade-end:0px; display:flex; flex-wrap:nowrap; gap:8px; min-width:0; overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x proximity; scroll-padding-inline:24px; scrollbar-width:thin; scrollbar-color:hsl(var(--border)) transparent; padding-bottom:4px; -webkit-mask-image:linear-gradient(to right,transparent 0,hsl(var(--foreground)) var(--fade-start),hsl(var(--foreground)) calc(100% - var(--fade-end)),transparent 100%); mask-image:linear-gradient(to right,transparent 0,hsl(var(--foreground)) var(--fade-start),hsl(var(--foreground)) calc(100% - var(--fade-end)),transparent 100%); }
   .cms-filter-bar[data-fade-start] { --fade-start:28px; }
@@ -405,7 +414,7 @@
   .cost-controls { padding:18px; border:1px solid hsl(var(--border)); border-radius:12px; background:hsl(var(--card)); }
   .cost-search { flex:0 1 430px; min-height:36px; border-radius:10px; padding:8px 14px; }
   .cost-search:focus-within { border-color:hsl(var(--ring)); box-shadow:0 0 0 2px hsl(var(--ring)/.12); }
-  .cost-search input { font-size:13px; min-width:0; }
+  .cost-search input { font-size:var(--fs-input); min-width:0; }
   .cost-search>button { display:grid; place-items:center; flex-shrink:0; width:28px; height:28px; border-radius:5px; }
   .cost-sync { display:flex; align-items:center; gap:6px; font-size:11px; color:hsl(var(--primary)); line-height:1.6; }
   .cost-results-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:28px 0 14px; }
@@ -720,7 +729,7 @@
     background: transparent;
     border: 0;
     min-width: 0;
-    font-size: 11px;
+    font-size: var(--fs-input);
   }
   .library-search kbd {
     font-size: 9px;
@@ -2042,7 +2051,7 @@
     padding: 7px 9px;
     border-radius: 5px;
     background: hsl(var(--card));
-    font-size: 11px;
+    font-size: var(--fs-input);
   }
   .project-list-footer {
     display: flex;
@@ -2111,7 +2120,7 @@
     min-width: 0;
     outline: none;
     background: transparent;
-    font-size: 12px;
+    font-size: var(--fs-input);
   }
   .auth-submit {
     width: 100%;
@@ -2397,7 +2406,6 @@
     font-size: 12px;
   }
   .property-field input {
-    font-size: 16px;
     padding: 8px;
   }
   .room-row,
@@ -2418,7 +2426,7 @@
     padding: 10px 0;
   }
   .library-search input {
-    font-size: 13px;
+    font-size: var(--fs-input);
   }
   .panel-tabs button {
     font-size: 12px;
@@ -2429,9 +2437,6 @@
   .auth-dialog {
     width: calc(100% - 26px) !important;
     padding: 24px !important;
-  }
-  .auth-field input {
-    font-size: 16px;
   }
 }
 /* Object-following visual editor and project costs */
@@ -2599,7 +2604,7 @@
   font-weight: 500;
 }
 /* 编辑器控件：不放进 @layer components，否则会被 shadcn Input / Button / Label 的 utilities（13px / 14px / svg 16px）覆盖 */
-.editor-control { @apply min-w-0 w-full; height: var(--ctl-lg); border-radius: var(--ctl-radius); font-size: var(--fs-control); }
+.editor-control { @apply min-w-0 w-full; height: var(--ctl-lg); border-radius: var(--ctl-radius); font-size: var(--fs-input); }
 .editor-action { height: var(--ctl-lg); border-radius: var(--ctl-radius); font-size: var(--fs-control); gap: 6px; }
 .editor-action svg { width: 15px; height: 15px; }
 .editor-field { @apply grid gap-1.5 mb-2; }
@@ -2608,9 +2613,8 @@
 .editor-procurement-toggle { @apply h-auto px-0 py-1; font-size: var(--fs-control); }
 .price-control { @apply flex-1 w-24; }
 .field-label { display: flex; flex-direction: column; gap: 6px; min-width: 0; margin: 0; font-size: var(--fs-label); font-weight: 500; line-height: 1.3; color: hsl(var(--muted-foreground)); }
-/* 手机端输入框 16px 防止 iOS 聚焦缩放；同行按钮与标签同步放大，保持比例 */
+/* 手机端输入框字号由 --fs-input 统一保证；同行按钮与标签同步放大，保持比例 */
 @media (max-width:700px) {
-  .editor-control { font-size:16px; }
   .editor-action { font-size:14px; }
   .field-label, .editor-field label, .rotation-angle-field { font-size:12px; }
 }
@@ -3207,7 +3211,7 @@ button.room-cost-row:hover {
   border: 1px solid hsl(var(--border));
   border-radius: 5px;
   background: hsl(var(--background));
-  font-size: 11px;
+  font-size: var(--fs-input);
 }
 .labor-form > button {
   display: flex;
@@ -3247,11 +3251,6 @@ button.room-cost-row:hover {
   }
   .visual-size-trigger {
     font-size: 10px;
-  }
-  .visual-editor-popover input,
-  .price-entry input,
-  .labor-form input {
-    font-size: 16px;
   }
   .cost-detail-heading b {
     font-size: 12px;
@@ -3481,7 +3480,7 @@ button.room-cost-row:hover {
   border-radius: 5px;
   padding: 9px;
   background: hsl(var(--background));
-  font-size: 11px;
+  font-size: var(--fs-input);
 }
 .custom-image-panel > small {
   font-size: 9px;
@@ -3576,13 +3575,6 @@ button.room-cost-row:hover {
   .custom-furniture-layout {
     grid-template-columns: 1fr;
     gap: 16px;
-  }
-  .custom-furniture-fields input,
-  .custom-furniture-fields select,
-  .custom-image-panel textarea,
-  .procurement-fields input,
-  .procurement-fields select {
-    font-size: 16px;
   }
   .custom-image-preview {
     height: 180px;

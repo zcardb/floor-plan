@@ -7,7 +7,7 @@ import { PDFArray, PDFDict, PDFDocument, PDFName } from 'pdf-lib';
 import { blankDesign } from '../data/templates';
 import { library } from '../data/catalog';
 import { createDrawingDocument, createExportDocument } from './drawingDocument';
-import { serializeDrawing, downloadDrawing, serializeProjectJson } from './drawingExport';
+import { serializeDrawing, drawingFile, projectJsonFile, serializeProjectJson } from './drawingExport';
 import { serializeDxf } from './dxfExport';
 import { serializePdf } from './pdfExport';
 import { drawingScale, drawingSheet } from './drawingScale';
@@ -165,13 +165,13 @@ describe('工程交换图',()=>{
     const parsed=new DxfParser().parseSync(serializeDrawing(d,'dxf'))!;
     expect(parsed.entities.some(e=>'vertices' in e && Array.isArray(e.vertices) && e.vertices.some((p:{x:number;y:number})=>p.x<0||p.y<0))).toBe(true);
   });
-  it('下载使用正确扩展名并清理URL；无有效墙体时不创建下载链接',async()=>{
-    vi.useFakeTimers();const click=vi.fn(),revoke=vi.fn(),link={click,download:''};
-    vi.stubGlobal('document',{createElement:()=>link});vi.stubGlobal('URL',{createObjectURL:vi.fn(()=>'blob:test'),revokeObjectURL:revoke});
-    try{await downloadDrawing(fixture(),'svg','项目');expect(click).toHaveBeenCalledOnce();expect(link.download).toBe('项目.svg');
-      vi.runAllTimers();expect(revoke).toHaveBeenCalledWith('blob:test');
-      for(const format of ['dxf','svg','pdf'] as const)await expect(downloadDrawing({...fixture(),walls:[]},format,'项目')).rejects.toThrow('有效墙体');
-      expect(click).toHaveBeenCalledOnce();
-    }finally{vi.unstubAllGlobals();vi.useRealTimers();}
+  it('导出文件使用正确扩展名和类型；无有效墙体时拒绝生成',async()=>{
+    const d=fixture(),svg=await drawingFile(d,'svg','项/目');
+    expect(svg.name).toBe('项-目.svg');expect(svg.blob.type).toContain('image/svg+xml');
+    expect(await svg.blob.text()).toBe(serializeDrawing(d,'svg','项/目'));
+    const json=projectJsonFile(d,'项目');
+    expect(json.name).toBe('项目.json');expect(json.blob.type).toBe('application/json');
+    expect(await json.blob.text()).toBe(serializeProjectJson(d,'项目'));
+    for(const format of ['dxf','svg','pdf'] as const)await expect(drawingFile({...fixture(),walls:[]},format,'项目')).rejects.toThrow('有效墙体');
   });
 });

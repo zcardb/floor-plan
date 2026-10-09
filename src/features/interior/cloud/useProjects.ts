@@ -3,6 +3,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { errorMessage, notify } from "@/lib/notify";
+import { onPageHide } from "@/lib/platform";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { validateDesign } from "../model/validation";
 import { nextGuestEditCount } from "../model/templateState";
@@ -280,6 +281,16 @@ export function useProjects() {
     }
     return success;
   }, [persist]);
+  // 微信 / Safari 切走后页面可能直接被系统回收：有排队中的云端保存就立刻执行，不再等防抖。
+  // 正在保存时不重复发起，保存结束后若仍有改动会自行续存。
+  const saveRef = useRef(save);
+  saveRef.current = save;
+  useEffect(() => onPageHide(() => {
+    if (!timer.current || saving.current) return;
+    clearTimeout(timer.current);
+    timer.current = null;
+    void saveRef.current();
+  }, "persist"), []);
   const update = useCallback(
     (design: Design) => {
       const p = activeRef.current;

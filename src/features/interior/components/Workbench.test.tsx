@@ -27,6 +27,7 @@ vi.mock('../model/useDesign', () => ({ useDesign: () => ({
   counts: { undo: 0, redo: 0 }, sizeTransaction: { flush: vi.fn(), cancel: state.cancel },
 }) }));
 import { Workbench } from './Workbench';
+import { initialSceneState } from './useSceneLifecycle';
 import { blankDesign, referenceDesign } from '../data/templates';
 import { PlanCanvas } from './PlanCanvas';
 import { DimensionEditDialog } from './DimensionEditDialog';
@@ -107,7 +108,7 @@ describe('分割墙段共享入口及快照提交', () => {
     expect(() => (dialog.props.onApply as (cuts: number[], i: number) => void)([300], 0)).toThrow('设计已变化');
     expect(state.commit).not.toHaveBeenCalled(); expect(render().some(n => n.type === WallSplitDialog)).toBe(false);
     state.values = []; state.design!.demolished = ['outer-0']; expect(open()).toBeUndefined();
-    state.values[2] = '3d'; expect(render().find(n => n.type === PropertyPanel)!.props.splitWall).toBeUndefined();
+    state.values[2] = { ...initialSceneState, view: '3d' }; expect(render().find(n => n.type === PropertyPanel)!.props.splitWall).toBeUndefined();
   });
 });
 describe('承重墙删除保护', () => {
@@ -196,7 +197,7 @@ describe('2D 常用工具与顶部工具栏', () => {
       expect(state.values[1]).toBe('select');
       key('m', true);
       expect(state.values[1]).toBe('select');
-      state.values[2] = '3d';
+      state.values[2] = { ...initialSceneState, view: '3d' };
       attach();
       key('x'); key('m');
       expect(state.values[1]).toBe('select');
@@ -211,7 +212,7 @@ describe('2D 常用工具与顶部工具栏', () => {
     expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['选择']);
     const more = tools(render()).find(node => node.props['aria-label'] === '更多')!;
     expect(more.props.className).toContain('compact-only');
-    state.values[2] = '3d';
+    state.values[2] = { ...initialSceneState, view: '3d' };
     expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['鸟瞰', '漫游', '俯视', '剖切']);
   });
 });
