@@ -8,7 +8,7 @@ import { length } from '../model/geometry';
 import { WallSplitPreview } from './WallSplitPreview';
 import { formatMeters, meterDraft, parseMeterDraft } from '../model/lengthUnits';
 import { contactDistances, originalSegment, wallSplitDraft } from '../model/wallSplitDraft';
-import { wallContacts } from '../model/wallContacts';
+import { wallContacts, type WallContact } from '../model/wallContacts';
 import { isBearingWall } from '../model/wallPolicy';
 import { wallDisplayName } from '../model/wallLabel';
 import type { Design } from '../model/types';
@@ -20,7 +20,7 @@ const modes: { value: SplitMode; label: string }[] = [
   { value: 2, label: '两点分割' },
   { value: 'contact', label: '接触点分割' },
 ];
-const kinds = { tee: 'T 形交接', cross: '十字穿过' } as const;
+const kinds = { tee: 'T 形交接', cross: '十字穿过', opening: '门窗洞口' } as const;
 const StepTitle = ({ no, children }: { no: number; children: React.ReactNode }) =>
   <span className="wall-split-step-title"><i className="wall-split-step-no" aria-hidden="true">{no}</i>{children}</span>;
 
@@ -70,6 +70,11 @@ export function WallSplitDialog({ design, wallId, onApply, onClose }: {
       notify.success(`墙段已分割为 ${count} 段，已选中第 ${selected + 1} 段`);
     } catch (e) { const message = e instanceof Error ? e.message : '分割失败'; setError(message); notify.fail('墙段未分割：' + message); }
   };
+  /** 门窗边接触点：按当前显示方向说明切在哪一侧边缘。 */
+  const edgeLabel = (contact: WallContact) => {
+    const start = contact.opening!.edge === 'start';
+    return (reversed ? !start : start) ? '近 A 侧' : '近 B 侧';
+  };
   const describedBy = showValidation ? 'wall-split-error' : 'wall-split-hint';
   return <Dialog open onOpenChange={open => { if (!open) onClose(); }}>
     <DialogContent className="wall-split-dialog" onKeyDown={e => e.stopPropagation()}>
@@ -105,10 +110,12 @@ export function WallSplitDialog({ design, wallId, onApply, onClose }: {
                   className={picked.includes(contact.offset) ? 'wall-split-contact is-active' : 'wall-split-contact'} onClick={() => toggle(contact.offset)}>
                   <i className="wall-split-check" aria-hidden="true">{picked.includes(contact.offset) && <Check size={11} strokeWidth={3} />}</i>
                   <span>接触点 {i + 1} · 距 A {formatMeters(contactDistances(L, [contact.offset], reversed)[0]!)} m</span>
-                  <small>{contact.blocked ? '位于门窗洞口内，不能作为分割点' : <><span>{kinds[contact.kind]}</span> · {contact.wallIds.map(id => { const w = design.walls.find(x => x.id === id); return w ? wallDisplayName(design, w) : '相接墙'; }).join('、')}</>}</small>
+                  <small>{contact.blocked ? '位于门窗洞口内，不能作为分割点' : contact.opening
+                    ? `${contact.opening.kind === 'door' ? '门' : '窗'}洞口${edgeLabel(contact)}边缘`
+                    : <><span>{kinds[contact.kind]}</span> · {contact.wallIds.map(id => { const w = design.walls.find(x => x.id === id); return w ? wallDisplayName(design, w) : '相接墙'; }).join('、')}</>}</small>
                 </button>)}
               </div>
-            </> : <p className="wall-split-hint">本墙没有其他墙相接，可使用单点或两点分割</p>}
+            </> : <p className="wall-split-hint">本墙没有其他墙相接，也没有门窗洞口，可使用单点或两点分割</p>}
             {showValidation ? <p id="wall-split-error" role="alert" className="wall-split-error">{draft.error}</p> : null}
           </div> : <div className="wall-split-step"><StepTitle no={1}>分割距离 · 距 A（米）</StepTitle>
             <div className={mode === 2 ? 'wall-split-inputs is-pair' : 'wall-split-inputs'}>

@@ -26,7 +26,6 @@ function engineItems(assistants: Assistant[]): PickerItem[] {
       id: keyOf({ kind: "model", id: m.id }),
       label: m.name,
       group: MODEL_GROUP,
-      hint: m.vision ? "可读图" : undefined,
       keywords: [m.id, m.group],
     })),
   ];

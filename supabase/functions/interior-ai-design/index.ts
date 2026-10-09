@@ -8,14 +8,11 @@ const MODELS: Record<string, { protocol: Protocol; vision: boolean }> = {
   'openai/gpt-6.1-sol': { protocol: 'responses', vision: true },
   'openai/gpt-6-astra': { protocol: 'responses', vision: true },
   'openai/gpt-6-luna': { protocol: 'responses', vision: true },
-  'deepseek/deepseek-v4-flash': { protocol: 'chat', vision: false },
-  'deepseek/deepseek-v4-pro': { protocol: 'chat', vision: false },
   'moonshotai/kimi-k3': { protocol: 'chat', vision: true },
   'alibaba/qwen-3.8-max': { protocol: 'chat', vision: true },
-  'z-ai/glm-5.2': { protocol: 'chat', vision: false },
   'minimax/minimax-m3': { protocol: 'chat', vision: true },
 };
-const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
+const DEFAULT_MODEL = 'openai/gpt-6-luna';
 const BASE = 'https://api.enter.pro/code/api/v1/ai';
 const ENDPOINT: Record<Protocol, string> = { anthropic: `${BASE}/messages`, chat: `${BASE}/chat/completions`, responses: `${BASE}/responses` };
 const PROJECT_ID = 'eba6e37b0b3d4d608b63a3efedec61a3';

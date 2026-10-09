@@ -63,9 +63,38 @@ describe('相接墙接触点', () => {
   it('落在门窗洞口内的接触点标记为 blocked，但仍列出', () => {
     const d = add(host(), 'partition', [2000, 0], [2000, 3000]);
     d.openings = [{ id: 'win', wallId: 'host', kind: 'window', offset: 2000, width: 900 }];
-    expect(wallContacts(d, 'host')).toEqual([{ offset: 2000, wallIds: ['partition'], kind: 'tee', blocked: true }]);
+    expect(wallContacts(d, 'host')).toEqual([
+      { offset: 1550, wallIds: [], kind: 'opening', blocked: false, opening: { id: 'win', kind: 'window', edge: 'start' } },
+      { offset: 2000, wallIds: ['partition'], kind: 'tee', blocked: true },
+      { offset: 2450, wallIds: [], kind: 'opening', blocked: false, opening: { id: 'win', kind: 'window', edge: 'end' } },
+    ]);
     d.openings = [{ id: 'win', wallId: 'host', kind: 'window', offset: 2450, width: 900 }];
     expect(wallContacts(d, 'host')[0]!.blocked).toBe(false);
+  });
+  it('门窗洞口两侧边缘各成一个接触点，取存储位置不取整', () => {
+    const d = host();
+    d.openings = [{ id: 'door', wallId: 'host', kind: 'door', offset: 2000, width: 850 }];
+    expect(wallContacts(d, 'host')).toEqual([
+      { offset: 1575, wallIds: [], kind: 'opening', blocked: false, opening: { id: 'door', kind: 'door', edge: 'start' } },
+      { offset: 2425, wallIds: [], kind: 'opening', blocked: false, opening: { id: 'door', kind: 'door', edge: 'end' } },
+    ]);
+  });
+  it('停在洞口边上的交接点不 blocked、按洞口边位置切开', () => {
+    const on = add(host(), 'partition', [2060, 0], [2060, 3000]);
+    on.openings = [{ id: 'win', wallId: 'host', kind: 'window', offset: 2500, width: 880 }];
+    expect(wallContacts(on, 'host')[0]).toEqual({ offset: 2060, wallIds: ['partition'], kind: 'tee', blocked: false });
+    // 8 mm 落进洞口，仍在吸附窗口内：按洞口边处理，不 blocked。
+    const inside = add(host(), 'partition', [2068, 0], [2068, 3000]);
+    inside.openings = [{ id: 'win', wallId: 'host', kind: 'window', offset: 2500, width: 880 }];
+    expect(wallContacts(inside, 'host')[0]).toEqual({ offset: 2060, wallIds: ['partition'], kind: 'tee', blocked: false });
+  });
+  it('洞口边距墙端或相邻交接点不到 0.05 m 时不列出', () => {
+    const edge = host();
+    edge.openings = [{ id: 'w', wallId: 'host', kind: 'window', offset: 240, width: 400 }];
+    expect(wallContacts(edge, 'host').map(c => c.offset)).toEqual([440]);
+    const junction = add(host(), 'partition', [2000, 0], [2000, 3000]);
+    junction.openings = [{ id: 'w', wallId: 'host', kind: 'window', offset: 2220, width: 360 }];
+    expect(wallContacts(junction, 'host').map(c => [c.offset, c.kind])).toEqual([[2000, 'tee'], [2400, 'opening']]);
   });
   it('按存储的 a→b 方向量取，与相接墙的绘制方向无关', () => {
     const forward = wallContacts(add(host(), 'branch', [2000, 0], [2000, 3000]), 'host');
@@ -84,7 +113,7 @@ describe('相接墙接触点', () => {
         total++;
         expect(contact.offset).toBeGreaterThanOrEqual(50);
         expect(contact.offset).toBeLessThanOrEqual(L - 50);
-        expect(contact.offset % 10).toBe(0);
+        expect(contact.offset % 10 === 0 || contact.kind === 'opening').toBe(true);
         expect(contact.wallIds).not.toContain(wall.id);
         expect(contact.wallIds.every(id => d.walls.some(w => w.id === id))).toBe(true);
       }

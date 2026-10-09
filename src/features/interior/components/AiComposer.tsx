@@ -6,7 +6,7 @@ import { AI_COUNT_OPTIONS, AI_IMAGE_LIMIT } from "../ai/client";
 import { ImagePreview } from "./ImagePreview";
 import { AiEnginePicker } from "./AiEnginePicker";
 import { imagesUploading, useReferenceImages, type AiImageDraft, type ImagesUpdate } from "../ai/referenceImages";
-import { modelOf, type AiEngine } from "../ai/models";
+import { type AiEngine } from "../ai/models";
 import { useAssistants } from "../cloud/useAssistants";
 
 export interface AiComposerValue {
@@ -50,8 +50,6 @@ export function AiComposer({ value, onDescription, onImages, onCount, onEngine, 
   const assistants = useAssistants();
   const assistant = value.engine.kind === "assistant" ? assistants.items.find((a) => a.id === value.engine.id) : undefined;
   const missingAssistant = value.engine.kind === "assistant" && !assistants.loading && !assistant;
-  const model = modelOf(value.engine.kind === "model" ? value.engine.id : assistant?.model);
-  const blind = value.images.length > 0 && !!model && !model.vision;
   const reason = missingAssistant ? "所选小助手已删除，请重新选择" : !value.description.trim() ? "请先描述需求" : uploading ? "参考图上传中" : "";
   const send = () => { if (!reason) onSend(); };
   // 输入框随内容增高，超过上限后内部滚动。
@@ -119,11 +117,11 @@ export function AiComposer({ value, onDescription, onImages, onCount, onEngine, 
       <AiEnginePicker engine={value.engine} assistants={assistants.items} onChange={onEngine} onCreate={assistants.create} />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button type="button" className="ai-composer-count" aria-label={`方案数量，当前 ${value.count} 个`}>{value.count} 个方案<ChevronDown size={12} /></button>
+          <button type="button" className="ai-composer-count" aria-label={`数量，当前 ${value.count}`}>{`数量 ${value.count}`}<ChevronDown size={12} /></button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="ai-count-menu">
           <DropdownMenuRadioGroup value={String(value.count)} onValueChange={(next) => onCount(Number(next))}>
-            {AI_COUNT_OPTIONS.map((n) => <DropdownMenuRadioItem key={n} value={String(n)}>{n} 个方案</DropdownMenuRadioItem>)}
+            {AI_COUNT_OPTIONS.map((n) => <DropdownMenuRadioItem key={n} value={String(n)} aria-label={`数量 ${n}`}>{n}</DropdownMenuRadioItem>)}
           </DropdownMenuRadioGroup>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -132,7 +130,6 @@ export function AiComposer({ value, onDescription, onImages, onCount, onEngine, 
         <button type="button" className="ai-composer-send" aria-label={sendLabel} disabled={!!reason} onClick={send}><ArrowUp size={15} /><span>{sendLabel}</span></button>
       </EditorTooltip>
     </div>
-    {blind && <p className="ai-composer-notice" role="status">{model!.name} 不读取参考图，生成时只参考文字描述；需要参考图请换成可读图的模型。</p>}
     <ImagePreview src={preview?.src ?? null} alt={preview?.alt ?? ""} onClose={() => setPreview(null)} />
     </div>
   </div>;

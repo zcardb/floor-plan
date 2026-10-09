@@ -21,7 +21,6 @@ const MODEL_ITEMS: PickerItem[] = AI_MODELS.map((m) => ({
   id: m.id,
   label: m.name,
   group: "模型",
-  hint: m.vision ? "可读图" : undefined,
   keywords: [m.id, m.group],
 }));
 

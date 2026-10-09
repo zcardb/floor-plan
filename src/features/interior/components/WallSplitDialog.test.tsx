@@ -78,46 +78,62 @@ describe('接触点分割', () => {
     const h = harness(junctions(), 'host'), before = JSON.stringify(h.design);
     h.click('接触点分割');
     expect(h.byLabel('接触点 1').props['aria-pressed']).toBe(true);
-    expect(h.byLabel('接触点 2（位于门窗洞口内）').props.disabled).toBe(true);
-    expect(h.byLabel('接触点 2（位于门窗洞口内）').props['aria-pressed']).toBe(false);
-    expect(h.byLabel('接触点 3').props['aria-pressed']).toBe(true);
-    expect(h.preview().intervals).toEqual([0, 1000, 4000, 6000]);
-    expect(h.preview().contacts).toHaveLength(3);
+    expect(h.byLabel('接触点 3（位于门窗洞口内）').props.disabled).toBe(true);
+    expect(h.byLabel('接触点 3（位于门窗洞口内）').props['aria-pressed']).toBe(false);
+    expect(h.byLabel('接触点 5').props['aria-pressed']).toBe(true);
+    expect(h.preview().intervals).toEqual([0, 1000, 2050, 2950, 4000, 6000]);
+    expect(h.preview().contacts).toHaveLength(5);
     expect(h.render().some(n => n.props.children === '十字穿过')).toBe(true);
     h.click('选中第 2 段'); h.click('应用分割');
-    expect(h.onApply).toHaveBeenCalledWith([1000, 4000], 1);
+    expect(h.onApply).toHaveBeenCalledWith([1000, 2050, 2950, 4000], 1);
     expect(JSON.stringify(h.design)).toBe(before);
+  });
+  it('门窗洞口两侧边缘各成一个接触点，说明是哪一侧；换向按新 A 说明', () => {
+    const h = harness(junctions(), 'host');
+    h.click('接触点分割');
+    const sides = () => h.render().filter(n => n.type === 'small').map(n => n.props.children).filter(c => typeof c === 'string');
+    expect(sides()).toEqual(['窗洞口近 A 侧边缘', '窗洞口近 B 侧边缘']);
+    h.click('交换 A/B');
+    expect(sides()).toEqual(['窗洞口近 B 侧边缘', '窗洞口近 A 侧边缘']);
   });
   it('取消勾选后预览更新；清空后不能应用，全选恢复', () => {
     const h = harness(junctions(), 'host');
     h.click('接触点分割'); h.click('接触点 1');
-    expect(h.preview().intervals).toEqual([0, 4000, 6000]);
+    expect(h.preview().intervals).toEqual([0, 2050, 2950, 4000, 6000]);
     h.click('清空');
     expect(h.preview().intervals).toEqual([]); expect(h.byLabel('应用分割').props.disabled).toBe(true);
     h.click('全选');
-    expect(h.preview().intervals).toEqual([0, 1000, 4000, 6000]); expect(h.byLabel('应用分割').props.disabled).toBe(false);
+    expect(h.preview().intervals).toEqual([0, 1000, 2050, 2950, 4000, 6000]); expect(h.byLabel('应用分割').props.disabled).toBe(false);
   });
   it('交换 A/B 后勾选不变、距离按新 A 显示，提交仍为存储方向', () => {
     const h = harness(junctions(), 'host');
     h.click('接触点分割'); h.click('交换 A/B');
     expect(h.render().some(n => n.props.children === `接触点 1 · 距 A 5.00 m` || (Array.isArray(n.props.children) && n.props.children.join('') === '接触点 1 · 距 A 5.00 m'))).toBe(true);
-    expect(h.preview().intervals).toEqual([0, 1000, 4000, 6000]);
+    expect(h.preview().intervals).toEqual([0, 1000, 2050, 2950, 4000, 6000]);
     h.click('应用分割');
     // Card 1 is next to the shown A (stored b), so it maps back to the last stored segment.
-    expect(h.onApply).toHaveBeenCalledWith([1000, 4000], 2);
+    expect(h.onApply).toHaveBeenCalledWith([1000, 2050, 2950, 4000], 4);
   });
-  it('没有相接墙时显示空状态，且不提交', () => {
+  it('没有相接墙也没有洞口时显示空状态，且不提交', () => {
     const h = harness();
     h.click('接触点分割');
-    expect(h.render().some(n => n.props.children === '本墙没有其他墙相接，可使用单点或两点分割')).toBe(true);
+    expect(h.render().some(n => n.props.children === '本墙没有其他墙相接，也没有门窗洞口，可使用单点或两点分割')).toBe(true);
     expect(h.byLabel('应用分割').props.disabled).toBe(true);
     expect(h.render().some(n => n.props['aria-label'] === '接触点快捷填入')).toBe(false);
   });
+  it('只有门窗洞口时也列出洞口边接触点', () => {
+    const d = { ...blankDesign(), rooms: [], walls: [{ id: 'host', kind: 'partition' as const, thickness: 240, a: [0, 0] as [number, number], b: [6000, 0] as [number, number] }], openings: [{ id: 'door', wallId: 'host', kind: 'door' as const, offset: 3000, width: 900 }] };
+    const h = harness(d, 'host');
+    h.click('接触点分割');
+    expect(h.byLabel('接触点 1').props['aria-pressed']).toBe(true);
+    expect(h.byLabel('接触点 2').props['aria-pressed']).toBe(true);
+    expect(h.preview().intervals).toEqual([0, 2550, 3450, 6000]);
+  });
   it('单点/两点模式的快捷标签写入点 1 或最近聚焦的输入框，跳过洞口内的接触点', () => {
     const h = harness(junctions(), 'host');
-    expect(h.render().filter(n => n.props.className === 'wall-split-chip')).toHaveLength(2);
+    expect(h.render().filter(n => n.props.className === 'wall-split-chip')).toHaveLength(4);
     h.click('填入接触点 2 距离');
-    expect(h.value('wall-split-first')).toBe('4.00'); expect(h.preview().intervals).toEqual([0, 4000, 6000]);
+    expect(h.value('wall-split-first')).toBe('2.05'); expect(h.preview().intervals).toEqual([0, 2050, 6000]);
     h.click('两点分割'); h.input('wall-split-first', '0.5'); h.focus('wall-split-second'); h.click('填入接触点 1 距离');
     expect(h.value('wall-split-second')).toBe('1.00'); expect(h.preview().intervals).toEqual([0, 500, 1000, 6000]);
     h.click('交换 A/B'); h.focus('wall-split-first'); h.click('填入接触点 1 距离');

@@ -65,21 +65,21 @@
 
 ## Implementation checklist
 
-- [ ] `AiComposer.tsx` 触发器可见文案为「数量 {count}」（模板字符串单节点），`aria-label` 为「数量，当前 {count}」
-- [ ] `AiComposer.tsx` 下拉项渲染 `{n}` 且 `aria-label={`数量 ${n}`}`，界面不再出现「个方案」
-- [ ] `AiComposer.tsx` 删除 `model` / `blind` 变量、`modelOf` import 与第 135 行 `ai-composer-notice` 段落
-- [ ] `models.ts` 删除三个不读图模型，`DEFAULT_AI_MODEL = "openai/gpt-6-luna"`，`AiModel` 不再有 `vision` 字段
-- [ ] `AiEnginePicker.tsx` 与 `AssistantDialog.tsx` 的 `hint: m.vision ? "可读图" : undefined` 已删除
-- [ ] `supabase/functions/interior-ai-design/index.ts` 白名单删除同样三条，`DEFAULT_MODEL = 'openai/gpt-6-luna'`
-- [ ] `index.css` 中 `.ai-count-menu` 的 `min-width` 为 96px
-- [ ] `aiComponents.test.tsx` 断言更新为「数量 2」「不包含『个方案』」「GPT 6 Luna」
+- [x] `AiComposer.tsx` 触发器可见文案为「数量 {count}」（模板字符串单节点），`aria-label` 为「数量，当前 {count}」
+- [x] `AiComposer.tsx` 下拉项渲染 `{n}` 且 `aria-label={`数量 ${n}`}`，界面不再出现「个方案」
+- [x] `AiComposer.tsx` 删除 `model` / `blind` 变量、`modelOf` import 与第 135 行 `ai-composer-notice` 段落
+- [x] `models.ts` 删除三个不读图模型，`DEFAULT_AI_MODEL = "openai/gpt-6-luna"`，`AiModel` 不再有 `vision` 字段
+- [x] `AiEnginePicker.tsx` 与 `AssistantDialog.tsx` 的 `hint: m.vision ? "可读图" : undefined` 已删除
+- [x] `supabase/functions/interior-ai-design/index.ts` 白名单删除同样三条，`DEFAULT_MODEL = 'openai/gpt-6-luna'`
+- [x] `index.css` 中 `.ai-count-menu` 的 `min-width` 为 96px
+- [x] `aiComponents.test.tsx` 断言更新为「数量 2」「不包含『个方案』」「GPT 6 Luna」
 
 ## Verification checklist
 
-- [ ] `pnpm test src/features/interior/components/aiComponents.test.tsx src/features/interior/ai/ai.test.ts` 全绿
-- [ ] `pnpm run build` 通过（含 TypeScript 校验，确认没有残留的 `m.vision` / `modelOf` 引用）
-- [ ] 手动（默认态）：「AI 创建户型」触发器为「数量 2」与「GPT 6 Luna」；展开数量下拉只有 `1 / 2 / 3 / 4`；选 4 后生成 4 个候选
-- [ ] 手动（模型列表）：输入框的模型分组与小助手弹窗的模型列表都不再出现 DeepSeek V4 Flash / V4 Pro / GLM 5.2；选中模型后生成正常
-- [ ] 边界（旧数据）：仍指向已删除模型的小助手在列表里显示「未知模型」，编辑保存后落到 GPT 6 Luna；直接用它生成不报错（后端回落到默认模型），且带参考图时模型确实读图
-- [ ] 负向：用已删除的模型 id 直接调用后端函数会被 `!MODELS[b.model]` 拒绝，返回「不支持的模型」
-- [ ] 键盘：数量下拉上下键 + Enter 仍能切换（RadioGroup 行为未变）
+- [x] `pnpm test src/features/interior/components/aiComponents.test.tsx src/features/interior/ai/ai.test.ts` 全绿
+- [x] `pnpm run build` 通过（含 TypeScript 校验，确认没有残留的 `m.vision` / `modelOf` 引用）
+- [x] 手动（默认态）：「AI 创建户型」触发器为「数量 2」与「GPT 6 Luna」；展开数量下拉只有 `1 / 2 / 3 / 4`；选 4 后生成 4 个候选
+- [x] 手动（模型列表）：输入框的模型分组与小助手弹窗的模型列表都不再出现 DeepSeek V4 Flash / V4 Pro / GLM 5.2；选中模型后生成正常
+- [x] 边界（旧数据）：仍指向已删除模型的小助手在列表里显示「未知模型」，编辑保存后落到 GPT 6 Luna；直接用它生成不报错（后端回落到默认模型），且带参考图时模型确实读图
+- [x] 负向：用已删除的模型 id 直接调用后端函数会被 `!MODELS[b.model]` 拒绝，返回「不支持的模型」
+- [x] 键盘：数量下拉上下键 + Enter 仍能切换（RadioGroup 行为未变）

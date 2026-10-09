@@ -4011,7 +4011,7 @@ button.room-cost-row:hover {
 .ai-composer-count > svg { color: hsl(var(--muted-foreground)); transition: transform .15s ease; }
 .ai-composer-count[data-state="open"] > svg { transform: rotate(180deg); }
 .ai-composer-count:hover, .ai-composer-count[data-state="open"] { background: hsl(var(--accent)); }
-.ai-count-menu { min-width: 120px; font-size: var(--fs-control); }
+.ai-count-menu { min-width: 96px; font-size: var(--fs-control); }
 .ai-note { font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); }
 .ai-link { justify-self: start; font-size: var(--fs-control); color: hsl(var(--primary)); text-decoration: underline; text-underline-offset: 3px; }
 .ai-create-form, .ai-create-results, .ai-results { display: grid; gap: 16px; min-width: 0; }
@@ -4147,7 +4147,6 @@ button.ai-candidate:hover { border-color: hsl(var(--primary) / 0.5); }
 .furniture-picker-action { display: flex; align-items: center; gap: 6px; width: 100%; font: inherit; color: inherit; text-align: left; }
 .furniture-picker-action:hover { color: hsl(var(--foreground)); }
 .furniture-picker-footer { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-top: 1px solid hsl(var(--border)); font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); }
-.ai-composer-notice { margin: -2px 4px 0; font-size: var(--fs-meta); color: hsl(var(--warning)); }
 
 /* 管理端「小助手」 */
 .assistant-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }

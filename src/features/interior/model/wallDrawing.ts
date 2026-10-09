@@ -1,25 +1,35 @@
 import { length,nearestOnWall } from './geometry';
 import type { Design,Point } from './types';
-export interface WallSnap { point:Point; target?:{wallId:string;kind:'endpoint'|'intersection'} }
+export interface WallSnap { point:Point; target?:{wallId:string;kind:'endpoint'|'intersection'|'opening'} }
+const snapRank={endpoint:0,opening:1,intersection:2} as const;
 export function resolveWallPoint(raw:Point,d:Design,scale:number,snap:boolean,start?:Point,exclude?:string):WallSnap {
   const horizontal=start?Math.abs(raw[0]-start[0])>=Math.abs(raw[1]-start[1]):null;
   const point:Point=start?(horizontal?[raw[0],start[1]]:[start[0],raw[1]]):[...raw];
   if(!snap)return {point};
-  const tolerance=12/scale,candidates:{point:Point;wallId:string;kind:'endpoint'|'intersection';distance:number}[]=[];
+  const tolerance=12/scale,candidates:{point:Point;wallId:string;kind:keyof typeof snapRank;distance:number}[]=[];
   for(const w of d.walls){
     if(w.id===exclude||d.demolished.includes(w.id))continue;
-    const accept=(p:Point,kind:'endpoint'|'intersection')=>{
+    const accept=(p:Point,kind:keyof typeof snapRank)=>{
       if(kind==='intersection'&&start&&((horizontal&&Math.abs(p[1]-start[1])>0.01)||(!horizontal&&Math.abs(p[0]-start[0])>0.01)))return;
-      const reference=kind==='endpoint'?raw:point;
+      // 端点与门窗洞口边都是图纸上的确定点：允许小幅方向修正，直接吸到该点。
+      const reference=kind==='intersection'?point:raw;
       const distance=Math.hypot(p[0]-reference[0],p[1]-reference[1]);
       if(distance<=tolerance+(kind==='intersection'?w.thickness/2:0))candidates.push({point:p,wallId:w.id,kind,distance});
     };
     accept(w.a,'endpoint');accept(w.b,'endpoint');
+    const L=length(w);
+    if(L>0.001){
+      const dx=(w.b[0]-w.a[0])/L,dy=(w.b[1]-w.a[1])/L;
+      for(const o of d.openings)if(o.wallId===w.id){
+        accept([w.a[0]+dx*(o.offset-o.width/2),w.a[1]+dy*(o.offset-o.width/2)],'opening');
+        accept([w.a[0]+dx*(o.offset+o.width/2),w.a[1]+dy*(o.offset+o.width/2)],'opening');
+      }
+    }
     if(!start){accept(nearestOnWall(point,w).point,'intersection');continue;}
     const axis=horizontal?1:0,delta=w.b[axis]-w.a[axis];
     if(Math.abs(delta)>0.001){const t=(start[axis]-w.a[axis])/delta;if(t>=0&&t<=1)accept([w.a[0]+t*(w.b[0]-w.a[0]),w.a[1]+t*(w.b[1]-w.a[1])],'intersection');}
   }
-  candidates.sort((a,b)=>a.kind===b.kind?a.distance-b.distance:a.kind==='endpoint'?-1:1);
+  candidates.sort((a,b)=>a.kind===b.kind?a.distance-b.distance:snapRank[a.kind]-snapRank[b.kind]);
   const found=candidates[0];return found?{point:[...found.point],target:{wallId:found.wallId,kind:found.kind}}:{point};
 }
 export function resolveWallHover(raw:Point,d:Design,scale:number):WallSnap {
