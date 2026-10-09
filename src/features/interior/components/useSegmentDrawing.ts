@@ -51,6 +51,12 @@ export function useSegmentDrawing(enabled: boolean, design: React.RefObject<Desi
   };
   return { draft, candidate, hover, clear, move,
     clearHover: () => { setCandidate(null); setHover(null); },
+    /** 从已吸附好的点直接开始一段（选择模式单击墙身进入绘墙时使用）。 */
+    start(p: Point) {
+      pointer.current = null;
+      chain.current = { start: p, first: p };
+      setDraft({ a: p, b: p });
+    },
     down(p: Point, id: number, screen: Point) {
       const continuing = !!chain.current;
       if (!continuing) {

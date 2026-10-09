@@ -10,12 +10,15 @@ import { errorMessage, notify } from "@/lib/notify";
 import { rasterSize } from "@/lib/platform";
 import { canResizeWall, isBearingWall, isOnBearingWall, BEARING_WALL_WARNING } from '../model/wallPolicy';
 import { syncRooms } from '../model/roomFollow';
+import { splitAtJunctions } from '../model/wallAutoSplit';
+import { followWallFurniture } from '../model/furnitureFollow';
 import {
   area,
   center,
   length,
   nearestOnWall,
   norm,
+  rebuildRooms,
   roomPath,
   blockFurnitureMove,
 } from "../model/geometry";
@@ -67,6 +70,8 @@ interface Props {
   onCoord: (p: Point) => void;
   onAnchor: (r: ScreenRect | null) => void;
   finishTool: () => void;
+  /** 选择模式单击墙身时切到绘墙工具（起点由画布设置）。 */
+  startWallTool?: () => void;
   onDimensionSelect?: (segment: DimensionSegment) => void;
   selectedDimension?: DimensionBinding;
 }
@@ -98,6 +103,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     onCoord,
     onAnchor,
     finishTool,
+    startWallTool,
     onDimensionSelect,
     selectedDimension,
   },
@@ -126,11 +132,18 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
   // 选择模式悬停墙体时的测距点（与绘墙悬停共用 WallHoverOverlay）。
   const [selectHover, setSelectHover] = useState<WallSnap | null>(null);
   const clearSelectHover = () => setSelectHover(h => (h ? null : h));
+  /** 墙身上的绘墙起点：与绘墙相同的吸附（端点、洞口边、交点），吸不到时取墙中心线上的最近点。 */
+  const wallStartPoint = (p: Point, wallId: string): WallSnap => {
+    const d = current.current, snapped = resolveWallPoint(p, d, vr.current.s, layers.snap);
+    if (snapped.target) return snapped;
+    const wall = d.walls.find(w => w.id === wallId)!;
+    return { point: nearestOnWall(p, wall).point, target: { wallId, kind: 'intersection' } };
+  };
   const hoverWall = (target: EventTarget | null, p: Point) => {
     const id = (target as Element | null)?.closest?.('[data-wall]')?.getAttribute('data-wall');
     const wall = id ? current.current.walls.find(w => w.id === id) : undefined;
     if (!wall || current.current.demolished.includes(wall.id)) return clearSelectHover();
-    setSelectHover({ point: nearestOnWall(p, wall).point, target: { wallId: wall.id, kind: 'intersection' } });
+    setSelectHover(wallStartPoint(p, wall.id));
   };
   const wallPolygons = useMemo(() => {
     const walls = wallDrawing.draft && length(wallDrawing.draft as Design['walls'][number]) >= 100
@@ -297,6 +310,14 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       return;
     }
     const d = current.current;
+    if ((dr.kind === 'wallmove' || dr.kind === 'wallclick') && !dr.moved) {
+      // 单击墙身（没有拖动）：切到绘墙，并以吸附点作为第一段墙的起点。
+      if (!startWallTool) return;
+      const start = wallStartPoint(dr.start, dr.id!).point;
+      startWallTool();
+      wallDrawing.start(start);
+      return;
+    }
     if (dr.kind === 'openingmove') {
       const original = dr.before.openings.find(o => o.id === dr.id);
       const moved = d.openings.find(o => o.id === dr.id);
@@ -312,7 +333,10 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         let next = d;
         if (wallEdit) {
           try {
-            next = syncRooms(dr.before, d);
+            // 先同步房间（空白户型按外框重算），再按交接点分割墙段：分割只改墙段划分，房间仍然成立。
+            const synced = syncRooms(dr.before, d);
+            next = splitAtJunctions(synced, dr.id!);
+            if (next.template === 'blank') next = rebuildRooms(next);
           } catch (cause) {
             preview(dr.before);
             notify.fail(errorMessage(cause, "该调整会破坏房间划分"));
@@ -475,10 +499,9 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           const w = design.walls.find((w) => w.id === wid)!;
           wallClick.current={id:wid,fraction:nearestOnWall(p,w).offset/length(w)};
           select({ kind: "wall", id: wid });
-          if (canResizeWall(design, w)) {
-            base.kind = "wallmove";
-            base.id = wid;
-          } else return;
+          // 锁定尺寸的墙不能拖动，但仍可单击作为绘墙起点。
+          base.kind = canResizeWall(design, w) ? "wallmove" : "wallclick";
+          base.id = wid;
         } else
           base.room =
             el.closest("[data-room]")?.getAttribute("data-room") || undefined;
@@ -536,6 +559,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         if (Math.hypot(e.clientX - dr.screen[0], e.clientY - dr.screen[1]) > 5)
           dr.moved = true;
         if (!dr.moved) return;
+        if (dr.kind === 'wallclick') return;
         if (dr.kind === "pan") {
           setView({
             ...dr.view!,
@@ -786,7 +810,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       {layers.dims && <PerimeterDimensions layout={dimensionLayout} onSelect={tool === 'select' ? onDimensionSelect : undefined} selected={selectedDimension} />}
       {tool==='wall' && wallDrawing.draft && Math.hypot(wallDrawing.draft.b[0]-wallDrawing.draft.a[0],wallDrawing.draft.b[1]-wallDrawing.draft.a[1])>0 && <g data-export-hide="true" pointerEvents="none"><polygon points={connectedWallPoly({id:'draft',...wallDrawing.draft,thickness:design.thickness,kind:'partition'},design.walls,design.demolished).map(p=>p.join(',')).join(' ')} fill="var(--plan-selection-soft)" stroke="var(--plan-selection)" strokeWidth={1/view.s}/><MeasureLine a={wallDrawing.draft.a} b={wallDrawing.draft.b} scale={view.s}/></g>}
       {tool === 'wall' && <WallHoverOverlay walls={design.walls} demolished={design.demolished} candidate={wallDrawing.hover} connection={wallDrawing.candidate} scale={view.s} />}
-      {tool === 'select' && <WallHoverOverlay walls={design.walls} demolished={design.demolished} candidate={selectHover} connection={null} scale={view.s} />}
+      {tool === 'select' && <WallHoverOverlay walls={design.walls} demolished={design.demolished} candidate={selectHover} connection={null} scale={view.s} label={startWallTool && !readOnly ? '点击开始绘墙' : undefined} />}
       <AlignmentGuides guides={guides} scale={view.s} />
       {selection?.kind === 'opening' && <OpeningDistances design={design} openingId={selection.id} scale={view.s} />}
       {selection && (

@@ -9,5 +9,5 @@ export function OpeningDistances({ design, openingId, scale }: { design: Design;
   const total = length(wall);
   const ranges: [number, number][] = [[0, opening.offset - opening.width / 2], [opening.offset + opening.width / 2, total]];
   // Keep labels horizontal and on separate rows when the opening is small on screen.
-  return <WallRangeDimensions wall={wall} ranges={ranges} scale={scale} stagger={opening.width * scale < 120} label="门窗两侧墙端距离" />;
+  return <WallRangeDimensions wall={wall} ranges={ranges} scale={scale} stagger={opening.width * scale < 120} label="门窗两侧墙端距离" keepVisible />;
 }

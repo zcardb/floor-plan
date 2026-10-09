@@ -1,4 +1,4 @@
-# 改墙四件事：交接自动分割 / 删房间连家具 / 悬停墙身开画 / 移墙带家具
+# 改墙四件事 + 编辑栏 / 提示文案避让距离标注
 
 ## Context
 
@@ -8,6 +8,7 @@
 2. 删除房间：(a) 点击房间后，浮动编辑栏出现删除按钮，只删地板（房间）与房间里的家具，墙保留；(b) 删除一面墙后，如果原来的房间不再被墙围住，这个房间和里面的家具一起删掉（「墙删除就彻底删除呗」）。
 3. 在选择模式下，鼠标在墙身上时默认可以开始画墙：悬停墙身出现绘墙起点，点一下就从这一点开始画新墙；按住拖动仍是移动墙。
 4. 移动墙时，贴着这面墙的家具跟着移动。
+5. 选中门窗时，浮动编辑栏（visual editor bar）和距离标注重叠了，两样都要能看到；悬停墙身时的提示文案（「点击开始绘墙」/「点击连接」）也不能和距离标注重叠。
 
 已核对的现状：
 
@@ -47,7 +48,7 @@ export function dropOrphanFurniture(before: Design, after: Design): Design;
 
 ### 3. 选择模式下单击墙身开始画墙
 
-- 悬停：选择模式的悬停点改用 `resolveWallPoint`（与绘墙相同的吸附：端点、交点、洞口边），圆点旁加标签「点击开始绘墙」（`WallHoverOverlay` 新增 `label` 参数，绘墙模式下仍显示「点击连接」）。
+- 悬停：选择模式的悬停点改用 `resolveWallPoint`（与绘墙相同的吸附：端点、交点、洞口边），圆点旁加标签「点击开始绘墙」（`WallHoverOverlay` 新增 `label` 参数，绘墙模式下仍显示「点击连接」）。提示的摆放位置见第 5 节，不与距离标注重叠。
 - 单击（按下到松开移动 ≤ 5 px）墙身：切到绘墙工具，并以吸附点作为第一段墙的起点，后续与正常绘墙完全一样（再点一下确定终点，可以连续画；双击、右键、Esc、「完成绘墙」退出）。锁定尺寸的墙（不能移动）也可以作为起点。
 - 拖动（超过 5 px）：仍是移动墙，不变。
 - 选中墙看属性：按下时仍会选中墙（现有逻辑），单击后进入绘墙状态。**双击墙身**会退回选择模式且墙保持选中，可以用编辑栏和「墙选项」（分割、承重、删除）。现有的双击结束绘墙机制会自然实现这一点，不需要额外代码。
@@ -78,6 +79,15 @@ export function followWallFurniture(before: Design, after: Design): Design;
   - 与 keepVisible 重叠按与障碍物相同的权重（×10）计分，所以只要有不重叠的位置就一定选它；原有候选排序与边界裁剪规则不变。
 - 编辑栏的位置在选中对象、视图缩放或平移、尺寸变化时会重新计算（现有的 `onAnchor` 链路）。标注与选中状态在同一次渲染里生成，计算位置时已经能读到。
 
+**悬停提示文案与距离标注不重叠**
+
+现状：`WallHoverOverlay` 把「点击连接」固定画在圆点右上方（`x + 12/scale, y − 12/scale`）；两段距离读数由 `WallRangeDimensions` 画在墙的法向 `n = (−uy, ux)` 一侧，位置在两段的中点。墙的走向一变（例如从下往上画的竖墙、从右往左画的横墙），提示就会和读数落在同一侧，压在一起。
+
+- `WallRangeDimensions` 导出 `rangeSide(wall)`（即上面的法向 `n`，读数所在一侧），供提示计算位置复用，保证两边对「哪一侧」的判断一致。
+- 提示改画在墙的**另一侧**（`−n` 方向），距中心线 `thickness/2 + 20/scale`，并以悬停点为水平中心；文字按 `−n` 的方向选 `textAnchor`/`dominantBaseline`，让文字整体朝远离墙的方向展开，不压墙身也不压圆点。
+- 读数与提示分处墙的两侧，任何墙的走向、缩放比例下都不会互相覆盖；屏幕上的像素间距由 `/scale` 保证不随缩放变化。
+- 绘墙模式的「点击连接」与选择模式的「点击开始绘墙」都走这条逻辑。
+
 ## 关键文件
 
 - 新增：`src/features/interior/model/roomFurniture.ts`、`src/features/interior/model/furnitureFollow.ts`，以及对应的 `*.test.ts`
@@ -101,6 +111,7 @@ export function followWallFurniture(before: Design, after: Design): Design;
 - [ ] `WallRangeDimensions` 新增 `keepVisible` → `data-editor-keep-visible`；`OpeningDistances` 开启它
 - [ ] `placeEditor` 新增 `keepVisible` 参数：围绕「对象 ∪ 标注」增加候选位置，与标注重叠按 ×10 计分
 - [ ] `SelectionEditor.position()` 收集 `[data-editor-keep-visible]` 的矩形，传给 `placeEditor`
+- [ ] `WallRangeDimensions` 导出 `rangeSide(wall)`；`WallHoverOverlay` 的提示改画在 `−rangeSide` 一侧，按方向选择文字对齐方式
 
 ## Verification checklist
 
@@ -112,5 +123,6 @@ export function followWallFurniture(before: Design, after: Design): Design;
 - [ ] 组件测试 `SelectionEditor.test.tsx`：选中房间时出现「删除对象」按钮
 - [ ] 单测 `selectionAnchor.test.ts`：按截图布局（门在墙上方，两段标注在墙下方，原来的首选位置压住右侧标注），新结果与两段标注都不重叠且仍在视口内；不传 `keepVisible` 时结果与原来一致（回归）
 - [ ] 视觉：preview 在 desktop_1280 下选中一扇门，截图确认编辑栏与两侧距离标注都完整可见
+- [ ] 组件测试 `WallHoverOverlay.test.tsx`：横墙、竖墙各取正反两个走向（共 4 种），提示文字锚点与两段距离读数分别位于墙中心线两侧（有符号距离一正一负），且离中心线至少 `thickness/2`
 - [ ] 全量 `pnpm exec vitest run src/features/interior`：除另一个会话的 `dimensionWallEdit` 既有红灯外无新增失败；`pnpm lint` 0 error；`pnpm run build` 通过
 - [ ] 未验证（需人工点击）：真实指针下悬停标签、单击开画、双击回到选中，以及拖墙时家具跟随的手感

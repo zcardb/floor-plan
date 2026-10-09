@@ -42,3 +42,13 @@ export function splitAtJunctions(design: Design, wallId: string): Design {
   }
   return next;
 }
+
+/** 对一组改动过的墙依次做交接点分割（拖墙、改尺寸后使用）；已被删除的 id 跳过。 */
+export function splitAtJunctionsOf(design: Design, wallIds: Iterable<string>): Design {
+  let next = design;
+  for (const id of wallIds) {
+    if (!next.walls.some(w => w.id === id)) continue;
+    next = splitAtJunctions(next, id);
+  }
+  return next;
+}
