@@ -150,7 +150,7 @@ export function sanitizePlanSpec(raw: unknown, { width, depth, catalog }: { widt
       if (items.length >= MAX_ITEMS_PER_ZONE || itemCount >= MAX_ITEMS_TOTAL) break;
       const placed = placedItemOf(raw, zone, catalog);
       if (!placed) continue;
-      items.push(placed.spec);
+      items.push(placed);
       itemCount++;
     }
     if (items.length) furniture.push({ zone, items });
@@ -166,7 +166,7 @@ export function sanitizeRoomPlan(raw: unknown, { zone, catalog, required }: { zo
   for (const rawItem of Array.isArray(source.items) ? source.items : []) {
     if (items.length >= MAX_ITEMS_PER_ZONE) break;
     const placed = placedItemOf(rawItem, zone, catalog);
-    if (placed) items.push(placed.spec);
+    if (placed) items.push(placed);
   }
   if (!items.length) throw new AiDesignError('AI 没有给出可用的家具方案，请重试');
   return items;
@@ -185,7 +185,7 @@ export function matchesRequired(items: AiPlacedItem[], required: { code: string;
   return required.every((r) => (counts.get(r.code) ?? 0) === r.count);
 }
 
-function placedItemOf(raw: unknown, zone: Box, catalog: AiCatalog): { spec: AiPlacedItem; entry: ReturnType<typeof resolveCode> } | null {
+function placedItemOf(raw: unknown, zone: Box, catalog: AiCatalog): AiPlacedItem | null {
   const entry = (raw ?? {}) as Record<string, unknown>;
   const catalogEntry = resolveCode(catalog, entry.code ?? entry.type ?? entry.name);
   if (!catalogEntry) return null;
@@ -196,10 +196,10 @@ function placedItemOf(raw: unknown, zone: Box, catalog: AiCatalog): { spec: AiPl
   const w = clamp(num(entry.w) === null ? catalogEntry.w : snap(num(entry.w)!), MIN_FURNITURE, MAX_FURNITURE);
   const d = clamp(num(entry.d) === null ? catalogEntry.d : snap(num(entry.d)!), MIN_FURNITURE, MAX_FURNITURE);
   const span = horizontal ? x2 - x1 : y2 - y1;
-  const alongMax = Math.max(0, span - (horizontal ? w : d) / 2);
-  const along = clamp(num(entry.along) === null ? span / 2 : snap(num(entry.along)!), (horizontal ? w : d) / 2, Math.max((horizontal ? w : d) / 2, alongMax));
+  const depth = (horizontal ? w : d) / 2;
+  const along = clamp(num(entry.along) === null ? span / 2 : snap(num(entry.along)!), depth, Math.max(depth, span - depth));
   const gap = clamp(num(entry.gap) === null ? 0 : snap(num(entry.gap)!), 0, 600);
-  return { spec: { code: catalogEntry.code, back, along, gap, w, d }, entry: catalogEntry };
+  return { code: catalogEntry.code, back, along, gap, w, d };
 }
 
 /** 把代号解析回家具素材（摆放时用），代号无效返回 null。 */
@@ -240,8 +240,7 @@ const boxRing = ([x1, y1, x2, y2]: Box): [number, number][] => [
   [x1, y2],
 ];
 
-/** 多边形的实际面积（mm²），用来过滤过小的房间。 */
-function ringAreaOf(ring: [number, number][]): number {
+/** 多边形的实际面积（mm²），用来过滤过小的房间。 */function ringAreaOf(ring: [number, number][]): number {
   let sum = 0;
   for (let i = 0; i < ring.length; i++) {
     const [x1, y1] = ring[i];
