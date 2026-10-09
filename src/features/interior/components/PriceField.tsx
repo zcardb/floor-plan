@@ -43,7 +43,7 @@ export function PriceField({ design, group, priceKey, name, unit, change }: {
       <span className="price-field-source">
         <span className={'price-source-tag' + (source === '项目覆盖' ? ' is-override' : '')}>{source}</span>
         {source === '项目覆盖' && saveAccount && <EditorTooltip label="删除本项目单价，改用账号默认价">
-          <button type="button" className="back-link" onClick={() => { change(d => restorePrice(d, group, priceKey)); notify.success(`「${name}」已恢复账号默认价`); }}>恢复账号默认</button>
+          <button type="button" className="price-restore" onClick={() => { change(d => restorePrice(d, group, priceKey)); notify.success(`「${name}」已恢复账号默认价`); }}>恢复账号默认</button>
         </EditorTooltip>}
       </span>
     </div>

@@ -1,7 +1,9 @@
 import { useRef, useState } from 'react';
 import { ManagementLoading } from './ManagementLoading';
 import { LoadError } from './LoadError';
-import { Plus, LayoutTemplate, RefreshCw, Loader2, ChevronDown, FilePlus2, FileUp, Search, X } from 'lucide-react';
+import { Plus, LayoutTemplate, LayoutGrid, RefreshCw, Loader2, ChevronDown, FilePlus2, FileUp, Search, X } from 'lucide-react';
+import { CmsPageHeader } from './CmsPageHeader';
+import { CmsSearchField } from './CmsSearchField';
 import { Button } from '@/components/ui/button';
 import { EditorTooltip } from '@/components/ui/editor-tooltip';
 import { Input } from '@/components/ui/input';
@@ -85,10 +87,10 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
   const refreshing = projects.loading && !rowAction.pending;
 
   return <>
-    <div className="cms-heading">
-      <div><h1>项目管理</h1><p>把每个空间的灵感，保存成独立方案。</p></div>
-      <div className="cms-heading-actions">
-        <Button variant="outline" className="cms-refresh-button" disabled={projects.loading} aria-busy={refreshing} onClick={() => void projects.reload()}><RefreshCw className={refreshing ? 'animate-spin' : ''} />刷新</Button>
+    <CmsPageHeader eyebrow="设计工作台" title="项目管理" description="把每个空间的灵感，保存成独立方案。" actions={<>
+        <EditorTooltip label="刷新" disabled={projects.loading}>
+          <Button variant="outline" className="cms-refresh-button cms-icon-button" aria-label="刷新" disabled={projects.loading} aria-busy={refreshing} onClick={() => void projects.reload()}><RefreshCw className={refreshing ? 'animate-spin' : ''} /></Button>
+        </EditorTooltip>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button className="cms-create-button" disabled={createBusy} aria-busy={imports.reading}>
@@ -107,17 +109,15 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
           event.target.value = '';
           if (selected) imports.importFile(selected);
         }} />
-      </div>
-    </div>
+      </>} />
     <div className="cost-controls project-filter-panel">
       <div className="cost-toolbar">
-        <div className="cms-search cost-search" aria-busy={projects.loading}>
-          {projects.loading ? <Loader2 className="animate-spin" size={17} aria-label="加载项目" /> : <Search size={17} />}
-          <input aria-label="搜索项目" placeholder="搜索项目名称、户型…" value={query} onChange={e => setQuery(e.target.value)} />
-          {query && <EditorTooltip label="清空搜索"><button type="button" aria-label="清空搜索" onClick={() => setQuery('')}><X size={16} /></button></EditorTooltip>}
-        </div>
+        <CmsSearchField label="搜索项目" placeholder="搜索项目名称、户型…" value={query} onChange={setQuery} loading={projects.loading} loadingLabel="加载项目" matchCount={entries.length} />
       </div>
-      <CmsFilterBar label="项目分类" value={scope} onChange={id => setScope(id as ProjectScope)} chips={PROJECT_SCOPES.map(s => ({ id: s.id, label: s.label, meta: counts[s.id] }))} />
+      <div className="cost-group project-scope-group">
+        <div className="cost-group-label"><LayoutGrid size={15} /><span>来源</span><small>{counts.all} 项</small></div>
+        <CmsFilterBar label="项目分类" value={scope} onChange={id => setScope(id as ProjectScope)} chips={PROJECT_SCOPES.map(s => ({ id: s.id, label: s.label, meta: counts[s.id] }))} />
+      </div>
     </div>
     <div className="cost-results-heading">
       <h2>{SCOPE_TITLE[scope]}<span>{entries.length} 项{paged.pages > 1 ? ` · 第 ${paged.page} / ${paged.pages} 页` : ''}</span></h2>

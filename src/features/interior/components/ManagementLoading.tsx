@@ -6,14 +6,16 @@ const GROUPS = [[0, 1, 2], [0, 1, 2, 3, 4, 5]];
 export function ManagementLoading({ heading = false, label = '加载内容', variant = 'cards' }: { heading?: boolean; label?: string; variant?: 'cards' | 'library' }) {
   if (variant === 'library') return <div className="cms-loading-placeholder" role="status" aria-label={label} aria-busy="true">
     {heading && <div className="cms-loading-heading cms-loading-heading--library" aria-hidden="true">
-      <span className="cms-skeleton cms-skeleton-eyebrow" />
-      <span className="cms-skeleton cms-skeleton-title" />
-      <span className="cms-skeleton cms-skeleton-description" />
+      <div className="cms-loading-heading-text">
+        <span className="cms-skeleton cms-skeleton-eyebrow" />
+        <span className="cms-skeleton cms-skeleton-title" />
+        <span className="cms-skeleton cms-skeleton-description" />
+      </div>
+      <span className="cms-skeleton cms-skeleton-action" />
     </div>}
     <div className="cms-loading-panel" aria-hidden="true">
       <div className="cms-loading-toolbar">
         <span className="cms-skeleton cms-skeleton-search" />
-        <span className="cms-skeleton cms-skeleton-action" />
       </div>
       {GROUPS.map((chips, group) => <div className="cms-loading-group" key={group}>
         <span className="cms-skeleton cms-skeleton-group-label" />

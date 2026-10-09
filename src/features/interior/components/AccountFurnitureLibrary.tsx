@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Armchair, Check, Layers, Loader2, Plus, Search, X } from 'lucide-react';
+import { AlertCircle, Armchair, Check, Layers, Loader2, Plus, Search, X } from 'lucide-react';
+import { CmsPageHeader } from './CmsPageHeader';
+import { CmsSearchField } from './CmsSearchField';
 import { LoadError } from './LoadError';
 import { Button } from '@/components/ui/button';
 import { EditorTooltip } from '@/components/ui/editor-tooltip';
@@ -44,16 +46,15 @@ export function AccountFurnitureLibrary({ catalog, floors = [], walls = [], open
   const open = (entry: CostEntry) => entry.furniture ? setDetail(entry.furniture) : setEditing(entry);
   const customIds = new Set(catalog.items.map(item => item.catalogId));
   return <div className="account-cost-page">
-    <header className="cms-heading cost-heading">
-      <div><span className="cost-eyebrow">工作室素材库</span><h1>账号家具库</h1><p>家具、地面、墙面、门窗、屋面与吊顶都在这里管理，设好单价后各项目直接沿用。</p></div>
-    </header>
+    <CmsPageHeader eyebrow="工作室素材库" title="账号家具库" description="家具、地面、墙面、门窗、屋面与吊顶都在这里管理，设好单价后各项目直接沿用。" actions={<>
+      {(busy || failure || commit.saved) && <span className={'cms-sync-pill' + (failure && !busy ? ' is-error' : '')} role="status">{busy ? <><Loader2 size={13} className="animate-spin"/>正在保存…</> : failure ? <><AlertCircle size={13}/>修改尚未保存</> : <><Check size={13}/>已保存并生效</>}</span>}
+      <EditorTooltip label="新建家具" disabled={locked}>
+        <Button className="cms-create-button" disabled={locked} onClick={() => onNew(category)}><Plus/>新建家具</Button>
+      </EditorTooltip>
+    </>}/>
     <div className="cost-controls">
       <div className="cost-toolbar">
-        <div className="cms-search cost-search" aria-busy={catalog.loading}>{catalog.loading ? <Loader2 className="animate-spin" size={17} aria-label="加载家具"/> : <Search size={17}/>}<input aria-label="搜索材料或家具" placeholder="搜索材料、家具名称…" value={query} onChange={event => setQuery(event.target.value)}/>{query && <EditorTooltip label="清空搜索"><button type="button" aria-label="清空搜索" onClick={() => setQuery('')}><X size={16}/></button></EditorTooltip>}</div>
-        {(busy || failure || commit.saved) && <span className="cost-sync" role="status">{busy ? <><Loader2 size={14} className="animate-spin"/>正在保存…</> : failure ? '修改尚未保存' : <><Check size={14}/>已保存并生效</>}</span>}
-        <EditorTooltip label="新建家具" disabled={locked}>
-          <Button className="cost-new" disabled={locked} onClick={() => onNew(category)}><Plus size={16}/>新建家具</Button>
-        </EditorTooltip>
+        <CmsSearchField label="搜索材料或家具" placeholder="搜索材料、家具名称…" value={query} onChange={setQuery} loading={catalog.loading} loadingLabel="加载家具" matchCount={visible.length}/>
       </div>
       <div className="cost-group-columns">
         {groups.map(group => <div className={'cost-group cost-group--' + (group.major === '硬装' ? 'hard' : 'soft')} key={group.major}>

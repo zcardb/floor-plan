@@ -37,7 +37,8 @@ type Node = ReactElement<Record<string, unknown>>;
 function nodes(tree: ReactNode): Node[] {
   if (Array.isArray(tree)) return tree.flatMap(nodes);
   if (!isValidElement<Record<string, unknown>>(tree)) return [];
-  return [tree, ...nodes(tree.props.children as ReactNode)];
+  // 页头的主操作通过 actions 插槽传入，也要遍历到
+  return [tree, ...nodes(tree.props.children as ReactNode), ...nodes(tree.props.actions as ReactNode)];
 }
 function render<T>(callback: () => T): T { harness.cursor = 0; return callback(); }
 function fresh() { harness.slots = []; harness.cursor = 0; }

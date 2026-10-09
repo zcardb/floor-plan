@@ -44,7 +44,7 @@ export function SizeFields({design,selection,transaction,close}:{design:Design;s
   const bearingWarning=wall&&design.template!=='blank'&&isBearingWall(wall);
   if(wall&&!canResizeWall(design,wall))return <p className="visual-locked">此项目创建时锁定了结构尺寸，复制该项目后副本可自由调整。</p>;
   if(opening&&openingIsLocked(design,opening.wallId))return <p className="visual-locked">承重墙上的门窗洞口已锁定，不能修改尺寸。</p>;
-  return <div onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cancel();}}}>{bearingWarning&&<p className="muted-note" role="note">{BEARING_WALL_WARNING}。</p>}<div className="visual-size-fields">{fields.current.map(([key,label])=><Label key={key}>{label}<Input className="editor-control" aria-label={label} type="number" step={key==='rot'?1:0.01} value={draft[key]??''} onChange={e=>{
+  return <div onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cancel();}}}>{bearingWarning&&<p className="muted-note" role="note">{BEARING_WALL_WARNING}。</p>}<div className="visual-size-fields">{fields.current.map(([key,label])=><Label key={key} className="field-label">{label}<Input className="editor-control" aria-label={label} type="number" step={key==='rot'?1:0.01} value={draft[key]??''} onChange={e=>{
     if(!token.current||!transaction.isActive(token.current)){token.current=transaction.begin(selection);edited.current.clear();}
     edited.current.add(key);
     const next={...draft,[key]:e.target.value};setDraft(next);

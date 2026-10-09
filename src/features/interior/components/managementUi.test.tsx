@@ -12,6 +12,7 @@ vi.mock('./useProjectImport', async original => {
 import { ManagementLoading } from './ManagementLoading';
 import { ProjectManager } from './ProjectManager';
 import { AccountFurnitureLibrary } from './AccountFurnitureLibrary';
+import { CmsSearchField } from './CmsSearchField';
 import type { useProjects, ProjectSummary } from '../cloud/useProjects';
 import { TEMPLATE_PRESETS, createProject } from '../data/templates';
 import { mineCardActions, templateCardActions } from './projectCardActions';
@@ -51,6 +52,10 @@ describe('管理端精简与加载分支', () => {
     expect(html).toMatch(/<input[^>]*type="file"[^>]*hidden/);
     expect(html.indexOf('cms-refresh-button')).toBeGreaterThan(-1);
     expect(html.indexOf('cms-refresh-button')).toBeLessThan(html.indexOf('新建项目'));
+    expect(html).toMatch(/<button[^>]*cms-refresh-button[^>]*aria-label="刷新"/);
+    // 页头与家具库同结构：小标题 + 标题 + 说明，操作在页头而不在筛选面板
+    expect(html).toContain('设计工作台');
+    expect(html.indexOf('新建项目')).toBeLessThan(html.indexOf('cost-controls'));
     expect(html).toContain('我的项目');
     expect(html).not.toContain('正在读取');
     expect(html).not.toContain('cms-loading-placeholder');
@@ -107,6 +112,7 @@ describe('管理端精简与加载分支', () => {
     const html = render(createElement(ProjectManager, { projects: projects(false), opened: () => {} }));
     expect(html).toContain('aria-label="搜索项目"');
     expect(html).toContain('aria-label="项目分类"');
+    expect(html).toMatch(/cost-group-label"><svg[^]*?<span>来源<\/span><small>\d+ 项<\/small>/);
     for (const label of ['全部', '内置', '我的']) expect(html).toMatch(new RegExp('>' + label + '<b>\\d+</b>'));
     expect(html).toMatch(/aria-pressed="true"[^>]*>全部<b>/);
     expect(html).toContain('全部项目');
@@ -158,8 +164,10 @@ describe('管理端精简与加载分支', () => {
     expect(html).toContain('全部单价');
     const toolbar = html.slice(html.indexOf('cost-toolbar'), html.indexOf('cost-group-columns'));
     expect(toolbar).toContain('搜索材料或家具');
-    expect(toolbar).toContain('新建家具');
-    expect(html.slice(0, html.indexOf('cost-controls'))).not.toContain('新建家具');
+    expect(toolbar).not.toContain('新建家具');
+    expect(html.slice(0, html.indexOf('cost-controls'))).toContain('新建家具');
+    // 保存状态空闲时不渲染
+    expect(html).not.toContain('cms-sync-pill');
     expect(html).not.toContain('正在读取');
   });
   it('家具读取仍显示内置家具并保留错误，但不增加读取文字行', () => {
@@ -169,5 +177,18 @@ describe('管理端精简与加载分支', () => {
     expect(html).toContain('cms-item-card');
     expect(html).toContain('读取失败');
     expect(html).not.toContain('正在读取家具');
+  });
+  it('统一搜索框：空闲提示 / 快捷键，输入后显示匹配数与清空，加载时转圈', () => {
+    const idle = render(createElement(CmsSearchField, { label: '搜索', placeholder: '搜索…', value: '', onChange: () => {}, matchCount: 6 }));
+    expect(idle).toContain('cms-search-kbd');
+    expect(idle).not.toContain('匹配');
+    expect(idle).not.toContain('清空搜索');
+    const typed = render(createElement(CmsSearchField, { label: '搜索', placeholder: '搜索…', value: '沙发', onChange: () => {}, matchCount: 6 }));
+    expect(typed).toContain('匹配 6 项');
+    expect(typed).toContain('aria-label="清空搜索"');
+    expect(typed).not.toContain('cms-search-kbd');
+    const loading = render(createElement(CmsSearchField, { label: '搜索', placeholder: '搜索…', value: '', onChange: () => {}, loading: true, loadingLabel: '加载家具' }));
+    expect(loading).toContain('aria-busy="true"');
+    expect(loading).toContain('aria-label="加载家具"');
   });
 });

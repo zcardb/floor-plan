@@ -102,7 +102,8 @@ export function useProjects() {
       if (!data || generation !== epoch.current) continue;
       let thumbnail;
       try { thumbnail = compactThumbnail(data.state as unknown as Design); } catch { continue; }
-      const { error } = await attempt(supabase.from("interior_design_projects").update({ thumbnail: thumbnail as unknown as Json }).eq("id", row.id));
+      // 只补空值：用户此刻可能正好保存了更新的缩略图，不能覆盖。
+      const { error } = await attempt(supabase.from("interior_design_projects").update({ thumbnail: thumbnail as unknown as Json }).eq("id", row.id).is("thumbnail", null));
       if (error || generation !== epoch.current) continue;
       setCloud((c) => c.map((r) => (r.id === row.id ? { ...r, thumbnail } : r)));
     }
