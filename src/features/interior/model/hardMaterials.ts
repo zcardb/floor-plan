@@ -131,19 +131,18 @@ const omit = (r: Room, ...keys: (keyof Room)[]): Room => { const next = { ...r }
 export function applyRoomWall(d: Design, roomId: string, key: string, account: CustomWall[]): Design {
   return patchRoom(withSurface(d, "wall", key, account), roomId, (r) => ({ ...r, wallMat: key }));
 }
-/** 给房间设置屋面；key 为 null 表示无屋面（同时清除坡度与吊顶：没有屋面就没有吊顶）。 */
+/** 给房间设置屋面；key 为 null 表示无屋面（同时清除坡度；吊顶独立保留）。 */
 export function applyRoomRoof(d: Design, roomId: string, key: string | null, account: CustomWall[]): Design {
-  if (key === null) return patchRoom(d, roomId, (r) => omit(r, "roofMat", "roofSlope", "ceilingMat"));
+  if (key === null) return patchRoom(d, roomId, (r) => omit(r, "roofMat", "roofSlope"));
   return patchRoom(withSurface(d, "roof", key, account), roomId, (r) => ({ ...r, roofMat: key }));
 }
 export function setRoomRoofSlope(d: Design, roomId: string, slope: number): Design {
   if (!Number.isFinite(slope) || slope < 0 || slope > ROOF_SLOPE_MAX) throw new Error(`坡度需在 0～${ROOF_SLOPE_MAX}° 之间`);
   return patchRoom(d, roomId, (r) => ({ ...r, roofSlope: slope }));
 }
-/** 给房间设置吊顶；key 为 null 表示原顶。吊顶依附屋面，房间没有屋面时不能设置。 */
+/** 给房间设置吊顶；key 为 null 表示原顶。吊顶与屋面相互独立。 */
 export function applyRoomCeiling(d: Design, roomId: string, key: string | null, account: CustomWall[]): Design {
   if (key === null) return patchRoom(d, roomId, (r) => omit(r, "ceilingMat"));
-  if (!d.rooms.find((r) => r.id === roomId)?.roofMat) throw new Error("请先设置屋面，再选择吊顶");
   return patchRoom(withSurface(d, "ceiling", key, account), roomId, (r) => ({ ...r, ceilingMat: key }));
 }
 /** 某类门窗可选款式（不含标准门/窗）。 */

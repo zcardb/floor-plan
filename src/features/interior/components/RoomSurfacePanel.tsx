@@ -23,7 +23,7 @@ function SurfaceGrid({ cards, value, showCosts, onPick }: { cards: Card[]; value
   </div>;
 }
 
-/** 右侧房间属性里的墙面 / 屋面 / 吊顶卡片，与「地面材质」同样的选择方式；没有屋面时不展示吊顶。 */
+/** 右侧房间属性里的墙面 / 屋面 / 吊顶卡片，与「地面材质」同样的选择方式；吊顶与屋面相互独立。 */
 export function RoomSurfacePanel({ design, room, change, accountWalls, accountRoofs, accountCeilings, showCosts }: Props) {
   const cards = (kind: 'wall' | 'roof' | 'ceiling', group: PriceGroup, account: CustomWall[]): Card[] =>
     pickableSurfaces(design, kind, account).map(({ key, name, material, fromAccount }) => ({
@@ -41,10 +41,10 @@ export function RoomSurfacePanel({ design, room, change, accountWalls, accountRo
         onPick={key => runSurfaceChange(change, d => applyRoomRoof(d, room.id, key, accountRoofs), '屋面设置失败')} />
       {room.roofMat && <RoofSlopeInput key={room.id + ':' + (room.roofSlope ?? 0)} className="editor-field room-roof-slope" room={room} change={change} />}
     </section>
-    {room.roofMat && <section>
+    <section>
       <h3 className="section-title">吊顶</h3>
       <SurfaceGrid cards={[{ key: null, name: '原顶（无吊顶）' }, ...cards('ceiling', 'ceilingPrices', accountCeilings)]} value={room.ceilingMat ?? null} showCosts={showCosts}
         onPick={key => runSurfaceChange(change, d => applyRoomCeiling(d, room.id, key, accountCeilings), '吊顶设置失败')} />
-    </section>}
+    </section>
   </>;
 }

@@ -538,6 +538,21 @@ export function Workbench(p: Props) {
     setSelection(null);
     notify.success(`已清空 ${count} 件家具，可撤销恢复`);
   };
+  const clearOpenings = async () => {
+    if (readOnly) return;
+    const count = d.openings.length;
+    if (!count) return;
+    const ok = await confirm({
+      title: "清空所有门窗？",
+      description: `将删除 ${count} 个门窗（含承重墙上的洞口），墙体和家具会保留，可撤销恢复。`,
+      confirmText: "清空门窗",
+      tone: "destructive",
+    });
+    if (!ok) return;
+    change((d) => ({ ...d, openings: [] }));
+    if (selection?.kind === "opening") setSelection(null);
+    notify.success(`已清空 ${count} 个门窗，可撤销恢复`);
+  };
   const resetDesign = async () => {
     if (readOnly) return;
     // CAD 导入的户型没有内置的初始模板，重置会把它换成参考户型。
@@ -693,6 +708,10 @@ export function Workbench(p: Props) {
                   <Trash2 />
                   清空家具
                 </DropdownMenuItem>
+                <DropdownMenuItem className="danger-item compact-only" disabled={!d.openings.length} onSelect={clearOpenings}>
+                  <DoorOpen />
+                  清空门窗
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -751,13 +770,27 @@ export function Workbench(p: Props) {
           <ToolButton label="重置方案" onClick={resetDesign}>
             <RotateCcw size={16} />
           </ToolButton>
-          <ToolButton
-            label="清空家具"
-            disabled={!d.furniture.length}
-            onClick={clearFurniture}
-          >
-            <Trash2 size={16} />
-          </ToolButton>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="tool-button" aria-label="清空" disabled={readOnly || (!d.furniture.length && !d.openings.length)}>
+                <Trash2 size={16} />
+                <span>清空</span>
+                <ChevronDown size={12} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem className="danger-item" disabled={!d.furniture.length} onSelect={clearFurniture}>
+                <Armchair />
+                清空家具
+                <span className="menu-item-count">{d.furniture.length}</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem className="danger-item" disabled={!d.openings.length} onSelect={clearOpenings}>
+                <DoorOpen />
+                清空门窗
+                <span className="menu-item-count">{d.openings.length}</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
         </div>
         <div className="toolbar-right">

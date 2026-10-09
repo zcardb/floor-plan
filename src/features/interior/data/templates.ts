@@ -289,21 +289,25 @@ export function referenceDesign(): Design {
 function lengthOf(w: Wall) {
   return Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
 }
-export function blankDesign(): Design {
+export interface BlankSize { width: number; depth: number }
+export const DEFAULT_BLANK_SIZE: BlankSize = { width: 6000, depth: 6000 };
+/** 空白户型的长宽范围（毫米）。 */
+export const BLANK_SIZE_LIMITS = { min: 500, max: 50000 } as const;
+export function blankDesign({ width, depth }: BlankSize = DEFAULT_BLANK_SIZE): Design {
   return {
     version: 2,
     template: "blank",
-    width: 6000,
-    depth: 6000,
+    width,
+    depth,
     thickness: 240,
     height: 2800,
-    walls: outerWalls(6000, 6000, 240),
+    walls: outerWalls(width, depth, 240),
     openings: [],
     rooms: [
       {
         id: uid(),
         name: "房间 1",
-        rings: [rect(0, 0, 6000, 6000)],
+        rings: [rect(0, 0, width, depth)],
         mat: "wood",
       },
     ],
@@ -321,13 +325,14 @@ export const designForTemplate = (id: string): Design => (presetById(id) ?? TEMP
 export function createProject(
   template: string = "blank",
   name?: string,
+  size?: BlankSize,
 ): Project {
   return {
     id: uid(),
     name:
       name || (template === "blank" ? "未命名户型" : presetById(template)?.name ?? TEMPLATE_PRESETS[0].name),
     state: {
-      ...(template === "blank" ? blankDesign() : designForTemplate(template)),
+      ...(template === "blank" ? blankDesign(size) : designForTemplate(template)),
       structureUnlocked: true,
     },
     updatedAt: new Date().toISOString(),

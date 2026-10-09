@@ -31,7 +31,7 @@ export function RoofSlopeInput({ room, change, className }: Pick<RoomSurfaceProp
   </div>;
 }
 
-/** 房间材质弹层里的屋面 / 坡度 / 吊顶：没有屋面时不展示坡度与吊顶。 */
+/** 房间材质弹层里的屋面 / 坡度 / 吊顶：没有屋面时不展示坡度；吊顶独立于屋面。 */
 export function RoomSurfaceFields({ design, room, change, accountRoofs, accountCeilings }: RoomSurfaceProps) {
   const options = (kind: 'roof' | 'ceiling', account: CustomWall[], none: string) => [
     { value: NONE, label: none },
@@ -40,10 +40,9 @@ export function RoomSurfaceFields({ design, room, change, accountRoofs, accountC
   return <>
     <EditorSelect label="屋面" value={room.roofMat || NONE} options={options('roof', accountRoofs, '无屋面')}
       onChange={value => runSurfaceChange(change, d => applyRoomRoof(d, room.id, value === NONE ? null : value, accountRoofs), '屋面设置失败')} />
-    {room.roofMat && <>
-      <RoofSlopeInput key={room.id + ':' + (room.roofSlope ?? 0)} room={room} change={change} />
-      <EditorSelect label="吊顶" value={room.ceilingMat || NONE} options={options('ceiling', accountCeilings, '原顶（无吊顶）')}
-        onChange={value => runSurfaceChange(change, d => applyRoomCeiling(d, room.id, value === NONE ? null : value, accountCeilings), '吊顶设置失败')} />
-    </>}
+    {room.roofMat && <RoofSlopeInput key={room.id + ':' + (room.roofSlope ?? 0)} room={room} change={change} />}
+    <EditorSelect label="吊顶" value={room.ceilingMat || NONE} options={options('ceiling', accountCeilings, '原顶（无吊顶）')}
+      onChange={value => runSurfaceChange(change, d => applyRoomCeiling(d, room.id, value === NONE ? null : value, accountCeilings), '吊顶设置失败')} />
+  
   </>;
 }

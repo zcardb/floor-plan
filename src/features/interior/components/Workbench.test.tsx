@@ -172,7 +172,7 @@ describe('2D 常用工具与顶部工具栏', () => {
     const more = tools(render()).find(node => node.props['aria-label'] === '更多')!;
     expect(more.props.className).toContain('compact-only');
     const items = tools(render()).filter(node => typeof node.props.onSelect === 'function');
-    expect(items.map(item => text(item.props.children as ReactNode))).toEqual(['重置方案', '清空家具']);
+    expect(items.map(item => text(item.props.children as ReactNode))).toEqual(['重置方案', '清空家具', '清空门窗']);
   });
   it('V、Esc 保留工具切换，M、X 不再切换工具', () => {
     const listeners = new Map<string, (event: KeyboardEvent) => void>();
@@ -256,9 +256,31 @@ describe('单行顶部工具栏', () => {
     expect(tree.some(n => n.props['aria-label'] === '文件' || n.props['aria-label'] === '图层')).toBe(false);
     expect(tree.some(n => n.props.className === 'workspace-save-status' && n.props.role === 'status')).toBe(true);
   });
-  it('小屏的重置方案 / 清空家具在 2D「更多」菜单的 compact-only 项里', () => {
+  it('小屏的重置方案 / 清空家具 / 清空门窗在 2D「更多」菜单的 compact-only 项里', () => {
     const more = tools(render()).filter(n => typeof n.props.className === 'string' && (n.props.className as string).includes('compact-only') && n.props.onSelect);
-    expect(more.map(n => text(n.props.children as ReactNode))).toEqual(['重置方案', '清空家具']);
+    expect(more.map(n => text(n.props.children as ReactNode))).toEqual(['重置方案', '清空家具', '清空门窗']);
+  });
+  it('宽屏「清空」下拉合并清空家具与清空门窗，显示数量，无对象时禁用', () => {
+    const danger = render().find(n => n.props.className === 'tool-group danger-actions')!;
+    const items = nodes(danger).filter(n => n.props.onSelect);
+    expect(items.map(n => text(n.props.children as ReactNode))).toEqual(['清空家具0', '清空门窗0']);
+    expect(items.every(n => n.props.disabled === true)).toBe(true);
+    expect(nodes(danger).find(n => n.props['aria-label'] === '清空')!.props.disabled).toBe(true);
+  });
+  it('清空门窗：二次确认后删除全部门窗（含承重墙），保留墙体与家具', async () => {
+    const reference = referenceDesign();
+    state.design = reference;
+    const clear = () => nodes(render().find(n => n.props.className === 'tool-group danger-actions')!).find(n => text(n.props.children as ReactNode).startsWith('清空门窗'))!.props.onSelect as () => Promise<void>;
+    state.confirm.mockResolvedValue(false);
+    await clear()();
+    expect(state.change).not.toHaveBeenCalled();
+    state.confirm.mockResolvedValue(true);
+    await clear()();
+    expect(state.confirm).toHaveBeenLastCalledWith(expect.objectContaining({ confirmText: '清空门窗', tone: 'destructive' }));
+    const next = (state.change.mock.calls[0][0] as (d: Design) => Design)(reference);
+    expect(next.openings).toEqual([]);
+    expect(next.walls).toBe(reference.walls);
+    expect(next.furniture).toBe(reference.furniture);
   });
 });
 

@@ -224,7 +224,7 @@ export function calculateCosts(d: Design, defaults?: AccountCostSettings) {
     }
     if (r.roofMat)
       add(hard, "roofPrices", r.roofMat, surfaceMaterialOf(d, "roof", r.roofMat)?.name || "屋面", roofSurfaceArea(r), "m²");
-    if (r.roofMat && r.ceilingMat)
+    if (r.ceilingMat)
       add(hard, "ceilingPrices", r.ceilingMat, surfaceMaterialOf(d, "ceiling", r.ceilingMat)?.name || "吊顶", area(r), "m²");
   }
   for (const o of d.openings) {

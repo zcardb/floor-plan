@@ -285,7 +285,7 @@ function normalizeRoomSurfaces(d: Design, r: Room): Room {
   const next = { ...r };
   if (next.roofMat !== undefined && (typeof next.roofMat !== "string" || !isSurfaceKey(d, "roof", next.roofMat))) delete next.roofMat;
   if (next.ceilingMat !== undefined && (typeof next.ceilingMat !== "string" || !isSurfaceKey(d, "ceiling", next.ceilingMat))) delete next.ceilingMat;
-  if (!next.roofMat) { delete next.roofSlope; delete next.ceilingMat; }
+  if (!next.roofMat) delete next.roofSlope;
   else if (next.roofSlope !== undefined)
     next.roofSlope = typeof next.roofSlope === "number" && Number.isFinite(next.roofSlope) ? Math.min(ROOF_SLOPE_MAX, Math.max(0, next.roofSlope)) : 0;
   return next;

@@ -72,14 +72,16 @@ describe('屋面与吊顶（按房间计入硬装）', () => {
     expect(accountCostSource(d, { group: 'roofPrices', key: tile.key })).toBe('账号屋面库');
     expect(accountCostSource(d, { group: 'ceilingPrices', key: board.key })).toBe('账号吊顶库');
   });
-  it('没有屋面就没有吊顶：不能单独设吊顶，清除屋面一并清除吊顶，不计吊顶费用', () => {
+  it('吊顶与屋面独立：无屋面也可设吊顶并计费，清除屋面保留吊顶', () => {
     const d = blankDesign(), id = d.rooms[0].id;
-    expect(() => applyRoomCeiling(d, id, 'gypsum', [])).toThrow('请先设置屋面');
+    const ceilingOnly = applyRoomCeiling(d, id, 'gypsum', []);
+    expect(ceilingOnly.rooms[0]).toMatchObject({ ceilingMat: 'gypsum' });
+    expect(ceilingOnly.rooms[0].roofMat).toBeUndefined();
+    expect(calculateCosts(ceilingOnly).hard.find(x => x.group === 'ceilingPrices')!.quantity).toBeCloseTo(area(d.rooms[0]));
+    expect(validateDesign(ceilingOnly).rooms[0].ceilingMat).toBe('gypsum');
     const full = withSurfaces(), cleared = applyRoomRoof(full, full.rooms[0].id, null, []);
-    expect(cleared.rooms[0].ceilingMat).toBeUndefined();
-    const orphan = { ...d, rooms: d.rooms.map(r => ({ ...r, ceilingMat: 'gypsum' })) };
-    expect(calculateCosts(orphan).hard.some(x => x.group === 'ceilingPrices')).toBe(false);
-    expect(validateDesign(orphan).rooms[0].ceilingMat).toBeUndefined();
+    expect(cleared.rooms[0].ceilingMat).toBe(board.key);
+    expect(cleared.rooms[0].roofSlope).toBeUndefined();
   });
   it('平面图纸不含屋面 / 吊顶内容', () => {
     const doc = JSON.stringify(createDrawingDocument(withSurfaces(), layers));

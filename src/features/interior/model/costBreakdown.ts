@@ -130,7 +130,7 @@ export function costBreakdown(d: Design): CostBreakdown {
   for (const r of d.rooms) {
     const items: [PriceGroup, string | undefined, string, number, string | undefined][] = [
       ["roofPrices", r.roofMat, surfaceMaterialOf(d, "roof", r.roofMat || "")?.name || "屋面", roofSurfaceArea(r), r.roofSlope ? `坡度 ${r.roofSlope}° 换算` : "平顶"],
-      ["ceilingPrices", r.roofMat && r.ceilingMat, surfaceMaterialOf(d, "ceiling", r.ceilingMat || "")?.name || "吊顶", area(r), "按房间面积"],
+      ["ceilingPrices", r.ceilingMat, surfaceMaterialOf(d, "ceiling", r.ceilingMat || "")?.name || "吊顶", area(r), "按房间面积"],
     ];
     for (const [group, key, label, quantity, note] of items) {
       if (!key) continue;

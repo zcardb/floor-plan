@@ -3593,6 +3593,14 @@ button.room-cost-row:hover {
   color: hsl(var(--destructive));
   background: hsl(var(--destructive) / 0.1);
 }
+/* 菜单项右侧的对象数量：先告知影响范围，再执行破坏性操作 */
+.menu-item-count {
+  margin-left: auto;
+  padding-left: 16px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: hsl(var(--muted-foreground));
+}
 .danger-actions .tool-button {
   color: hsl(var(--destructive));
 }

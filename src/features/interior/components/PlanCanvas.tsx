@@ -31,7 +31,7 @@ import {
 import { FurnitureShape } from "./FurnitureShape";
 import { MaterialDefs } from "./Materials";
 import { selectionPoints, localWallPoint, type ScreenRect } from "../model/selectionAnchor";
-import { resolveWallPoint,validateWallSegment } from '../model/wallDrawing';
+import { resolveWallPoint,validateWallSegment,type WallSnap } from '../model/wallDrawing';
 import { useWallDrawing } from './useWallDrawing';
 import { OpeningDistances } from './OpeningDistances';
 import { connectedWallPoly } from '../model/wallConnections';
@@ -120,6 +120,15 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
   const mouseDown = useRef<(() => void) | null>(null);
   const wallClick = useRef<{id:string;fraction:number}|null>(null);
   const wallDrawing = useWallDrawing(tool === 'wall', current, view.s, layers.snap, commit, finishTool);
+  // 选择模式悬停墙体时的测距点（与绘墙悬停共用 WallHoverOverlay）。
+  const [selectHover, setSelectHover] = useState<WallSnap | null>(null);
+  const clearSelectHover = () => setSelectHover(h => (h ? null : h));
+  const hoverWall = (target: EventTarget | null, p: Point) => {
+    const id = (target as Element | null)?.closest?.('[data-wall]')?.getAttribute('data-wall');
+    const wall = id ? current.current.walls.find(w => w.id === id) : undefined;
+    if (!wall || current.current.demolished.includes(wall.id)) return clearSelectHover();
+    setSelectHover({ point: nearestOnWall(p, wall).point, target: { wallId: wall.id, kind: 'intersection' } });
+  };
   const wallPolygons = useMemo(() => {
     const walls = wallDrawing.draft && length(wallDrawing.draft as Design['walls'][number]) >= 100
       ? [...design.walls, { id: 'draft', ...wallDrawing.draft, thickness: design.thickness, kind: 'partition' as const }]
@@ -367,6 +376,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         if (e.button) return;
         const begin = () => {
         closePanels();
+        clearSelectHover();
         const p = mm(e),
           el = e.target as SVGElement;
         points.current.set(e.pointerId, [e.clientX, e.clientY]);
@@ -525,6 +535,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         onCoord(p);
         if (tool === 'wall') { wallDrawing.move(p); return; }
         const dr = drag.current;
+        if (tool === 'select' && !dr) hoverWall(e.target, p);
         if (!dr) return;
         if (dr.pid !== e.pointerId) return;
         if (Math.hypot(e.clientX - dr.screen[0], e.clientY - dr.screen[1]) > 5)
@@ -605,7 +616,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         if (tool === 'wall') wallDrawing.up(mm(e), e.pointerId, [e.clientX, e.clientY]);
         else finish();
       }}
-      onPointerLeave={() => wallDrawing.clearHover()}
+      onPointerLeave={() => { wallDrawing.clearHover(); clearSelectHover(); }}
       onPointerCancel={(e) => {
         points.current.delete(e.pointerId);
         pinch.current = null;
@@ -778,6 +789,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       {layers.dims && <PerimeterDimensions layout={dimensionLayout} onSelect={tool === 'select' ? onDimensionSelect : undefined} selected={selectedDimension} />}
       {tool==='wall' && wallDrawing.draft && Math.hypot(wallDrawing.draft.b[0]-wallDrawing.draft.a[0],wallDrawing.draft.b[1]-wallDrawing.draft.a[1])>0 && <g data-export-hide="true" pointerEvents="none"><polygon points={connectedWallPoly({id:'draft',...wallDrawing.draft,thickness:design.thickness,kind:'partition'},design.walls,design.demolished).map(p=>p.join(',')).join(' ')} fill="var(--plan-selection-soft)" stroke="var(--plan-selection)" strokeWidth={1/view.s}/><MeasureLine a={wallDrawing.draft.a} b={wallDrawing.draft.b} scale={view.s}/></g>}
       {tool === 'wall' && <WallHoverOverlay walls={design.walls} demolished={design.demolished} candidate={wallDrawing.hover} connection={wallDrawing.candidate} scale={view.s} />}
+      {tool === 'select' && <WallHoverOverlay walls={design.walls} demolished={design.demolished} candidate={selectHover} connection={null} scale={view.s} />}
       <AlignmentGuides guides={guides} scale={view.s} />
       {selection?.kind === 'opening' && <OpeningDistances design={design} openingId={selection.id} scale={view.s} />}
       {selection && (
