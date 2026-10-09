@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { blankDesign, referenceDesign } from '../data/templates';
+import { blankDesign, designForTemplate } from '../data/templates';
 import { isPristineDesign, nextGuestEditCount } from './templateState';
+
+const referenceDesign = () => designForTemplate('reference');
 
 describe('初始模版判定', () => {
   it('刚生成的模版、以及带解锁标记的模版都算初始态', () => {

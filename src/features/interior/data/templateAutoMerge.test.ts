@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createProject, referenceDesign, TEMPLATE_PRESETS } from './templates';
+import { createProject, designForTemplate, TEMPLATE_PRESETS } from './templates';
 import { length } from '../model/geometry';
 import { dragOpening } from '../model/openingDrag';
 import type { Design, Opening } from '../model/types';
@@ -30,7 +30,7 @@ describe('复刻模板默认清空分割', () => {
   });
 
   it('原木之家：室内门洞口段原先标为外围墙，合并后所在隔墙不会被升级为外围墙', () => {
-    const d = referenceDesign();
+    const d = designForTemplate('reference');
     const door = d.openings.find(o => o.id === 'door0')!;
     expect(d.walls.find(w => w.id === door.wallId)!.kind).toBe('partition');
   });

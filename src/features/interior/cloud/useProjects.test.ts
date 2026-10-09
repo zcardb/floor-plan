@@ -52,7 +52,8 @@ vi.mock('@/integrations/supabase/client', () => ({
   },
 }));
 import { useProjects } from './useProjects';
-import { referenceDesign } from '../data/templates';
+import { designForTemplate } from '../data/templates';
+const referenceDesign = () => designForTemplate('reference');
 
 function fakeStorage() {
   const map = new Map<string, string>();
