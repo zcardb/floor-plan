@@ -13,7 +13,7 @@ import { ProjectRenameDialog, ProjectDeleteDialog } from './ProjectDialogs';
 import { ProjectRowActions } from './ProjectRowActions';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { notify } from '@/lib/notify';
-import { createProject, TEMPLATE_PRESETS, presetById } from '../data/templates';
+import { createProject, TEMPLATE_PRESETS } from '../data/templates';
 import { BuiltinTemplateCard } from './BuiltinTemplates';
 import { CmsFilterBar } from './CmsFilterBar';
 import { ProjectPagination } from './ProjectPagination';
@@ -97,14 +97,35 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
         }} />
       </div>
     </div>
-    <BuiltinTemplates pending={createBusy || submit.pending} onPreview={id => { const row = projects.builtins.find(r => r.templateId === id); if (row) void rowAction.run('open', row); }} onCreate={id => { setTemplate(id); setName(presetById(id)?.name ?? ''); setCreating(true); }} />
-    <h2 className="builtin-heading">我的项目</h2>
-    {projects.listError && <LoadError title="云端项目读取失败" message={projects.listError} retrying={projects.loading} onRetry={() => void projects.reload()} />}
-    {projects.loading && !list.length && <ManagementLoading label="加载项目" />}
-    {!projects.loading && !projects.listError && !list.length && <div className="cms-empty"><LayoutTemplate size={36} /><h2>还没有设计项目</h2><p>新建空白户型，开始规划你的空间。</p></div>}
-    <div className="cms-project-grid">{list.map(row => {
-      const working = busyRow === row.id;
-      return <article className={'cms-card' + (working ? ' is-busy' : '')} key={row.id} aria-busy={working}>
+    <div className="cost-controls project-filter-panel">
+      <div className="cost-toolbar">
+        <div className="cms-search cost-search" aria-busy={projects.loading}>
+          {projects.loading ? <Loader2 className="animate-spin" size={17} aria-label="加载项目" /> : <Search size={17} />}
+          <input aria-label="搜索项目" placeholder="搜索项目名称、户型…" value={query} onChange={e => setQuery(e.target.value)} />
+          {query && <EditorTooltip label="清空搜索"><button type="button" aria-label="清空搜索" onClick={() => setQuery('')}><X size={16} /></button></EditorTooltip>}
+        </div>
+      </div>
+      <CmsFilterBar label="项目分类" value={scope} onChange={id => setScope(id as ProjectScope)} chips={PROJECT_SCOPES.map(s => ({ id: s.id, label: s.label, meta: counts[s.id] }))} />
+    </div>
+    <div className="cost-results-heading">
+      <h2>{SCOPE_TITLE[scope]}<span>{entries.length} 项{paged.pages > 1 ? ` · 第 ${paged.page} / ${paged.pages} 页` : ''}</span></h2>
+      {filtered
+        ? <EditorTooltip label="查看全部"><button type="button" className="cost-clear-filter" onClick={resetFilter}><X size={14} />查看全部</button></EditorTooltip>
+        : <span>按修改时间排序</span>}
+    </div>
+    {scope !== 'builtin' && projects.listError && <LoadError title="云端项目读取失败" message={projects.listError} retrying={projects.loading} onRetry={() => void projects.reload()} />}
+    {scope !== 'builtin' && !searching && projects.loading && !list.length && <ManagementLoading label="加载项目" />}
+    {scope !== 'builtin' && !searching && !projects.loading && !projects.listError && !list.length && <div className="cms-empty"><LayoutTemplate size={36} /><h2>还没有设计项目</h2><p>{scope === 'all' ? '新建空白户型，或从下方内置模板开始。' : '新建空白户型，开始规划你的空间。'}</p></div>}
+    {searching && !entries.length && !projects.loading && <div className="cms-empty"><Search size={30} /><h2>没有匹配的项目</h2><p>{more ? '已加载的项目中没有匹配项，可翻到下一页加载更多，或换个关键词。' : '换个分类，或清空搜索再试。'}</p><Button variant="outline" onClick={resetFilter}>清空筛选</Button></div>}
+    <div className="cms-project-grid">{paged.items.map(entry => {
+      if (entry.kind === 'builtin') {
+        const id = entry.preset.id;
+        return <BuiltinTemplateCard key={entry.key} preset={entry.preset} pending={createBusy || submit.pending}
+          onPreview={() => { const row = projects.builtins.find(r => r.templateId === id); if (row) void rowAction.run('open', row); }}
+          onCreate={() => { setTemplate(id); setName(entry.preset.name); setCreating(true); }} />;
+      }
+      const row = entry.row, working = busyRow === row.id;
+      return <article className={'cms-card' + (working ? ' is-busy' : '')} key={entry.key} aria-busy={working}>
         <EditorTooltip label={row.name} disabled={rowAction.pending}>
           <button type="button" className="cms-card-open" aria-label={'打开项目 ' + row.name} disabled={rowAction.pending} onClick={() => void rowAction.run('open', row)} />
         </EditorTooltip>
@@ -117,7 +138,7 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
         </div>
       </article>;
     })}</div>
-    {projects.hasMore && <div className="project-list-footer"><Button variant="ghost" loading={projects.loading && !!list.length} disabled={projects.loading} onClick={() => void projects.loadMore()}>加载更多</Button></div>}
+    <ProjectPagination page={paged.page} pages={paged.pages} hasMore={more} loading={projects.loading} onPage={setPage} onLoadMore={projects.loadMore} />
 
     <Dialog open={creating} onOpenChange={v => { if (!v && !submit.pending) setCreating(false); }}>
       <DialogContent>

@@ -37,6 +37,7 @@ import { ProjectMenu } from './ProjectMenu';
 import { Button } from '@/components/ui/button';
 import { ExportMenu } from './ExportMenu';
 import { AccountMenu } from './AccountMenu';
+import { WorkbenchBanner } from './WorkbenchBanner';
 import { perimeterDimensions } from '../model/perimeterDimensions';
 import type { DimensionSegment } from '../model/perimeterDimensions';
 
@@ -261,7 +262,7 @@ describe('单行顶部工具栏', () => {
 });
 
 describe('游客改模版后的顶部提示条', () => {
-  const banner = (tree: Node[]) => tree.find(n => n.props.className === 'guest-cloud-banner');
+  const banner = (tree: Node[]) => tree.find(n => n.type === WorkbenchBanner && n.props.label === '模版已更改');
   it('只有游客改过方案才出现', () => {
     expect(banner(render({ guestEdits: 1 }))).toBeDefined();
     expect(banner(render())).toBeUndefined();
@@ -270,11 +271,30 @@ describe('游客改模版后的顶部提示条', () => {
   it('主按钮触发登录保存，「暂不保存」只关掉当前版本', async () => {
     const cloudSave = vi.fn(async () => true);
     const buttons = nodes(banner(render({ guestEdits: 2, cloudSave }))!).filter(n => n.type === Button);
-    (buttons[0].props.onClick as () => void)();
+    const byText = (label: string) => buttons.find(b => text(b.props.children as ReactNode) === label)!;
+    expect(buttons.map(b => text(b.props.children as ReactNode))).toEqual(['暂不保存', '登录并保存']);
+    (byText('登录并保存').props.onClick as () => void)();
     await Promise.resolve();
     expect(cloudSave).toHaveBeenCalledOnce();
-    (buttons[1].props.onClick as () => void)();
+    (byText('暂不保存').props.onClick as () => void)();
     expect(banner(render({ guestEdits: 2, cloudSave }))).toBeUndefined();
     expect(banner(render({ guestEdits: 3, cloudSave }))).toBeDefined();
+  });
+});
+
+describe('内置模板只读预览提示条', () => {
+  const banner = (tree: Node[]) => tree.find(n => n.type === WorkbenchBanner && n.props.label === '只读预览');
+  const builtin = () => ({ id: 'builtin:reference', name: '参考户型', state: state.design!, builtin: true, templateId: 'reference' } as unknown as Project);
+  it('只在内置模板只读预览时出现，与游客提示条复用同一组件', () => {
+    expect(banner(render({ project: builtin() }))).toBeDefined();
+    expect(banner(render())).toBeUndefined();
+  });
+  it('「用此模板新建」按当前模板新建', async () => {
+    const createFromTemplate = vi.fn(async () => true);
+    const [create] = nodes(banner(render({ project: builtin(), createFromTemplate }))!).filter(n => n.type === Button);
+    expect(text(create.props.children as ReactNode)).toBe('用此模板新建');
+    (create.props.onClick as () => void)();
+    await Promise.resolve();
+    expect(createFromTemplate).toHaveBeenCalledWith('reference');
   });
 });

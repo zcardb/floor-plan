@@ -387,6 +387,34 @@
     .cost-save-error { align-items:flex-start; } .cost-save-error>button { flex-shrink:0; }
   }
   @media(prefers-reduced-motion:reduce) { .cms-filter-bar { scroll-behavior:auto; } }
+  /* 项目管理：与家具库同一套筛选面板；内置模板卡片与项目卡片同处一个网格。 */
+  .project-filter-panel .cost-toolbar { padding-bottom:16px; margin-bottom:16px; }
+  .project-filter-panel .cost-search { flex:1 1 auto; max-width:none; }
+  .builtin-template-card { display:flex; flex-direction:column; border:1px solid hsl(var(--border)); border-radius:12px; padding:12px; background:hsl(var(--card)); transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease; }
+  .builtin-template-card:hover { border-color:hsl(var(--primary)/0.35); box-shadow:var(--shadow-float); transform:translateY(-2px); }
+  .template-preview-button { position:relative; display:flex; align-items:center; justify-content:center; height:148px; border-radius:10px; background:hsl(var(--canvas)); overflow:hidden; cursor:zoom-in; }
+  .template-preview-button:focus-visible { outline:2px solid hsl(var(--ring)); outline-offset:2px; }
+  .template-preview-button:disabled { cursor:default; opacity:.6; }
+  .template-thumbnail { width:100%; height:100%; }
+  .template-map-rooms polygon { fill:var(--plan-paper); stroke:none; }
+  .template-map-walls line { stroke:var(--plan-wall); stroke-linecap:square; }
+  .template-card-content { display:flex; flex:1; flex-direction:column; gap:6px; padding:12px 4px 2px; }
+  .template-card-content h2 { font-size:15px; font-weight:600; line-height:1.4; overflow-wrap:anywhere; }
+  .template-card-content p { font-size:12px; line-height:1.6; color:hsl(var(--muted-foreground)); display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+  .template-card-content small { font-size:11px; color:hsl(var(--muted-foreground)); font-variant-numeric:tabular-nums; }
+  .template-card-actions { display:flex; gap:8px; margin-top:auto; padding-top:10px; }
+  .template-card-actions>button { flex:1 1 0; }
+  .project-pagination { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px; margin:8px 0 24px; }
+  .project-pagination ol { display:flex; align-items:center; gap:4px; list-style:none; margin:0; padding:0; }
+  .project-pagination ol span { display:grid; place-items:center; min-width:24px; font-size:12px; color:hsl(var(--muted-foreground)); }
+  .project-pagination ol button { min-width:32px; padding:0 8px; font-variant-numeric:tabular-nums; color:hsl(var(--muted-foreground)); }
+  .project-pagination ol button.active { border-color:hsl(var(--primary)/0.35); background:hsl(var(--accent)); color:hsl(var(--accent-foreground)); font-weight:600; }
+  @media(max-width:700px) {
+    .template-preview-button { height:128px; }
+    .template-card-actions { flex-direction:column; }
+    .project-pagination button { min-height:44px; }
+    .project-pagination ol button { min-width:44px; }
+  }
   .workbench {
     position: relative;
     display: grid;
@@ -3563,22 +3591,17 @@ button.room-cost-row:hover {
   .toolbar-fullscreen { display:none; }
 }
 
-/* 游客改过模版后的顶部提示条：放在工作台栅格之外，避免打乱 .workbench 的三行布局 */
+/* 工作台顶部提示条（游客改模版 / 内置模板只读预览共用 WorkbenchBanner）：放在工作台栅格之外，避免打乱 .workbench 的三行布局 */
 .workbench-shell { display:flex; flex-direction:column; height:100dvh; background:hsl(var(--card)); }
 .workbench-shell > .workbench { flex:1 1 auto; height:auto; min-height:0; }
-.guest-cloud-banner { display:flex; align-items:center; gap:10px; margin:10px 16px 0; padding:6px 8px 6px 10px; border:1px solid hsl(var(--primary) / 0.45); border-radius:10px; background:linear-gradient(90deg,hsl(var(--primary) / 0.22),hsl(var(--primary) / 0.07)); box-shadow:0 10px 22px -16px hsl(var(--primary) / 0.7); color:hsl(var(--foreground)); font-size:12px; }
-.guest-cloud-banner-badge { display:grid; place-items:center; flex:none; width:22px; height:22px; border-radius:7px; background:hsl(var(--primary)); color:hsl(var(--primary-foreground)); }
-.guest-cloud-banner-copy { display:flex; align-items:baseline; gap:8px; flex:1 1 auto; min-width:0; }
-.guest-cloud-banner-copy > b { font-size:12px; font-weight:600; white-space:nowrap; }
-.guest-cloud-banner-copy > span { color:hsl(var(--muted-foreground)); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.guest-cloud-banner .guest-cloud-banner-save,.guest-cloud-banner .guest-cloud-banner-dismiss { flex:none; height:28px; padding:0 10px; gap:6px; font-size:12px; }
-.guest-cloud-banner .guest-cloud-banner-save { box-shadow:0 4px 12px -6px hsl(var(--primary) / 0.6); }
-.guest-cloud-banner .guest-cloud-banner-dismiss { padding:0 8px; color:hsl(var(--muted-foreground)); }
-.guest-cloud-banner .guest-cloud-banner-dismiss:hover:not(:disabled) { color:hsl(var(--foreground)); }
+.workbench-banner { display:flex; align-items:center; justify-content:space-between; flex:none; gap:16px; min-height:40px; padding:4px 12px 4px 16px; border-bottom:1px solid hsl(var(--primary) / 0.16); background:hsl(var(--accent)); color:hsl(var(--accent-foreground)); font-size:12px; }
+.workbench-banner-copy { display:flex; align-items:center; flex:1 1 auto; min-width:0; }
+.workbench-banner-copy > span { color:hsl(var(--accent-foreground)); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.workbench-banner-actions { display:flex; align-items:center; gap:4px; flex:none; }
+.workbench-banner .workbench-banner-action,.workbench-banner .workbench-banner-dismiss { height:28px; padding:0 12px; font-size:12px; }
+.workbench-banner .workbench-banner-dismiss { color:hsl(var(--accent-foreground)); background:transparent; }
+.workbench-banner .workbench-banner-dismiss:hover:not(:disabled) { background:hsl(var(--primary) / 0.08); }
 @media (max-width: 600px) {
-  .guest-cloud-banner { margin:8px 8px 0; padding:5px 6px 5px 8px; gap:8px; }
-  .guest-cloud-banner-copy > span { display:none; }
-  .guest-cloud-banner .guest-cloud-banner-save,.guest-cloud-banner .guest-cloud-banner-dismiss { height:32px; }
-  .guest-cloud-banner .guest-cloud-banner-dismiss { padding:0 6px; }
-  .guest-cloud-banner .guest-cloud-banner-dismiss > span { display:none; }
+  .workbench-banner { gap:8px; padding:4px 8px 4px 12px; }
+  .workbench-banner .workbench-banner-action,.workbench-banner .workbench-banner-dismiss { height:32px; padding:0 10px; }
 }

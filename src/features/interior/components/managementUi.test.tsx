@@ -101,6 +101,29 @@ describe('管理端精简与加载分支', () => {
     expect(loading).not.toContain('还没有设计项目');
     expect(empty).toContain('还没有设计项目');
     expect(empty).not.toContain('cms-loading-placeholder');
+    expect(empty).not.toContain('没有匹配的项目');
+  });
+  it('项目管理与家具库同版式：搜索框与全部 / 内置 / 我的三个分类，默认全部', () => {
+    const html = render(createElement(ProjectManager, { projects: projects(false), opened: () => {} }));
+    expect(html).toContain('aria-label="搜索项目"');
+    expect(html).toContain('aria-label="项目分类"');
+    for (const label of ['全部', '内置', '我的']) expect(html).toMatch(new RegExp('>' + label + '<b>\\d+</b>'));
+    expect(html).toMatch(/aria-pressed="true"[^>]*>全部<b>/);
+    expect(html).toContain('全部项目');
+    expect(html).toContain('builtin-template-card');
+    expect(html).toContain('aria-label="打开项目 我的项目"');
+    // 我的项目按修改时间排在内置模板之前
+    expect(html.indexOf('打开项目 我的项目')).toBeLessThan(html.indexOf('builtin-template-card'));
+  });
+  it('超过一页显示分页，一页以内不显示；云端还有更多时数量带 +', () => {
+    const many = Array.from({ length: 20 }, (_, i) => ({ ...project, id: 'p' + i, name: '项目' + i }));
+    const paged = render(createElement(ProjectManager, { projects: projects(false, many), opened: () => {} }));
+    expect(paged).toContain('aria-label="项目分页"');
+    expect(paged).toContain('aria-current="page"');
+    expect(render(createElement(ProjectManager, { projects: projects(false), opened: () => {} }))).not.toContain('aria-label="项目分页"');
+    const more = render(createElement(ProjectManager, { projects: { ...projects(false), hasMore: true } as ReturnType<typeof useProjects>, opened: () => {} }));
+    expect(more).toMatch(/>我的<b>1\+<\/b>/);
+    expect(more).toContain('aria-label="项目分页"');
   });
   it('列表读取失败显示错误与重试，而不是“还没有设计项目”', () => {
     const failed = render(createElement(ProjectManager, { projects: { ...projects(false, []), listError: 'Failed to fetch' } as ReturnType<typeof useProjects>, opened: () => {} }));

@@ -1,12 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-
-/** 页码序列：首尾页、当前页及其左右各一页，其余折叠为省略号。 */
-export function pageNumbers(page: number, pages: number): (number | '…')[] {
-  const keep = new Set([1, pages, page - 1, page, page + 1].filter(n => n >= 1 && n <= pages));
-  const sorted = [...keep].sort((a, b) => a - b);
-  return sorted.flatMap((n, i) => i && n - sorted[i - 1] > 1 ? ['…' as const, n] : [n]);
-}
+import { pageNumbers } from '../model/projectFilter';
 
 /**
  * 列表分页。hasMore 表示云端还有未加载的数据：此时停在最后一页仍可「下一页」，先加载再翻页。

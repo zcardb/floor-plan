@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterProjects, paginate } from './projectFilter';
+import { filterProjects, pageNumbers, paginate } from './projectFilter';
 import type { TemplatePreset } from '../data/templatePresets';
 import type { ProjectSummary } from '../cloud/useProjects';
 
@@ -40,5 +40,9 @@ describe('paginate', () => {
     expect(paginate(list, 9, 12).page).toBe(3);
     expect(paginate(list, 0, 12).page).toBe(1);
     expect(paginate([], 2, 12)).toEqual({ items: [], page: 1, pages: 1 });
+  });
+  it('页码保留首尾与当前页邻居，其余折叠为省略号', () => {
+    expect(pageNumbers(1, 3)).toEqual([1, 2, 3]);
+    expect(pageNumbers(5, 10)).toEqual([1, '…', 4, 5, 6, '…', 10]);
   });
 });

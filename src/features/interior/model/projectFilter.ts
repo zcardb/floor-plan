@@ -30,6 +30,13 @@ export function filterProjects(presets: readonly TemplatePreset[], rows: readonl
   return [...mine, ...builtin];
 }
 
+/** 页码序列：首尾页、当前页及其左右各一页，其余折叠为省略号。 */
+export function pageNumbers(page: number, pages: number): (number | '…')[] {
+  const keep = new Set([1, pages, page - 1, page, page + 1].filter(n => n >= 1 && n <= pages));
+  const sorted = [...keep].sort((a, b) => a - b);
+  return sorted.flatMap((n, i) => i && n - sorted[i - 1] > 1 ? ['…' as const, n] : [n]);
+}
+
 /** 页码从 1 开始；越界时修正到有效范围，空列表视为 1 页。 */
 export function paginate<T>(list: readonly T[], page: number, size: number) {
   const pages = Math.max(1, Math.ceil(list.length / size));
