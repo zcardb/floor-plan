@@ -189,6 +189,41 @@ describe("整户户型候选清洗与落地", () => {
   it("房间全部不可用时抛错", () => {
     expect(() => sanitizePlan({ ...plan, rooms: [{ id: "x", box: [0, 0, 10, 10] }] }, { catalog })).toThrow("房间");
   });
+  it("模型把外墙厚度算进室内（房间与内墙从 120 起）：贴外墙的边与顶到外墙的墙端吸附到外轮廓，不留白边", () => {
+    // 真实回包节选：10 × 14 m，房间与内墙都离外轮廓 120
+    const inset = {
+      width: 10000, depth: 14000, openings: [], furniture: [],
+      walls: [
+        { key: "a", dir: "v", at: 6800, from: 120, to: 5680 },
+        { key: "c", dir: "h", at: 5680, from: 120, to: 9880 },
+        { key: "e", dir: "v", at: 2200, from: 11000, to: 13880 },
+      ],
+      rooms: [
+        { id: "living", name: "客厅餐厅", box: [120, 120, 6800, 5680] },
+        { id: "bath", name: "卫浴", box: [6800, 120, 9880, 5680] },
+        { id: "master", name: "主卧", poly: [[120, 5680], [9880, 5680], [9880, 13880], [2200, 13880], [2200, 11000], [120, 11000]] },
+        { id: "ensuite", name: "主卫", box: [120, 11000, 2200, 13880] },
+      ],
+    };
+    const spec = sanitizePlan(inset, { catalog });
+    expect(spec.walls.map((w) => [w.from, w.to])).toEqual([[0, 5680], [0, 10000], [11000, 14000]]);
+    const box = (name: string) => {
+      const ring = spec.rooms.find((r) => r.name === name)!.poly;
+      return [Math.min(...ring.map((p) => p[0])), Math.min(...ring.map((p) => p[1])), Math.max(...ring.map((p) => p[0])), Math.max(...ring.map((p) => p[1]))];
+    };
+    expect(box("客厅餐厅")).toEqual([0, 0, 6740, 5620]);
+    expect(box("卫浴")).toEqual([6860, 0, 10000, 5620]);
+    expect(box("主卧")).toEqual([0, 5740, 10000, 14000]);
+    expect(box("主卫")).toEqual([0, 11000, 2140, 14000]);
+    // 落地后房间铺满外墙内表面：10 × 14 = 140 m² 只扣内墙占地（约 2.2 m²）；吸附前只有约 132 m²
+    const design = planToDesign(spec, catalog);
+    expect(() => validateDesign(design)).not.toThrow();
+    expect(design.rooms.reduce((s, r) => s + area(r), 0)).toBeGreaterThan(137.5);
+  });
+  it("离外轮廓 300 以上的房间边不吸附（真正的走廊 / 留白保持原样）", () => {
+    const far = { width: 8000, depth: 8000, walls: [], openings: [], furniture: [], rooms: [{ id: "a", name: "卧室", box: [400, 0, 8000, 8000] }] };
+    expect(sanitizePlan(far, { catalog }).rooms[0]!.poly.map((p) => p[0])).toContain(400);
+  });
 });
 
 describe("指定家具改尺寸", () => {

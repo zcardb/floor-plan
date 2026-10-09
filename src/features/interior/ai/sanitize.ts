@@ -13,6 +13,11 @@ const MIN_WALL_LENGTH = 600;
 const MIN_ROOM_AREA = 1.5;
 /** 内墙离外墙内侧至少这么远，否则会和外墙叠在一起。 */
 const MIN_WALL_OFFSET = 300;
+/**
+ * 房间边、内墙端点离外轮廓不超过该距离时吸附到外轮廓上。外墙在外轮廓之外，
+ * 模型却常把外墙厚度算进室内（房间从 120 / 240 起），留下一圈露底的白边。须小于 MIN_WALL_OFFSET。
+ */
+const OUTER_SNAP = 250;
 const SIDES: Side[] = ["up", "down", "left", "right"];
 const OUTER_NAMES = ["top", "right", "bottom", "left"];
 const MAT_FALLBACK = "wood";
@@ -95,6 +100,44 @@ export function sanitizeRoomItems(
   return rugsFirst(specs);
 }
 
+/** 外轮廓的一条边：dir=h 为横边（at 是 y，from/to 是 x 范围），dir=v 为竖边。 */
+interface OuterEdge {
+  dir: "h" | "v";
+  at: number;
+  from: number;
+  to: number;
+}
+
+const outerEdgesOf = (outline: Point[] | undefined, width: number, depth: number): OuterEdge[] =>
+  outline
+    ? outline.map((a, i) => {
+        const b = outline[(i + 1) % outline.length];
+        const dir = a[1] === b[1] ? "h" : "v";
+        const [p, q] = dir === "h" ? [a[0], b[0]] : [a[1], b[1]];
+        return { dir, at: dir === "h" ? a[1] : a[0], from: Math.min(p, q), to: Math.max(p, q) };
+      })
+    : [
+        { dir: "h", at: 0, from: 0, to: width },
+        { dir: "h", at: depth, from: 0, to: width },
+        { dir: "v", at: 0, from: 0, to: depth },
+        { dir: "v", at: width, from: 0, to: depth },
+      ];
+
+/** 与 [from, to] 重合超过一半、且离 at 不超过 OUTER_SNAP 的同向外轮廓边坐标；没有时原样返回。 */
+function snapToOuter(dir: "h" | "v", at: number, from: number, to: number, outer: OuterEdge[]) {
+  const hit = outer.find(
+    (e) => e.dir === dir && Math.abs(e.at - at) <= OUTER_SNAP && Math.min(to, e.to) - Math.max(from, e.from) > (to - from) / 2,
+  );
+  return hit ? hit.at : at;
+}
+
+/** 内墙端点吸附到它顶着的那条外轮廓边上（该边须横跨内墙所在的中心线）。 */
+function snapWallEnd(dir: "h" | "v", at: number, end: number, outer: OuterEdge[]) {
+  const across = dir === "h" ? "v" : "h";
+  const hit = outer.find((e) => e.dir === across && e.from <= at && at <= e.to && Math.abs(e.at - end) <= OUTER_SNAP);
+  return hit ? hit.at : end;
+}
+
 /** 房间轮廓的某条边上是否有内墙（重合超过一半才算）。 */
 function wallOnEdge(a: Point, b: Point, walls: WallSpec[]) {
   const horizontal = a[1] === b[1];
@@ -109,10 +152,11 @@ function wallOnEdge(a: Point, b: Point, walls: WallSpec[]) {
 }
 
 /**
- * 模型按墙中心线给房间轮廓；这里把贴着内墙的边向房间内收半个墙厚，得到净空轮廓。
+ * 模型按墙中心线给房间轮廓；这里把贴着内墙的边向房间内收半个墙厚，
+ * 贴着外墙的边吸附到外轮廓（外墙内表面），得到净空轮廓。
  * 只处理横平竖直的轮廓；斜边轮廓原样返回。
  */
-function netRing(source: Point[], walls: WallSpec[]): Point[] {
+function netRing(source: Point[], walls: WallSpec[], outer: OuterEdge[]): Point[] {
   // 先去掉共线的中间点，保证相邻两条边一横一竖。
   const ring = source.filter((p, i) => {
     const prev = source[(i - 1 + source.length) % source.length], next = source[(i + 1) % source.length];
@@ -128,7 +172,9 @@ function netRing(source: Point[], walls: WallSpec[]): Point[] {
     const inward = horizontal
       ? (inRing([mid[0], mid[1] + 1], ring) ? 1 : -1)
       : (inRing([mid[0] + 1, mid[1]], ring) ? 1 : -1);
-    const at = (horizontal ? a[1] : a[0]) + (wallOnEdge(a, b, walls) ? inward * half : 0);
+    const raw = horizontal ? a[1] : a[0];
+    const [from, to] = horizontal ? [Math.min(a[0], b[0]), Math.max(a[0], b[0])] : [Math.min(a[1], b[1]), Math.max(a[1], b[1])];
+    const at = wallOnEdge(a, b, walls) ? raw + inward * half : snapToOuter(horizontal ? "h" : "v", raw, from, to, outer);
     return { horizontal, at };
   });
   if (edges.some((edge) => !edge)) return source;
@@ -173,8 +219,9 @@ export function sanitizePlan(value: unknown, { catalog }: { catalog: AiCatalog }
   };
   const width = sizeOf(raw.width), depth = sizeOf(raw.depth);
   const outline = parseOutline(raw.outline, width, depth);
+  const outer = outerEdgesOf(outline, width, depth);
   // 外墙名 → [沿墙方向, 起点, 终点]；内墙 key 不能与外墙名相同。
-  const outer = new Map<string, ["h" | "v", number, number]>(
+  const outerSpans = new Map<string, ["h" | "v", number, number]>(
     outline
       ? outline.map((a, i) => {
           const b = outline[(i + 1) % outline.length];
@@ -192,10 +239,13 @@ export function sanitizePlan(value: unknown, { catalog }: { catalog: AiCatalog }
     const w = (entry ?? {}) as { key?: unknown; dir?: unknown; at?: unknown; from?: unknown; to?: unknown };
     const key = text(w.key), at = num(w.at);
     // 外墙名是保留字：模型把它们当内墙 key 用会造成歧义，直接丢弃。
-    if (!key || OUTER_NAMES.includes(key) || outer.has(key) || wallKeys.has(key) || (w.dir !== "h" && w.dir !== "v") || at === undefined) continue;
+    if (!key || OUTER_NAMES.includes(key) || outerSpans.has(key) || wallKeys.has(key) || (w.dir !== "h" && w.dir !== "v") || at === undefined) continue;
     const across = w.dir === "h" ? depth : width, limit = w.dir === "h" ? width : depth;
     if (at < MIN_WALL_OFFSET || at > across - MIN_WALL_OFFSET) continue;
-    const ends = [clamp(num(w.from) ?? 0, 0, limit), clamp(num(w.to) ?? limit, 0, limit)].sort((a, b) => a - b);
+    // 顶到外墙的一端吸附到外轮廓上，墙端与外墙内表面之间不留缝。
+    const ends = [clamp(num(w.from) ?? 0, 0, limit), clamp(num(w.to) ?? limit, 0, limit)]
+      .map((end) => snapWallEnd(w.dir as "h" | "v", at, end, outer))
+      .sort((a, b) => a - b);
     if (ends[1] - ends[0] < MIN_WALL_LENGTH) continue;
     const next = `w-${walls.length + 1}`;
     wallKeys.set(key, next);
@@ -203,7 +253,7 @@ export function sanitizePlan(value: unknown, { catalog }: { catalog: AiCatalog }
   }
 
   const spanOf = (key: string): [string, "h" | "v", number, number] | undefined => {
-    const edge = outer.get(key);
+    const edge = outerSpans.get(key);
     if (edge) return [key, ...edge];
     const wall = walls.find((w) => w.key === wallKeys.get(key));
     return wall && [wall.key, wall.dir, wall.from, wall.to];
@@ -244,7 +294,7 @@ export function sanitizePlan(value: unknown, { catalog }: { catalog: AiCatalog }
         ? (r.poly as Point[])
         : null;
     if (!source || source.length < 3) continue;
-    const ring = netRing(source.map(([x, y]): Point => [round10(clamp(x, 0, width)), round10(clamp(y, 0, depth))]), walls);
+    const ring = netRing(source.map(([x, y]): Point => [round10(clamp(x, 0, width)), round10(clamp(y, 0, depth))]), walls, outer);
     if (ringArea(ring) / 1e6 < MIN_ROOM_AREA) continue;
     const name = text(r.name, 20) ?? `房间 ${rooms.length + 1}`;
     const mat = text(r.mat);
