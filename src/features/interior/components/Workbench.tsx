@@ -12,6 +12,7 @@ import { northAngle } from '../model/northAngle';
 import { splitWall as splitWallModel } from '../model/wallSplit';
 import { removeWall as removeWallModel } from '../model/wallRemoval';
 import { mergeWall as mergeWallModel, wallMergeGroup } from '../model/wallMerge';
+import { bearingWalls, clearBearing, mergeAllSplits, splitPointCount } from '../model/wallBulk';
 import { isBearingWall } from '../model/wallPolicy';
 import { length } from '../model/geometry';
 import { dimensionEditPolicy, editDimensionWalls } from '../model/dimensionWallEdit';
@@ -21,6 +22,7 @@ import {
   Armchair,
   Check,
   ChevronDown,
+  Combine,
   Copy,
   DoorOpen,
   Expand,
@@ -44,6 +46,7 @@ import {
   ScanLine,
   Settings2,
   ShieldCheck,
+  ShieldOff,
   SquareDashed,
   Sun,
   Trash2,
@@ -553,6 +556,45 @@ export function Workbench(p: Props) {
     if (selection?.kind === "opening") setSelection(null);
     notify.success(`已清空 ${count} 个门窗，可撤销恢复`);
   };
+  const clearSplits = async () => {
+    if (readOnly) return;
+    const count = splitPointCount(d);
+    if (!count) return;
+    const ok = await confirm({
+      title: "清空所有墙体分割？",
+      description: `将合并 ${count} 处分割，连续的同类墙段恢复为整段；墙体交界处保持分开，门窗位置与承重标记保留，可撤销恢复。`,
+      confirmText: "清空分割",
+      tone: "destructive",
+    });
+    if (!ok) return;
+    const before = model.current.current;
+    const result = mergeAllSplits(before);
+    if (!result.merged) return notify.fail("没有可合并的墙段");
+    commit(result.design, before);
+    if (selection?.kind === "wall" && !result.design.walls.some(w => w.id === selection.id)) setSelection(null);
+    notify.success(`已合并 ${result.merged} 处分割，可撤销恢复` + (result.skipped ? `（${result.skipped} 段因门窗冲突未合并）` : ""));
+  };
+  const clearBearingWalls = async () => {
+    if (readOnly) return;
+    const count = bearingWalls(d).length;
+    if (!count) return;
+    const ok = await confirm({
+      title: "清空所有承重标记？",
+      description: `${count} 面承重墙将改为普通墙，取消承重保护后可自由拆改；仅用于方案示意，可撤销恢复。`,
+      confirmText: "清空承重",
+      tone: "destructive",
+    });
+    if (!ok) return;
+    change(clearBearing);
+    notify.success(`已将 ${count} 面承重墙改为普通墙，可撤销恢复`);
+  };
+  /** 「清空」菜单：先对象（家具、门窗），再墙体（分割、承重）；宽屏下拉与窄屏「更多」共用。 */
+  const clearActions = [
+    { label: "清空家具", icon: Armchair, count: d.furniture.length, run: clearFurniture },
+    { label: "清空门窗", icon: DoorOpen, count: d.openings.length, run: clearOpenings },
+    { label: "清空分割", icon: Combine, count: splitPointCount(d), run: clearSplits, group: true },
+    { label: "清空承重", icon: ShieldOff, count: bearingWalls(d).length, run: clearBearingWalls },
+  ];
   const resetDesign = async () => {
     if (readOnly) return;
     // CAD 导入的户型没有内置的初始模板，重置会把它换成参考户型。
@@ -704,14 +746,12 @@ export function Workbench(p: Props) {
                   <RotateCcw />
                   重置方案
                 </DropdownMenuItem>
-                <DropdownMenuItem className="danger-item compact-only" disabled={!d.furniture.length} onSelect={clearFurniture}>
-                  <Trash2 />
-                  清空家具
-                </DropdownMenuItem>
-                <DropdownMenuItem className="danger-item compact-only" disabled={!d.openings.length} onSelect={clearOpenings}>
-                  <DoorOpen />
-                  清空门窗
-                </DropdownMenuItem>
+                {clearActions.map(a => (
+                  <DropdownMenuItem key={a.label} className="danger-item compact-only" disabled={!a.count} onSelect={a.run}>
+                    <a.icon />
+                    {a.label}
+                  </DropdownMenuItem>
+                ))}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -772,23 +812,21 @@ export function Workbench(p: Props) {
           </ToolButton>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="tool-button" aria-label="清空" disabled={readOnly || (!d.furniture.length && !d.openings.length)}>
+              <button className="tool-button" aria-label="清空" disabled={readOnly || clearActions.every(a => !a.count)}>
                 <Trash2 size={16} />
                 <span>清空</span>
                 <ChevronDown size={12} />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
-              <DropdownMenuItem className="danger-item" disabled={!d.furniture.length} onSelect={clearFurniture}>
-                <Armchair />
-                清空家具
-                <span className="menu-item-count">{d.furniture.length}</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="danger-item" disabled={!d.openings.length} onSelect={clearOpenings}>
-                <DoorOpen />
-                清空门窗
-                <span className="menu-item-count">{d.openings.length}</span>
-              </DropdownMenuItem>
+              {clearActions.map(a => [
+                a.group && <DropdownMenuSeparator key={a.label + ":sep"} />,
+                <DropdownMenuItem key={a.label} className="danger-item" disabled={!a.count} onSelect={a.run}>
+                  <a.icon />
+                  {a.label}
+                  <span className="menu-item-count">{a.count}</span>
+                </DropdownMenuItem>,
+              ])}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

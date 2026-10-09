@@ -30,16 +30,11 @@ export function filterProjects(presets: readonly TemplatePreset[], rows: readonl
   return [...mine, ...builtin];
 }
 
-/** 页码序列：首尾页、当前页及其左右各一页，其余折叠为省略号。 */
-export function pageNumbers(page: number, pages: number): (number | '…')[] {
-  const keep = new Set([1, pages, page - 1, page, page + 1].filter(n => n >= 1 && n <= pages));
-  const sorted = [...keep].sort((a, b) => a - b);
-  return sorted.flatMap((n, i) => i && n - sorted[i - 1] > 1 ? ['…' as const, n] : [n]);
-}
-
-/** 页码从 1 开始；越界时修正到有效范围，空列表视为 1 页。 */
-export function paginate<T>(list: readonly T[], page: number, size: number) {
-  const pages = Math.max(1, Math.ceil(list.length / size));
-  const current = Math.min(Math.max(1, Math.floor(page) || 1), pages);
-  return { items: list.slice((current - 1) * size, current * size), page: current, pages };
+/**
+ * 滚动加载的可见窗口：取前 visible 条。
+ * 云端还有未加载的项目时，内置模板（排在我的项目之后）先不露出，避免新加载的项目插到它们前面造成跳动。
+ */
+export function visibleEntries(entries: readonly ProjectEntry[], visible: number, cloudHasMore: boolean) {
+  const available = cloudHasMore ? entries.filter(e => e.kind === 'mine') : entries;
+  return { items: available.slice(0, visible), available: available.length };
 }
