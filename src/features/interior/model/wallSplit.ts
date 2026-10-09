@@ -2,6 +2,8 @@ import { length } from './geometry';
 import { uid, type Design, type Point, type Wall } from './types';
 
 export const splitTolerance = 0.01;
+/** 洞口边吸附窗口（mm）：两位小数的距离输入落在这个范围内时按洞口边切开。 */
+export const splitEdgeSnap = 10;
 /** Manual distances stay 1–2 points; a junction split can cut one wall into many segments. */
 export const splitMaxCuts = 12;
 export function wallSplitIntervals(design: Design, wallId: string, cuts: number[]): number[] {
@@ -15,7 +17,7 @@ export function wallSplitIntervals(design: Design, wallId: string, cuts: number[
   // Snap only near opening edges, so boundary ownership never creates a sliver of an opening.
   const points = cuts.map(c => {
     for (const o of openings) for (const edge of [o.offset - o.width / 2, o.offset + o.width / 2]) {
-      if (Math.abs(c - edge) <= splitTolerance) return edge;
+      if (Math.abs(c - edge) <= splitEdgeSnap) return edge;
     }
     return c;
   });

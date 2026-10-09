@@ -1,4 +1,5 @@
 import { length, nearestOnWall } from './geometry';
+import { splitEdgeSnap } from './wallSplit';
 import type { Design, Point, Wall } from './types';
 
 const epsilon = 0.01;
@@ -12,15 +13,18 @@ export interface WallContact {
   offset: number;
   /** Walls that produce this junction, in design order. */
   wallIds: string[];
-  kind: 'tee' | 'cross';
+  kind: 'tee' | 'cross' | 'opening';
   /** True when the junction sits inside one of this wall's door/window openings. */
   blocked: boolean;
+  /** Door/window edge contact: the opening and which of its two edges this is. */
+  opening?: { id: string; kind: 'door' | 'window'; edge: 'start' | 'end' };
 }
 
 /**
  * Other walls meeting one wall, listed as cut positions measured from its a end.
  * A wall whose end stops within this wall's thickness is a T junction (cut at its centerline);
  * a wall running through to both sides is a crossing (cut where the centerlines meet).
+ * Both edges of this wall's own doors and windows are listed too, so a wall can also be cut at an opening.
  */
 export function wallContacts(design: Design, wallId: string): WallContact[] {
   const wall = design.walls.find(w => w.id === wallId);
@@ -60,22 +64,40 @@ export function wallContacts(design: Design, wallId: string): WallContact[] {
       add(nearestOnWall(end, wall).offset, other, 'tee');
     }
   }
-  const contacts: WallContact[] = [];
+  const junctions: WallContact[] = [];
   for (const hit of found.sort((a, b) => a.offset - b.offset)) {
     // A cut within 0.05 m of either end would only create a sliver segment (and drops L corners).
     if (hit.offset < mergeGap || hit.offset > L - mergeGap) continue;
-    const previous = contacts[contacts.length - 1];
+    const previous = junctions[junctions.length - 1];
     if (previous && hit.offset - previous.offset <= mergeGap) {
       if (!previous.wallIds.includes(hit.wallId)) previous.wallIds.push(hit.wallId);
       if (hit.kind === 'cross') previous.kind = 'cross';
       continue;
     }
-    contacts.push({ offset: hit.offset, wallIds: [hit.wallId], kind: hit.kind, blocked: false });
+    junctions.push({ offset: hit.offset, wallIds: [hit.wallId], kind: hit.kind, blocked: false });
   }
   const openings = design.openings.filter(o => o.wallId === wallId);
-  return contacts.map(contact => {
-    // Whole centimeters match the two-decimal meter inputs, so a chip and a typed value agree.
-    const offset = Math.round(contact.offset / 10) * 10;
-    return { ...contact, offset, blocked: openings.some(o => offset > o.offset - o.width / 2 && offset < o.offset + o.width / 2) };
+  /** The opening edge this position already sits on (drawing tolerance), if any. */
+  const edgeAt = (offset: number) => {
+    for (const o of openings) for (const edge of [o.offset - o.width / 2, o.offset + o.width / 2]) {
+      if (Math.abs(offset - edge) <= splitEdgeSnap) return edge;
+    }
+    return undefined;
+  };
+  const insideOpening = (offset: number) => openings.some(o => offset > o.offset - o.width / 2 && offset < o.offset + o.width / 2);
+  const contacts = junctions.map(contact => {
+    const edge = edgeAt(contact.offset);
+    // A junction that stops on an opening edge is a legal cut there; only one sitting inside the
+    // opening is blocked. Whole centimeters match the two-decimal meter inputs, so a chip and a typed
+    // value agree; an opening edge keeps its exact stored position instead, as the cut snaps back to it.
+    return { ...contact, offset: edge ?? Math.round(contact.offset / 10) * 10, blocked: edge === undefined && insideOpening(contact.offset) };
   });
+  for (const o of openings) {
+    for (const [edge, end] of [[o.offset - o.width / 2, 'start'], [o.offset + o.width / 2, 'end']] as const) {
+      // A cut that close to the wall end or to another junction could only make a sliver.
+      if (edge < mergeGap || edge > L - mergeGap || contacts.some(c => Math.abs(c.offset - edge) <= mergeGap)) continue;
+      contacts.push({ offset: edge, wallIds: [], kind: 'opening', blocked: false, opening: { id: o.id, kind: o.kind, edge: end } });
+    }
+  }
+  return contacts.sort((a, b) => a.offset - b.offset);
 }
