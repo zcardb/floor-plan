@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import { library } from "../data/catalog";
 import { furnitureTypes } from "../model/furnitureAppearance";
 import { AiResults } from "./AiResults";
+import { AiComposer } from "./AiComposer";
+import { DEFAULT_AI_ENGINE } from "../ai/models";
 import { AiCreateProjectForm, DEFAULT_PLAN_PROMPT } from "./AiCreateProjectDialog";
 import { filterPickerItems, furniturePickerItems, groupPickerItems, typePickerItems } from "./pickerItems";
 import type { LibraryItem } from "../model/types";
@@ -74,6 +76,29 @@ describe("候选方案网格", () => {
   });
 });
 
+describe("共用 AI 输入区", () => {
+  const renderComposer = (description: string) => renderToStaticMarkup(createElement(AiComposer, {
+    value: { description, images: [], count: 2, engine: DEFAULT_AI_ENGINE },
+    label: "布局需求", hint: "例如：家具靠墙，保留通道。", placeholder: "描述布局…",
+    onDescription: () => {}, onImages: () => {}, onCount: () => {}, onEngine: () => {}, onSend: () => {},
+  }));
+  it("常驻标签和示例关联输入框，设置分组与文字主按钮共用", () => {
+    const html = renderComposer("家具靠墙");
+    const labelId = html.match(/<label for="([^"]+)"/)?.[1];
+    expect(labelId).toBeTruthy();
+    expect(html).toContain(`id="${labelId}"`);
+    expect(html).toContain('aria-label="布局需求"');
+    expect(html).toContain("aria-describedby=");
+    expect(html).toContain("例如：家具靠墙，保留通道。");
+    expect(html).toContain("ai-composer-settings");
+    expect(html).toContain("<span>生成方案</span>");
+    expect(html).not.toMatch(/aria-label="生成方案"[^>]*disabled/);
+  });
+  it.each(["", "   "])("空描述 %j 仍禁用生成", (description) => {
+    expect(renderComposer(description)).toMatch(/aria-label="生成方案"[^>]*disabled/);
+  });
+});
+
 describe("AI 创建户型表单", () => {
   const html = renderToStaticMarkup(createElement(AiCreateProjectForm, { pending: false, onClose: () => {}, onSubmit: () => {} }));
   it("需求描述默认填入示例（含长宽、几室几厅几卫），可编辑可直接发送；没有「高级设计」；数量默认 2；模型默认 DeepSeek V4 Flash", () => {
@@ -81,7 +106,10 @@ describe("AI 创建户型表单", () => {
     expect(html).not.toContain('id="ai-project-width"');
     expect(html).toContain(DEFAULT_PLAN_PROMPT);
     expect(html).toContain("长 12 m × 宽 10 m");
-    expect(html).not.toMatch(/aria-label="生成"[^>]*disabled/);
+    expect(html).toContain('aria-label="生成方案"');
+    expect(html).not.toMatch(/aria-label="生成方案"[^>]*disabled/);
+    expect(html).toContain('aria-label="户型需求"');
+    expect(html).toContain("ai-field-optional");
     expect(html).toContain("2 个方案");
     expect(html).toContain("DeepSeek V4 Flash");
   });

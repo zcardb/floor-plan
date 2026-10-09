@@ -49,16 +49,16 @@
 
 ## Implementation checklist
 
-- [ ] 共用 `.ai-dialog` 输入态及结果态上限改为 640px，桌面/窄屏间距和视口内滚动完成。
-- [ ] 两种标题说明统一层级，关闭按钮位置保留；房间面积/尺寸与可选家具标签完成。
-- [ ] AI 创建名称标为可选，`DEFAULT_PLAN_PROMPT`、名称留空行为与默认模型/数量保持不变。
-- [ ] AiComposer 共用需求 label、示例提示和 textarea 关联，两种调用方提供各自文案。
-- [ ] 共用输入区默认高度约 88px、上限仍 200px，边框/聚焦态使用语义 token。
-- [ ] 两处共用「生成方案」文字主按钮与底栏分组，模型/数量/参考图回调不变。
+- [x] 共用 `.ai-dialog` 输入态及结果态上限改为 640px，桌面/窄屏间距和视口内滚动完成。
+- [x] 两种标题说明统一层级，关闭按钮位置保留；房间面积/尺寸与可选家具标签完成。
+- [x] AI 创建名称标为可选，`DEFAULT_PLAN_PROMPT`、名称留空行为与默认模型/数量保持不变。
+- [x] AiComposer 共用需求 label、示例提示和 textarea 关联，两种调用方提供各自文案。
+- [x] 共用输入区默认高度约 88px、上限仍 200px，边框/聚焦态使用语义 token。
+- [x] 两处共用「生成方案」文字主按钮与底栏分组，模型/数量/参考图回调不变。
 - [ ] 窄屏底栏两行、主要触控目标至少 44px、长名称不导致溢出，键盘焦点可见。
-- [ ] 两处结果态使用最多两列/窄屏单列网格，进度与操作可换行；全部原回调保持。
-- [ ] 组件测试覆盖常驻标签、主按钮、默认设置和空描述禁用，不弱化原有断言。
-- [ ] 改动仅涉及上述共用 AI UI、测试与本计划，其他弹窗及后端不变。
+- [x] 两处结果态使用最多两列/窄屏单列网格，进度与操作可换行；全部原回调保持。
+- [x] 组件测试覆盖常驻标签、主按钮、默认设置和空描述禁用，不弱化原有断言。
+- [x] 改动仅涉及上述共用 AI UI、测试与本计划，其他弹窗及后端不变。
 
 ## Verification checklist
 
@@ -70,5 +70,18 @@
 - [ ] 结果：核验两处生成中/成功/失败、选择/放大/重试/重新生成/返回修改；房间后台生成与应用、创建确认与 pending 状态仍连接原流程。不为验证新增线上假数据，无法覆盖的真实状态标未验证。
 - [ ] 在同一受影响工作台路由分别打开两种弹窗，以 `desktop_1280` 和 `mobile_390` 作为设备假设截图验证宽度、输入比例、换行、溢出及关闭/底部操作可达性；不检查无关路由，不能打开的状态标未验证。
 - [ ] 检查文字与按钮对比度、Tab 焦点、Esc 关闭及焦点恢复；不能仅凭截图宣称可访问性通过。
-- [ ] 执行定向测试 `pnpm exec vitest run src/features/interior/components/aiComponents.test.tsx src/features/interior/components/toolbarMenus.test.tsx`。
-- [ ] 执行 `pnpm test`（全部 interior 测试）、`pnpm lint`、`pnpm exec tsc --noEmit` 与 `pnpm run build`；记录实际结果，检查 diff 无业务逻辑或其他弹窗改动。
+- [x] 执行定向测试 `pnpm exec vitest run src/features/interior/components/aiComponents.test.tsx src/features/interior/components/toolbarMenus.test.tsx`：25/25 通过。
+- [x] 执行 `pnpm test`（全部 interior 测试）、`pnpm lint`、`pnpm exec tsc --noEmit` 与 `pnpm run build`；结果见下，diff 无业务逻辑或其他弹窗改动。
+
+## 执行与验证结果
+
+- UI 代码已完成。640px 共用上限、88px 输入最小高度、窄屏两行底栏/44px 主操作及结果网格已落实；这些响应式样式尚未取得弹窗打开状态的视口证据，因此相关视觉/交互验收项保持未勾选。
+- 功能回归：定向 25 项通过；全量 603 项中 601 项通过、2 项失败，定位为未改动的 `model/wallRemoval.test.ts` 和 `model/dimensionWallEdit.test.ts`，分别涉及参考户型删除墙后的校验和移墙后的房间名单。未越界改墙体逻辑。
+- lint 0 错误、3 个未改动文件的 Hook 依赖警告（PlanCanvas 的 fit；Scene3D 的 pose/fly）；TypeScript、开发构建、生产构建及 `git diff --check` 通过。
+- 构建审计：未验证。已执行生产构建（manifest 存在）与 `--profile app --strict`，审计器缺少 parse5；独立依赖安装因 skill 目录无 pnpm 锁文件失败。没有修改应用依赖或审计配置来规避问题。
+- 性能基线：当前 `/` 是交互编辑器 app（支持游客和登录），保留 CSR；本次不变更首屏依赖、路由、i18n、analytics 或请求。改前生产入口 JS 约 1462.53 kB raw / 463.63 kB gzip、CSS 188.57 kB raw / 32.71 kB gzip；这些是本地构建估算，不是实际传输或浏览器性能结果。生产构建保留既有大 chunk、混合导入与第三方 use-client 告警。
+- 浏览器性能：未验证，无可用 Playwright/Puppeteer 或交互工具，不能控制冷缓存、CPU/网络及采集长任务。
+- 视觉：对 `/` 已捕获 desktop_1280 与 mobile_390，但截图只展示默认工作台，无法通过现有工具打开两种 AI 弹窗；不把工作台截图当作弹窗响应式通过证据。
+- 部署 HTTP：未验证，本次无发布 URL/部署头验收。
+- 平台待支持：弹窗状态的浏览器交互验证、性能审计器 parse5 运行依赖，以及生产浏览器/部署 HTTP 的测量证据。整体性能验收保持未验证；本次 UI 相关测试与构建已通过。
+

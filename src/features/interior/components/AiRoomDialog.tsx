@@ -27,7 +27,7 @@ export function AiRoomDialog({ ai, furniture }: { ai: RoomAi; furniture: Library
     <DialogContent className="ai-dialog">
       <DialogHeader>
         <DialogTitle>AI 布局 · {room.name}</DialogTitle>
-        <DialogDescription>结合整套户型为这个房间布置家具；先预览候选方案，确认后再应用，可撤销。</DialogDescription>
+        <DialogDescription>结合整套户型生成家具布局，先预览再应用，可撤销。</DialogDescription>
       </DialogHeader>
       {results
         ? <>
@@ -44,22 +44,24 @@ export function AiRoomDialog({ ai, furniture }: { ai: RoomAi; furniture: Library
             <Button type="button" variant="ghost" onClick={ai.back}><ArrowLeft />{ai.running ? "停止并返回修改" : "返回修改"}</Button>
             <span />
             <Button type="button" variant="outline" onClick={ai.close}>{ai.running ? "后台生成" : "取消"}</Button>
-            <Button type="button" disabled={!ready || ai.selected === null} onClick={ai.apply}>应用</Button>
+            <Button type="button" disabled={!ready || ai.selected === null} onClick={ai.apply}>应用方案</Button>
           </div>
         </>
         : <>
           <dl className="ai-room-facts">
-            <div><dt>面积：</dt><dd>{formatMeters(x2 - x1)} × {formatMeters(y2 - y1)} m · {area(room).toFixed(2)} m²</dd></div>
-            <div><dt>家具：</dt><dd>
+            <div><dt>房间面积</dt><dd className="ai-room-area"><strong>{area(room).toFixed(2)} m²</strong><span>{formatMeters(x2 - x1)} × {formatMeters(y2 - y1)} m</span></dd></div>
+            <div><dt>家具<span className="ai-field-optional">可选</span></dt><dd>
               <FurnitureChips picks={draft.picks} catalog={furniture} onChange={(picks) => ai.updateDraft((d) => ({ ...d, picks }))} />
-              <small>{draft.picks.length ? "AI 只摆放清单里的家具，件数一致" : "清单为空时由 AI 从家具库挑选"}</small>
+              <small>{draft.picks.length ? "AI 只摆放清单里的家具，件数一致" : "未指定时由 AI 从家具库挑选"}</small>
             </dd></div>
           </dl>
           {ai.busyElsewhere && <p className="ai-note" role="status">另一个房间正在生成，发送后会停止那一批。</p>}
           {batch && <button type="button" className="ai-link" onClick={ai.showResults}>查看上一次的 {batch.slots.length} 个方案</button>}
           <AiComposer
             value={draft}
-            placeholder="描述这个房间要怎么布置，例如：双人床靠北墙，留出梳妆位，整体原木风"
+            label="布局需求"
+            hint="例如：双人床靠北墙，留出梳妆位，整体原木风。"
+            placeholder="描述家具位置、使用需求或喜欢的风格…"
             onDescription={(description) => ai.updateDraft((d) => ({ ...d, description }))}
             onImages={(fn) => ai.updateDraft((d) => ({ ...d, images: fn(d.images) }))}
             onCount={(count) => ai.updateDraft((d) => ({ ...d, count }))}

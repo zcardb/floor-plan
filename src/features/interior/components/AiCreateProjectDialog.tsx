@@ -36,7 +36,7 @@ export function AiCreateProjectDialog({ open, pending, onClose, onSubmit }: {
     <DialogContent className="ai-dialog">
       <DialogHeader>
         <DialogTitle>AI 创建户型</DialogTitle>
-        <DialogDescription>描述需求（长宽、几室几厅几卫都写在描述里），AI 生成带门窗与家具的整套户型；选中一个方案后创建项目。</DialogDescription>
+        <DialogDescription>描述户型需求，生成带门窗与家具的方案，预览后创建项目。</DialogDescription>
       </DialogHeader>
       {open && <AiCreateProjectForm pending={pending} onClose={onClose} onSubmit={onSubmit} />}
     </DialogContent>
@@ -100,11 +100,13 @@ export function AiCreateProjectForm({ pending, onClose, onSubmit }: { pending: b
   </div>;
 
   return <div className="ai-create-form">
-    <div className="cms-field"><Label htmlFor="ai-project-name">项目名称</Label><Input id="ai-project-name" maxLength={100} placeholder="留空则用方案名称" value={name} onChange={(e) => setName(e.target.value)} /></div>
+    <div className="cms-field"><Label htmlFor="ai-project-name">项目名称 <span className="ai-field-optional">可选</span></Label><Input id="ai-project-name" maxLength={100} placeholder="留空则用方案名称" value={name} onChange={(e) => setName(e.target.value)} /></div>
     {ai.batch && <button type="button" className="ai-link" onClick={() => setView("results")}>查看上一次的 {ai.batch.slots.length} 个方案</button>}
     <AiComposer
       value={composer}
-      placeholder={`描述户型需求，例如：${DEFAULT_PLAN_PROMPT}`}
+      label="户型需求"
+      hint="写下长宽、几室几厅几卫，以及朝向或风格偏好。"
+      placeholder="描述户型尺寸、房间数量与设计偏好…"
       onDescription={(description) => setComposer((c) => ({ ...c, description }))}
       onImages={(fn) => setComposer((c) => ({ ...c, images: fn(c.images) }))}
       onCount={(count) => setComposer((c) => ({ ...c, count }))}

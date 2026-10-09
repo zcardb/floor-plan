@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
+import { useId, useLayoutEffect, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
 import { ArrowUp, ChevronDown, ImagePlus, Loader2, Plus, X } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { EditorTooltip } from "@/components/ui/editor-tooltip";
@@ -29,7 +29,7 @@ const fromClipboard = (items: DataTransferItemList | null | undefined) =>
  * 底部左侧 ＋ 添加参考图，右侧「模型 / 小助手」选择、「数量」下拉（1–4）与发送按钮。
  * 支持粘贴（Ctrl / ⌘ + V）和拖入图片；Enter 发送，Shift + Enter 换行，输入法组字时不发送。
  */
-export function AiComposer({ value, onDescription, onImages, onCount, onEngine, onSend, placeholder, sendLabel = "生成" }: {
+export function AiComposer({ value, onDescription, onImages, onCount, onEngine, onSend, placeholder, label = "需求描述", hint, sendLabel = "生成方案" }: {
   value: AiComposerValue;
   onDescription: (text: string) => void;
   onImages: ImagesUpdate;
@@ -37,8 +37,11 @@ export function AiComposer({ value, onDescription, onImages, onCount, onEngine, 
   onEngine: (engine: AiEngine) => void;
   onSend: () => void;
   placeholder: string;
+  label?: string;
+  hint?: string;
   sendLabel?: string;
 }) {
+  const descriptionId = useId(), hintId = useId();
   const file = useRef<HTMLInputElement>(null), text = useRef<HTMLTextAreaElement>(null);
   const [dragging, setDragging] = useState(false), [preview, setPreview] = useState<{ src: string; alt: string } | null>(null);
   const images = useReferenceImages(value.images, onImages);
@@ -70,7 +73,12 @@ export function AiComposer({ value, onDescription, onImages, onCount, onEngine, 
     const files = fromList(e.dataTransfer?.files);
     if (files.length) images.add(files);
   };
-  return <div
+  return <div className="ai-composer-field">
+    <div className="ai-composer-heading">
+      <label htmlFor={descriptionId}>{label}</label>
+      {hint && <p id={hintId}>{hint}</p>}
+    </div>
+    <div
     className={"ai-composer" + (dragging ? " is-dragging" : "")}
     onDragOver={(e) => { if ([...e.dataTransfer.types].includes("Files")) { e.preventDefault(); setDragging(true); } }}
     onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false); }}
@@ -88,7 +96,9 @@ export function AiComposer({ value, onDescription, onImages, onCount, onEngine, 
     </ul>}
     <textarea
       ref={text}
-      aria-label="需求描述"
+      id={descriptionId}
+      aria-label={label}
+      aria-describedby={hint ? hintId : undefined}
       maxLength={2000}
       rows={3}
       value={value.description}
@@ -105,7 +115,7 @@ export function AiComposer({ value, onDescription, onImages, onCount, onEngine, 
       </EditorTooltip>
       <input ref={file} type="file" accept={IMAGE_ACCEPT} multiple hidden aria-hidden="true" tabIndex={-1}
         onChange={(e) => { const files = fromList(e.target.files); e.target.value = ""; if (files.length) images.add(files); }} />
-      <span className="ai-composer-spacer" />
+      <div className="ai-composer-settings">
       <AiEnginePicker engine={value.engine} assistants={assistants.items} onChange={onEngine} onCreate={assistants.create} />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -117,11 +127,13 @@ export function AiComposer({ value, onDescription, onImages, onCount, onEngine, 
           </DropdownMenuRadioGroup>
         </DropdownMenuContent>
       </DropdownMenu>
+      </div>
       <EditorTooltip label={reason || sendLabel} shortcut={reason ? undefined : "Enter"} side="top" disabled={!!reason}>
-        <button type="button" className="ai-composer-send" aria-label={sendLabel} disabled={!!reason} onClick={send}><ArrowUp size={15} /></button>
+        <button type="button" className="ai-composer-send" aria-label={sendLabel} disabled={!!reason} onClick={send}><ArrowUp size={15} /><span>{sendLabel}</span></button>
       </EditorTooltip>
     </div>
     {blind && <p className="ai-composer-notice" role="status">{model!.name} 不读取参考图，生成时只参考文字描述；需要参考图请换成可读图的模型。</p>}
     <ImagePreview src={preview?.src ?? null} alt={preview?.alt ?? ""} onClose={() => setPreview(null)} />
+    </div>
   </div>;
 }
