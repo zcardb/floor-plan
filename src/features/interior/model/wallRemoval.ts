@@ -2,6 +2,7 @@ import { rebuildRooms } from './geometry';
 import { dropOpenRooms } from './roomEnclosure';
 import { dropOrphanFurniture } from './roomFurniture';
 import { mergeRoomsAcrossWall } from './roomMerge';
+import { stripStrayHoles } from './roomHoles';
 import { canDeleteWall } from './wallPolicy';
 import type { Design } from './types';
 
@@ -10,6 +11,7 @@ import type { Design } from './types';
  * 墙两侧都有房间时，把两侧房间与这面墙的墙带并成一间（名称等属性取面积较大的那一间）；
  * 空白户型的房间按外框重算，删掉隔墙本来就连成一体。
  * 删墙后不再被墙围住的房间连同里面的家具一起删除；一间房都不剩时拒绝删除。
+ * 并房用求差拼轮廓，可能留下被删墙的一小截墙带（房间轮廓里的碎洞），最后统一清掉。
  * 承重墙需先取消承重标记。
  */
 export function removeWall(design: Design, wallId: string): Design {
@@ -25,7 +27,7 @@ export function removeWall(design: Design, wallId: string): Design {
   const merged = mergeRoomsAcrossWall(after, design, wall);
   const kept = dropOpenRooms(merged, design);
   if (!kept.rooms.length) throw new Error('删除后将没有房间，无法删除这面墙');
-  return dropOrphanFurniture(design, kept);
+  return stripStrayHoles(dropOrphanFurniture(design, kept));
 }
 
 /** 旧版「标记拆除」已移除：加载时直接删掉被标记的墙及墙上门窗。 */

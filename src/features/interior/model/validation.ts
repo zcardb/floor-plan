@@ -1,5 +1,6 @@
 import { isFloorKey, validCustomFloor } from "./floorMaterials";
 import { purgeDemolished } from './wallRemoval';
+import { stripStrayHoleRooms } from './roomHoles';
 import { validFurnitureType, validFurnitureOutline } from './furnitureAppearance';
 import { referenceDesign } from "../data/templates";
 import { length } from "./geometry";
@@ -274,7 +275,11 @@ export function validateDesign(value: unknown): Design {
   }
   return structuredClone({
     ...v,
-    rooms: v.rooms.map((r) => normalizeRoomSurfaces(v, r)),
+    // 房间轮廓里的墙垛碎洞（并房/切房残留的墙带）在加载时一并清掉。
+    rooms: stripStrayHoleRooms(
+      v.rooms.map((r) => normalizeRoomSurfaces(v, r)),
+      v.thickness,
+    ),
     furniture: v.furniture.map(normalizeFurniture),
   });
 }

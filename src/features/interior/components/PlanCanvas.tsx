@@ -12,6 +12,7 @@ import { canResizeWall, isBearingWall, isOnBearingWall, BEARING_WALL_WARNING } f
 import { syncRooms } from '../model/roomFollow';
 import { splitAtJunctions } from '../model/wallAutoSplit';
 import { followWallFurniture } from '../model/furnitureFollow';
+import { moveWallWithJoints } from '../model/wallMove';
 import {
   area,
   center,
@@ -608,8 +609,10 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           if (dr.kind === "wallmove") {
             const dx = Math.round((p[0] - dr.start[0]) / 10) * 10,
               dy = Math.round((p[1] - dr.start[1]) / 10) * 10;
-            wall.a = [wall.a[0] + dx, wall.a[1] + dy];
-            wall.b = [wall.b[0] + dx, wall.b[1] + dy];
+            // 墙端连着其他墙时沿连接墙滑动，贴墙家具沿法向跟着走。
+            const moved = moveWallWithJoints(dr.before, wall.id, [dx, dy]);
+            if (moved) preview(followWallFurniture(dr.before, moved));
+            return;
           } else if (dr.kind === "endpoint") {
             const key = dr.room as "a" | "b",
               other = key === "a" ? wall.b : wall.a,

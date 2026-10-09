@@ -3,6 +3,7 @@ import { rebuildRooms, ringArea } from './geometry';
 import { connectedWallPoly } from './wallConnections';
 import { dropOpenRooms } from './roomEnclosure';
 import { dropOrphanFurniture } from './roomFurniture';
+import { stripStrayHoles } from './roomHoles';
 import { uid, type Design, type Point, type Room, type Wall } from './types';
 
 /** 房间环贴合墙面的容差（mm）。 */
@@ -154,6 +155,7 @@ function freeName(base: string, taken: Set<string>) {
 /**
  * 非空白户型新增一面墙后，只切开与墙相交的房间；其余房间原样保留。
  * 面积最大的一块继承原房间全部属性，其余块作为新房间追加（同材质，名称加序号）。
+ * 切出来的轮廓可能带回墙带碎洞，最后统一清掉。
  */
 export function splitRoomsWithWall(d: Design, wallId: string): Design {
   const wall = d.walls.find(w => w.id === wallId);
@@ -174,7 +176,7 @@ export function splitRoomsWithWall(d: Design, wallId: string): Design {
       added.push({ id: uid(), name, rings, mat: room.mat, wallMat: room.wallMat, counted: room.counted });
     }
   }
-  return added.length ? { ...d, rooms: [...kept, ...added] } : d;
+  return added.length ? stripStrayHoles({ ...d, rooms: [...kept, ...added] }) : d;
 }
 
 /**

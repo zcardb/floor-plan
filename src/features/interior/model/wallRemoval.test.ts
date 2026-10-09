@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { blankDesign, referenceDesign } from '../data/templates';
-import { area, rebuildRooms, resizeBlank, ringArea, wallPoly } from './geometry';
+import { area, rebuildRooms, rect, resizeBlank, ringArea, wallPoly } from './geometry';
 import { validateDesign } from './validation';
 import { isBearingWall, setWallBearing } from './wallPolicy';
 import { purgeDemolished, removeWall } from './wallRemoval';
-import type { Design, Wall } from './types';
+import type { Design, Point, Wall } from './types';
 
 const drawn: Wall = { id: 'inner', kind: 'partition', a: [3000, 0], b: [3000, 6000], thickness: 200 };
 const blank = () => rebuildRooms({ ...blankDesign(), walls: [...blankDesign().walls, drawn] });
@@ -70,6 +70,23 @@ describe('删除当前墙', () => {
     const between = removeWall(reference, 'w34');
     expect(between.rooms.some(r => r.id === 'gbath')).toBe(false);
     expect(between.rooms.find(r => r.id === 'dining')!.name).toBe('餐厅');
+  });
+  it('删墙后清掉房间轮廓里残留的墙带碎洞（不再跟着并出来的房间走）', () => {
+    const partition: Wall = { id: 'inner', kind: 'partition', a: [2500, 0], b: [2500, 6000], thickness: 200 };
+    const hole: Point[] = [[1000, 1000], [1000, 1350], [1120, 1350], [1120, 1000]];
+    const before: Design = {
+      ...blankDesign(),
+      template: 'reference',
+      walls: [...blankDesign().walls, partition],
+      rooms: [
+        { id: 'small', name: '小间', mat: 'wood', rings: [rect(0, 0, 2400, 6000), hole] },
+        { id: 'big', name: '大间', mat: 'wood', rings: [rect(2600, 0, 3400, 6000)] },
+      ],
+    };
+    const next = removeWall(before, partition.id);
+    expect(next.rooms.length).toBeGreaterThan(0);
+    expect(next.rooms.every(r => r.rings.length === 1)).toBe(true);
+    expect(validateDesign(JSON.parse(JSON.stringify(next)))).toEqual(next);
   });
   it('承重墙（原始或手动标记）拒绝删除，取消标记后可删；不存在与最后一面墙拒绝', () => {
     const reference = referenceDesign(), original = reference.walls.find(w => w.kind === 'bearing')!;

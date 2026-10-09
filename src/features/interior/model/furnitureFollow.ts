@@ -38,14 +38,17 @@ export function followWallFurniture(before: Design, after: Design): Design {
   for (const old of before.walls) {
     const now = after.walls.find(w => w.id === old.id);
     if (!now) continue;
+    const L = length(old), L2 = length(now);
+    if (L < 1 || L2 < 1) continue;
+    const u: Point = [(old.b[0] - old.a[0]) / L, (old.b[1] - old.a[1]) / L];
+    const u2: Point = [(now.b[0] - now.a[0]) / L2, (now.b[1] - now.a[1]) / L2];
+    // 只认整体平移（方向不变，两端法向位移相同）；端点沿连接墙滑动造成的长度变化不影响。
+    if (Math.abs(u[0] * u2[1] - u[1] * u2[0]) > 1e-6 || dot(u, u2) < 0) continue;
+    const n: Point = [-u[1], u[0]];
     const da: Point = [now.a[0] - old.a[0], now.a[1] - old.a[1]];
     const db: Point = [now.b[0] - old.b[0], now.b[1] - old.b[1]];
-    if (Math.hypot(da[0] - db[0], da[1] - db[1]) > 0.01) continue;
-    const L = length(old);
-    if (L < 1) continue;
-    const n: Point = [-(old.b[1] - old.a[1]) / L, (old.b[0] - old.a[0]) / L];
     const k = dot(da, n);
-    if (Math.abs(k) < 0.01) continue;
+    if (Math.abs(k - dot(db, n)) > 0.01 || Math.abs(k) < 0.01) continue;
     shifts.push({ wall: old, delta: [n[0] * k, n[1] * k] });
   }
   if (!shifts.length) return after;
