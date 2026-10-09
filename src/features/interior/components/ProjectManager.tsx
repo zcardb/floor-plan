@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { ManagementLoading } from './ManagementLoading';
 import { LoadError } from './LoadError';
-import { Plus, LayoutTemplate, RefreshCw, Loader2, ChevronDown, FilePlus2, FileUp } from 'lucide-react';
+import { Plus, LayoutTemplate, RefreshCw, Loader2, ChevronDown, FilePlus2, FileUp, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EditorTooltip } from '@/components/ui/editor-tooltip';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,10 @@ import { ProjectRowActions } from './ProjectRowActions';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { notify } from '@/lib/notify';
 import { createProject, TEMPLATE_PRESETS, presetById } from '../data/templates';
-import { BuiltinTemplates } from './BuiltinTemplates';
+import { BuiltinTemplateCard } from './BuiltinTemplates';
+import { CmsFilterBar } from './CmsFilterBar';
+import { ProjectPagination } from './ProjectPagination';
+import { filterProjects, paginate, PROJECT_SCOPES, type ProjectScope } from '../model/projectFilter';
 import { IMPORT_ACCEPT } from '../model/designImport';
 import { DxfImportDialog } from './DxfImportDialog';
 import { useProjectImport } from './useProjectImport';
@@ -22,14 +25,31 @@ import { SoftwareSoonItem } from './SoftwareSoonItem';
 import type { useProjects, ProjectSummary } from '../cloud/useProjects';
 
 type Projects = ReturnType<typeof useProjects>;
+const PAGE_SIZE = 12;
+const SCOPE_TITLE: Record<ProjectScope, string> = { all: '全部项目', builtin: '内置模板', mine: '我的项目' };
 
 export function ProjectManager({ projects, opened }: { projects: Projects; opened: () => void }) {
   const [creating, setCreating] = useState(false), [name, setName] = useState(''), [template, setTemplate] = useState<string>('blank');
   const [rename, setRename] = useState<ProjectSummary | null>(null), [deleting, setDeleting] = useState<ProjectSummary | null>(null);
+  const [scope, setScopeState] = useState<ProjectScope>('all'), [query, setQueryState] = useState(''), [page, setPage] = useState(1);
+  const setScope = (next: ProjectScope) => { setScopeState(next); setPage(1); };
+  const setQuery = (next: string) => { setQueryState(next); setPage(1); };
+  const resetFilter = () => { setScopeState('all'); setQueryState(''); setPage(1); };
   const list: ProjectSummary[] = [
     ...projects.guests.map(g => ({ id: g.id, name: g.name, updatedAt: g.updatedAt, revision: g.revision, cloud: false, system: g.system === true })),
     ...projects.cloud,
-  ].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  ];
+  const entries = filterProjects(TEMPLATE_PRESETS, list, scope, query);
+  const paged = paginate(entries, page, PAGE_SIZE);
+  // 云端还有未加载的项目时，数量只代表已加载部分，用「N+」提示。
+  const more = projects.hasMore && scope !== 'builtin';
+  const counts: Record<ProjectScope, string> = {
+    all: TEMPLATE_PRESETS.length + list.length + (projects.hasMore ? '+' : ''),
+    builtin: String(TEMPLATE_PRESETS.length),
+    mine: list.length + (projects.hasMore ? '+' : ''),
+  };
+  const searching = query.trim() !== '';
+  const filtered = searching || scope !== 'all';
 
   // 卡片级操作共用一把锁：同一时间只处理一个项目，避免打开/复制/删除互相打架。
   const rowAction = useAsyncAction(

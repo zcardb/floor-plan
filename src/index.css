@@ -2983,6 +2983,16 @@ button.room-cost-row:hover {
   gap: 5px;
 }
 .price-entry .price-control { flex:1; min-width:0; width:100px; }
+.price-sync-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  color: hsl(var(--foreground));
+  font-size: 12px;
+  cursor: pointer;
+}
+.price-sync-option input { accent-color: hsl(var(--primary)); width: 14px; height: 14px; }
 .price-entry small {
   flex-basis: 100%;
   color: hsl(var(--destructive));

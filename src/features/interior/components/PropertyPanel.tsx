@@ -23,6 +23,7 @@ import {
   setPrice,
 } from "../model/costs";
 import { PriceInput } from "./PriceInput";
+import { FurniturePriceField } from "./FurniturePriceField";
 import { selectionCost } from "../model/costBreakdown";
 import { yuan } from "../model/money";
 import { editSelection } from "../model/selectionEdits";
@@ -267,26 +268,7 @@ export function PropertyPanel({
               />
             </label>
           </div>
-          {showCosts && <div className="furniture-price-field">
-            <h3 className="section-title">
-              家具单价 <small>元 / 件 · 同款联动</small>
-            </h3>
-            <PriceInput
-              key={
-                furnitureKey(f) + priceOf(d, "furniturePrices", furnitureKey(f))
-              }
-              value={priceOf(d, "furniturePrices", furnitureKey(f))}
-              label={f.name + "单价"}
-              onApply={(v) =>
-                change((d) =>
-                  setPrice(d, "furniturePrices", furnitureKey(f), v),
-                )
-              }
-            />
-            <p className="footnote">
-              修改仅影响当前项目的同款家具，自动计入软装总成本。
-            </p>
-          </div>}
+          {showCosts && <FurniturePriceField key={f.id} design={design} furniture={f} change={change} />}
           <div className="property-actions">
             <EditorTooltip label="复制">
               <Button size="sm" variant="outline" onClick={duplicate}>
