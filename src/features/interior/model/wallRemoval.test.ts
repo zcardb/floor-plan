@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { blankDesign, referenceDesign } from '../data/templates';
-import { rebuildRooms, resizeBlank } from './geometry';
+import { area, rebuildRooms, resizeBlank, ringArea, wallPoly } from './geometry';
 import { validateDesign } from './validation';
-import { setWallBearing } from './wallPolicy';
+import { isBearingWall, setWallBearing } from './wallPolicy';
 import { purgeDemolished, removeWall } from './wallRemoval';
 import type { Design, Wall } from './types';
 
@@ -32,8 +32,44 @@ describe('删除当前墙', () => {
       const w = reference.walls.find(w => w.kind === kind)!, next = removeWall(reference, w.id);
       expect(next.walls.some(x => x.id === w.id)).toBe(false);
       expect(next.openings.some(o => o.wallId === w.id)).toBe(false);
-      expect(next.rooms).toBe(reference.rooms);
+      expect(validateDesign(JSON.parse(JSON.stringify(next)))).toEqual(next);
     }
+  });
+  it('删外围墙：挨着的房间原样保留，不会因为区域开敞被删除', () => {
+    const reference = referenceDesign();
+    for (const w of reference.walls.filter(w => w.kind === 'exterior' && !w.id.startsWith('opening-wall-')))
+      expect(removeWall(reference, w.id).rooms).toBe(reference.rooms);
+    const d = removeWall(blank(), 'outer-0');
+    expect(d.rooms).toHaveLength(2);
+  });
+  it('参考户型逐面删墙：两侧房间连同墙带并成一间，其余房间与顺序不变', () => {
+    const reference = referenceDesign();
+    const order = reference.rooms.map(r => r.id);
+    let merges = 0;
+    for (const w of reference.walls.filter(w => !isBearingWall(w))) {
+      const next = removeWall(reference, w.id);
+      expect(validateDesign(JSON.parse(JSON.stringify(next)))).toEqual(next);
+      const ids = next.rooms.map(r => r.id);
+      expect(ids).toEqual(order.filter(id => ids.includes(id)));
+      const gone = reference.rooms.filter(r => !ids.includes(r.id));
+      const changed = next.rooms.filter(r => r.rings !== reference.rooms.find(o => o.id === r.id)!.rings);
+      if (!gone.length && !changed.length) continue;
+      merges++;
+      expect(changed).toHaveLength(1);
+      const kept = changed[0]!, original = reference.rooms.find(r => r.id === kept.id)!;
+      expect(next.rooms.find(r => r.id === kept.id)).toMatchObject({ name: original.name, mat: original.mat });
+      // 合并后的面积 = 参与合并的房间 + 墙带（含两侧各 50 mm 的误差容差），不会凭空多出或少掉
+      const parts = area(original) + gone.reduce((s, r) => s + area(r), 0);
+      const band = ringArea(wallPoly({ ...w, thickness: w.thickness + 100 })) / 1e6;
+      expect(area(kept)).toBeGreaterThan(parts - 0.01);
+      expect(area(kept)).toBeLessThan(parts + band + 0.01);
+      expect(gone.every(r => area(r) <= area(original))).toBe(true);
+    }
+    expect(merges).toBeGreaterThan(5);
+    // 客卫浴 / 餐厅之间的隔墙：餐厅面积更大，保留餐厅
+    const between = removeWall(reference, 'w34');
+    expect(between.rooms.some(r => r.id === 'gbath')).toBe(false);
+    expect(between.rooms.find(r => r.id === 'dining')!.name).toBe('餐厅');
   });
   it('承重墙（原始或手动标记）拒绝删除，取消标记后可删；不存在与最后一面墙拒绝', () => {
     const reference = referenceDesign(), original = reference.walls.find(w => w.kind === 'bearing')!;

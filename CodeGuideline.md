@@ -39,6 +39,8 @@ project-root/
   - `util.ts` holds pure helpers parsed from the manifest: `fallbackLng`, `supportedLngs`, `languageOptions`, `normalizeLanguage`, `getLanguageDirection`, plus types.
   - Components use the official `useTranslation()` from `react-i18next` directly; there is no project-specific `useT` wrapper.
 - **src/features/**: Feature modules. `interior/` UI must follow `src/features/interior/UI_GUIDELINES.md` (font scale, control heights, toolbar and icon sizes, plus the interaction and UX-psychology rules in sections 5–7: no fake progress, always keep an exit path, one primary action per view).
+  - `interior/model/routes.ts`: page-level route paths, path builders and the pure `resolveView()` (URL + login state → current page).
+  - `interior/components/useStudioRoute.ts`: two-way sync between the URL and studio state (URL → open project, UI → navigate) plus the single leave guard (`useBlocker`).
 - **src/lib/**: Utility functions and libraries that are not React components or hooks.
 - **src/pages/**: All route-level pages.  
   - *Each page should have its own subdirectory if it contains more than a single file or has related logic/components.*
@@ -94,6 +96,18 @@ Whenever a new module (such as a component, hook, or utility) or a new page is a
 - **Locale content lives in `public/locales/{code}.json`** as flat dotted-key JSON; the `fallbackLng` file owns the canonical key set.
 - **Runtime code reads the manifest only through `src/i18n/util.ts`.** Adding or removing a language means editing `i18n.config.json` plus the matching `public/locales/{code}.json`; nothing in `src/i18n/` needs to change.
 - **Translations are read with the official `useTranslation()` from `react-i18next`.** No custom hook, no cast at call sites.
+
+## Routing Rules (mandatory)
+
+Every page-level view must be reflected in the URL, in both directions.
+
+- **Any new page, or any page-level view switch (sidebar item, detail page, standalone flow page), must get its own route.** Add the path to `src/features/interior/model/routes.ts` and register it in `src/router.tsx` with a semantic `name`.
+- **Never use `useState` to decide "which page am I on".** The URL is the single source of truth: derive the page from it (`resolveView`) and change pages with `navigate`, never by setting component state.
+- **Two-way means:** UI actions update the URL; refresh, pasted links and browser back/forward restore the same page (and the same project for detail pages).
+- **Studio pages share one `<Index />` instance** (child routes under `/`), so session, autosave and the open project survive route changes. Do not give them separate page components.
+- **Leave guards go through the single `useBlocker` in `useStudioRoute.ts`**, so browser back and in-app links behave the same.
+- **Each new route states where a logged-out visitor goes**, and gets a `resolveView` case in `model/routes.test.ts`.
+- In-page UI state (list filters, 2D/3D view, panel tabs) stays out of the URL unless explicitly requested.
 
 ## Coding Best Practices
 

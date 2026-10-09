@@ -58,7 +58,8 @@ describe('新建家具默认分类', () => {
   it.each(['卧室', '全部', '墙面'])('账号父组件将 %s 归一化后传给新建弹窗', category => {
     const projects = { session: { user: { id: 'owner', email: 'test@example.com' } } } as ReturnType<typeof useProjects>;
     const costs = { settings: {}, saving: false } as ReturnType<typeof useAccountCosts>;
-    const page = () => render(() => AccountCMS({ projects, costs, opened: () => {} }));
+    let tab = 'projects';
+    const page = () => render(() => AccountCMS({ projects, costs, opened: () => {}, tab, onTab: next => { tab = next; } }));
     const menu = nodes(page()).find(node => node.type === 'button' && Array.isArray(node.props.children) && node.props.children.includes('家具管理'));
     (menu!.props.onClick as () => void)();
     const library = nodes(page()).find(node => node.type === AccountFurnitureLibrary)!;
@@ -113,14 +114,15 @@ describe('新建家具默认分类', () => {
   it('账号页导航只保留项目管理与家具管理', () => {
     const projects = { session: { user: { id: 'owner', email: 'test@example.com' } } } as ReturnType<typeof useProjects>;
     const costs = { settings: {}, saving: false } as ReturnType<typeof useAccountCosts>;
-    const labels = nodes(render(() => AccountCMS({ projects, costs, opened: () => {} }))).filter(node => node.type === 'button' && Array.isArray(node.props.children)).flatMap(node => (node.props.children as unknown[]).filter(child => typeof child === 'string'));
+    const labels = nodes(render(() => AccountCMS({ projects, costs, opened: () => {}, tab: 'projects', onTab: () => {} }))).filter(node => node.type === 'button' && Array.isArray(node.props.children)).flatMap(node => (node.props.children as unknown[]).filter(child => typeof child === 'string'));
     expect(labels).toContain('项目管理'); expect(labels).toContain('家具管理'); expect(labels).not.toContain('成本管理');
   });
   it('账号页新建家具或地面后自动刷新对应列表', () => {
     harness.loadFloors.mockReset(); harness.loadCatalog.mockReset(); harness.loadWalls.mockReset(); harness.loadOpenings.mockReset();
     const projects = { session: { user: { id: 'owner', email: 'test@example.com' } } } as ReturnType<typeof useProjects>;
     const costs = { settings: {}, saving: false } as ReturnType<typeof useAccountCosts>;
-    const page = () => render(() => AccountCMS({ projects, costs, opened: () => {} }));
+    let tab = 'projects';
+    const page = () => render(() => AccountCMS({ projects, costs, opened: () => {}, tab, onTab: next => { tab = next; } }));
     const menu = nodes(page()).find(node => node.type === 'button' && Array.isArray(node.props.children) && node.props.children.includes('家具管理'));
     (menu!.props.onClick as () => void)();
     const library = nodes(page()).find(node => node.type === AccountFurnitureLibrary)!;

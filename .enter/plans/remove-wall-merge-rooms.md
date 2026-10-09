@@ -67,21 +67,28 @@
 
 ## Implementation checklist
 
-- [ ] 新增 `roomMerge.ts`：`mergeRoomsAcrossWall` + 两侧探测（比例 × 距离，按 id 去重）
-- [ ] 空白户型短路：返回传入的同一个 design 对象
-- [ ] 一侧没有房间 → 返回原对象；两侧同一间 → 并集补缺口；≥2 间 → 并成一间并取较大者属性与位置
-- [ ] 并集安全阀：单一多边形 + 每环 ≥3 点，否则原样返回
-- [ ] `wallRemoval.ts`：接入 `mergeRoomsAcrossWall`，移除 `dropOpenRooms` 调用与 import，更新注释
-- [ ] 新增 `roomMerge.test.ts` 的 4 条用例
-- [ ] 更新 `wallRemoval.test.ts`：外墙保留房间 + 参考户型逐面删墙性质用例
+- [x] 新增 `roomMerge.ts`：`mergeRoomsAcrossWall` + 两侧探测（实际改为沿墙每 200 mm × 3 个法向距离，按 id 去重，见实施备注）
+- [x] 空白户型短路：返回传入的同一个 design 对象
+- [x] 一侧没有房间 → 返回原对象；两侧同一间 → 并集补缺口；≥2 间 → 并成一间并取较大者属性与位置
+- [x] 并集安全阀：单一多边形 + 每环 ≥3 点，否则原样返回
+- [x] `wallRemoval.ts`：接入 `mergeRoomsAcrossWall`，移除 `dropOpenRooms` 调用与 import，更新注释
+- [x] 新增 `roomMerge.test.ts` 的 4 条用例
+- [x] 更新 `wallRemoval.test.ts`：外墙保留房间 + 参考户型逐面删墙性质用例
 
 ## Verification checklist
 
-- [ ] `pnpm exec vitest run src/features/interior/model/roomMerge.test.ts src/features/interior/model/wallRemoval.test.ts` 全绿（`wallRemoval.test.ts` 此前两条既有红灯因规则 4 恢复）
-- [ ] `pnpm exec vitest run src/features/interior` 全量：除另一个会话的 `dimensionWallEdit` 红灯外无新增失败
-- [ ] 正向：参考户型删「客卫浴 / 餐厅」之间的隔墙（`w34`）→ 房间数 -1、「餐厅」保留且面积 ≈ 原两间 + 墙带；删 `w26`（下一侧埋在别的墙带里）→ 房间原样
-- [ ] 负向/边界：空白户型删自绘隔墙仍是 1 间；删外围墙（空白 `outer-0`、参考 `w2`）房间原样保留且 `validateDesign` 通过；承重墙 / 最后一面墙的既有报错文案不变
-- [ ] 反跑校验：临时放宽安全阀（多块也接受）后新用例应失败，确认用例不是空跑（改回后不留在仓库）
-- [ ] 真实数据回归（项目「一层后」的 state）：分别删 `left-0`（左外墙）与 `bottom-end`（下外墙）——改动前统计被连带删掉的房间数（预期整片洗澡间 / 院子 / 堂屋），改动后断言房间原样保留、`validateDesign` 通过；再用截图那三个洗澡间核对「删墙后它们还在，且面积 / 名称不变」（临时脚本按计划删除，不留在仓库）
-- [ ] `pnpm lint` 无新增 error；`pnpm run build` 通过
+- [x] `pnpm exec vitest run src/features/interior/model/roomMerge.test.ts src/features/interior/model/wallRemoval.test.ts` 全绿（`wallRemoval.test.ts` 此前两条既有红灯因规则 4 恢复）
+- [x] `pnpm exec vitest run src/features/interior` 全量：除另一个会话的 `dimensionWallEdit` 红灯外无新增失败
+- [x] 正向：参考户型删「客卫浴 / 餐厅」之间的隔墙（`w34`）→ 房间数 -1、「餐厅」保留且面积 ≈ 原两间 + 墙带；删 `w26`（下一侧埋在别的墙带里）→ 房间原样
+- [x] 负向/边界：空白户型删自绘隔墙仍是 1 间；删外围墙（空白 `outer-0`、参考 `w2`）房间原样保留且 `validateDesign` 通过；承重墙 / 最后一面墙的既有报错文案不变
+- [x] 反跑校验：临时让 `mergeRoomsAcrossWall` 直接返回原设计（等于关掉合并）后，3 条合并用例 + 参考户型逐面删墙用例共 4 条失败，确认用例不是空跑（已改回，未留在仓库）
+- [x] 真实数据回归（项目「一层后」的 state）：分别删 `left-0`（左外墙）与 `bottom-end`（下外墙）——改动前统计被连带删掉的房间数（预期整片洗澡间 / 院子 / 堂屋），改动后断言房间原样保留、`validateDesign` 通过；再用截图那三个洗澡间核对「删墙后它们还在，且面积 / 名称不变」（临时脚本按计划删除，不留在仓库）
+- [x] `pnpm lint` 无新增 error；`pnpm run build` 通过
 - [ ] 未验证（需人工点击）：2D 编辑界面里删两间之间的隔墙 → 并成一间、无缝隙、可撤销；删外围墙 → 房间还在。截图工具无法代替点击操作，只能靠模型层用例覆盖
+
+## 实施备注
+
+- 签名为 `mergeRoomsAcrossWall(after, before, wall)`：墙带用删墙前的 `connectedWallPoly` 斜接轮廓；两侧各加宽 50 mm 容差（限制在参与房间的外接矩形内），再减去剩余墙体，避免并进墙里。真实数据里房间环与墙面常差约 10 mm，不加容差时 3 面墙无法合并。
+- 探测改为沿墙每 200 mm 采样（两端各让出一个墙厚），长墙一侧挨着多间房时都能探到（例：「一层后」x≈7380 的长隔墙，院子并入楼梯间 / 厨房 / 房间5）。
+- 真实数据回归：「一层后」删 `left-0` / `bottom-end`，旧逻辑各连带删掉 5 个房间（含截图 3 个洗澡间）；新逻辑 13 间全保留，洗澡间面积 2.04 / 1.23 / 1.10 不变。
+- 全量 `vitest src/features/interior`：644 通过，仅 `dimensionWallEdit` 一条既有红灯（另一个会话）；`wallRemoval.test.ts` 原来的红灯已恢复。lint 0 error；build 通过；tsc 仅剩 `wallFaces.ts:37` 既有错误。

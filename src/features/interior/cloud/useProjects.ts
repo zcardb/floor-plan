@@ -371,6 +371,14 @@ export function useProjects() {
     },
     [save],
   );
+  /** 只凭 id 打开项目（来自 URL）：内置模板、本机项目、云端项目依次判断。 */
+  const openById = useCallback(
+    (id: string) =>
+      open({ id, name: "", updatedAt: "", revision: 0, cloud: !guestsRef.current.some((r) => r.id === id) }),
+    [open],
+  );
+  /** 当前项目的即时值：异步操作刚完成、界面还没重新渲染时也能读到最新结果。 */
+  const current = useCallback(() => activeRef.current, []);
   const create = useCallback(
     async (p: Project, toCloud = false) => {
       if (!sessionRef.current) return false;
@@ -630,6 +638,8 @@ export function useProjects() {
     update,
     save,
     open,
+    openById,
+    current,
     create,
     remove,
     rename,
