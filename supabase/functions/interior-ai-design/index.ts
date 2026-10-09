@@ -47,10 +47,6 @@ interface Body {
   images: string[];
   catalog: Entry[];
   projectId?: string;
-  width?: number;
-  depth?: number;
-  /** 高级设计填写的约束（长宽、几室几厅几卫），并入提示词。 */
-  hints?: string[];
   room?: { roomId: string; name: string; area: number; zone: [number, number, number, number]; openings: unknown[] };
   plan?: unknown;
   existing?: { name: string; w: number; d: number }[];
@@ -75,10 +71,7 @@ function guard(raw: unknown): Body | string {
   if (b.projectId !== undefined && (typeof b.projectId !== 'string' || !UUID.test(b.projectId))) return '项目编号无效';
   if (b.model !== undefined && (typeof b.model !== 'string' || !MODELS[b.model])) return '不支持的模型';
   if (b.assistantId !== undefined && (typeof b.assistantId !== 'string' || !UUID.test(b.assistantId))) return '小助手编号无效';
-  if (b.mode === 'plan') {
-    if ((b.width !== undefined && !finite(b.width, 3000, 40000)) || (b.depth !== undefined && !finite(b.depth, 3000, 40000))) return '长、宽需在 3–40 m 之间';
-    if (b.hints !== undefined && (!Array.isArray(b.hints) || b.hints.length > 4 || !b.hints.every((h) => str(h, 200)))) return '高级设计参数无效';
-  } else {
+  if (b.mode === 'room') {
     const r = b.room;
     if (!r || !str(r.roomId, 100) || !str(r.name, 100) || !Array.isArray(r.zone) || r.zone.length !== 4 || !r.zone.every((n) => finite(n)) || !Array.isArray(r.openings)) return '房间信息无效';
     if (!b.plan || typeof b.plan !== 'object' || JSON.stringify(b.plan).length > 200_000) return '户型快照无效或过大';
@@ -118,6 +111,7 @@ const PLAN_CONTRACT = `你是资深住宅建筑师兼室内设计师，在给定
 
 坐标约定：单位 mm；原点在室内净轮廓左上角；x 向右，y 向下（下方为南，上方为北）。室内净尺寸为 width × depth。
 外墙由系统按长宽自动生成，名字固定为 top / right / bottom / left，不要输出外墙。
+长宽由你在顶层输出：用户需求里写明了长宽或面积时按该数值设计（width 对应「长」（x 方向），depth 对应「宽」（y 方向）），没写就按房间数量与面积定。
 
 输出格式：
 {
@@ -203,17 +197,12 @@ function roomPrompt(b: Body) {
   ].filter(Boolean).join(NL + NL);
 }
 
-/** 尺寸可选：没填的那一边由模型按需求决定，并在 JSON 顶层输出。 */
-function sizeLine(b: Body) {
-  if (b.width !== undefined && b.depth !== undefined) return `室内净尺寸：width=${Math.round(b.width)}，depth=${Math.round(b.depth)}（mm），已固定，不要输出 width / depth。`;
-  const fixed = [b.width !== undefined ? `width=${Math.round(b.width)} 已固定` : '', b.depth !== undefined ? `depth=${Math.round(b.depth)} 已固定` : ''].filter(Boolean).join('，');
-  return `室内净尺寸${fixed ? `部分固定（${fixed}）` : '未指定'}：请根据需求（房间数量、面积）确定合理的 width 与 depth（3000–40000 mm，取 100 的整数倍），并在 JSON 顶层输出 "width" 与 "depth"。`;
-}
+/** 长宽由描述里的需求决定（用户把长宽写在描述里），模型必须在 JSON 顶层输出。 */
+const SIZE_LINE = '室内净尺寸未固定：若用户需求里给出了长宽（如「长 12 m × 宽 10 m」）或面积，请严格按该数值换算成 mm 设计；否则按房间数量与面积确定合理尺寸。请在 JSON 顶层输出 "width" 与 "depth"（3000–40000 mm，取 100 的整数倍）。';
 
 function planPrompt(b: Body) {
   return [
-    sizeLine(b),
-    ...(b.hints ?? []).map((h) => `高级设计要求：${h}`),
+    SIZE_LINE,
     `家具目录（代号 名称 | 分类 | 类型 | 宽×深 mm）：${NL}${catalogText(b.catalog)}`,
     `用户需求：${b.description.trim()}`,
     b.images.length ? '附有参考图（可能是户型图或风格图），请参考其中的布局与风格意图。' : '',
@@ -298,7 +287,7 @@ const area = (ring: Ring) => Math.abs(ring.reduce((s, a, i) => { const c = ring[
 function validatePlan(value: unknown, b: Body): Issues {
   const found = issues(), errors = found.hard;
   const v = value as { width?: unknown; depth?: unknown; walls?: unknown; rooms?: unknown; openings?: unknown; furniture?: unknown };
-  const W = b.width ?? (finite(v?.width, 3000, 40000) ? v.width : NaN), D = b.depth ?? (finite(v?.depth, 3000, 40000) ? v.depth : NaN);
+  const W = finite(v?.width, 3000, 40000) ? v.width : NaN, D = finite(v?.depth, 3000, 40000) ? v.depth : NaN;
   if (!Number.isFinite(W) || !Number.isFinite(D)) return { hard: ['顶层必须输出 width 与 depth（3000–40000 的数字，单位 mm）'], soft: [] };
   const byCode = new Map(b.catalog.map((e) => [e.code, e]));
   const walls = new Map<string, { dir: string; at: number; from: number; to: number }>();

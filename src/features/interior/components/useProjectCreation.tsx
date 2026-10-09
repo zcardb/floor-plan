@@ -11,14 +11,16 @@ import { useProjectImport } from './useProjectImport';
 import type { CreateProjectActions } from './CreateProjectMenuItems';
 
 /**
- * 「新建项目」的全部方式（空白新建、AI 创建、导入图纸）共用一套弹窗与流程。
+ * 「新建项目」的全部方式（手动创建、复刻当前项目、AI 创建、导入图纸）共用一套弹窗与流程。
  * 项目管理页与工作台项目下拉都用它，保证两处入口的选项与行为一致。
  * `dialogs` 需渲染在下拉菜单之外，菜单收起后弹窗仍保留。
  */
-export function useProjectCreation({ create, opened, ai }: {
+export function useProjectCreation({ create, opened, ai, duplicate }: {
   create: (project: Project) => Promise<boolean>;
   opened: () => void;
   ai: boolean;
+  /** 复刻当前项目；项目管理页没有「当前项目」概念，故只有工作台传入。 */
+  duplicate?: () => void;
 }) {
   const [creating, setCreating] = useState(false), [aiCreating, setAiCreating] = useState(false);
   const submit = useAsyncAction(async ({ template, name, size, design }: NewProjectInput) => {
@@ -29,6 +31,7 @@ export function useProjectCreation({ create, opened, ai }: {
   const imports = useProjectImport({ create }, opened);
   const actions: CreateProjectActions = {
     blank: () => setCreating(true),
+    duplicate,
     ai: ai ? () => setAiCreating(true) : undefined,
     importFile: () => file.current?.click(),
   };

@@ -3798,8 +3798,17 @@ button.room-cost-row:hover {
 .project-menu { width:min(360px,calc(100vw - 24px)); }
 .project-menu-create { font-weight:600; color:hsl(var(--primary)); }
 .project-menu-create:focus,.project-menu-create[data-state="open"] { color:hsl(var(--primary)); }
+/* 菜单条目统一尺度：父级菜单、新建子菜单、导出、账号共用一套行高与 14px 图标，避免 24px 与 16px 混用 */
+.project-menu [role="menuitem"]:not(.project-menu-option),
+.create-menu [role="menuitem"],
+.export-menu [role="menuitem"],
+.account-menu [role="menuitem"] { min-height:32px; gap:8px; padding:0 10px; border-radius:6px; font-size:13px; }
+.project-menu [role="menuitem"]:not(.project-menu-option)>svg,
+.create-menu [role="menuitem"]>svg,
+.export-menu [role="menuitem"]>svg,
+.account-menu [role="menuitem"]>svg { width:14px; height:14px; flex:none; }
 .project-menu-list { max-height:min(360px,calc(var(--radix-dropdown-menu-content-available-height) - 60px)); overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }
-.project-menu-option { display:grid; grid-template-columns:minmax(0,1fr) auto 16px; gap:12px; min-height:40px; }
+.project-menu-option { display:grid; grid-template-columns:minmax(0,1fr) auto 16px; gap:12px; min-height:32px; }
 .project-menu-option[aria-current="true"] { font-weight:600; }
 .project-menu-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .project-menu-date { display:flex; align-items:center; font-size:11px; color:hsl(var(--muted-foreground)); font-variant-numeric:tabular-nums; }
@@ -3816,7 +3825,7 @@ button.room-cost-row:hover {
 .export-button:hover,.export-button[data-state="open"] { background:hsl(var(--primary) / 0.08); border-color:hsl(var(--primary)); color:hsl(var(--primary)); }
 .export-button .export-button-caret { width:14px; height:14px; opacity:.7; }
 .toolbar-right>.export-button { margin:0 4px; }
-.export-menu,.create-menu { min-width:184px; }
+.export-menu,.create-menu { min-width:200px; }
 .account-trigger { display:grid; place-items:center; flex:none; width:40px; height:40px; border-radius:50%; }
 .account-trigger .account-avatar { transition:box-shadow .2s ease; }
 .account-trigger:hover .account-avatar,.account-trigger[data-state="open"] .account-avatar { box-shadow:0 0 0 3px hsl(var(--secondary)),0 0 0 4px hsl(var(--border)); }
@@ -4072,19 +4081,6 @@ button.ai-candidate.is-failed:hover .ai-candidate-retry { border-color: hsl(var(
 .ai-size-editor-save { height: var(--ctl-sm); padding: 0 14px; border-radius: var(--ctl-radius-in); background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); font-size: var(--fs-control); }
 .ai-size-editor-save:hover:not(:disabled) { background: hsl(var(--primary) / 0.9); }
 .ai-size-editor-save:disabled { opacity: .45; cursor: not-allowed; }
-/* AI 创建：高级设计（默认收起，选填） */
-.ai-advanced { border: 1px solid hsl(var(--border)); border-radius: var(--ctl-radius); background: hsl(var(--card)); }
-.ai-advanced-toggle { display: flex; align-items: center; gap: 8px; width: 100%; min-height: var(--ctl-lg); padding: 0 12px; font-size: var(--fs-control); color: hsl(var(--foreground)); text-align: left; border-radius: inherit; }
-.ai-advanced-toggle > svg:first-child { color: hsl(var(--muted-foreground)); flex: none; }
-.ai-advanced-toggle > span { font-weight: 600; flex: none; }
-.ai-advanced-toggle > small { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
-.ai-advanced-toggle:hover { background: hsl(var(--accent) / 0.6); }
-.ai-advanced-toggle:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
-.ai-advanced-caret { flex: none; color: hsl(var(--muted-foreground)); transition: transform .2s ease; }
-.ai-advanced.is-open .ai-advanced-caret { transform: rotate(180deg); }
-.ai-advanced-body { display: grid; gap: 10px; padding: 4px 12px 12px; }
-.ai-advanced-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.ai-advanced-row.is-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 /* 参考图全屏预览：深色遮罩铺满，图片等比适配屏幕、无边框；右上角下载 / 关闭 */
 .image-lightbox-overlay { position: fixed; inset: 0; z-index: 80; background: hsl(var(--foreground) / 0.92); animation: lightbox-fade .18s ease-out; }
 .image-lightbox { position: fixed; inset: 0; z-index: 81; display: grid; place-items: center; padding: 72px 80px 56px; outline: none; animation: lightbox-fade .18s ease-out; }

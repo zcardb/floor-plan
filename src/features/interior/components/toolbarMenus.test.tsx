@@ -143,23 +143,32 @@ describe('ProjectMenu', () => {
     expect(menu({ onCreateProject }).tree.some(n => n.type === AiCreateProjectDialog)).toBe(true);
     expect(menu({ onCreateProject, loggedIn: false }).tree.some(n => n.type === DropdownMenuSubTrigger)).toBe(false);
   });
-  it('共享的新建选项：新建、AI 创建（可选）、导入 DXF、其他软件 Coming soon', () => {
+  it('共享的新建选项：手动创建、AI 创建（可选）、导入 DXF、其他软件 Coming soon', () => {
     const actions = { blank: vi.fn(), ai: vi.fn(), importFile: vi.fn() };
     const tree = nodes(CreateProjectMenuItems({ actions }));
     const labels = items(tree).map(n => text(n.props.children as ReactNode));
-    expect(labels).toEqual(['新建项目', 'AI 创建…', '导入 DXF 图纸…']);
+    expect(labels).toEqual(['手动创建', 'AI 创建…', '导入 DXF 图纸…']);
     expect(tree.some(n => n.type === SoftwareSoonItem && n.props.label === '从其他软件导入')).toBe(true);
     items(tree).forEach(n => (n.props.onSelect as () => void)());
     expect([actions.blank, actions.ai, actions.importFile].every(f => f.mock.calls.length === 1)).toBe(true);
     expect(items(nodes(CreateProjectMenuItems({ actions: { ...actions, ai: undefined } }))).map(n => text(n.props.children as ReactNode))).not.toContain('AI 创建…');
   });
-  it('复制当前项目：登录且可复制时显示，点击复制当前项目', () => {
+  it('复刻当前项目是子菜单里的第二项，只在可复刻时出现，点击复刻当前项目', () => {
+    const onCreateProject = vi.fn(async () => true);
+    const submenuActions = (overrides: Partial<Parameters<typeof ProjectMenu>[0]> = {}) => {
+      const { tree } = menu({ onCreateProject, ...overrides });
+      const shared = nodes(tree.find(n => n.type === DropdownMenuSubContent)!.props.children as ReactNode).find(n => n.type === CreateProjectMenuItems)!;
+      return shared.props.actions as CreateProjectActions;
+    };
     expect(items(menu().tree).some(n => text(n.props.children as ReactNode) === '复制当前项目')).toBe(false);
+    expect(submenuActions().duplicate).toBeUndefined();
+    const labels = items(nodes(CreateProjectMenuItems({ actions: submenuActions({ onDuplicate: vi.fn(async () => true) }) })))
+      .map(n => text(n.props.children as ReactNode));
+    expect(labels.slice(0, 2)).toEqual(['手动创建', '复刻当前项目']);
     const onDuplicate = vi.fn(async () => true);
-    const copy = items(menu({ onDuplicate }).tree).find(n => text(n.props.children as ReactNode) === '复制当前项目')!;
-    (copy.props.onSelect as () => void)();
+    const actions = submenuActions({ onDuplicate });
+    actions.duplicate!();
     expect(onDuplicate).toHaveBeenCalledWith(current);
-    expect(items(menu({ onDuplicate, loggedIn: false }).tree).some(n => text(n.props.children as ReactNode) === '复制当前项目')).toBe(false);
   });
 });
 

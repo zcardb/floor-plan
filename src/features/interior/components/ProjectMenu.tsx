@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Check, ChevronDown, Copy, Loader2, Plus } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, Loader2, Plus } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent,
   DropdownMenuSubTrigger, DropdownMenuTrigger,
@@ -52,7 +52,6 @@ export function ProjectMenu(p: Props) {
   const [pending, setPending] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<ProjectSummary | null>(null), [deleting, setDeleting] = useState<ProjectSummary | null>(null);
   const [menuOpen, setMenuOpen] = useState(false), [duplicating, setDuplicating] = useState(false);
-  const creation = useProjectCreation({ create: p.onCreateProject ?? (async () => false), opened: () => {}, ai: p.loggedIn });
   const opening = useRef(false);
   const open = async (row: ProjectSummary) => {
     if (opening.current || row.id === p.project.id) return;
@@ -65,6 +64,11 @@ export function ProjectMenu(p: Props) {
     setDuplicating(true);
     try { await p.onDuplicate(p.project); } finally { setDuplicating(false); }
   };
+  // 「复刻当前项目」与「手动创建 / AI 创建 / 导入图纸」并列在同一个「新建项目」子菜单里。
+  const creation = useProjectCreation({
+    create: p.onCreateProject ?? (async () => false), opened: () => {}, ai: p.loggedIn,
+    duplicate: p.onDuplicate && (() => void duplicate()),
+  });
   const busy = !!pending || duplicating || creation.importing || creation.submitting;
   const name = p.project.name;
   const rows = p.projectList;
@@ -80,12 +84,11 @@ export function ProjectMenu(p: Props) {
           <DropdownMenuItem disabled={busy} onSelect={p.onBack}><ArrowLeft />返回项目管理</DropdownMenuItem>
           {/* 与项目管理页的「新建项目」同一套选项：悬停展开，点击选项再创建。 */}
           {p.onCreateProject && <DropdownMenuSub>
-            <DropdownMenuSubTrigger className="project-menu-create" disabled={busy}><Plus size={16} />新建项目</DropdownMenuSubTrigger>
+            <DropdownMenuSubTrigger className="project-menu-create" disabled={busy}><Plus size={14} />新建项目</DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="create-menu" sideOffset={6}>
               <CreateProjectMenuItems actions={creation.actions} />
             </DropdownMenuSubContent>
           </DropdownMenuSub>}
-          {p.onDuplicate && <DropdownMenuItem disabled={busy} onSelect={() => void duplicate()}><Copy />复制当前项目</DropdownMenuItem>}
           <DropdownMenuSeparator />
         </>}
         <div className="project-menu-list" role="group" aria-label="项目列表">

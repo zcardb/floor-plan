@@ -29,7 +29,7 @@ const fromClipboard = (items: DataTransferItemList | null | undefined) =>
  * 底部左侧 ＋ 添加参考图，右侧「模型 / 小助手」选择、「数量」下拉（1–4）与发送按钮。
  * 支持粘贴（Ctrl / ⌘ + V）和拖入图片；Enter 发送，Shift + Enter 换行，输入法组字时不发送。
  */
-export function AiComposer({ value, onDescription, onImages, onCount, onEngine, onSend, placeholder, sendLabel = "生成", blocked }: {
+export function AiComposer({ value, onDescription, onImages, onCount, onEngine, onSend, placeholder, sendLabel = "生成" }: {
   value: AiComposerValue;
   onDescription: (text: string) => void;
   onImages: ImagesUpdate;
@@ -38,8 +38,6 @@ export function AiComposer({ value, onDescription, onImages, onCount, onEngine, 
   onSend: () => void;
   placeholder: string;
   sendLabel?: string;
-  /** 发送前还缺什么（例如长宽无效）；有值时禁用发送并作为提示。 */
-  blocked?: string;
 }) {
   const file = useRef<HTMLInputElement>(null), text = useRef<HTMLTextAreaElement>(null);
   const [dragging, setDragging] = useState(false), [preview, setPreview] = useState<{ src: string; alt: string } | null>(null);
@@ -51,7 +49,7 @@ export function AiComposer({ value, onDescription, onImages, onCount, onEngine, 
   const missingAssistant = value.engine.kind === "assistant" && !assistants.loading && !assistant;
   const model = modelOf(value.engine.kind === "model" ? value.engine.id : assistant?.model);
   const blind = value.images.length > 0 && !!model && !model.vision;
-  const reason = blocked || (missingAssistant ? "所选小助手已删除，请重新选择" : !value.description.trim() ? "请先描述需求" : uploading ? "参考图上传中" : "");
+  const reason = missingAssistant ? "所选小助手已删除，请重新选择" : !value.description.trim() ? "请先描述需求" : uploading ? "参考图上传中" : "";
   const send = () => { if (!reason) onSend(); };
   // 输入框随内容增高，超过上限后内部滚动。
   useLayoutEffect(() => {

@@ -46,13 +46,8 @@ export interface AiRoomRequest extends AiRequestBase {
   required: AiRequiredItem[];
 }
 
-export interface AiPlanRequest extends AiRequestBase {
-  /** 高级设计填写的长宽（mm）；不填由 AI 决定。 */
-  width?: number;
-  depth?: number;
-  /** 高级设计的文字约束（几室几厅几卫等）。 */
-  hints: string[];
-}
+/** 整户户型：长宽、几室几厅几卫都写在 description 里，尺寸由模型决定。 */
+export type AiPlanRequest = AiRequestBase;
 
 /** 只把中文说明展示给用户；英文原文（网络错误、上游报错）换成可操作的提示。 */
 export const friendlyError = (message: string | undefined, fallback = "生成失败，请重试") =>

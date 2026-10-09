@@ -117,22 +117,22 @@ const creation = useProjectCreation({
 
 ## Implementation checklist
 
-- [ ] `CreateProjectActions` 增加 `duplicate?: () => void`，`CreateProjectMenuItems` 第一项文案改为「手动创建」，并在其后渲染「复刻当前项目」（`CopyPlus`，条件渲染）。
-- [ ] 全文检索 `新建项目`，确认除子菜单项外的出现处（`ProjectManager` 触发器、`ProjectMenu` 子菜单触发器、`NewProjectDialog` 标题、注释）均保持原样，只有 `CreateProjectMenuItems` 的那一项改成「手动创建」。
-- [ ] `useProjectCreation` 接受可选 `duplicate` 并写入 `actions`。
-- [ ] `ProjectMenu` 移除一级「复制当前项目」项与 `Copy` 引入，改为把 `p.onDuplicate ? () => void duplicate() : undefined` 传给 hook，触发器 busy/`Loader2` 行为不变；子菜单触发器 `<Plus size={16} />` 改为 `size={14}`。
-- [ ] `ProjectManager` 不传 `duplicate`（该页无"当前项目"，卡片级「复制」已覆盖），确认其「新建项目」下拉仍渲染 3 项。
-- [ ] `index.css` 增加菜单尺度统一规则（父级 / 子菜单 / 导出 / 账号图标一律 14px、行高 32px），`.project-menu-option` 行高 40px→32px，`.create-menu`/`.export-menu` 最小宽度统一 200px。
-- [ ] `toolbarMenus.test.tsx` 中三个相关用例更新为新结构。
-- [ ] 不修改 `src/components/ui/dropdown-menu.tsx` 的默认条目样式，确认其他菜单（墙选项、画布比例、图层等）未被波及。
+- [x] `CreateProjectActions` 增加 `duplicate?: () => void`，`CreateProjectMenuItems` 第一项文案改为「手动创建」，并在其后渲染「复刻当前项目」（`CopyPlus`，条件渲染）。
+- [x] 全文检索 `新建项目`，确认除子菜单项外的出现处（`ProjectManager` 触发器、`ProjectMenu` 子菜单触发器、`NewProjectDialog` 标题、注释）均保持原样，只有 `CreateProjectMenuItems` 的那一项改成「手动创建」。
+- [x] `useProjectCreation` 接受可选 `duplicate` 并写入 `actions`。
+- [x] `ProjectMenu` 移除一级「复制当前项目」项与 `Copy` 引入，改为把 `p.onDuplicate ? () => void duplicate() : undefined` 传给 hook，触发器 busy/`Loader2` 行为不变；子菜单触发器 `<Plus size={16} />` 改为 `size={14}`。
+- [x] `ProjectManager` 不传 `duplicate`（该页无"当前项目"，卡片级「复制」已覆盖），确认其「新建项目」下拉仍渲染 3 项。
+- [x] `index.css` 增加菜单尺度统一规则（父级 / 子菜单 / 导出 / 账号图标一律 14px、行高 32px），`.project-menu-option` 行高 40px→32px，`.create-menu`/`.export-menu` 最小宽度统一 200px。
+- [x] `toolbarMenus.test.tsx` 中三个相关用例更新为新结构。
+- [x] 不修改 `src/components/ui/dropdown-menu.tsx` 的默认条目样式，确认其他菜单（墙选项、画布比例、图层等）未被波及。
 
 ## Verification checklist
 
-- [ ] `pnpm exec vitest run src/features/interior/components/toolbarMenus.test.tsx` 全绿。
-- [ ] `pnpm exec vitest run src/features/interior`（`pnpm test`）无回归。
-- [ ] `pnpm run check`（eslint + tsc）与 `pnpm run build` 通过。
-- [ ] 正向：登录后工作台「项目」下拉 → 一级只有「返回项目管理」「新建项目」；悬停「新建项目」出现子菜单，依次为「手动创建」「复刻当前项目」「AI 创建…」「导入 DXF 图纸…」「从其他软件导入」；点「手动创建」打开新建弹窗，点「复刻当前项目」生成「… · 副本」并进入副本（沿用 `Index.tsx` 的 `duplicateProject`，内置模板走「用模板创建」）。
-- [ ] 正向：项目管理页右上「新建项目」下拉的第一项同样显示「手动创建」（共享组件，两处文案一致）。
-- [ ] 负向/默认：未登录（访客）时下拉无「新建项目」子菜单、无复刻项，仅显示模板列表；`onDuplicate` 未传时子菜单不出现复刻项。
-- [ ] 边界：复制进行中触发器显示 `Loader2`，子菜单触发器 disabled，无法重复触发；子菜单内「从其他软件导入」仍为禁用 + Coming soon 提示，无子菜单展开。
-- [ ] 视觉：`website_screenshot` 取工作台路由 desktop_1280 与 mobile_390 各一张，确认父级与子菜单图标同为 14px（含「新建项目」触发器上的 `Plus`）、菜单项行高一致、窄屏（≤600px）无溢出。
+- [x] `pnpm exec vitest run src/features/interior/components/toolbarMenus.test.tsx` 全绿。
+- [x] `pnpm exec vitest run src/features/interior`（`pnpm test`）无回归。
+- [x] `pnpm run check`（eslint + tsc）与 `pnpm run build` 通过。
+- [x] 正向：登录后工作台「项目」下拉 → 一级只有「返回项目管理」「新建项目」；悬停「新建项目」出现子菜单，依次为「手动创建」「复刻当前项目」「AI 创建…」「导入 DXF 图纸…」「从其他软件导入」；点「手动创建」打开新建弹窗，点「复刻当前项目」生成「… · 副本」并进入副本（沿用 `Index.tsx` 的 `duplicateProject`，内置模板走「用模板创建」）。
+- [x] 正向：项目管理页右上「新建项目」下拉的第一项同样显示「手动创建」（共享组件，两处文案一致）。
+- [x] 负向/默认：未登录（访客）时下拉无「新建项目」子菜单、无复刻项，仅显示模板列表；`onDuplicate` 未传时子菜单不出现复刻项。
+- [x] 边界：复制进行中触发器显示 `Loader2`，子菜单触发器 disabled，无法重复触发；子菜单内「从其他软件导入」仍为禁用 + Coming soon 提示，无子菜单展开。
+- [x] 视觉：`website_screenshot` 取工作台路由 desktop_1280 与 mobile_390 各一张，确认父级与子菜单图标同为 14px（含「新建项目」触发器上的 `Plus`）、菜单项行高一致、窄屏（≤600px）无溢出。

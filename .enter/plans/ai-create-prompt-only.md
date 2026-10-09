@@ -57,23 +57,23 @@
 - `src/index.css`
 
 ## Implementation checklist
-- [ ] `AiCreateProjectDialog.tsx` 删除高级设计状态、UI 与 `planFields` / `parseMeterDraft` / 图标 import，文件内不再出现 `ai-advanced`、`hints`、`width`、`depth`
-- [ ] `PlanRequest` 只保留 `description` / `images`，`generatePlanCandidate` 与 `sanitizePlan` 调用同步收敛
-- [ ] 新增 `DEFAULT_PLAN_PROMPT` 常量并作为 `composer.description` 初值（含长宽、几室几厅几卫、风格），placeholder 用同一段文案，`DialogDescription` 补上「长宽写在描述里」的提示
-- [ ] `AiCreateProjectForm` 渲染结果不含 `高级设计` 与 `ai-advanced` 节点
-- [ ] `AiComposer` 移除 `blocked` 属性，`AiRoomDialog` 调用处不受影响（本来就没传）
-- [ ] `client.ts` 的 `AiPlanRequest` 删除 `width` / `depth` / `hints`
-- [ ] `sanitize.ts` 的 `sanitizePlan` 只按模型输出定尺寸，缺尺寸仍抛错
-- [ ] `planFields.ts` 删除，仓库内无残留引用
-- [ ] `index.css` 删除 `.ai-advanced*` 规则，`.ai-size-hint` / `.ai-note` 保留
-- [ ] 后端 `Body` / `guard` / `planPrompt` 去掉 `width` / `depth` / `hints`，`sizeLine` 指向「按描述里的长宽」，`validatePlan` 只认模型输出尺寸
-- [ ] 后端函数重新部署成功
-- [ ] `aiComponents.test.tsx` 与 `ai.test.ts` 按新行为更新
+- [x] `AiCreateProjectDialog.tsx` 删除高级设计状态、UI 与 `planFields` / `parseMeterDraft` / 图标 import，文件内不再出现 `ai-advanced`、`hints`、`width`、`depth`
+- [x] `PlanRequest` 只保留 `description` / `images`，`generatePlanCandidate` 与 `sanitizePlan` 调用同步收敛
+- [x] 新增 `DEFAULT_PLAN_PROMPT` 常量并作为 `composer.description` 初值（含长宽、几室几厅几卫、风格），placeholder 用同一段文案，`DialogDescription` 补上「长宽写在描述里」的提示
+- [x] `AiCreateProjectForm` 渲染结果不含 `高级设计` 与 `ai-advanced` 节点（SSR 断言）
+- [x] `AiComposer` 移除 `blocked` 属性，`AiRoomDialog` 调用处不受影响（本来就没传）
+- [x] `client.ts` 的 `AiPlanRequest` 删除 `width` / `depth` / `hints`
+- [x] `sanitize.ts` 的 `sanitizePlan` 只按模型输出定尺寸，缺尺寸仍抛错
+- [x] `planFields.ts` 删除，仓库内无残留引用（grep 无命中）
+- [x] `index.css` 删除 `.ai-advanced*` 规则，`.ai-size-hint` / `.ai-note` 保留
+- [x] 后端 `Body` / `guard` / `planPrompt` 去掉 `width` / `depth` / `hints`，`SIZE_LINE` 指向「按描述里的长宽」，`validatePlan` 只认模型输出尺寸
+- [x] 后端函数重新部署成功（未带 token 调用返回网关 401，函数为 ACTIVE）
+- [x] `aiComponents.test.tsx` 与 `ai.test.ts` 按新行为更新
 
 ## Verification checklist
-- [ ] `pnpm lint` 与 `pnpm exec tsc --noEmit` 无错误
-- [ ] `pnpm test`（vitest，`src/features/interior`）全绿，含更新后的弹窗断言与 `sanitizePlan` 尺寸用例
-- [ ] `pnpm run build` 通过
-- [ ] 预览里打开「新建项目 → AI 创建」：弹窗只剩项目名称 + 输入框，无「高级设计」折叠区，输入框里已带默认示例文案且可直接编辑、发送按钮可用；清空后 placeholder 显示同一段提示（desktop_1280 与 mobile_390 各看一次）
-- [ ] 直接用默认示例发一批方案，生成的户型长宽接近 12 × 10 m（模型输出，允许 100 mm 级偏差）；把描述删成「三室两厅两卫，原木风」（不写长宽）时仍能生成
-- [ ] 描述里写超范围尺寸（如「长 100 m」）不会崩：后端校验/前端夹取后仍出方案或给出可读中文错误
+- [x] `pnpm lint` 与 `pnpm exec tsc --noEmit` 无错误（lint 仅 3 条既有 warning）
+- [x] `pnpm test`（vitest，`src/features/interior`）全绿：79 文件 / 593 用例
+- [x] `pnpm run build` 通过
+- [ ] 人工确认（界面需点击才能打开弹窗，截图工具无法操作）：弹窗只剩项目名称 + 输入框，无「高级设计」，输入框已带默认示例且可编辑、发送可用，清空后 placeholder 显示同一段提示
+- [ ] 人工确认（需登录与 AI 额度）：用默认示例发一批方案，生成的户型长宽接近 12 × 10 m（模型输出，允许 100 mm 级偏差）；把描述改成「三室两厅两卫，原木风」（不写长宽）时仍能生成
+- [x] 描述里写超范围尺寸（如「长 100 m」）不会崩：`sanitizePlan` 把模型给的尺寸夹进 3000–40000 mm（单测覆盖 `width: 100000, depth: 1000` → `40000 × 3000`）
