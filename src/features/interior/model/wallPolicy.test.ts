@@ -36,7 +36,7 @@ describe('承重墙标记策略', () => {
   });
   it('参考户型（旧项目与新建项目）标记承重后，墙上的门窗仍可移动', () => {
     for (const base of [referenceDesign(), createProject('reference').state]) {
-      const o = base.openings.find(o => base.walls.find(w => w.id === o.wallId)!.kind === 'partition')!;
+      const o = base.openings.find(o => base.walls.find(w => w.id === o.wallId)!.kind !== 'bearing')!;
       const d = setWallBearing(base, o.wallId, true);
       expect(isOnBearingWall(d, o.wallId)).toBe(true);
       const next = editSelection(d, { kind: 'opening', id: o.id }, { width: o.width - 100 });

@@ -6,12 +6,9 @@ import { CmsPageHeader } from './CmsPageHeader';
 import { CmsSearchField } from './CmsSearchField';
 import { Button } from '@/components/ui/button';
 import { EditorTooltip } from '@/components/ui/editor-tooltip';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ProjectRenameDialog, ProjectDeleteDialog } from './ProjectDialogs';
+import { NewProjectDialog, type NewProjectInput } from './NewProjectDialog';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { notify } from '@/lib/notify';
 import { createProject, TEMPLATE_PRESETS } from '../data/templates';
@@ -34,7 +31,7 @@ type RowKind = 'open' | 'duplicate' | 'remove' | 'copyTemplate';
 const BUSY_LABEL: Record<RowKind, string> = { open: '正在打开…', duplicate: '正在复制…', remove: '正在删除…', copyTemplate: '正在复制…' };
 
 export function ProjectManager({ projects, opened }: { projects: Projects; opened: () => void }) {
-  const [creating, setCreating] = useState(false), [name, setName] = useState(''), [template, setTemplate] = useState<string>('blank');
+  const [creating, setCreating] = useState(false);
   const [rename, setRename] = useState<ProjectSummary | null>(null), [deleting, setDeleting] = useState<ProjectSummary | null>(null);
   const [scope, setScopeState] = useState<ProjectScope>('all'), [query, setQueryState] = useState(''), [page, setPage] = useState(1);
   const setScope = (next: ProjectScope) => { setScopeState(next); setPage(1); };
@@ -71,8 +68,8 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
     },
     (kind, row) => kind + ':' + row.id,
   );
-  const submit = useAsyncAction(async () => {
-    const project = createProject(template, name);
+  const submit = useAsyncAction(async ({ template, name, size }: NewProjectInput) => {
+    const project = createProject(template, name, size);
     if (await projects.create(project, true)) { setCreating(false); notify.success('已创建项目「' + project.name + '」'); opened(); }
   });
   const file = useRef<HTMLInputElement>(null);
@@ -98,7 +95,7 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="create-menu">
-            <DropdownMenuItem onSelect={() => { setName(''); setCreating(true); }}><FilePlus2 />新建项目</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setCreating(true)}><FilePlus2 />新建项目</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={pickFile}><FileUp />导入 DXF 图纸…</DropdownMenuItem>
             <SoftwareSoonItem label="从其他软件导入" />
@@ -145,18 +142,7 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
     })}</div>
     <ProjectPagination page={paged.page} pages={paged.pages} hasMore={more} loading={projects.loading} onPage={setPage} onLoadMore={projects.loadMore} />
 
-    <Dialog open={creating} onOpenChange={v => { if (!v && !submit.pending) setCreating(false); }}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>新建项目</DialogTitle><DialogDescription>项目内容与单独调价互不影响。</DialogDescription></DialogHeader>
-        <form className="cms-form" onSubmit={e => { e.preventDefault(); void submit.run(); }}>
-          <fieldset className="contents" disabled={submit.pending}>
-            <div className="cms-field"><Label htmlFor="project-name">项目名称</Label><Input id="project-name" required maxLength={100} value={name} onChange={e => setName(e.target.value)} /></div>
-            <div className="cms-field"><Label htmlFor="project-template">户型模板</Label><Select value={template} onValueChange={v => setTemplate(v as typeof template)} disabled={submit.pending}><SelectTrigger id="project-template"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="blank">空白户型</SelectItem>{TEMPLATE_PRESETS.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></div>
-          </fieldset>
-          <Button loading={submit.pending} disabled={!name.trim()}>{submit.pending ? '正在保存…' : '确认保存'}</Button>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <NewProjectDialog open={creating} pending={submit.pending} onClose={() => setCreating(false)} onSubmit={input => void submit.run(input)} />
 
     {imports.drawing && <DxfImportDialog source={imports.drawing.source} defaultName={imports.drawing.name} pending={imports.saving}
       onImport={imports.confirmDrawing} onClose={imports.closeDrawing} />}

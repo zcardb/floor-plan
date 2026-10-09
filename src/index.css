@@ -292,6 +292,16 @@
   /* 弹窗主操作不再拉满整行：右对齐定宽，和卡片、工具栏按钮同一尺度 */
   .cms-form>button { justify-self:end; min-width:132px; }
   .cms-field { display:grid; gap:6px; }
+  /* 新建项目：长宽并排，底部墙体预览 */
+  .new-project-dialog { width:min(560px, calc(100vw - 24px)); max-width:min(560px, calc(100vw - 24px)); max-height:calc(100dvh - 24px); overflow-y:auto; }
+  .new-project-size { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .new-project-preview { display:grid; gap:8px; margin:0; }
+  .new-project-preview figcaption { font-size:12px; color:hsl(var(--muted-foreground)); font-variant-numeric:tabular-nums; }
+  .new-project-preview figcaption.is-error { color:hsl(var(--destructive)); }
+  .wall-layout-preview { display:block; width:100%; aspect-ratio:16 / 10; max-height:260px; background:var(--plan-paper); border:1px solid hsl(var(--border)); border-radius:var(--radius); }
+  .wall-layout-preview.is-empty { display:grid; place-items:center; font-size:12px; color:hsl(var(--muted-foreground)); }
+  .wall-layout-preview-walls polygon { fill:var(--plan-ink); stroke:var(--plan-ink); stroke-width:0.5; vector-effect:non-scaling-stroke; }
+  .wall-layout-preview-dims text { fill:hsl(var(--muted-foreground)); font-variant-numeric:tabular-nums; }
   .cms-toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:14px; margin-bottom:24px; }
   .cms-search { display:flex; align-items:center; gap:9px; min-height:36px; padding:8px 14px; border:1px solid hsl(var(--input)); border-radius:999px; background:hsl(var(--card)); color:hsl(var(--muted-foreground)); min-width:240px; }
   .cms-search input { border:0; background:transparent; color:hsl(var(--foreground)); width:100%; font-size:12px; outline:none; }
