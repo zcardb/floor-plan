@@ -223,6 +223,53 @@ describe("AI 决定户型尺寸", () => {
   });
 });
 
+describe("不规则外轮廓（outline）", () => {
+  const catalog = buildAiCatalog();
+  const bed = codeOf(catalog, "双人床 1.5m");
+  // L 形：右上角缺 4000 × 3000；e2 是 x=8000 的竖墙，e5 是底边。
+  const outline = [[0, 0], [8000, 0], [8000, 3000], [12000, 3000], [12000, 10000], [0, 10000]];
+  const plan = {
+    width: 12000, depth: 10000, outline,
+    walls: [{ key: "a", dir: "h", at: 6000, from: 0, to: 12000 }],
+    rooms: [
+      { id: "bed", name: "主卧", box: [0, 0, 8000, 6000] },
+      { id: "living", name: "客厅", poly: [[0, 6000], [12000, 6000], [12000, 10000], [0, 10000]] },
+    ],
+    openings: [
+      { wall: "e5", kind: "door", at: 6000, width: 1000, into: "up" },
+      { wall: "e1", kind: "window", at: 4000, width: 1800 },
+      { wall: "e2", kind: "window", at: 1500, width: 1200 },
+      { wall: "top", kind: "window", at: 10000, width: 1200 },
+      { wall: "a", kind: "door", at: 3000, width: 900, into: "up" },
+    ],
+    furniture: [{ room: "bed", items: [{ code: bed, back: "up", along: 4000, gap: 0 }] }],
+  };
+  it("合法 outline 原样保留；门窗可以引用 e1…eN，矩形外墙名 top 不再可用", () => {
+    const spec = sanitizePlan(plan, { catalog });
+    expect(spec.outline).toEqual(outline);
+    expect(spec.openings.map((o) => `${o.wall}:${o.kind}`)).toEqual(["e5:door", "e1:window", "e2:window", "w-1:door"]);
+    expect(spec.openings.find((o) => o.wall === "e2")!.at).toBe(1500);
+  });
+  it("落地后外墙沿 L 形生成（6 段），不再是 width × depth 的矩形，且能通过校验", () => {
+    const design = planToDesign(sanitizePlan(plan, { catalog }), catalog);
+    expect(() => validateDesign(design)).not.toThrow();
+    const exterior = design.walls.filter((w) => w.kind === "exterior");
+    // 缺角处的两段外墙：x = 8000 + 120 的竖墙、y = 3000 - 120 的横墙。
+    expect(exterior.some((w) => w.a[0] === 8120 && w.b[0] === 8120)).toBe(true);
+    expect(exterior.some((w) => w.a[1] === 2880 && w.b[1] === 2880)).toBe(true);
+    // 缺角区域（右上 4000 × 3000）里没有外墙穿过：不存在 y = -120 且延伸到 x > 8240 的顶墙。
+    expect(exterior.some((w) => w.a[1] === -120 && w.b[1] === -120 && Math.max(w.a[0], w.b[0]) > 8240)).toBe(false);
+    expect(design.openings.filter((o) => o.kind === "window")).toHaveLength(2);
+  });
+  it("斜边、点数不足或边太短的 outline 被忽略，退回矩形外墙；引用 e1…eN 的门窗随之丢弃", () => {
+    for (const bad of [[[0, 0], [12000, 0], [12000, 10000]], [[0, 0], [12000, 0], [12000, 10000], [6000, 9000], [0, 10000]], [[0, 0], [12000, 0], [12000, 10000], [11900, 10000], [11900, 9900], [0, 9900]]]) {
+      const spec = sanitizePlan({ ...plan, outline: bad }, { catalog });
+      expect(spec.outline).toBeUndefined();
+      expect(spec.openings.map((o) => o.wall)).toEqual(["top", "w-1"]);
+    }
+  });
+});
+
 describe("指定家具不因放不下而丢件", () => {
   it("比房间还大的家具也保留（夹到分区内），指定件数仍然对得上", () => {
     const catalog = buildAiCatalog();
