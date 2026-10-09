@@ -1,37 +1,34 @@
-# 复制出来的项目里，门窗可以移动和修改
+# 门窗始终可以移动和修改（承重墙只提醒，不锁定）
 
 ## 背景
-复制出来的项目（不管是复制自己的项目，还是用模板新建）都会写入 `structureUnlocked: true`，墙体尺寸因此可以修改。但门窗的锁定判断 `openingIsLocked` 只看所在墙是不是承重墙，**完全没有考虑这个解锁标记**。参考户型里很多门窗都开在承重墙上，所以复制以后这些门窗还是拖不动、改不了尺寸、换不了款式，也删不掉。
-
-已确认的规则：在解锁的项目里，承重墙上的门窗也可以移动和修改，同时提示"承重墙改动仅用于方案示意"。
+现在的 `openingIsLocked` 只要门窗开在承重墙上就锁定，导致不管是复制自己的项目还是用模板新建，这些门窗都不能拖动、改尺寸、换款式或删除。
+已确认：**承重墙的判断保留，但只用来提醒；门窗在任何项目里都可以移动和修改。**（内置模板的只读预览是另一套机制，不受影响。）
 
 ## 方案
-只改一个地方：锁定判断函数。所有调用它的地方（画布拖动、拖动手柄、尺寸面板、款式选择、删除、可视工具条、`editSelection`）会自动跟着生效。
-
-`src/features/interior/model/wallPolicy.ts`
-```ts
-export const openingIsLocked = (design: Design, wallId: string) =>
-  !(design.structureUnlocked === true && design.template !== 'blank') &&
-  design.walls.some(w => w.id === wallId && isBearingWall(w));
-```
-- 解锁判断和 `canResizeWall` 保持一致：模板或复制的项目（非空白户型）且已解锁 → 放开。
-- 空白户型保持原有规则：用户自己标记为承重的墙，上面的门窗仍然锁定。
-- 旧项目（没有解锁标记）保持锁定；复制一份后就能编辑（沿用现有文案）。
-
-承重墙提醒（复用 `BEARING_WALL_WARNING`）：
-- `SizeFields.tsx`：选中开在承重墙上的门窗、且门窗未锁定时，显示和墙体一样的 `muted-note` 提醒。
-- `PlanCanvas.tsx`：拖动承重墙上的门窗（`openingmove`）提交后，和拖墙一样弹出 `notify.warning(BEARING_WALL_WARNING)`。
+1. **取消门窗锁定**：删除 `wallPolicy.ts` 里的 `openingIsLocked`，并去掉所有调用点的锁定分支：
+   - `model/selectionEdits.ts`：删掉 `throw '承重墙上的门窗洞口已锁定'`
+   - `components/PlanCanvas.tsx`：拖动门窗本体和拖动手柄时不再 `return`
+   - `components/SizeFields.tsx`：删掉"门窗洞口已锁定"的早退分支
+   - `components/PropertyPanel.tsx`：款式选择和删除按钮不再 `disabled`，删除按钮的提示恢复为普通文案
+   - `components/SelectionEditor.tsx`：可视工具条对门窗始终显示
+   - `components/Workbench.tsx`：删除门窗时不再拦截
+2. **保留承重墙提醒**（新增 `isOnBearingWall(design, opening)`，复用 `isBearingWall` 和 `BEARING_WALL_WARNING`）：
+   - `SizeFields.tsx`：选中开在承重墙上的门窗时，显示和墙体一样的 `muted-note` 提醒
+   - `PlanCanvas.tsx`：承重墙上的门窗拖动提交后，弹出 `notify.warning(BEARING_WALL_WARNING)`
+3. 现有校验全部保留：门窗不能超出墙段、不能和同墙其他门窗重叠、高度限制。
 
 ## 实施清单
-- [ ] `wallPolicy.ts`：`openingIsLocked` 在 `structureUnlocked && template !== 'blank'` 时返回 false
-- [ ] `SizeFields.tsx`：门窗在承重墙上且未锁定时显示 `BEARING_WALL_WARNING`
-- [ ] `PlanCanvas.tsx`：承重墙上的门窗拖动提交后弹出 `BEARING_WALL_WARNING`
-- [ ] `structureUnlock.test.tsx`：更新"门窗锁定"用例：解锁的参考项目中，承重墙上的门窗不再锁定并显示提醒；旧项目 / 空白户型中仍然锁定
-- [ ] `wallPolicy.test.ts`：新增 `openingIsLocked` 用例，覆盖解锁参考项目 / 未解锁参考项目 / 空白户型三种情况
+- [ ] `wallPolicy.ts`：删除 `openingIsLocked`，新增 `isOnBearingWall`
+- [ ] `selectionEdits.ts`：门窗编辑不再因承重墙抛错
+- [ ] `PlanCanvas.tsx`：门窗拖动 / 手柄不再被承重墙拦截；拖动后弹出承重提醒
+- [ ] `SizeFields.tsx`：去掉锁定文案，承重墙上的门窗显示提醒
+- [ ] `PropertyPanel.tsx`、`SelectionEditor.tsx`、`Workbench.tsx`：移除门窗锁定相关的 disabled 和拦截
+- [ ] 更新测试：`structureUnlock.test.tsx`、`wallPolicy.test.ts`、`wallSplit.test.ts` 中断言"门窗锁定"的用例改为断言"可编辑 + 显示提醒"
 
 ## 验证清单
-- [ ] 正向：在 `createProject('reference')` 中，用 `editSelection` 修改承重墙上门窗的 offset / width 成功
-- [ ] 默认：`referenceDesign()`（未解锁）修改同一个门窗时仍抛出"锁定"错误
-- [ ] 边界：空白户型（即使 `structureUnlocked`）中被标记为承重的墙上，门窗仍然锁定
-- [ ] 回归：现有的同墙重叠和超出墙段校验仍然生效
+- [ ] 正向：`referenceDesign()`（旧项目、未解锁）和 `createProject('reference')` 中，承重墙上门窗的 offset / width 都能通过 `editSelection` 修改
+- [ ] 正向：空白户型中被手动标记为承重的墙上，门窗也能修改
+- [ ] 提醒：选中承重墙上的门窗时，`SizeFields` 输出包含 `BEARING_WALL_WARNING`；非承重墙上的门窗不显示
+- [ ] 回归：超出墙段、同墙重叠仍然报错；墙体本身的锁定规则（`canResizeWall` / `canDemolishWall`）保持不变
+- [ ] 代码中 `grep openingIsLocked` 无结果
 - [ ] `pnpm vitest run src/features/interior` 通过；`pnpm run build` 通过
