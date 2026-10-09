@@ -10,6 +10,7 @@ import { uid, type Design, type Project } from "../model/types";
 import { purgeRecoveryCopies, readGuestDefault, readGuests, writeGuests, writeGuestDefault } from "./guestStore";
 import { TEMPLATE_PRESETS, presetById } from '../data/templates';
 import { builtinProject, isBuiltinId, isPresetId } from '../data/templatePresets';
+import { compactThumbnail, readThumbnail, type ThumbnailDesign } from '../model/planThumbnail';
 export type SaveStatusKind = "saved" | "saving" | "dirty" | "error" | "conflict";
 export interface SaveStatus {
   kind: SaveStatusKind;
@@ -50,6 +51,8 @@ export interface ProjectSummary {
   system?: boolean;
   builtin?: boolean;
   templateId?: string;
+  /** 云端项目最近一次保存时留下的瘦身平面图；缺失时卡片显示占位。 */
+  thumbnail?: ThumbnailDesign | null;
 }
 export function useProjects() {
   const confirm = useConfirm();
@@ -91,6 +94,19 @@ export function useProjects() {
     setStatus(STATUS.local);
     return true;
   }, []);
+  /** 缺缩略图的云端项目（旧版本客户端写入的）：用已保存的方案补算一份，只写缩略图列，不改修改时间。 */
+  const backfillThumbnails = useCallback(async (rows: ProjectSummary[]) => {
+    for (const row of rows.slice(0, 6)) {
+      const generation = epoch.current;
+      const { data } = await attempt(supabase.from("interior_design_projects").select("state").eq("id", row.id).maybeSingle());
+      if (!data || generation !== epoch.current) continue;
+      let thumbnail;
+      try { thumbnail = compactThumbnail(data.state as unknown as Design); } catch { continue; }
+      const { error } = await attempt(supabase.from("interior_design_projects").update({ thumbnail: thumbnail as unknown as Json }).eq("id", row.id));
+      if (error || generation !== epoch.current) continue;
+      setCloud((c) => c.map((r) => (r.id === row.id ? { ...r, thumbnail } : r)));
+    }
+  }, []);
   const loadList = useCallback(
     async (more = false) => {
       if (!sessionRef.current) return;
@@ -102,7 +118,7 @@ export function useProjects() {
       try {
         result = await supabase
           .from("interior_design_projects")
-          .select("id,name,updated_at,revision")
+          .select("id,name,updated_at,revision,thumbnail")
           .order("updated_at", { ascending: false })
           .range(start, start + 19);
       } catch (cause) {
@@ -125,12 +141,14 @@ export function useProjects() {
         name: r.name,
         updatedAt: r.updated_at || "",
         revision: r.revision,
+        thumbnail: readThumbnail(r.thumbnail),
         cloud: true,
       }));
       setCloud((c) => (more ? [...c, ...list] : list));
       setHasMore(data.length === 20);
+      void backfillThumbnails(list.filter((r) => !r.thumbnail));
     },
-    [cloud.length],
+    [cloud.length, backfillThumbnails],
   );
   const loadListRef = useRef(loadList);
   loadListRef.current = loadList;
@@ -203,11 +221,13 @@ export function useProjects() {
       version = editVersion.current;
     setStatus(STATUS.saving);
     const work = (async () => {
+      const thumbnail = compactThumbnail(p.state);
       const { data, error } = await attempt(supabase
         .from("interior_design_projects")
         .update({
           name: p.name,
           state: p.state as unknown as Json,
+          thumbnail: thumbnail as unknown as Json,
           revision: p.revision + 1,
           updated_at: new Date().toISOString(),
         })
@@ -240,6 +260,7 @@ export function useProjects() {
                 name: next.name,
                 revision: next.revision,
                 updatedAt: next.updatedAt,
+                thumbnail,
               }
             : r,
         ),
@@ -370,6 +391,7 @@ export function useProjects() {
           notify.fail("请先登录");
           return false;
         }
+        const thumbnail = compactThumbnail(next.state);
         const { error } = await attempt(supabase
           .from("interior_design_projects")
           .insert({
@@ -377,6 +399,7 @@ export function useProjects() {
             name: next.name,
             state: next.state as unknown as Json,
             schema_version: 2,
+            thumbnail: thumbnail as unknown as Json,
           }));
         if (generation !== epoch.current) return false;
         if (error) {
@@ -389,6 +412,7 @@ export function useProjects() {
             name: next.name,
             revision: 0,
             updatedAt: next.updatedAt,
+            thumbnail,
             cloud: true,
           },
           ...c,
@@ -415,6 +439,7 @@ export function useProjects() {
       cloud: true,
       system: false,
     };
+    const thumbnail = compactThumbnail(next.state);
     const { error } = await attempt(supabase
       .from("interior_design_projects")
       .insert({
@@ -422,6 +447,7 @@ export function useProjects() {
         name: next.name,
         state: next.state as unknown as Json,
         schema_version: 2,
+        thumbnail: thumbnail as unknown as Json,
       }));
     if (error) {
       notify.error("保存到云端失败", error);
@@ -433,6 +459,7 @@ export function useProjects() {
         name: next.name,
         revision: 0,
         updatedAt: next.updatedAt,
+        thumbnail,
         cloud: true,
       },
       ...c,

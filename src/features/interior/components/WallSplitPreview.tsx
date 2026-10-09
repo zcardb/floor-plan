@@ -4,11 +4,13 @@ import { connectedWallPoly, wallSectionPolygons } from '../model/wallConnections
 import { formatMeters } from '../model/lengthUnits';
 import { displayOffset } from '../model/wallSplitDraft';
 import type { Design, Point } from '../model/types';
+import type { WallContact } from '../model/wallContacts';
 
-interface Props { design: Design; wallId: string; intervals: number[]; selected: number; reversed?: boolean }
+interface Props { design: Design; wallId: string; intervals: number[]; selected: number; reversed?: boolean; contacts?: WallContact[] }
 const pointsText = (points: Point[]) => points.map(p => p.join(',')).join(' ');
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
-export function WallSplitPreview({ design, wallId, intervals, selected, reversed = false }: Props) {
+export function WallSplitPreview({ design, wallId, intervals, selected, reversed = false, contacts = [] }: Props) {
   // Geometry is stable while typing; do not recompute wall connections for each draft keystroke.
   const geometry = useMemo(() => {
     const wall = design.walls.find(w => w.id === wallId)!;
@@ -31,6 +33,9 @@ export function WallSplitPreview({ design, wallId, intervals, selected, reversed
   const at = (offset: number): Point => map([wall.a[0] + forward[0] * offset, wall.a[1] + forward[1] * offset]);
   const A = map(start), B = map(reversed ? wall.a : wall.b);
   const count = Math.max(intervals.length - 1, 0);
+  const sorted = intervals.slice(1, -1)
+    .map(offset => ({ offset, shown: displayOffset(L, offset, reversed) }))
+    .sort((a, b) => a.shown - b.shown);
   const selectedPolygons = intervals.length > selected + 1 && selected >= 0
     ? wallSectionPolygons(wall, polygon, intervals[selected], intervals[selected + 1]) : [];
   const arrowAt = at(L / 2);
@@ -38,20 +43,29 @@ export function WallSplitPreview({ design, wallId, intervals, selected, reversed
   const arrowEnd: Point = [arrowStart[0] + direction[0] * 28, arrowStart[1] + direction[1] * 28];
   const arrowLeft: Point = [arrowEnd[0] - direction[0] * 7 - direction[1] * 4, arrowEnd[1] - direction[1] * 7 + direction[0] * 4];
   const arrowRight: Point = [arrowEnd[0] - direction[0] * 7 + direction[1] * 4, arrowEnd[1] - direction[1] * 7 - direction[0] * 4];
-  const slots = count === 3 ? [180] : [95, 265];
-  const cuts = intervals.slice(1, -1)
-    .map(offset => ({ offset, shown: displayOffset(L, offset, reversed) }))
-    .sort((a, b) => a.shown - b.shown)
-    .map((cut, i) => ({ ...cut, number: i + 1, x: slots[i] ?? 180 }));
+  const slots = sorted.length === 1 ? [180] : [95, 265];
+  // Two full labels sit left/right by where their cut is drawn, so leader lines never cross.
+  const leftFirst = sorted.length === 2 && at(sorted[0].offset)[0] > at(sorted[1].offset)[0] + 0.5;
+  // One or two cuts keep the full distance label; junction splits with more cuts use short
+  // "点 N" tags above each cut, staggered on two rows so neighbours never overlap.
+  const compact = sorted.length > 2;
+  const labels = sorted.map((cut, i) => compact
+    ? { ...cut, width: 40, x: clamp(at(cut.offset)[0], 22, 338), y: i % 2 ? 60 : 28, text: `点 ${i + 1}` }
+    : { ...cut, width: 144, x: slots[leftFirst ? 1 - i : i] ?? 180, y: 28, text: `点 ${i + 1} · 距 A ${formatMeters(cut.shown)} m` });
   return <svg className="wall-split-map" viewBox="0 0 360 250" role="img" aria-label={`局部户型示意：A为量距起点（${reversed ? '已交换' : '默认'}），B为终点，距离从A量取`}>
     <title>局部户型 · A 起点 → B 终点</title>
     <g className="wall-split-map-rooms">{geometry.rooms.flatMap(r => r.rings.map((ring, i) => <polygon key={`${r.id}:${i}`} points={pointsText(ring.map(map))} />))}</g>
     <g className="wall-split-map-context">{geometry.neighbors.map(w => <polygon key={w.id} points={pointsText(w.points.map(map))} />)}</g>
     <polygon className="wall-split-map-wall" points={pointsText(polygon.map(map))} />
     {selectedPolygons.map((p, i) => <polygon key={i} className="wall-split-map-result" data-segment={selected + 1} points={pointsText(p.map(map))} />)}
+    <g className="wall-split-map-contacts">{contacts.map((contact, i) => {
+      const p = at(contact.offset);
+      return <circle key={`${contact.offset}:${i}`} className={contact.blocked ? 'wall-split-map-contact is-blocked' : 'wall-split-map-contact'} data-contact={i + 1} cx={p[0]} cy={p[1]} r={4} />;
+    })}</g>
     <g className="wall-split-map-direction"><line x1={arrowStart[0]} y1={arrowStart[1]} x2={arrowEnd[0]} y2={arrowEnd[1]} /><polyline points={pointsText([arrowLeft, arrowEnd, arrowRight])} /></g>
     {([['A', A, -1], ['B', B, 1]] as const).map(([name, p, sign]) => {
-      const label: Point = [Math.max(45, Math.min(315, p[0] + direction[0] * sign * 48)), Math.max(76, Math.min(224, p[1] + direction[1] * sign * 42 + 20))];
+      // Endpoint tags stay clear of the cut tags (top rows end at y≈44) without covering the wall end.
+      const label: Point = [Math.max(45, Math.min(315, p[0] + direction[0] * sign * 48)), Math.max(62, Math.min(224, p[1] + direction[1] * sign * 42 + (direction[1] * sign < 0 ? -4 : 20)))];
       return <g key={name} className="wall-split-map-endpoint" data-endpoint={name}>
         <line x1={p[0]} y1={p[1]} x2={label[0]} y2={label[1]} />
         <circle cx={p[0]} cy={p[1]} r={5} />
@@ -59,11 +73,11 @@ export function WallSplitPreview({ design, wallId, intervals, selected, reversed
         <text x={label[0]} y={label[1]}>{name} {name === 'A' ? '起点' : '终点'}</text>
       </g>;
     })}
-    {cuts.map(cut => <g key={cut.number} className="wall-split-map-cut" data-cut={cut.number}>
-      <line x1={at(cut.offset)[0]} y1={at(cut.offset)[1]} x2={cut.x} y2={44} />
-      <circle cx={at(cut.offset)[0]} cy={at(cut.offset)[1]} r={4} />
-      <rect x={cut.x - 72} y={12} width={144} height={32} rx={7} />
-      <text x={cut.x} y={28}>点 {cut.number} · 距 A {formatMeters(cut.shown)} m</text>
+    {labels.map((label, i) => <g key={i} className={compact ? 'wall-split-map-cut is-compact' : 'wall-split-map-cut'} data-cut={i + 1}>
+      <line x1={at(label.offset)[0]} y1={at(label.offset)[1]} x2={label.x} y2={label.y} />
+      <circle cx={at(label.offset)[0]} cy={at(label.offset)[1]} r={4} />
+      <rect x={label.x - label.width / 2} y={label.y - 16} width={label.width} height={32} rx={7} />
+      <text x={label.x} y={label.y}>{label.text}</text>
     </g>)}
   </svg>;
 }

@@ -10,11 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ProjectRenameDialog, ProjectDeleteDialog } from './ProjectDialogs';
-import { ProjectRowActions } from './ProjectRowActions';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { notify } from '@/lib/notify';
 import { createProject, TEMPLATE_PRESETS } from '../data/templates';
-import { BuiltinTemplateCard } from './BuiltinTemplates';
+import { ProjectCard } from './ProjectCard';
+import { PlanThumbnail, PresetThumbnail } from './PlanThumbnail';
+import { mineCardActions, templateCardActions } from './projectCardActions';
 import { CmsFilterBar } from './CmsFilterBar';
 import { ProjectPagination } from './ProjectPagination';
 import { filterProjects, paginate, PROJECT_SCOPES, type ProjectScope } from '../model/projectFilter';
@@ -27,6 +28,8 @@ import type { useProjects, ProjectSummary } from '../cloud/useProjects';
 type Projects = ReturnType<typeof useProjects>;
 const PAGE_SIZE = 12;
 const SCOPE_TITLE: Record<ProjectScope, string> = { all: '全部项目', builtin: '内置模板', mine: '我的项目' };
+type RowKind = 'open' | 'duplicate' | 'remove' | 'copyTemplate';
+const BUSY_LABEL: Record<RowKind, string> = { open: '正在打开…', duplicate: '正在复制…', remove: '正在删除…', copyTemplate: '正在复制…' };
 
 export function ProjectManager({ projects, opened }: { projects: Projects; opened: () => void }) {
   const [creating, setCreating] = useState(false), [name, setName] = useState(''), [template, setTemplate] = useState<string>('blank');
@@ -53,9 +56,15 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
 
   // 卡片级操作共用一把锁：同一时间只处理一个项目，避免打开/复制/删除互相打架。
   const rowAction = useAsyncAction(
-    async (kind: 'open' | 'duplicate' | 'remove', row: ProjectSummary) => {
+    async (kind: RowKind, row: ProjectSummary) => {
       if (kind === 'open') { if (await projects.open(row)) opened(); return; }
       if (kind === 'duplicate') { if (await projects.duplicate(row)) opened(); return; }
+      if (kind === 'copyTemplate') {
+        // 「用模板新建」即复制：直接生成一份可编辑的云端副本并打开，和复制我的项目同一流程。
+        const name = row.name + ' · 副本';
+        if (await projects.create(createProject(row.templateId, name), true)) { notify.success('已复制为「' + name + '」'); opened(); }
+        return;
+      }
       return projects.remove(row);
     },
     (kind, row) => kind + ':' + row.id,
@@ -68,8 +77,11 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
   const imports = useProjectImport(projects, opened);
   const pickFile = () => file.current?.click();
   const createBusy = rowAction.pending || imports.reading || imports.saving;
-  const busyRow = rowAction.pendingKey?.split(':')[1] ?? null;
-  const isPending = (kind: string, row: ProjectSummary) => rowAction.pendingKey === kind + ':' + row.id;
+  const busyLabel = (row: ProjectSummary) => {
+    const [kind, id] = rowAction.pendingKey?.split(/:(.*)/) ?? [];
+    return id === row.id ? BUSY_LABEL[kind as RowKind] : undefined;
+  };
+  const guestStates = new Map(projects.guests.map(g => [g.id, g.state]));
   const refreshing = projects.loading && !rowAction.pending;
 
   return <>
@@ -119,24 +131,17 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
     {searching && !entries.length && !projects.loading && <div className="cms-empty"><Search size={30} /><h2>没有匹配的项目</h2><p>{more ? '已加载的项目中没有匹配项，可翻到下一页加载更多，或换个关键词。' : '换个分类，或清空搜索再试。'}</p><Button variant="outline" onClick={resetFilter}>清空筛选</Button></div>}
     <div className="cms-project-grid">{paged.items.map(entry => {
       if (entry.kind === 'builtin') {
-        const id = entry.preset.id;
-        return <BuiltinTemplateCard key={entry.key} preset={entry.preset} pending={createBusy || submit.pending}
-          onPreview={() => { const row = projects.builtins.find(r => r.templateId === id); if (row) void rowAction.run('open', row); }}
-          onCreate={() => { setTemplate(id); setName(entry.preset.name); setCreating(true); }} />;
+        const row = projects.builtins.find(r => r.templateId === entry.preset.id);
+        if (!row) return null;
+        return <ProjectCard key={entry.key} title={entry.preset.name} badge="内置" thumbnail={<PresetThumbnail preset={entry.preset} />}
+          busyLabel={busyLabel(row)} locked={createBusy || submit.pending} openLabel="预览模板" onOpen={() => void rowAction.run('open', row)}
+          actions={templateCardActions(() => void rowAction.run('copyTemplate', row))} />;
       }
-      const row = entry.row, working = busyRow === row.id;
-      return <article className={'cms-card' + (working ? ' is-busy' : '')} key={entry.key} aria-busy={working}>
-        <EditorTooltip label={row.name} disabled={rowAction.pending}>
-          <button type="button" className="cms-card-open" aria-label={'打开项目 ' + row.name} disabled={rowAction.pending} onClick={() => void rowAction.run('open', row)} />
-        </EditorTooltip>
-        {working ? <Loader2 className="animate-spin" size={30} /> : <LayoutTemplate size={30} />}
-        <h2>{row.name}</h2>
-        <p>{isPending('remove', row) ? '正在删除…' : isPending('duplicate', row) ? '正在复制…' : new Date(row.updatedAt).toLocaleDateString('zh-CN')}</p>
-        <div className="cms-card-actions">
-          <ProjectRowActions row={row} disabled={rowAction.pending} onRename={() => setRename(row)} onDelete={() => setDeleting(row)}
-            onDuplicate={() => void rowAction.run('duplicate', row)} duplicating={isPending('duplicate', row)} />
-        </div>
-      </article>;
+      const row = entry.row, design = guestStates.get(row.id) ?? row.thumbnail;
+      const thumbnail = design ? <PlanThumbnail design={design} label={row.name + ' 平面缩略图'} /> : null;
+      return <ProjectCard key={entry.key} title={row.name} badge={row.cloud ? undefined : '本机'} thumbnail={thumbnail}
+        busyLabel={busyLabel(row)} locked={rowAction.pending} openLabel="打开项目" onOpen={() => void rowAction.run('open', row)}
+        actions={mineCardActions(row, { rename: () => setRename(row), duplicate: () => void rowAction.run('duplicate', row), remove: () => setDeleting(row) })} />;
     })}</div>
     <ProjectPagination page={paged.page} pages={paged.pages} hasMore={more} loading={projects.loading} onPage={setPage} onLoadMore={projects.loadMore} />
 

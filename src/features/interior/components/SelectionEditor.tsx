@@ -1,6 +1,5 @@
 import {
   forwardRef,
-  useContext,
   useEffect,
   useImperativeHandle,
   useRef,
@@ -26,7 +25,6 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import { applyRoomFloor, floorMaterialOf, pickableFloors } from "../model/floorMaterials";
-import { FURNITURE_COLORS } from "../data/palette";
 import { WallOptionsMenu } from './WallOptionsMenu';
 import { canEditWall, canResizeWall, openingIsLocked, wallKindName } from '../model/wallPolicy';
 import { length } from "../model/geometry";
@@ -43,6 +41,7 @@ import { yuan } from "../model/money";
 import type { CustomFloor, CustomOpening, CustomWall, Design, Selection } from "../model/types";
 import { applyRoomWall, openingName, openingPriceKey, pickableWalls } from "../model/hardMaterials";
 import { PriceField } from "./PriceField";
+import { ColorSwatches } from "./ColorSwatches";
 import { useCostDesign } from './CostDefaultsContext';
 import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
 import { EditorSelect } from './EditorSelect';
@@ -83,7 +82,6 @@ interface Props {
   /** 删除墙体（与属性面板的「删除隔墙」共用同一实现）。 */
   removeWall?: (wallId: string) => void;
 }
-const colors = FURNITURE_COLORS;
 export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
   function SelectionEditor(p, ref) {
     const costDesign = useCostDesign(p.design);
@@ -158,8 +156,8 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
     const resizableWall = w && canResizeWall(p.design, w);
     const fields = f
       ? [
-          ["w", "宽 / m", f.w],
-          ["d", f.type === 'stairs' ? "长 / m" : "深 / m", f.d],
+          ["w", "宽度 / m", f.w],
+          ["d", f.type === 'stairs' ? "长度 / m" : "深度 / m", f.d],
           ["cx", "中心 X / m", f.cx],
           ["cy", "中心 Y / m", f.cy],
           ["rot", "旋转 / °", f.rot],
@@ -304,26 +302,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         {w && <WallOptionsMenu design={p.design} wall={w} change={p.change} splitWall={p.splitWall} mergeWall={p.mergeWall} removeWall={p.removeWall} />}
         {(f || w) && (
           <EditorTooltip label="常用颜色">
-            <div className="visual-colors" role="group" aria-label="常用颜色">
-              {colors.map((c) => (
-                <button
-                  key={c}
-                  className={(f?.color || w?.color) === c ? "selected" : ""}
-                  style={{ background: c }}
-                  aria-label={"设置颜色 " + c}
-                  onClick={() => paint(c)}
-                />
-              ))}
-              <label className="visual-custom-color">
-                <Palette size={15} />
-                <input
-                  aria-label="自定义颜色"
-                  type="color"
-                  value={f?.color || w?.color || "#eee9de"}
-                  onChange={(e) => paint(e.target.value)}
-                />
-              </label>
-            </div>
+            <ColorSwatches value={f?.color || w?.color || ""} onPick={paint} />
           </EditorTooltip>
         )}
         {r && (

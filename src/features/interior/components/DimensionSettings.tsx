@@ -15,7 +15,7 @@ export function DimensionSettings({ design, change }: { design: Design; change: 
     <div className="property-form">
       {(['top', 'bottom', 'left', 'right'] as const).map((key, i) => <label className="property-field" key={key}>
         {['上侧距离 / m', '下侧距离 / m', '左侧距离 / m', '右侧距离 / m'][i]}
-        <Input className="editor-control" aria-label={['上侧距离 / m', '下侧距离 / m', '左侧距离 / m', '右侧距离 / m'][i]}
+        <Input className="editor-control" aria-label={['上侧距离 / m', '下侧距离 / m', '左侧距离 / m', '右侧距离 / m'][i]} disabled={!settings.visible}
           key={settings[key]} type="number" defaultValue={meterDraft(settings[key])} min={0} max={10} step={0.01}
           onBlur={e => {
             if (e.currentTarget.value === meterDraft(settings[key])) return;
@@ -30,6 +30,6 @@ export function DimensionSettings({ design, change }: { design: Design; change: 
           }} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
       </label>)}
     </div>
-    <p className="muted-note">距离从墙体外缘计算。标注数字根据墙体自动生成，不能手动覆盖。</p>
+    <p className="muted-note">{settings.visible ? '距离从墙体外缘计算。标注数字根据墙体自动生成，不能手动覆盖。' : '开启「显示尺寸标注」后可调整标注距离。'}</p>
   </section>;
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import polygonClipping from 'polygon-clipping';
 import { blankDesign, referenceDesign } from '../data/templates';
 import { area, length, rebuildRooms, resizeBlank, ringArea } from './geometry';
-import { splitWall } from './wallSplit';
+import { splitMaxCuts, splitWall } from './wallSplit';
 import { connectedWallPoly, wallSectionPolygons } from './wallConnections';
 import { validateDesign } from './validation';
 import { setWallBearing, canEditWall, openingIsLocked } from './wallPolicy';
@@ -56,8 +56,22 @@ describe('图纸墙段分割', () => {
     expect(validateDesign(JSON.parse(JSON.stringify(twice))).walls).toEqual(twice.walls);
     const invalid = structuredClone(twice); invalid.walls[0].exteriorRootId = ''; expect(() => validateDesign(invalid)).toThrow();
   });
-  it.each([[NaN], [Infinity], [], [0], [-1], [49], [5990], [300, 300], [800, 300], [300, 340], [1, 2, 3]].map(cuts => ({ cuts })))('非法输入原子拒绝 $cuts', ({ cuts }) => {
+  it.each([[NaN], [Infinity], [], [0], [-1], [49], [5990], [300, 300], [800, 300], [300, 340], [1, 2, 3], Array.from({ length: 13 }, (_, i) => 300 + i * 300)].map(cuts => ({ cuts })))('非法输入原子拒绝 $cuts', ({ cuts }) => {
     const d = fixture(), before = JSON.stringify(d); expect(() => splitWall(d, 'p', cuts)).toThrow(); expect(JSON.stringify(d)).toBe(before);
+  });
+  it('接触点分割可一次切出多段：上限 12 个点，几何、门窗和费用保持', () => {
+    const d = fixture(); d.openings = [{ id: 'door', wallId: 'p', kind: 'door', offset: 2500, width: 900, hinge: 'end', swingSide: -1, height: 2100 }];
+    const cuts = [500, 1000, 1500, 2000, 3000, 3500, 4000, 4500, 5000, 5200, 5400, 5600];
+    expect(cuts).toHaveLength(splitMaxCuts);
+    const result = splitWall(d, 'p', cuts, 4), segments = result.design.walls.slice(-13);
+    expect(segments).toHaveLength(13);
+    expect(segments.reduce((s, w) => s + length(w), 0)).toBeCloseTo(6000);
+    for (let i = 1; i < segments.length; i++) expect(segments[i].a).toEqual(segments[i - 1].b);
+    expect(result.selectedId).toBe(segments[4].id);
+    const o = result.design.openings[0], w = result.design.walls.find(w => w.id === o.wallId)!;
+    expect(w.a[1] + o.offset).toBe(2500); expect(o).toMatchObject({ width: 900, hinge: 'end', swingSide: -1 });
+    expect(calculateCosts(result.design)).toEqual(calculateCosts(d));
+    expect(() => splitWall(d, 'p', [...cuts, 5800])).toThrow(`1–${splitMaxCuts}`);
   });
   it('洞口内部、已拆、未知墙、无效选中及2000上限', () => {
     const d = fixture(); d.openings = [{ id: 'o', wallId: 'p', kind: 'window', offset: 1500, width: 1000 }];

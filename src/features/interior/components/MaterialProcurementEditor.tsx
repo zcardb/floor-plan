@@ -5,7 +5,6 @@ import {
   validateProcurement,
 } from "../model/materialProcurement";
 import { floorMaterialOf } from "../model/floorMaterials";
-import { priceOf, validPrice } from "../model/costs";
 import type { Design, MaterialProcurement } from "../model/types";
 import { useCostDesign } from './CostDefaultsContext';
 import { Input } from '@/components/ui/input';
@@ -28,9 +27,6 @@ export function MaterialProcurementEditor({
     [expanded, setExpanded] = useState(false),
     [draft, setDraft] = useState<MaterialProcurement>(
       saved || defaultProcurement(material, design),
-    ),
-    [price, setPrice] = useState(
-      String(priceOf(effective, "floorPrices", material) ?? ""),
     ),
     [error, setError] = useState("");
   const sizeDrafts = (value: MaterialProcurement) => ({
@@ -92,7 +88,6 @@ export function MaterialProcurementEditor({
             setExpanded(!expanded);
             setDraft(saved || defaultProcurement(material, design));
             setSizes(sizeDrafts(saved || defaultProcurement(material, design)));
-            setPrice(String(priceOf(effective, "floorPrices", material) ?? ""));
           }}
         >
           规格 / 损耗 / 计价单位{expanded ? " −" : " ＋"}
@@ -103,11 +98,9 @@ export function MaterialProcurementEditor({
           onSubmit={async (e) => {
             e.preventDefault();
             const label = floorMaterialOf(design, material).name;
+            const unitChanged = (saved?.unit || "m²") !== draft.unit;
             try {
               validateProcurement(draft);
-              const v = price.trim() === "" ? null : Number(price);
-              if (v !== null && !validPrice(v))
-                throw new Error("请输入非负有效单价");
               const result = change((d) => ({
                 ...d,
                 costSettings: {
@@ -116,15 +109,13 @@ export function MaterialProcurementEditor({
                     ...d.costSettings?.procurement,
                     [material]: draft,
                   },
-                  floorPrices: {
-                    ...d.costSettings?.floorPrices,
-                    [material]: v,
-                  },
                 },
               }));
               setError("");
               setExpanded(false);
-              if ((await result) !== false) notify.success(`「${label}」采购规格已应用`);
+              if ((await result) === false) return;
+              if (unitChanged) notify.warning(`「${label}」计价单位已改为「${draft.unit}」`, "请在上方单价重新填写对应单位的价格");
+              else notify.success(`「${label}」采购规格已应用`);
             } catch (err) {
               setError(err instanceof Error ? err.message : "规格无效");
               notify.fail(`采购规格未应用：${err instanceof Error ? err.message : "规格无效"}`);
@@ -138,21 +129,10 @@ export function MaterialProcurementEditor({
             {field("perBox", "每箱张数")}
             <EditorSelect label="计价单位" value={draft.unit}
               options={['m²','张','箱'].map(value=>({value,label:value}))}
-              onChange={value=>{setDraft(d=>({...d,unit:value as MaterialProcurement['unit']}));setPrice('');}} />
-            <label>
-              单价 / 元每{draft.unit}
-              <Input
-                className="editor-control"
-                aria-label="新单位单价"
-                type="number"
-                min={0}
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-              />
-            </label>
+              onChange={value=>setDraft(d=>({...d,unit:value as MaterialProcurement['unit']}))} />
           </div>
           <p className="footnote">
-            单位切换后请重新填写对应单价。数量为面积法采购估算，不含具体铺排裁切优化。
+            单价在上方填写；切换计价单位后请同步修改单价。数量为面积法采购估算，不含具体铺排裁切优化。
           </p>
           {error && (
             <p className="form-error" role="alert">

@@ -8,47 +8,35 @@ import {
   ArrowLeft,
   ArrowUpToLine,
   ArrowDownToLine,
+  BrickWall,
   Copy,
+  DoorOpen,
   Trash2,
   ChevronRight,
-  Info,
   LayoutGrid,
   Ruler,
 } from "lucide-react";
 import { notify } from "@/lib/notify";
 import { applyRoomFloor, floorMaterialOf, pickableFloors } from "../model/floorMaterials";
-import {
-  furnitureKey,
-  priceOf,
-  setPrice,
-} from "../model/costs";
-import { PriceInput } from "./PriceInput";
-import { FurniturePriceField } from "./FurniturePriceField";
+import { furnitureKey, priceOf } from "../model/costs";
+import { PriceField } from "./PriceField";
 import { selectionCost } from "../model/costBreakdown";
 import { yuan } from "../model/money";
-import { editSelection } from "../model/selectionEdits";
 import { useCostDesign } from './CostDefaultsContext';
 import { SizeFields } from './SizeFields';
 import { WallOptionsMenu } from './WallOptionsMenu';
 import { canEditWall, canResizeWall, openingIsLocked, wallKindName } from '../model/wallPolicy';
-import { RotationControls } from './RotationControls';
 import { DimensionSettings } from './DimensionSettings';
 import { NorthSettings } from './NorthSettings';
 import type { SizeTransaction } from '../model/sizeTransaction';
-import {
-  area,
-  bbox,
-  inRoom,
-  length,
-  norm,
-  perim,
-  rebuildRooms,
-  resizeBlank,
-} from "../model/geometry";
+import { area, bbox, inRoom, length, perim, resizeBlank } from "../model/geometry";
 import type { CustomFloor, CustomOpening, CustomWall, Design, Selection } from "../model/types";
-import { openingName } from "../model/hardMaterials";
+import { openingName, openingPriceKey } from "../model/hardMaterials";
 import { OpeningVariantSelect } from "./OpeningVariantSelect";
 import { RoomSurfacePanel } from "./RoomSurfacePanel";
+import { cardPrice } from "../model/priceLabel";
+import { ColorSwatches } from "./ColorSwatches";
+import { PanelHint, ShortcutList } from "./PanelHint";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 interface Props {
@@ -64,9 +52,8 @@ interface Props {
   /** 账号地面库；未加入项目的地面也可直接选择，选中后自动加入项目。 */
   accountFloors?: CustomFloor[];
   accountOpenings?: CustomOpening[];
-  /** 墙面在房间材质工具条中选择，这里只接收以保持与工具条一致的属性。 */
+  /** 账号墙面库、屋面库、吊顶库；选用后自动加入项目。 */
   accountWalls?: CustomWall[];
-  /** 账号屋面库、吊顶库；选用后自动加入项目。 */
   accountRoofs?: CustomWall[];
   accountCeilings?: CustomWall[];
   splitWall?: (wallId: string) => void;
@@ -76,6 +63,10 @@ interface Props {
   /** 切到成本页；成本页口径跟随当前选中对象。 */
   openCosts: () => void;
 }
+/**
+ * 右侧属性面板。各对象统一骨架：标题区 → 尺寸 → 外观 / 材质 → 单价 → 操作。
+ * 尺寸、名称、材质等只影响当前项目且可撤销，即时生效；单价可能同步账号库，需显式「应用」。
+ */
 export function PropertyPanel({
   design,
   showCosts,
@@ -91,6 +82,7 @@ export function PropertyPanel({
   openCosts,
   accountFloors = [],
   accountOpenings = [],
+  accountWalls = [],
   accountRoofs = [],
   accountCeilings = [],
 }: Props) {
@@ -102,20 +94,14 @@ export function PropertyPanel({
     r = s?.kind === "room" ? d.rooms.find((r) => r.id === s.id) : null,
     w = s?.kind === "wall" ? d.walls.find((w) => w.id === s.id) : null,
     o = s?.kind === "opening" ? d.openings.find((o) => o.id === s.id) : null;
-  const applyEdit = (values: Record<string, number>) => {
-    try {
-      change((d) => editSelection(d, s, values));
-    } catch (e) {
-      notify.fail(e instanceof Error ? e.message : "尺寸无效");
-    }
-  };
+  const blank = d.template === "blank";
   const input = (
     label: string,
     value: number,
-    update: (v: number) => void | Promise<boolean>,
+    update: (v: number) => void | boolean | Promise<boolean>,
     min = -100000,
     max = 100000,
-    isLength = true,
+    disabled = false,
   ) => (
     <label className="property-field" key={label}>
       {label}
@@ -124,19 +110,21 @@ export function PropertyPanel({
         aria-label={label}
         type="number"
         key={label + value}
-        defaultValue={isLength ? meterDraft(value) : String(value)}
-        min={isLength ? toMeters(min) : min}
-        max={isLength ? toMeters(max) : max}
-        step={isLength ? 0.01 : 1}
+        disabled={disabled}
+        defaultValue={meterDraft(value)}
+        min={toMeters(min)}
+        max={toMeters(max)}
+        step={0.01}
         onBlur={(e) => {
           const target = e.target;
-          if (target.value === (isLength ? meterDraft(value) : String(value))) return;
-          const v = isLength ? parseMeterDraft(target.value) : Number(target.value);
-          const restore = () => { target.value = isLength ? meterDraft(value) : String(value); };
+          if (target.value === meterDraft(value)) return;
+          const v = parseMeterDraft(target.value);
+          const restore = () => { target.value = meterDraft(value); };
           if (target.value && Number.isFinite(v) && v >= min && v <= max) {
             try {
               const result = update(v);
-              if (result instanceof Promise) void result.then(applied => { if (!applied) restore(); }).catch(error => {
+              if (result === false) restore();
+              else if (result instanceof Promise) void result.then(applied => { if (!applied) restore(); }).catch(error => {
                 restore(); notify.fail(error instanceof Error ? error.message : '户型调整失败');
               });
             } catch (error) {
@@ -161,8 +149,16 @@ export function PropertyPanel({
         defaultValue={value}
         maxLength={100}
         onBlur={(e) => {
-          if (e.target.value.trim()) update(e.target.value.trim());
+          const next = e.target.value.trim();
+          if (next === value) return;
+          if (!next) {
+            e.target.value = value;
+            notify.fail("名称不能为空，已恢复原名称");
+            return;
+          }
+          update(next);
         }}
+        onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
       />
     </label>
   );
@@ -179,8 +175,7 @@ export function PropertyPanel({
             {m.name}
             {fromAccount && <em className="material-source">账号库</em>}
             {showCosts && <small>
-              ¥{(fromAccount ? m.price : priceOf(d, "floorPrices", key)) ?? "未定价"} /{" "}
-              {d.costSettings?.procurement?.[key]?.unit || "m²"}
+              {cardPrice(fromAccount ? m.price : priceOf(d, "floorPrices", key), d.costSettings?.procurement?.[key]?.unit || "m²")}
             </small>}
           </span>
         </button>
@@ -195,6 +190,11 @@ export function PropertyPanel({
       </button>
     </EditorTooltip>
   );
+  const priceSection = (group: Parameters<typeof PriceField>[0]["group"], priceKey: string, name: string, unit: string) =>
+    showCosts && <section>
+      <h3 className="section-title">单价</h3>
+      <PriceField key={group + priceKey} design={design} group={group} priceKey={priceKey} name={name} unit={unit} change={change} />
+    </section>;
   const roomCost = r ? selectionCost(d, { kind: "room", id: r.id }) : null;
   const total = d.rooms
     .filter((r) => r.counted !== false)
@@ -215,7 +215,7 @@ export function PropertyPanel({
             <div>
               <h3>{f.name}</h3>
               <small>
-                {formatMeters(f.w)} × {formatMeters(f.d)} m
+                {formatMeters(f.w)} × {formatMeters(f.d)} m · 占地 {((f.w * f.d) / 1e6).toFixed(2)} m²
               </small>
             </div>
           </div>
@@ -236,53 +236,33 @@ export function PropertyPanel({
                 ),
               })),
             )}
-            {(["w", "d", "cx", "cy"] as const).map((key, i) =>
-              input(
-                [
-                  "宽度 / m",
-                  f.type === 'stairs' ? "长度 / m" : "深度 / m",
-                  "中心 X / m",
-                  "中心 Y / m",
-                ][i],
-                f[key],
-                (v) => applyEdit({ [key]: v }),
-                key === "w" || key === "d" ? 50 : -100000,
-                key === "w" || key === "d" ? 20000 : 100000,
-                true,
-              ),
-            )}
-            <RotationControls key={f.id} id={f.id} value={f.rot} transaction={transaction} />
-            <label className="property-field">
-              家具颜色
-              <input
-                type="color"
-                value={f.color}
-                onChange={(e) =>
-                  change((d) => ({
-                    ...d,
-                    furniture: d.furniture.map((g) =>
-                      g.id === f.id ? { ...g, color: e.target.value } : g,
-                    ),
-                  }))
-                }
-              />
-            </label>
           </div>
-          {showCosts && <FurniturePriceField key={f.id} design={design} furniture={f} change={change} />}
+          <h4 className="property-subtitle">尺寸与位置</h4>
+          <SizeFields key={f.id} design={design} selection={s} transaction={transaction} />
+          <h4 className="property-subtitle">颜色</h4>
+          <ColorSwatches value={f.color} onPick={(color) =>
+            change((d) => ({
+              ...d,
+              furniture: d.furniture.map((g) => (g.id === f.id ? { ...g, color } : g)),
+            }))
+          } />
+        </section>
+        {priceSection("furniturePrices", furnitureKey(f), f.name, "件")}
+        <section>
           <div className="property-actions">
-            <EditorTooltip label="复制">
+            <EditorTooltip label="复制" shortcut="Ctrl D">
               <Button size="sm" variant="outline" onClick={duplicate}>
                 <Copy />
                 复制
               </Button>
             </EditorTooltip>
-            <EditorTooltip label="删除">
+            <EditorTooltip label="删除，可撤销">
               <Button size="sm" variant="outline" onClick={remove}>
                 <Trash2 />
                 删除
               </Button>
             </EditorTooltip>
-            <EditorTooltip label="置顶">
+            <EditorTooltip label="平面图中显示在最上层">
               <Button
                 size="sm"
                 variant="ghost"
@@ -297,7 +277,7 @@ export function PropertyPanel({
                 置顶
               </Button>
             </EditorTooltip>
-            <EditorTooltip label="置底">
+            <EditorTooltip label="平面图中显示在最下层">
               <Button
                 size="sm"
                 variant="ghost"
@@ -314,14 +294,9 @@ export function PropertyPanel({
             </EditorTooltip>
           </div>
         </section>
-        <div className="panel-note">
-          <Info size={15} />
-          <p>
-            拖动家具移动；顶部圆点旋转，右下方块改变尺寸。
-            <br />
-            占地面积 {((f.w * f.d) / 1e6).toFixed(2)} m²
-          </p>
-        </div>
+        <PanelHint id="furniture-drag">
+          <p>拖动家具移动；顶部圆点旋转，右下方块改变尺寸。</p>
+        </PanelHint>
       </>
     );
   if (r) {
@@ -387,10 +362,10 @@ export function PropertyPanel({
             }
           })}
         </section>
-        <RoomSurfacePanel design={d} room={r} change={change} accountRoofs={accountRoofs} accountCeilings={accountCeilings} showCosts={showCosts} />
+        <RoomSurfacePanel design={d} room={r} change={change} accountWalls={accountWalls} accountRoofs={accountRoofs} accountCeilings={accountCeilings} showCosts={showCosts} />
         {showCosts && (
           <section>
-            <EditorTooltip label="本间成本">
+            <EditorTooltip label="查看本间成本明细并改价">
               <button className="room-cost-link" onClick={openCosts}>
                 <span>本间成本</span>
                 <b>
@@ -427,62 +402,85 @@ export function PropertyPanel({
   if (w) {
     const editable = canEditWall(design, w);
     const resizable = canResizeWall(design, w);
+    const demolished = design.demolished.includes(w.id);
+    const status = demolished ? "已标记拆除" : editable ? "可编辑" : resizable ? "可调尺寸" : "受保护";
     return (
       <>
         <div className="panel-heading">
           <span>墙体属性</span>
-          <span className="mini-label">
-            {wallKindName(w)}
-          </span>
+          <span className="mini-label">{wallKindName(w)}</span>
         </div>
         <section>
           {back}
-          <h3 className="section-title">
-            {editable ? "可编辑内部墙体" : resizable ? "可调整尺寸的墙体" : "受保护墙体"}
-          </h3>
+          <div className="object-title">
+            <span className="object-symbol">
+              <BrickWall size={22} />
+            </span>
+            <div>
+              <h3>
+                {wallKindName(w)}
+                <span className={"object-status" + (editable && !demolished ? " is-editable" : "")}>{status}</span>
+              </h3>
+              <small>长 {formatMeters(length(w))} m · 厚 {formatMeters(w.thickness)} m</small>
+            </div>
+          </div>
           <WallOptionsMenu design={design} wall={w} change={change} splitWall={splitWall} mergeWall={mergeWall} removeWall={removeWall} />
-          <p className="muted-note">分割与承重标记独立；取消分割不会解除承重保护。实际承重性质须专业确认。</p>
-          {design.demolished.includes(w.id) && <p className="muted-note">请先撤销拆除，再分割墙段。</p>}
+          <h4 className="property-subtitle">尺寸</h4>
           <SizeFields key={w.id} design={design} selection={s} transaction={transaction}/>
-          {editable && (
-            <EditorTooltip label="删除隔墙">
-              <Button variant="outline" size="sm" onClick={remove}>
-                <Trash2 />
-                删除隔墙
-              </Button>
-            </EditorTooltip>
-          )}
           <p className="muted-note">
-            {editable
-              ? "拖动墙体移动，拖动两端圆点调整长度。封闭隔墙将自动划分房间。"
-              : "参考户型原始外墙和承重结构不支持编辑。空白户型的外围尺寸可在户型设置中调整。"}
+            {demolished
+              ? "已标记拆除。如需分割或删除，请先在「墙选项」中撤销拆除。"
+              : editable
+                ? "拖动墙体移动，拖动两端圆点调整长度；封闭隔墙会自动划分房间。"
+                : "参考户型的原始外墙与承重结构不支持编辑；空白户型的外围尺寸可在「户型设置」中调整。"}
           </p>
         </section>
         <div className="panel-note">
-          <Info size={15} />
-          <p>此工具仅用于设计示意，实际墙体拆改须由专业人员评估。</p>
+          <p>此工具仅用于设计示意，墙体拆改与承重性质须由专业人员评估。</p>
         </div>
       </>
     );
   }
   if (o) {
+    const locked = openingIsLocked(design, o.wallId);
+    const name = openingName(design, o);
+    const kindName = o.kind === "door" ? "门" : "窗";
     return (
       <>
         <div className="panel-heading">
-          <span>{openingName(design, o)}属性</span>
+          <span>{kindName}属性</span>
+          <span className="mini-label">选中对象</span>
         </div>
         <section>
           {back}
-          <OpeningVariantSelect design={design} opening={o} accountOpenings={accountOpenings} change={change} disabled={openingIsLocked(design, o.wallId)} />
+          <div className="object-title">
+            <span className="object-symbol">
+              <DoorOpen size={22} />
+            </span>
+            <div>
+              <h3>{name}</h3>
+              <small>
+                宽 {formatMeters(o.width)} m · 高 {formatMeters(o.height ?? (o.kind === "door" ? 2100 : 1600))} m
+              </small>
+            </div>
+          </div>
+          <OpeningVariantSelect design={design} opening={o} accountOpenings={accountOpenings} change={change} disabled={locked} />
+          <h4 className="property-subtitle">尺寸与位置</h4>
           <SizeFields key={o.id} design={design} selection={s} transaction={transaction}/>
-          {o.kind === 'door' && <DoorOrientationControls door={o} onChange={patch => change(d => changeDoorOrientation(d, o.id, patch))} />}
+          {o.kind === 'door' && <>
+            <h4 className="property-subtitle">开向</h4>
+            <DoorOrientationControls door={o} onChange={patch => change(d => changeDoorOrientation(d, o.id, patch))} />
+          </>}
+        </section>
+        {priceSection("openingPrices", openingPriceKey(o), name, "m²")}
+        <section>
           <EditorTooltip
-            label="删除开口"
-            disabled={openingIsLocked(design, o.wallId)}
+            label={locked ? "承重墙上的门窗已锁定" : `删除这${o.kind === "door" ? "扇门" : "扇窗"}，可撤销`}
+            disabled={locked}
           >
-            <Button variant="outline" size="sm" disabled={openingIsLocked(design, o.wallId)} onClick={remove}>
+            <Button variant="outline" size="sm" disabled={locked} onClick={remove}>
               <Trash2 />
-              删除开口
+              删除{kindName}
             </Button>
           </EditorTooltip>
         </section>
@@ -517,16 +515,16 @@ export function PropertyPanel({
               户型尺寸
             </h3>
             <p className="muted-note">
-              {d.template === "blank"
+              {blank
                 ? "尺寸为墙内净尺寸，外围墙随参数自动更新。"
-                : "参考户型保留原始几何。如需绘制户型，请新建空白项目。"}
+                : "参考户型的外围尺寸已锁定；如需调整，请新建空白项目。层高仍可修改。"}
             </p>
             <div className="property-form">
               {input(
                 "净宽 / m",
                 d.width,
                 async (v) => {
-                  if (d.template !== "blank") return false;
+                  if (!blank) return false;
                   const outside =
                     d.furniture.some((f) => f.cx > v) ||
                     d.walls.some(
@@ -548,12 +546,13 @@ export function PropertyPanel({
                 },
                 500,
                 50000,
+                !blank,
               )}
               {input(
                 "净深 / m",
                 d.depth,
                 async (v) => {
-                  if (d.template !== "blank") return false;
+                  if (!blank) return false;
                   const outside =
                     d.furniture.some((f) => f.cy > v) ||
                     d.walls.some(
@@ -575,16 +574,18 @@ export function PropertyPanel({
                 },
                 500,
                 50000,
+                !blank,
               )}
               {input(
                 "外围墙厚 / m",
                 d.thickness,
                 (v) => {
-                  if (d.template === "blank")
-                    change((d) => resizeBlank(d, d.width, d.depth, v));
+                  if (!blank) return false;
+                  change((d) => resizeBlank(d, d.width, d.depth, v));
                 },
                 50,
                 1000,
+                !blank,
               )}
               {input(
                 "层高 / m",
@@ -597,29 +598,12 @@ export function PropertyPanel({
           </section>
           <DimensionSettings design={design} change={change} />
           <NorthSettings design={design} change={change} />
-          <section>
-            <h3 className="section-title">操作说明</h3>
-            <div className="shortcut-list">
-              <kbd>V</kbd>
-              <span>选择 / 移动</span>
-              <kbd>R</kbd>
-              <span>旋转家具 90°</span>
-              <kbd>Ctrl Z</kbd>
-              <span>撤销更改</span>
-              <kbd>Ctrl D</kbd>
-              <span>复制家具</span>
-              <kbd>T</kbd>
-              <span>2D / 3D 切换</span>
-              <kbd>F</kbd>
-              <span>适应窗口</span>
-            </div>
-          </section>
         </>
       ) : (
         <>
           <section>
             <div className="overview-top">
-              <span>空间，恰到好处。</span>
+              <span>套内净使用面积</span>
               <LayoutGrid size={17} />
             </div>
             <div className="area-hero">
@@ -627,10 +611,7 @@ export function PropertyPanel({
               <span>m²</span>
             </div>
             <p className="area-description">
-              套内净使用面积{" "}
-              <span>
-                · {d.rooms.filter((r) => r.counted !== false).length} 个空间
-              </span>
+              {d.rooms.filter((r) => r.counted !== false).length} 个空间
             </p>
             <div className="small-stats">
               <span>
@@ -667,10 +648,13 @@ export function PropertyPanel({
             </div>
             <p className="footnote">按墙内净尺寸计算；* 飘窗不计入使用面积。</p>
           </section>
-          <div className="panel-note">
-            <Info size={15} />
-            <p>选择房间更换地面材质，选择家具调整尺寸，设计与估算实时同步。</p>
-          </div>
+          <PanelHint id="overview-intro">
+            <p>选择房间更换材质，选择家具调整尺寸，设计与估算实时同步。</p>
+            <details>
+              <summary>查看快捷键</summary>
+              <ShortcutList />
+            </details>
+          </PanelHint>
         </>
       )}
     </>

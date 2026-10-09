@@ -13,6 +13,10 @@ export function originalSegment(count: number, index: number, reversed: boolean)
 export function displayOffset(L: number, offset: number, reversed: boolean): number {
   return reversed ? L - offset : offset;
 }
+/** Picked junctions, as ascending distances from the shown A so they read like typed input. */
+export function contactDistances(L: number, offsets: number[], reversed: boolean): number[] {
+  return offsets.map(offset => displayOffset(L, offset, reversed)).sort((a, b) => a - b);
+}
 
 export function wallSplitDraft(design: Design, wallId: string, L: number, distances: number[], reversed: boolean) {
   try {

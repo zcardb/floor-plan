@@ -1,0 +1,16 @@
+ALTER TABLE public.interior_design_projects RENAME COLUMN thumbnail TO thumbnail_svg_legacy;
+
+ALTER TABLE public.interior_design_projects ADD COLUMN IF NOT EXISTS thumbnail jsonb;
+
+UPDATE public.interior_design_projects SET thumbnail = jsonb_build_object(
+  'v', 1,
+  'width', round(coalesce((state->>'width')::numeric, 0)),
+  'depth', round(coalesce((state->>'depth')::numeric, 0)),
+  'walls', coalesce((select jsonb_agg(jsonb_build_object('id', w->>'id', 'a', jsonb_build_array(round((w->'a'->>0)::numeric), round((w->'a'->>1)::numeric)), 'b', jsonb_build_array(round((w->'b'->>0)::numeric), round((w->'b'->>1)::numeric)), 'thickness', round(coalesce((w->>'thickness')::numeric, 0)))) from jsonb_array_elements(coalesce(state->'walls', '[]'::jsonb)) w), '[]'::jsonb),
+  'openings', coalesce((select jsonb_agg(jsonb_build_object('id', o->>'id', 'wallId', o->>'wallId', 'kind', o->>'kind', 'offset', round(coalesce((o->>'offset')::numeric, 0)), 'width', round(coalesce((o->>'width')::numeric, 0)))) from jsonb_array_elements(coalesce(state->'openings', '[]'::jsonb)) o), '[]'::jsonb),
+  'rooms', coalesce((select jsonb_agg(jsonb_build_object('id', r->>'id', 'rings', jsonb_build_array(coalesce((select jsonb_agg(jsonb_build_array(round((p->>0)::numeric), round((p->>1)::numeric))) from jsonb_array_elements(coalesce(r->'rings'->0, '[]'::jsonb)) p), '[]'::jsonb)))) from jsonb_array_elements(coalesce(state->'rooms', '[]'::jsonb)) r), '[]'::jsonb),
+  'furniture', coalesce((select jsonb_agg(jsonb_build_object('id', f->>'id', 'type', f->>'type', 'shape', f->'shape', 'cx', round(coalesce((f->>'cx')::numeric, 0)), 'cy', round(coalesce((f->>'cy')::numeric, 0)), 'w', round(coalesce((f->>'w')::numeric, 0)), 'd', round(coalesce((f->>'d')::numeric, 0)), 'rot', round(coalesce((f->>'rot')::numeric, 0)), 'color', f->>'color')) from jsonb_array_elements(coalesce(state->'furniture', '[]'::jsonb)) f), '[]'::jsonb)
+) WHERE thumbnail IS NULL;
+
+ALTER TABLE public.interior_design_projects DROP CONSTRAINT IF EXISTS interior_design_projects_thumbnail_check;
+ALTER TABLE public.interior_design_projects ADD CONSTRAINT interior_design_projects_thumbnail_check CHECK (thumbnail IS NULL OR octet_length(thumbnail::text) <= 60000);

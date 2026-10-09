@@ -26,7 +26,7 @@ describe('普通楼梯家具', () => {
     const transaction = createSizeTransaction(()=>current,next=>{current=next;},next=>{current=next;commits++;});
     const selection = {kind:'furniture' as const,id:'stairs'};
     const markup = renderToStaticMarkup(<SizeFields design={current} selection={selection} transaction={transaction}/>);
-    expect(markup).toContain('长 / m');
+    expect(markup).toContain('长度 / m');
     expect(markup).toContain('value="3.00"');
     let token = transaction.begin(selection);
     transaction.update(token,sizeDraftToModel({w:'1.2',d:'4'}));

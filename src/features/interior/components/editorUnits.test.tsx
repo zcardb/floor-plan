@@ -15,7 +15,7 @@ describe('编辑控件与米制 UI',()=>{
     const furniture=design.furniture[0];
     const transaction=createSizeTransaction(()=>design,()=>{},()=>{});
     const html=render(createElement(SizeFields,{design,selection:{kind:'furniture',id:furniture.id},transaction}));
-    expect(html).toContain('宽 / m');
+    expect(html).toContain('宽度 / m');
     expect(html).toContain(`value="${(furniture.w/1000).toFixed(2)}"`);
     expect(html).toContain('step="0.01"');
     expect(html).toContain('旋转 / °');

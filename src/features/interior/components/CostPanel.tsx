@@ -45,7 +45,7 @@ export function CostPanel({
   if (room)
     return (
       <RoomCostDetail
-        design={effective}
+        design={design}
         room={room}
         wholeTotal={b.total}
         highlightedFurniture={furniture ? furnitureKey(furniture) : undefined}
@@ -65,8 +65,8 @@ export function CostPanel({
       </div>
       <section>
         <CostHero
-          eyebrow="全屋硬装 · 已录入费用"
-          amount={b.hardTotal}
+          eyebrow="全屋合计 · 硬装 + 软装"
+          amount={b.total}
           hard={b.hardTotal}
           soft={b.softTotal}
           softUnpriced={c.soft.filter((r) => r.price === null).length}
@@ -75,10 +75,6 @@ export function CostPanel({
           onlyUnpriced={onlyUnpriced}
           onToggleUnpriced={() => setOnlyUnpriced((v) => !v)}
         />
-        <div className="cost-total-line">
-          <span>硬装 + 软装合计</span>
-          <b>{yuan(b.total)}</b>
-        </div>
         {b.unpriced > 0 && (
           <p className="cost-warning">
             {b.unpriced} 类项目未定价，当前合计不是完整报价。
@@ -98,7 +94,7 @@ export function CostPanel({
           费用明细 <small>点击类别展开</small>
         </h3>
         <CostCategoryList
-          design={effective}
+          design={design}
           rows={[...c.hard, ...c.soft]}
           labor={c.labor}
           onlyUnpriced={onlyUnpriced}

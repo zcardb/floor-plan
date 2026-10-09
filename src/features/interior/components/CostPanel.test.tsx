@@ -19,12 +19,13 @@ const html = (design: Design, selection: Selection = null) =>
     />,
   );
 describe("成本页口径", () => {
-  it("未选中时显示全屋口径：硬装主数字、明细分组与按房间列表", () => {
+  it("未选中时显示全屋口径：合计主数字、明细分组与按房间列表", () => {
     const d = setPrice(referenceDesign(), "floorPrices", "wood", 200),
       b = costBreakdown(d),
       out = html(d);
     expect(out).toContain("全屋成本");
-    expect(out).toContain(yuan(b.hardTotal));
+    expect(out).toContain("全屋合计");
+    expect(out).toContain(yuan(b.total));
     expect(out).toContain("按房间");
     expect(out).toContain("全屋公共项");
     for (const room of d.rooms) expect(out).toContain(room.name);

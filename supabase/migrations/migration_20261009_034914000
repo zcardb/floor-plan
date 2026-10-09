@@ -1,0 +1,1 @@
+ALTER TABLE public.interior_design_projects ADD COLUMN IF NOT EXISTS thumbnail text CHECK (thumbnail IS NULL OR length(thumbnail) <= 300000);

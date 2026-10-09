@@ -12,7 +12,10 @@ vi.mock('./useProjectImport', async original => {
 import { ManagementLoading } from './ManagementLoading';
 import { ProjectManager } from './ProjectManager';
 import { AccountFurnitureLibrary } from './AccountFurnitureLibrary';
-import type { useProjects } from '../cloud/useProjects';
+import type { useProjects, ProjectSummary } from '../cloud/useProjects';
+import { TEMPLATE_PRESETS, createProject } from '../data/templates';
+import { mineCardActions, templateCardActions } from './projectCardActions';
+import { compactThumbnail } from '../model/planThumbnail';
 import type { useFurnitureCatalog } from '../cloud/useFurnitureCatalog';
 
 const project = { id: 'one', name: '我的项目', updatedAt: '2026-10-08', revision: 0, cloud: true };
@@ -34,7 +37,7 @@ describe('管理端精简与加载分支', () => {
     expect(html).not.toContain('cms-loading-grid');
     expect(html).not.toContain('<button');
   });
-  const projects = (loading: boolean, cloud = [project]) => ({ guests: [], cloud, loading, hasMore: false, reload: () => {}, open: async () => true }) as unknown as ReturnType<typeof useProjects>;
+  const projects = (loading: boolean, cloud: ProjectSummary[] = [project]) => ({ guests: [], cloud, builtins: TEMPLATE_PRESETS.map(p => ({ id: 'builtin-template:' + p.id, name: p.name, revision: 0, updatedAt: '', builtin: true, templateId: p.id })), loading, hasMore: false, reload: () => {}, open: async () => true }) as unknown as ReturnType<typeof useProjects>;
   it('选了外部 DXF 后显示识别确认弹窗；没有待识别图纸时不显示', () => {
     expect(render(createElement(ProjectManager, { projects: projects(false), opened: () => {} }))).not.toContain('data-dxf-import');
     importState.drawing = { source: {}, name: '户型图' };
@@ -53,46 +56,43 @@ describe('管理端精简与加载分支', () => {
     expect(html).not.toContain('cms-loading-placeholder');
     expect(html).not.toContain('project-list-footer');
   });
-  it('用户新建的本机与云端项目都提供打开、重命名、复制和删除', () => {
-    const guest = { ...project, id: 'local', name: '本地项目', cloud: false };
-    const localProjects = { ...projects(false, []), guests: [guest] } as unknown as ReturnType<typeof useProjects>;
-    const local = render(createElement(ProjectManager, { projects: localProjects, opened: () => {} }));
-    const cloud = render(createElement(ProjectManager, { projects: projects(false), opened: () => {} }));
-    const mixed = render(createElement(ProjectManager, { projects: { ...localProjects, cloud: [project] }, opened: () => {} }));
-    for (const html of [local, cloud, mixed]) expect(html).not.toContain('复制到云端');
-    for (const html of [local, mixed]) {
-      expect(html).toContain('aria-label="打开项目 本地项目"');
-      expect(html).toContain('aria-label="重命名本地项目"');
-      expect(html).toContain('aria-label="复制本地项目"');
-      expect(html).toContain('aria-label="删除本地项目"');
-      expect(html).not.toContain('disabled="" aria-label="重命名本地项目"');    }
-    for (const html of [cloud, mixed]) {
-      expect(html).toContain('aria-label="打开项目 我的项目"');
-      expect(html).toContain('aria-label="重命名我的项目"');
-      expect(html).toContain('aria-label="复制我的项目"');
-      expect(html).toContain('aria-label="删除我的项目"');
-    }
-  });
-  it('系统默认方案只能复制：重命名与删除禁用并给出原因', () => {
-    const system = { ...project, id: 'system', name: '三室两厅两卫 · 原木之家', cloud: false, system: true };
-    const html = render(createElement(ProjectManager, { projects: { ...projects(false, []), guests: [system] } as unknown as ReturnType<typeof useProjects>, opened: () => {} }));
-    const tag = (label: string) => {
-      const at = html.indexOf(`aria-label="${label}"`);
-      return html.slice(html.lastIndexOf('<button', at), html.indexOf('>', at) + 1);
-    };
-    expect(tag('重命名三室两厅两卫 · 原木之家')).toContain('disabled=""');
-    expect(tag('删除三室两厅两卫 · 原木之家')).toContain('disabled=""');
-    expect(tag('复制三室两厅两卫 · 原木之家')).not.toContain('disabled=""');
-  });
-  it('删除图标常驻危险色，重命名与复制保持中性', () => {
-    const guest = { ...project, id: 'local', name: '本地项目', cloud: false };
+  it('我的项目与内置模板同一套卡片：点卡片打开，「⋯」与标题同行', () => {
+    const guest = { ...project, id: 'local', name: '本地项目', cloud: false, state: createProject('blank').state };
     const html = render(createElement(ProjectManager, { projects: { ...projects(false), guests: [guest] } as unknown as ReturnType<typeof useProjects>, opened: () => {} }));
-    const tag = (label: string) => {
-      const at = html.indexOf(`aria-label="${label}"`);
-      return html.slice(html.lastIndexOf('<button', at), html.indexOf('>', at) + 1);
-    };
-    for (const label of ['删除本地项目', '删除我的项目']) expect(tag(label)).toContain('text-destructive');
-    for (const label of ['重命名本地项目', '重命名我的项目', '复制我的项目', '复制本地项目']) expect(tag(label)).not.toContain('text-destructive');
+    for (const name of ['本地项目', '我的项目']) {
+      expect(html).toContain(`aria-label="打开项目 ${name}"`);
+      expect(html).toContain(`aria-label="${name} 的更多操作"`);
+    }
+    expect(html).toContain('aria-label="预览模板 三室两厅两卫 · 原木之家"');
+    expect(html).toContain('aria-label="三室两厅两卫 · 原木之家 的更多操作"');
+    // 卡片只显示标题：没有模板描述、面积和单独的预览/新建按钮
+    for (const text of ['原木风格 · 双卫', '室内约', '只读预览', '用此模板新建']) expect(html).not.toContain(text);
+    expect(html).not.toContain('builtin-template-card');
+    // 本机项目实时渲染平面图；没有缩略图的旧云端项目显示占位
+    expect(html).toContain('aria-label="本地项目 平面缩略图"');
+    expect(html).toContain('project-card-placeholder');
+  });
+  it('云端项目用保存时留下的瘦身平面图渲染缩略图', () => {
+    const thumbnail = compactThumbnail(createProject('blank').state);
+    const html = render(createElement(ProjectManager, { projects: projects(false, [{ ...project, thumbnail }]), opened: () => {} }));
+    expect(html).toContain('aria-label="我的项目 平面缩略图"');
+    expect(html).not.toContain('project-card-placeholder');
+  });
+  it('「⋯」菜单：我的项目可重命名、复制、删除（置底、危险色），系统默认方案只能复制', () => {
+    const on = { rename: vi.fn(), duplicate: vi.fn(), remove: vi.fn() };
+    const normal = mineCardActions({ ...project }, on);
+    expect(normal.map(a => a.label)).toEqual(['重命名', '复制', '删除']);
+    expect(normal.every(a => !a.disabled)).toBe(true);
+    expect(normal.map(a => !!a.danger)).toEqual([false, false, true]);
+    const system = mineCardActions({ ...project, system: true }, on);
+    expect(system.map(a => [a.label, !!a.disabled, a.hint])).toEqual([
+      ['重命名', true, '系统默认方案不可重命名'], ['复制', false, undefined], ['删除', true, '系统默认方案不可删除'],
+    ]);
+    const copy = vi.fn();
+    const template = templateCardActions(copy);
+    expect(template.map(a => a.label)).toEqual(['复制为我的项目']);
+    template[0].onSelect();
+    expect(copy).toHaveBeenCalled();
   });
   it('首次无数据加载和真实空态明确区分', () => {
     const loading = render(createElement(ProjectManager, { projects: projects(true, []), opened: () => {} }));
@@ -110,10 +110,9 @@ describe('管理端精简与加载分支', () => {
     for (const label of ['全部', '内置', '我的']) expect(html).toMatch(new RegExp('>' + label + '<b>\\d+</b>'));
     expect(html).toMatch(/aria-pressed="true"[^>]*>全部<b>/);
     expect(html).toContain('全部项目');
-    expect(html).toContain('builtin-template-card');
     expect(html).toContain('aria-label="打开项目 我的项目"');
     // 我的项目按修改时间排在内置模板之前
-    expect(html.indexOf('打开项目 我的项目')).toBeLessThan(html.indexOf('builtin-template-card'));
+    expect(html.indexOf('打开项目 我的项目')).toBeLessThan(html.indexOf('预览模板 '));
   });
   it('超过一页显示分页，一页以内不显示；云端还有更多时数量带 +', () => {
     const many = Array.from({ length: 20 }, (_, i) => ({ ...project, id: 'p' + i, name: '项目' + i }));

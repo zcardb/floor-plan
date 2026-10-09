@@ -144,36 +144,36 @@
 ---
 
 ## Implementation checklist
-- [ ] `PriceInput`：保留「应用」+ Enter 提交、Esc 还原，失焦不提交
-- [ ] `PriceInput`：无修改时按钮禁用；有修改时输入框 `is-dirty` + 按钮主色 +「未应用」小字（`index.css` 用设计 token）
-- [ ] `PriceInput`：支持 `applyLabel`，同步勾选时显示「应用并同步」
-- [ ] `PriceInput`：`flush()` 在保存进行中时等待该次结果
-- [ ] `PriceInput`：卸载时若有未应用修改，toast 提示「修改未应用，已放弃」（对话框「完成」路径仍走 flush 提交）
-- [ ] 新建 `PriceField`：来源标签 + 恢复账号默认 + 同步勾选（全部 7 个 group），勾选项位于输入框之前
-- [ ] `PriceField` 同步勾选默认值：账号库无价 → 勾选，有价 → 不勾选
-- [ ] `PriceField` 同步失败时项目价不变、输入保留、提示错误
-- [ ] 家具属性面板改用 `PriceField`，删除 `FurniturePriceField.tsx`
-- [ ] 浮动单价弹层改用 `PriceField`
-- [ ] `RoomCostDetail` 硬装 / 家具行改用 `PriceField`（labor 除外）
-- [ ] `CostRowEditor` 改用 `PriceField`，移除其内部重复的来源 / 恢复逻辑
-- [ ] `MaterialProcurementEditor` 删除内部单价框，单位切换改为提示而非清空
-- [ ] 家具属性面板尺寸改用 `SizeFields`，移除自写输入与重复 `RotationControls`
-- [ ] `SizeFields` 家具标签统一为「宽度 / 深度 / 长度」
-- [ ] 房间面板新增「墙面」卡片网格
-- [ ] 参考户型禁用净宽 / 净深 / 外围墙厚，说明合并为一句
-- [ ] 外围墙厚在非空白户型下回滚（B2 兜底）
-- [ ] 名称清空失焦回显原名并提示
-- [ ] 尺寸标注关闭时禁用 4 个距离输入
-- [ ] 墙体面板：标题改名称 + 状态徽标，说明合并为 1 段，删除「删除隔墙」按钮
-- [ ] 新建 `PanelHint`（可关闭，localStorage 记忆），替换家具 / 总览底部提示
-- [ ] 家具占地面积移到标题副行
-- [ ] 快捷键说明从户型设置移到总览提示的「查看快捷键」
-- [ ] 总览标语替换为「套内净使用面积」，删除重复描述行；房间面积列表不动
-- [ ] 材质卡片未定价文案改为「未定价」
-- [ ] `CostPanel` 主金额改为全屋合计，删除 `cost-total-line`
-- [ ] 门窗面板：对象标题区、分节标题、`PriceField`（openingPrices）、删除按钮文案「删除门 / 删除窗」
-- [ ] 置顶 / 置底 tooltip 文案说明叠放顺序
-- [ ] 抽取 `ColorSwatches`，家具面板与浮动编辑器共用；自定义色只提交一次
+- [x] `PriceInput`：保留「应用」+ Enter 提交、Esc 还原，失焦不提交
+- [x] `PriceInput`：无修改时按钮禁用；有修改时输入框 `is-dirty` + 按钮主色 +「未应用」小字（`index.css` 用设计 token）
+- [x] `PriceInput`：支持 `applyLabel`，同步勾选时显示「应用并同步」
+- [x] `PriceInput`：`flush()` 在保存进行中时等待该次结果
+- [x] `PriceInput`：卸载时若有未应用修改，toast 提示「修改未应用，已放弃」（对话框「完成」路径仍走 flush 提交）
+- [x] 新建 `PriceField`：来源标签 + 恢复账号默认 + 同步勾选（全部 7 个 group），勾选项位于输入框之前
+- [x] `PriceField` 同步勾选默认值：账号库无价 → 勾选，有价 → 不勾选
+- [x] `PriceField` 同步失败时项目价不变、输入保留、提示错误
+- [x] 家具属性面板改用 `PriceField`，删除 `FurniturePriceField.tsx`
+- [x] 浮动单价弹层改用 `PriceField`
+- [x] `RoomCostDetail` 硬装 / 家具行改用 `PriceField`（labor 除外）
+- [x] `CostRowEditor` 改用 `PriceField`，移除其内部重复的来源 / 恢复逻辑
+- [x] `MaterialProcurementEditor` 删除内部单价框，单位切换改为提示而非清空
+- [x] 家具属性面板尺寸改用 `SizeFields`，移除自写输入与重复 `RotationControls`
+- [x] `SizeFields` 家具标签统一为「宽度 / 深度 / 长度」
+- [x] 房间面板新增「墙面」卡片网格
+- [x] 参考户型禁用净宽 / 净深 / 外围墙厚，说明合并为一句
+- [x] 外围墙厚在非空白户型下回滚（B2 兜底）
+- [x] 名称清空失焦回显原名并提示
+- [x] 尺寸标注关闭时禁用 4 个距离输入
+- [x] 墙体面板：标题改名称 + 状态徽标，说明合并为 1 段，删除「删除隔墙」按钮
+- [x] 新建 `PanelHint`（可关闭，localStorage 记忆），替换家具 / 总览底部提示
+- [x] 家具占地面积移到标题副行
+- [x] 快捷键说明从户型设置移到总览提示的「查看快捷键」
+- [x] 总览标语替换为「套内净使用面积」，删除重复描述行；房间面积列表不动
+- [x] 材质卡片未定价文案改为「未定价」
+- [x] `CostPanel` 主金额改为全屋合计，删除 `cost-total-line`
+- [x] 门窗面板：对象标题区、分节标题、`PriceField`（openingPrices）、删除按钮文案「删除门 / 删除窗」
+- [x] 置顶 / 置底 tooltip 文案说明叠放顺序
+- [x] 抽取 `ColorSwatches`，家具面板与浮动编辑器共用；自定义色只提交一次
 
 ## Verification checklist
 - [ ] 正向：家具属性面板输入价格后，输入框高亮、按钮变主色并显示「未应用」；点「应用」或回车后生效并恢复常态
@@ -196,5 +196,5 @@
 - [ ] 成本页主金额等于成本标签上的金额
 - [ ] 门窗面板显示单价入口，改价后全屋成本「门窗」类别同步变化
 - [ ] 「方案总览」房间面积列表与改造前一致
-- [ ] 运行：`npx tsc --noEmit -p tsconfig.app.json`、`npx eslint src/features/interior`、`npx vitest run src/features/interior`（更新受影响的价格输入相关用例）、`pnpm run build`
+- [x] 运行：`npx tsc --noEmit -p tsconfig.app.json`、`npx eslint src/features/interior`、`npx vitest run src/features/interior`（更新受影响的价格输入相关用例）、`pnpm run build`
 - [ ] 截图验证：desktop_1280 下选中家具 / 房间 / 墙 / 门窗 / 成本页各一次

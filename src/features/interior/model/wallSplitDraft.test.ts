@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { blankDesign } from '../data/templates';
 import { splitWall } from './wallSplit';
-import { displayOffset, originalCuts, originalSegment, wallSplitDraft } from './wallSplitDraft';
+import { contactDistances, displayOffset, originalCuts, originalSegment, wallSplitDraft } from './wallSplitDraft';
 
 describe('分割方向草稿', () => {
   it('交换后从B端量取并映射回原方向，两次交换恢复', () => {
@@ -26,5 +26,12 @@ describe('分割方向草稿', () => {
     const d = blankDesign(); d.openings.push({ id: 'w', wallId: 'outer-0', kind: 'window', offset: 5700, width: 800 });
     for (const distances of [[NaN], [20000], [10], [800, 300], [300, 300]]) expect(wallSplitDraft(d, 'outer-0', 6240, distances, true).intervals).toEqual([]);
     expect(wallSplitDraft(d, 'outer-0', 6240, [540], true).error).toContain('洞口');
+  });
+  it('接触点按当前 A 端换算为升序距离，交换后经 originalCuts 往返回存储位置', () => {
+    const L = 6000, offsets = [4000, 1000, 2500];
+    expect(contactDistances(L, offsets, false)).toEqual([1000, 2500, 4000]);
+    expect(contactDistances(L, offsets, true)).toEqual([2000, 3500, 5000]);
+    for (const reversed of [false, true]) expect(originalCuts(L, contactDistances(L, offsets, reversed), reversed)).toEqual([1000, 2500, 4000]);
+    expect(contactDistances(L, [], true)).toEqual([]);
   });
 });

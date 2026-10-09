@@ -3420,6 +3420,8 @@ export type Database = {
           revision: number
           schema_version: number
           state: Json
+          thumbnail: Json | null
+          thumbnail_svg_legacy: string | null
           updated_at: string
         }
         Insert: {
@@ -3430,6 +3432,8 @@ export type Database = {
           revision?: number
           schema_version?: number
           state: Json
+          thumbnail?: Json | null
+          thumbnail_svg_legacy?: string | null
           updated_at?: string
         }
         Update: {
@@ -3440,6 +3444,8 @@ export type Database = {
           revision?: number
           schema_version?: number
           state?: Json
+          thumbnail?: Json | null
+          thumbnail_svg_legacy?: string | null
           updated_at?: string
         }
         Relationships: []

@@ -2,11 +2,13 @@ import { length } from './geometry';
 import { uid, type Design, type Point, type Wall } from './types';
 
 export const splitTolerance = 0.01;
+/** Manual distances stay 1–2 points; a junction split can cut one wall into many segments. */
+export const splitMaxCuts = 12;
 export function wallSplitIntervals(design: Design, wallId: string, cuts: number[]): number[] {
   const wall = design.walls.find(w => w.id === wallId);
   if (!wall) throw new Error('墙体已不存在，请重新选择');
   if (design.demolished.includes(wallId)) throw new Error('请先撤销墙体拆除，再分割墙段');
-  if (cuts.length < 1 || cuts.length > 2 || cuts.some(c => !Number.isFinite(c))) throw new Error('请输入一个或两个有效分割距离');
+  if (cuts.length < 1 || cuts.length > splitMaxCuts || cuts.some(c => !Number.isFinite(c))) throw new Error(`请输入 1–${splitMaxCuts} 个有效分割距离`);
   if (design.walls.length + cuts.length > 2000) throw new Error('分割后墙段不能超过 2000 段');
   const L = length(wall);
   const openings = design.openings.filter(o => o.wallId === wallId);
