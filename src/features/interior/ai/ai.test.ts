@@ -8,7 +8,7 @@ import type { LibraryItem } from "../model/types";
 import { applyRoomLayout, planToDesign } from "./apply";
 import { buildAiCatalog, isBuiltinItem } from "./catalog";
 import { furnitureInRoom, planSnapshot, roomContext, roomZone } from "./context";
-import { addPick, initialPicks, pickNames, removePick, requiredOf } from "./picks";
+import { addPick, initialPicks, pickNames, removePick, requiredOf, resizePick, withPickSizes } from "./picks";
 import { sanitizePlan, sanitizeRoomItems } from "./sanitize";
 
 const account: LibraryItem = { catalogId: "11111111-1111-4111-8111-111111111111", name: "我的书桌", category: "书房", type: "desk", w: 1300, d: 650, color: "#aa8866", height: 760 };
@@ -178,5 +178,37 @@ describe("整户户型候选清洗与落地", () => {
   });
   it("房间全部不可用时抛错", () => {
     expect(() => sanitizePlan({ ...plan, rooms: [{ id: "x", box: [0, 0, 10, 10] }] }, { width: 8000, depth: 9000, catalog })).toThrow("房间");
+  });
+});
+
+describe("指定家具改尺寸", () => {
+  const catalog = buildAiCatalog();
+  const bed = "bed:双人床 1.8m";
+  it("改尺寸后本次请求的目录按新尺寸给模型与落地；与默认相同视为恢复", () => {
+    let picks = addPick([], bed);
+    picks = resizePick(picks, bed, { w: 1600, d: 2000 }, { w: 1800, d: 2000 });
+    const sized = withPickSizes(catalog, picks);
+    const code = catalog.codeOf(bed)!;
+    expect(sized.entries.find((e) => e.code === code)).toMatchObject({ w: 1600, d: 2000 });
+    expect(sized.byCode.get(code)).toMatchObject({ w: 1600, catalogId: bed });
+    expect(catalog.byCode.get(code)!.w).toBe(1800);
+    expect(pickNames(picks, sized)[0]).toContain("1.60 × 2.00 m");
+    expect(resizePick(picks, bed, { w: 1800, d: 2000 }, { w: 1800, d: 2000 })[0].size).toBeUndefined();
+    const d = referenceDesign(), master = d.rooms.find((r) => r.id === "master")!;
+    const items = sanitizeRoomItems({ items: [{ code, back: "up", along: 1800, gap: 0 }] }, { zone: roomZone(master), catalog: sized, required: [{ code, count: 1 }] });
+    const placed = furnitureInRoom(applyRoomLayout(d, master.id, items, sized), master);
+    expect(placed[0]).toMatchObject({ w: 1600, d: 2000 });
+  });
+});
+
+describe("AI 决定户型尺寸", () => {
+  const catalog = buildAiCatalog();
+  const bed = catalog.entries.find((e) => e.name === "双人床 1.5m")!.code;
+  const plan = { width: 7000, depth: 8000, walls: [], openings: [{ wall: "bottom", kind: "door", at: 3000, width: 1000 }],
+    rooms: [{ id: "a", name: "卧室", box: [0, 0, 7000, 8000] }], furniture: [{ room: "a", items: [{ code: bed, back: "up" }] }] };
+  it("没填长宽时取模型给的尺寸；填了以填的为准；都没有时报错", () => {
+    expect(sanitizePlan(plan, { catalog })).toMatchObject({ width: 7000, depth: 8000 });
+    expect(sanitizePlan(plan, { catalog, width: 9000 })).toMatchObject({ width: 9000, depth: 8000 });
+    expect(() => sanitizePlan({ ...plan, width: undefined }, { catalog })).toThrow("尺寸");
   });
 });

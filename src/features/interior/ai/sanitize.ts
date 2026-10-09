@@ -151,8 +151,16 @@ function netRing(source: Point[], walls: WallSpec[]): Point[] {
  *   门窗与家具通过「原名 → 新名」映射重新对上。
  * - 越界 / 重叠的门窗、碎墙、过小的房间、目录外的家具都丢弃；房间或家具全部不可用时抛错。
  */
-export function sanitizePlan(value: unknown, { width, depth, catalog }: { width: number; depth: number; catalog: AiCatalog }): PlanSpec {
-  const raw = (value ?? {}) as { walls?: unknown; openings?: unknown; rooms?: unknown; furniture?: unknown };
+export function sanitizePlan(value: unknown, { width: fixedWidth, depth: fixedDepth, catalog }: { width?: number; depth?: number; catalog: AiCatalog }): PlanSpec {
+  const raw = (value ?? {}) as { width?: unknown; depth?: unknown; walls?: unknown; openings?: unknown; rooms?: unknown; furniture?: unknown };
+  // 高级设计没填的长宽由 AI 决定：取模型输出的尺寸，夹进合理范围。
+  const sizeOf = (fixed: number | undefined, given: unknown) => {
+    if (fixed !== undefined) return fixed;
+    const n = num(given);
+    if (n === undefined) throw new Error("方案缺少户型尺寸");
+    return round10(clamp(n, 3000, 40000));
+  };
+  const width = sizeOf(fixedWidth, raw.width), depth = sizeOf(fixedDepth, raw.depth);
   const list = (v: unknown) => (Array.isArray(v) ? v : []);
 
   const walls: WallSpec[] = [];

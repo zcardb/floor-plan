@@ -5,6 +5,7 @@ import { library } from "../data/catalog";
 import { furnitureTypes } from "../model/furnitureAppearance";
 import { AiResults } from "./AiResults";
 import { AiCreateProjectForm } from "./AiCreateProjectDialog";
+import { advancedLabel, planHints } from "../ai/planFields";
 import { filterPickerItems, furniturePickerItems, groupPickerItems, typePickerItems } from "./pickerItems";
 import type { LibraryItem } from "../model/types";
 
@@ -50,7 +51,8 @@ describe("候选方案网格", () => {
     expect(html).toContain("已完成 2 / 3");
     expect(html).toContain("床靠北墙");
     expect(html).toContain("方案 2 · 生成中");
-    expect(html).toContain("方案里的家具与指定清单不一致");
+    expect(html).toContain("方案 3 生成失败");
+    expect(html).toContain('title="方案里的家具与指定清单不一致"');
     expect(html).toContain('aria-checked="true"');
   });
   it("全部失败时给出错误提示", () => {
@@ -64,12 +66,22 @@ describe("候选方案网格", () => {
 
 describe("AI 创建户型表单", () => {
   const html = renderToStaticMarkup(createElement(AiCreateProjectForm, { pending: false, onClose: () => {}, onSubmit: () => {} }));
-  it("长宽必填，默认 9 × 10 m；描述为空时不能发送；数量默认 2；没有模型选择", () => {
-    expect(html).toContain('id="ai-project-width"');
-    expect(html).toContain('value="9.00"');
-    expect(html).toContain('value="10.00"');
+  it("长宽与几室几厅几卫收在「高级设计」里（默认收起、选填）；描述为空时不能发送；数量默认 2；没有模型选择", () => {
+    expect(html).toContain("高级设计");
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).not.toContain('id="ai-project-width"');
     expect(html).toMatch(/aria-label="生成"[^>]*disabled/);
     expect(html).toContain("2 个方案");
     expect(html).not.toContain("模型");
+  });
+});
+
+describe("高级设计参数", () => {
+  it("填写的内容生成摘要与提示词；留空不生成", () => {
+    const rooms = { bedrooms: "3", livingRooms: "2", bathrooms: "" };
+    expect(advancedLabel({ width: 10000, depth: NaN }, rooms)).toBe("长 10.00 m · 3 卧 2 厅");
+    expect(planHints(rooms)).toEqual(["房间数量必须是：卧室 3 间，厅 2 个（客厅、餐厅等）；房间名称与功能对应"]);
+    expect(planHints({ bedrooms: "", livingRooms: "", bathrooms: "" })).toEqual([]);
+    expect(advancedLabel({ width: NaN, depth: NaN }, { bedrooms: "", livingRooms: "", bathrooms: "" })).toBe("");
   });
 });

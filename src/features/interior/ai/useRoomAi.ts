@@ -5,7 +5,7 @@ import type { Design } from "../model/types";
 import { applyRoomLayout } from "./apply";
 import { generateRoomCandidate, markCandidateApplied } from "./client";
 import { furnitureInRoom, planSnapshot, roomContext, roomZone } from "./context";
-import { initialPicks, pickNames, requiredOf } from "./picks";
+import { initialPicks, pickNames, requiredOf, withPickSizes } from "./picks";
 import { readyImageUrls, type AiImageDraft } from "./referenceImages";
 import { sanitizeRoomItems } from "./sanitize";
 import { useAiBatch } from "./useAiBatch";
@@ -56,6 +56,7 @@ export function useRoomAi({ design, catalog, projectId, change }: {
   const [view, setView] = useState<"input" | "results">("input");
   const [picked, setPicked] = useState<number | null>(null);
   const latest = useRef({ design, catalog });
+  const relaunch = useRef<(() => void) | null>(null);
   latest.current = { design, catalog };
 
   const batchRoom = ai.batch?.request.roomId;
@@ -87,25 +88,32 @@ export function useRoomAi({ design, catalog, projectId, change }: {
   }, [openId]);
 
   const send = useCallback(() => {
-    const { design: source, catalog: aiCatalog } = latest.current;
+    const { design: source } = latest.current;
     const room = openId ? source.rooms.find((r) => r.id === openId) : undefined;
     const draft = openId ? drafts[openId] : undefined;
     if (!room || !draft || !draft.description.trim()) return;
     const description = draft.description.trim(), images = readyImageUrls(draft.images);
+    const aiCatalog = withPickSizes(latest.current.catalog, draft.picks);
     const required = requiredOf(draft.picks, aiCatalog);
     const context = roomContext(source, room), plan = planSnapshot(source, room.id);
     const existing = furnitureInRoom(source, room).slice(0, 60).map((f) => ({ name: f.name, w: Math.round(f.w), d: Math.round(f.d) }));
     const request: AiRoomRequest = { roomId: room.id, roomName: room.name, description, images, furniture: pickNames(draft.picks, aiCatalog), catalog: aiCatalog };
-    ai.start(request, draft.count, async (index, generationId) => {
+    const count = draft.count;
+    const launch = () => ai.start(request, count, async (index, generationId) => {
       const { candidate } = await generateRoomCandidate({
         generationId, index, description, images, catalog: aiCatalog.entries, projectId, room: context, plan, existing, required,
       });
       const items = sanitizeRoomItems(candidate!.result, { zone: roomZone(room), ring: room.rings[0], catalog: aiCatalog, required });
       return { id: candidate!.candidateId, index, summary: candidate!.summary, result: { items, preview: applyRoomLayout(source, room.id, items, aiCatalog) } };
     });
+    relaunch.current = launch;
+    launch();
     setPicked(null);
     setView("results");
   }, [openId, drafts, ai, projectId]);
+
+  /** 重新生成：同样的描述、图片、家具与数量再来一批。 */
+  const regenerate = useCallback(() => { relaunch.current?.(); setPicked(null); }, []);
 
   /** 返回输入：生成中则停止这一批；输入内容保留。 */
   const back = useCallback(() => { if (ai.running) ai.clear(); setView("input"); }, [ai]);
@@ -143,7 +151,7 @@ export function useRoomAi({ design, catalog, projectId, change }: {
     view: openId === batchRoom ? view : "input",
     selected,
     select: setPicked,
-    open, close, updateDraft, send, back, apply, toneOf,
+    open, close, updateDraft, send, back, apply, toneOf, regenerate,
     showResults: () => setView("results"),
   };
 }

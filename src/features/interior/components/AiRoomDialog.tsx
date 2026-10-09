@@ -36,6 +36,7 @@ export function AiRoomDialog({ ai, furniture }: { ai: RoomAi; furniture: Library
             slots={batch.slots}
             selected={ai.selected}
             onSelect={ai.select}
+            onRegenerate={ai.regenerate}
             preview={(candidate) => <PlanThumbnail design={candidate.result.preview} focusRoomId={room.id} label={`${candidate.summary || "候选方案"}平面预览`} />}
           />
           <div className="ai-dialog-actions">

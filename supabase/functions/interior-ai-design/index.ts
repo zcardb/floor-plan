@@ -28,13 +28,14 @@ interface Body {
   mode: 'plan' | 'room';
   generationId: string;
   index: number;
-  temperature?: number;
   description: string;
   images: string[];
   catalog: Entry[];
   projectId?: string;
   width?: number;
   depth?: number;
+  /** 高级设计填写的约束（长宽、几室几厅几卫），并入提示词。 */
+  hints?: string[];
   room?: { roomId: string; name: string; area: number; zone: [number, number, number, number]; openings: unknown[] };
   plan?: unknown;
   existing?: { name: string; w: number; d: number }[];
@@ -47,7 +48,6 @@ function guard(raw: unknown): Body | string {
   if (!b || (b.mode !== 'plan' && b.mode !== 'room')) return '生成模式无效';
   if (typeof b.generationId !== 'string' || !UUID.test(b.generationId)) return '生成编号无效';
   if (!Number.isInteger(b.index) || b.index < 0 || b.index > 3) return '候选序号无效';
-  if (b.temperature !== undefined && !finite(b.temperature, 0, 1)) return '温度无效';
   if (!str(b.description, 2000)) return '请填写需求描述（2000 字以内）';
   if (!Array.isArray(b.images) || b.images.length > 4 || !b.images.every((u) => typeof u === 'string' && /^https:\/\//.test(u) && u.length <= 1000)) return '参考图最多 4 张';
   if (!Array.isArray(b.catalog) || !b.catalog.length || b.catalog.length > 800) return '家具目录无效';
@@ -55,7 +55,8 @@ function guard(raw: unknown): Body | string {
     if (!e || !/^F\d{1,4}$/.test(e.code) || !str(e.catalogId, 250) || !str(e.name, 100) || typeof e.category !== 'string' || e.category.length > 30 || !str(e.type, 40) || !finite(e.w, 10, 30000) || !finite(e.d, 10, 30000)) return '家具目录条目无效';
   if (b.projectId !== undefined && (typeof b.projectId !== 'string' || !UUID.test(b.projectId))) return '项目编号无效';
   if (b.mode === 'plan') {
-    if (!finite(b.width, 3000, 40000) || !finite(b.depth, 3000, 40000)) return '长、宽需在 3–40 m 之间';
+    if ((b.width !== undefined && !finite(b.width, 3000, 40000)) || (b.depth !== undefined && !finite(b.depth, 3000, 40000))) return '长、宽需在 3–40 m 之间';
+    if (b.hints !== undefined && (!Array.isArray(b.hints) || b.hints.length > 4 || !b.hints.every((h) => str(h, 200)))) return '高级设计参数无效';
   } else {
     const r = b.room;
     if (!r || !str(r.roomId, 100) || !str(r.name, 100) || !Array.isArray(r.zone) || r.zone.length !== 4 || !r.zone.every((n) => finite(n)) || !Array.isArray(r.openings)) return '房间信息无效';
@@ -145,9 +146,17 @@ function roomPrompt(b: Body) {
   ].filter(Boolean).join(NL + NL);
 }
 
+/** 尺寸可选：没填的那一边由模型按需求决定，并在 JSON 顶层输出。 */
+function sizeLine(b: Body) {
+  if (b.width !== undefined && b.depth !== undefined) return `室内净尺寸：width=${Math.round(b.width)}，depth=${Math.round(b.depth)}（mm），已固定，不要输出 width / depth。`;
+  const fixed = [b.width !== undefined ? `width=${Math.round(b.width)} 已固定` : '', b.depth !== undefined ? `depth=${Math.round(b.depth)} 已固定` : ''].filter(Boolean).join('，');
+  return `室内净尺寸${fixed ? `部分固定（${fixed}）` : '未指定'}：请根据需求（房间数量、面积）确定合理的 width 与 depth（3000–40000 mm，取 100 的整数倍），并在 JSON 顶层输出 "width" 与 "depth"。`;
+}
+
 function planPrompt(b: Body) {
   return [
-    `室内净尺寸：width=${Math.round(b.width!)}，depth=${Math.round(b.depth!)}（mm）。`,
+    sizeLine(b),
+    ...(b.hints ?? []).map((h) => `高级设计要求：${h}`),
     `家具目录（代号 名称 | 分类 | 类型 | 宽×深 mm）：${NL}${catalogText(b.catalog)}`,
     `用户需求：${b.description.trim()}`,
     b.images.length ? '附有参考图（可能是户型图或风格图），请参考其中的布局与风格意图。' : '',
@@ -222,8 +231,9 @@ const area = (ring: Ring) => Math.abs(ring.reduce((s, a, i) => { const c = ring[
 
 function validatePlan(value: unknown, b: Body): string[] {
   const errors: string[] = [];
-  const W = b.width!, D = b.depth!;
-  const v = value as { walls?: unknown; rooms?: unknown; openings?: unknown; furniture?: unknown };
+  const v = value as { width?: unknown; depth?: unknown; walls?: unknown; rooms?: unknown; openings?: unknown; furniture?: unknown };
+  const W = b.width ?? (finite(v?.width, 3000, 40000) ? v.width : NaN), D = b.depth ?? (finite(v?.depth, 3000, 40000) ? v.depth : NaN);
+  if (!Number.isFinite(W) || !Number.isFinite(D)) return ['顶层必须输出 width 与 depth（3000–40000 的数字，单位 mm）'];
   const byCode = new Map(b.catalog.map((e) => [e.code, e]));
   const walls = new Map<string, { dir: string; at: number; from: number; to: number }>();
   if (!Array.isArray(v?.walls)) errors.push('walls 必须是数组');
@@ -295,18 +305,27 @@ function resolveCodes(value: unknown, byCode: Map<string, Entry>): unknown {
   return out;
 }
 
+const friendly = (status: number) =>
+  status === 402 ? 'AI 额度已用完，请联系网站管理员'
+  : status === 403 ? 'AI 功能已被网站管理员关闭'
+  : status === 429 ? '请求太频繁，请稍等片刻再试'
+  : status === 503 || status === 529 ? 'AI 服务繁忙，请稍后重试'
+  : 'AI 服务暂时不可用，请稍后重试';
+
 class UpstreamError extends Error { constructor(message: string, readonly status: number) { super(message); } }
 
-async function callModel(token: string, session: string, system: string, messages: unknown[], temperature: number): Promise<string> {
+async function callModel(token: string, session: string, system: string, messages: unknown[]): Promise<string> {
   const response = await fetch(API, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'X-Session-ID': session, 'X-Enter-Project-ID': PROJECT_ID },
-    body: JSON.stringify({ model: MODEL, system, messages, stream: false, max_tokens: 8192, temperature }),
+    body: JSON.stringify({ model: MODEL, system, messages, stream: false, max_tokens: 8192 }),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data?.type === 'error') {
-    const message = data?.error?.message || `AI 服务错误（${response.status}）`;
-    throw new UpstreamError(message, response.ok ? 502 : response.status);
+    // 上游原文（英文、带 request id）只记日志，给用户的是可操作的中文说明。
+    console.error('upstream error', response.status, JSON.stringify(data?.error ?? data).slice(0, 1000));
+    const status = response.ok ? 502 : response.status;
+    throw new UpstreamError(friendly(status), status);
   }
   const text = (Array.isArray(data?.content) ? data.content : []).filter((c: { type?: string }) => c?.type === 'text').map((c: { text?: string }) => c.text ?? '').join('');
   if (!text) throw new UpstreamError('AI 没有返回内容', 502);
@@ -333,13 +352,11 @@ Deno.serve(async (req) => {
     if (!token) return json(500, { success: false, message: 'AI 服务尚未配置' });
 
     const { data: agents, error: agentError } = await admin.from('interior_ai_agents')
-      .select('owner_id,instructions,model,temperature,repair_rounds')
+      .select('owner_id,instructions,repair_rounds')
       .eq('kind', body.mode).eq('enabled', true).or(`owner_id.eq.${user.id},owner_id.is.null`);
     if (agentError) throw agentError;
     const agent = agents?.find((a) => a.owner_id === user.id) ?? agents?.find((a) => a.owner_id === null);
     const repairRounds = Math.min(3, Math.max(0, agent?.repair_rounds ?? 1));
-    const baseTemperature = Number(agent?.temperature ?? 0.4);
-    const temperature = Math.min(1, Math.max(0, body.temperature ?? baseTemperature + body.index * 0.12));
 
     const { data: existing, error: readError } = await admin.from('interior_ai_generations').select('owner_id').eq('id', body.generationId).maybeSingle();
     if (readError) throw readError;
@@ -361,7 +378,7 @@ Deno.serve(async (req) => {
     let errors: string[] = [];
     for (let round = 0; round <= repairRounds; round++) {
       if (round > 0 && Date.now() - started > REPAIR_BUDGET_MS) break;
-      const text = await callModel(token, session, system, messages, temperature);
+      const text = await callModel(token, session, system, messages);
       try {
         result = extractJson(text);
         errors = body.mode === 'room' ? validateRoom(result, body) : validatePlan(result, body);
@@ -374,7 +391,10 @@ Deno.serve(async (req) => {
       messages.push({ role: 'assistant', content: text });
       messages.push({ role: 'user', content: `上面的输出没有通过校验，请逐条修正后重新输出完整的 JSON（只输出 JSON）：${NL}${errors.slice(0, 20).map((e, i) => `${i + 1}. ${e}`).join(NL)}` });
     }
-    if (errors.length || !result) return await fail(422, `方案未通过校验：${errors[0] ?? '没有可用的输出'}`);
+    if (errors.length || !result) {
+      console.error('validation failed', JSON.stringify(errors.slice(0, 10)));
+      return await fail(422, '这个方案没有通过布局检查，请重新生成或把描述写得更具体');
+    }
 
     const summary = typeof (result as { summary?: unknown }).summary === 'string' ? String((result as { summary: string }).summary).slice(0, 60) : '';
     const byCode = new Map(body.catalog.map((e) => [e.code, e]));
@@ -387,6 +407,6 @@ Deno.serve(async (req) => {
   } catch (e) {
     console.error('interior-ai-design error', e);
     if (e instanceof UpstreamError) return await fail([402, 403, 429].includes(e.status) ? e.status : 502, e.message);
-    return await fail(500, e instanceof Error ? e.message : 'AI 设计服务错误，请重试');
+    return await fail(500, 'AI 设计服务出错，请重试');
   }
 });

@@ -27,7 +27,6 @@ export interface AiRequestBase {
   generationId: string;
   index: number;
   /** 0–1，用来在同一批里拿到不同的方案。 */
-  temperature?: number;
   description: string;
   images: string[];
   catalog: AiCatalogEntry[];
@@ -43,20 +42,27 @@ export interface AiRoomRequest extends AiRequestBase {
 }
 
 export interface AiPlanRequest extends AiRequestBase {
-  width: number;
-  depth: number;
+  /** 高级设计填写的长宽（mm）；不填由 AI 决定。 */
+  width?: number;
+  depth?: number;
+  /** 高级设计的文字约束（几室几厅几卫等）。 */
+  hints: string[];
 }
+
+/** 只把中文说明展示给用户；英文原文（网络错误、上游报错）换成可操作的提示。 */
+export const friendlyError = (message: string | undefined, fallback = "生成失败，请重试") =>
+  message && /[\u4e00-\u9fa5]/.test(message) ? message : /fetch|network|Failed to send/i.test(message ?? "") ? "网络连接异常，请检查网络后重试" : fallback;
 
 async function invoke<T>(body: object): Promise<AiRequestResult<T>> {
   const supabase = await backend();
   const { data, error } = await supabase.functions.invoke(AI_FUNCTION, { body });
   if (error instanceof FunctionsHttpError) {
     const value = await error.context.json().catch(() => ({}));
-    throw new Error(value.message || value.error?.message || error.message);
+    throw new Error(friendlyError(value.message || value.error?.message || error.message));
   }
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(friendlyError(error.message));
   const result = data as AiRequestResult<T>;
-  if (!result || result.success !== true || !result.candidate) throw new Error(result?.message || "生成失败，请重试");
+  if (!result || result.success !== true || !result.candidate) throw new Error(friendlyError(result?.message));
   return result;
 }
 

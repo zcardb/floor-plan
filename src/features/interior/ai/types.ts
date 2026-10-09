@@ -72,4 +72,6 @@ export type AiSlot<T> =
 export interface AiFurniturePick {
   catalogId: string;
   count: number;
+  /** 用户改过的尺寸（mm）；不填用目录尺寸。 */
+  size?: { w: number; d: number };
 }

@@ -3858,8 +3858,13 @@ button.room-cost-row:hover {
 .ai-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .ai-chip { display: inline-flex; align-items: center; gap: 2px; min-height: var(--ctl-sm); padding: 0 4px 0 10px; border: 1px solid hsl(var(--border)); border-radius: 999px; background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); font-size: var(--fs-label); }
 .ai-chip b { margin-left: 3px; font-weight: 600; color: hsl(var(--primary)); }
-.ai-chip > button { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; color: hsl(var(--muted-foreground)); }
-.ai-chip > button:hover { background: hsl(var(--accent)); color: hsl(var(--foreground)); }
+.ai-chip-body { display: inline-flex; align-items: center; gap: 4px; min-height: inherit; border-radius: 999px; cursor: pointer; }
+.ai-chip-body small { font-size: var(--fs-meta); color: hsl(var(--primary)); font-variant-numeric: tabular-nums; }
+.ai-chip-body:hover, .ai-chip-body[data-state="open"] { color: hsl(var(--primary)); }
+.ai-chip-body:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+.ai-chip.is-resized { border-color: hsl(var(--primary) / 0.45); }
+.ai-chip > button:not(.ai-chip-body) { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; color: hsl(var(--muted-foreground)); }
+.ai-chip > button:not(.ai-chip-body):hover { background: hsl(var(--accent)); color: hsl(var(--foreground)); }
 .ai-chip-add { display: inline-flex; align-items: center; gap: 4px; min-height: var(--ctl-sm); padding: 0 10px; border: 1px dashed hsl(var(--border)); border-radius: 999px; font-size: var(--fs-label); color: hsl(var(--primary)); }
 .ai-chip-add:hover, .ai-chip-add[data-state="open"] { border-color: hsl(var(--primary)); background: hsl(var(--primary) / 0.06); }
 /* AI 输入框：圆角卡片，参考图缩略图在上，底部左 ＋、右「数量 + 发送」 */
@@ -3870,11 +3875,13 @@ button.room-cost-row:hover {
 .ai-composer textarea { width: 100%; min-height: 60px; max-height: 200px; padding: 2px 4px; resize: none; border: 0; outline: none; background: transparent; color: hsl(var(--foreground)); font-size: var(--fs-input); line-height: 1.6; }
 .ai-composer textarea::placeholder { color: hsl(var(--muted-foreground)); }
 .ai-composer-images { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; padding: 0; list-style: none; }
-.ai-composer-images li { position: relative; width: 96px; height: 96px; border-radius: 14px; overflow: hidden; border: 1px solid hsl(var(--border)); background: hsl(var(--muted)); }
+.ai-composer-images li { position: relative; width: 64px; height: 64px; border-radius: 12px; overflow: hidden; border: 1px solid hsl(var(--border)); background: hsl(var(--muted)); }
 .ai-composer-images img { width: 100%; height: 100%; object-fit: cover; }
+.ai-composer-image-open { display: block; width: 100%; height: 100%; cursor: zoom-in; }
+.ai-composer-image-open:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
 .ai-composer-image-state { position: absolute; inset: 0; display: grid; place-items: center; background: hsl(var(--card) / 0.7); color: hsl(var(--primary)); }
 /* 悬停 / 键盘聚焦时右上角出现 ✕；无悬停的触屏设备常显 */
-.ai-composer-image-remove { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: hsl(var(--card)); color: hsl(var(--foreground)); box-shadow: 0 1px 4px hsl(var(--foreground) / 0.2); opacity: 0; transform: scale(.9); transition: opacity .15s ease, transform .15s ease; }
+.ai-composer-image-remove { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: hsl(var(--card)); color: hsl(var(--foreground)); box-shadow: 0 1px 4px hsl(var(--foreground) / 0.2); opacity: 0; transform: scale(.9); transition: opacity .15s ease, transform .15s ease; }
 .ai-composer-images li:hover .ai-composer-image-remove, .ai-composer-image-remove:focus-visible { opacity: 1; transform: scale(1); }
 .ai-composer-image-remove:hover { background: hsl(var(--accent)); }
 @media (hover: none) { .ai-composer-image-remove { opacity: 1; transform: none; } }
@@ -3901,8 +3908,14 @@ button.room-cost-row:hover {
 .ai-echo p { font-size: var(--fs-control); line-height: 1.6; color: hsl(var(--foreground)); white-space: pre-wrap; overflow-wrap: anywhere; }
 .ai-echo-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); }
 .ai-echo-meta img { width: 32px; height: 32px; border-radius: 4px; object-fit: cover; border: 1px solid hsl(var(--border)); }
+.ai-echo-meta > button { display: block; border-radius: 4px; cursor: zoom-in; }
+.ai-echo-meta > button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
+.ai-progress-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ai-regenerate { display: inline-flex; align-items: center; gap: 5px; flex: none; height: var(--ctl-sm); padding: 0 10px; border-radius: 999px; border: 1px solid hsl(var(--border)); font-size: var(--fs-control); color: hsl(var(--foreground)); }
+.ai-regenerate:hover { background: hsl(var(--accent)); border-color: hsl(var(--primary) / 0.4); color: hsl(var(--primary)); }
+.ai-regenerate:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
 .ai-progress { display: flex; align-items: center; gap: 6px; font-size: var(--fs-control); color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
-.ai-error { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: var(--ctl-radius-in); background: hsl(var(--destructive) / 0.08); color: hsl(var(--destructive)); font-size: var(--fs-control); }
+.ai-error { display: flex; align-items: flex-start; overflow-wrap: anywhere; gap: 6px; padding: 8px 10px; border-radius: var(--ctl-radius-in); background: hsl(var(--destructive) / 0.08); color: hsl(var(--destructive)); font-size: var(--fs-control); }
 .ai-candidate-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .ai-candidate { display: grid; gap: 6px; padding: 6px; border: 1px solid hsl(var(--border)); border-radius: var(--ctl-radius); background: hsl(var(--card)); text-align: left; font-size: var(--fs-label); color: hsl(var(--foreground)); transition: border-color .15s ease, box-shadow .15s ease; }
 .ai-candidate > span { display: grid; gap: 2px; min-height: 30px; overflow-wrap: anywhere; }
@@ -3910,6 +3923,7 @@ button.room-cost-row:hover {
 button.ai-candidate:hover { border-color: hsl(var(--primary) / 0.5); }
 .ai-candidate.is-selected { border-color: hsl(var(--primary)); box-shadow: 0 0 0 2px hsl(var(--primary) / 0.25); }
 .ai-candidate.is-failed { color: hsl(var(--destructive)); }
+.ai-candidate-error { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ai-candidate.is-pending > span { color: hsl(var(--muted-foreground)); }
 .ai-candidate-preview { position: relative; display: grid; place-items: center; aspect-ratio: 1; border-radius: var(--ctl-radius-in); background: var(--plan-paper); overflow: hidden; color: hsl(var(--muted-foreground)); }
 .ai-candidate.is-pending .ai-candidate-preview { background: linear-gradient(100deg, hsl(var(--muted)) 30%, hsl(var(--accent)) 50%, hsl(var(--muted)) 70%); background-size: 300% 100%; animation: ai-shimmer 1.4s ease-in-out infinite; color: hsl(var(--primary)); }
@@ -3918,11 +3932,12 @@ button.ai-candidate:hover { border-color: hsl(var(--primary) / 0.5); }
 .ai-candidate-check { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
 @keyframes ai-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
 @media (prefers-reduced-motion: reduce) { .ai-candidate.is-pending .ai-candidate-preview { animation: none; } }
-.ai-dialog-actions { display: flex; align-items: center; gap: 8px; padding-top: 4px; border-top: 1px solid hsl(var(--border)); }
+.ai-dialog-actions { display: flex; align-items: center; gap: 8px; padding-top: 4px; }
 .ai-dialog-actions > span { flex: 1; }
 .ai-dialog-actions > button { height: var(--ctl-md); font-size: var(--fs-control); }
 /* 统一家具选择器（AI 指定家具 / 新建家具的参考类型共用） */
 .furniture-picker { width: min(340px, calc(100vw - 24px)); padding: 0; }
+.furniture-picker [cmdk-list] { max-height: min(320px, calc(var(--radix-popover-content-available-height, 400px) - 56px)); overscroll-behavior: contain; }
 .furniture-picker [cmdk-input] { font-size: var(--fs-input); height: var(--ctl-lg); }
 .furniture-picker [cmdk-group-heading] { padding: 6px 8px 4px; font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); }
 .furniture-picker [cmdk-item] { display: flex; align-items: center; gap: 8px; min-height: var(--ctl-md); font-size: var(--fs-control); }
@@ -3944,5 +3959,35 @@ button.ai-candidate:hover { border-color: hsl(var(--primary) / 0.5); }
   .ai-dialog-actions > button:first-child { flex-basis: 100%; justify-content: flex-start; }
   .ai-dialog-actions > button:not(:first-child) { flex: 1; height: 34px; }
   .ai-chip, .ai-chip-add { min-height: 34px; }
-  .ai-composer-images li { width: 72px; height: 72px; }
 }
+
+/* AI：家具尺寸编辑弹层 */
+.ai-size-popover { width: min(280px, calc(100vw - 24px)); padding: 12px; }
+.ai-size-editor { display: grid; gap: 10px; }
+.ai-size-editor-title { display: grid; gap: 2px; font-size: var(--fs-control); font-weight: 600; color: hsl(var(--foreground)); }
+.ai-size-editor-title small { font-size: var(--fs-meta); font-weight: 400; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
+.ai-size-editor-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 6px; }
+.ai-size-editor-row > span { padding-bottom: 10px; color: hsl(var(--muted-foreground)); font-size: var(--fs-control); }
+.ai-size-editor-actions { display: flex; align-items: center; gap: 8px; }
+.ai-size-editor-actions > span { flex: 1; }
+.ai-size-editor-actions .ai-link { display: inline-flex; align-items: center; gap: 4px; text-decoration: none; }
+.ai-size-editor-actions .ai-link:disabled { color: hsl(var(--muted-foreground)); opacity: .5; cursor: not-allowed; }
+.ai-size-editor-save { height: var(--ctl-sm); padding: 0 14px; border-radius: var(--ctl-radius-in); background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); font-size: var(--fs-control); }
+.ai-size-editor-save:hover:not(:disabled) { background: hsl(var(--primary) / 0.9); }
+.ai-size-editor-save:disabled { opacity: .45; cursor: not-allowed; }
+/* AI 创建：高级设计（默认收起，选填） */
+.ai-advanced { border: 1px solid hsl(var(--border)); border-radius: var(--ctl-radius); background: hsl(var(--card)); }
+.ai-advanced-toggle { display: flex; align-items: center; gap: 8px; width: 100%; min-height: var(--ctl-lg); padding: 0 12px; font-size: var(--fs-control); color: hsl(var(--foreground)); text-align: left; border-radius: inherit; }
+.ai-advanced-toggle > svg:first-child { color: hsl(var(--muted-foreground)); flex: none; }
+.ai-advanced-toggle > span { font-weight: 600; flex: none; }
+.ai-advanced-toggle > small { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
+.ai-advanced-toggle:hover { background: hsl(var(--accent) / 0.6); }
+.ai-advanced-toggle:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
+.ai-advanced-caret { flex: none; color: hsl(var(--muted-foreground)); transition: transform .2s ease; }
+.ai-advanced.is-open .ai-advanced-caret { transform: rotate(180deg); }
+.ai-advanced-body { display: grid; gap: 10px; padding: 4px 12px 12px; }
+.ai-advanced-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ai-advanced-row.is-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* 参考图大图预览 */
+.image-preview-dialog { width: auto; max-width: min(960px, calc(100vw - 32px)) !important; padding: 12px !important; background: hsl(var(--card)); }
+.image-preview-dialog img { display: block; max-width: 100%; max-height: calc(100dvh - 96px); margin: 0 auto; border-radius: var(--ctl-radius-in); object-fit: contain; }

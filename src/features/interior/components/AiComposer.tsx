@@ -3,6 +3,7 @@ import { ArrowUp, ChevronDown, ImagePlus, Loader2, Plus, X } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { EditorTooltip } from "@/components/ui/editor-tooltip";
 import { AI_COUNT_OPTIONS, AI_IMAGE_LIMIT } from "../ai/client";
+import { ImagePreview } from "./ImagePreview";
 import { imagesUploading, useReferenceImages, type AiImageDraft, type ImagesUpdate } from "../ai/referenceImages";
 
 export interface AiComposerValue {
@@ -36,7 +37,7 @@ export function AiComposer({ value, onDescription, onImages, onCount, onSend, pl
   blocked?: string;
 }) {
   const file = useRef<HTMLInputElement>(null), text = useRef<HTMLTextAreaElement>(null);
-  const [dragging, setDragging] = useState(false);
+  const [dragging, setDragging] = useState(false), [preview, setPreview] = useState<{ src: string; alt: string } | null>(null);
   const images = useReferenceImages(value.images, onImages);
   const uploading = imagesUploading(value.images);
   const full = value.images.length >= AI_IMAGE_LIMIT;
@@ -70,7 +71,9 @@ export function AiComposer({ value, onDescription, onImages, onCount, onSend, pl
     {dragging && <div className="ai-composer-drop" aria-hidden="true"><ImagePlus size={15} />松开以添加参考图</div>}
     {value.images.length > 0 && <ul className="ai-composer-images" aria-label="参考图">
       {value.images.map((image, i) => <li key={image.id} aria-busy={image.uploading || undefined}>
-        <img src={image.preview} alt={`参考图 ${i + 1}`} crossOrigin={image.preview.startsWith("blob:") ? undefined : "anonymous"} />
+        <button type="button" className="ai-composer-image-open" aria-label={`放大查看参考图 ${i + 1}`} onClick={() => setPreview({ src: image.url ?? image.preview, alt: `参考图 ${i + 1}` })}>
+          <img src={image.preview} alt={`参考图 ${i + 1}`} crossOrigin={image.preview.startsWith("blob:") ? undefined : "anonymous"} />
+        </button>
         {image.uploading && <span className="ai-composer-image-state"><Loader2 size={15} className="animate-spin" /></span>}
         <button type="button" className="ai-composer-image-remove" aria-label={`移除参考图 ${i + 1}`} onClick={() => images.remove(image.id)}><X size={12} /></button>
       </li>)}
@@ -109,5 +112,6 @@ export function AiComposer({ value, onDescription, onImages, onCount, onSend, pl
         <button type="button" className="ai-composer-send" aria-label={sendLabel} disabled={!!reason} onClick={send}><ArrowUp size={15} /></button>
       </EditorTooltip>
     </div>
+    <ImagePreview src={preview?.src ?? null} alt={preview?.alt ?? ""} onClose={() => setPreview(null)} />
   </div>;
 }

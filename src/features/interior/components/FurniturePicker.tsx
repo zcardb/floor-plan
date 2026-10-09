@@ -18,7 +18,8 @@ export function FurniturePicker({ items, onPick, children, label, placeholder = 
 }) {
   const [open, setOpen] = useState(false), [query, setQuery] = useState("");
   const shown = groupPickerItems(filterPickerItems(items, query));
-  return <Popover open={open && !disabled} onOpenChange={(next) => { setOpen(next); if (!next) setQuery(""); }}>
+  // modal：弹层在弹窗里时接管滚动锁，否则鼠标滚轮会被外层弹窗挡住、列表滚不动。
+  return <Popover modal open={open && !disabled} onOpenChange={(next) => { setOpen(next); if (!next) setQuery(""); }}>
     <PopoverTrigger asChild disabled={disabled}>{children}</PopoverTrigger>
     <PopoverContent className="furniture-picker" align="start" collisionPadding={12} aria-label={label}>
       <Command shouldFilter={false}>

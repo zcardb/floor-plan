@@ -13,6 +13,8 @@ const TooltipContent = React.forwardRef<
   React.ElementRef<typeof TooltipPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
 >(({ className, sideOffset = 4, ...props }, ref) => (
+  // 渲染到 body：避免被弹窗等 overflow 容器裁切。
+  <TooltipPrimitive.Portal>
   <TooltipPrimitive.Content
     ref={ref}
     sideOffset={sideOffset}
@@ -22,6 +24,7 @@ const TooltipContent = React.forwardRef<
     )}
     {...props}
   />
+  </TooltipPrimitive.Portal>
 ))
 TooltipContent.displayName = TooltipPrimitive.Content.displayName
 
