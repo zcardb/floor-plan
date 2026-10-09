@@ -5,7 +5,7 @@
 右侧面板（属性 / 成本）由多轮迭代累积而成，同一类操作在不同面板里交互不一致，已经造成真实问题（例如「点完成价格不生效」）。本次依据 growth.design 心理学法则做整体走查，统一保存规则、消除「看起来可改实际不生效」的字段、降低信息噪音、统一面板骨架。
 
 已确认的决定：
-- 价格输入：**失焦 / 回车自动保存，去掉「应用」按钮**，有未保存修改时高亮提示。
+- 价格输入：**保留「应用」按钮（显式提交）**。理由：同步到账号库会影响其他项目且不在 Ctrl Z 撤销范围内；失焦自动保存会在点「同步」勾选时先按旧设置提交。改为补齐「未应用」可见性与关闭时的处理。尺寸、名称等仅影响当前项目且可撤销的字段，继续即时生效。
 - 「同步到账号库」勾选：**扩展到所有价格类别、所有改价入口**（家具、地面、墙面、门窗、屋面、吊顶、拆改）。默认规则沿用：账号库未定价 → 默认勾选；已定价 → 默认不勾选。
 - 「方案总览」里的「房间面积」列表：**保持不动**。
 
@@ -17,7 +17,7 @@
 
 | # | 问题 | 位置 | 违反法则 |
 |---|---|---|---|
-| A1 | 价格需要点「应用」才保存，其他字段失焦即生效，用户以为改了就保存了 | `PriceInput.tsx` | Mental Model / Law of Similarity |
+| A1 | 价格需要点「应用」才保存，但「未应用」状态不可见：按钮常态灰色、输入框无变化，关闭弹层 / 切换对象时修改静默丢失 | `PriceInput.tsx` | Visibility of System Status / Feedback |
 | A2 | 改价入口有 5 处，只有家具属性面板能「同步到账号库」；浮动单价弹层、本间成本、全屋成本明细都没有 | `FurniturePriceField.tsx`、`SelectionEditor.tsx` 384–409、`RoomCostDetail.tsx` 98/135、`CostRowEditor.tsx` 38 | Consistency / Mental Model |
 | A3 | 价格「来源」（项目覆盖 / 账号默认 / 内置参考）和「恢复账号默认」只在全屋成本明细里有，其他入口看不到当前价格从哪来 | `CostRowEditor.tsx` 46–58 | Visibility of System Status |
 | A4 | 家具尺寸在右侧面板用自写的失焦输入（标签「宽度 / m」），浮动编辑器与墙 / 门窗用 `SizeFields`（输入即生效，标签「宽 / m」），同一字段两套行为和文案 | `PropertyPanel.tsx` 239–254 vs `SizeFields.tsx` | Law of Similarity |
@@ -67,12 +67,18 @@
 
 ## 二、改造方案
 
-### 1. `PriceInput`：失焦 / 回车自动保存（A1）
-- 删除「应用」按钮；`onBlur` 与 `Enter` 触发保存，`Esc` 还原。
-- 有未保存修改（dirty）时输入框加 `is-dirty` 样式（主色描边 + 右侧小圆点），保存中显示 `is-saving`，失败保留输入并显示错误。
-- 保存中的 Promise 存进 ref；`flush()` 在保存进行中时等待这次结果，而不是返回 false（避免「点完成 → blur 先触发保存 → flush 因 busy 失败」的竞争）。
-- 组件卸载时（弹层关闭）如果有 dirty 修改，调用一次保存，保证浮动弹层关闭不丢值。
-- 同步更新依赖「应用」文案的提示：`AccountCostDialog.tsx`「留空并应用表示…」改为「清空后离开输入框表示…」。
+### 1. `PriceInput`：保留「应用」，让「未应用」看得见（A1）
+- 保留「应用」按钮与 `Enter` 提交、`Esc` 还原；**失焦不提交**。
+- 三态视觉：
+  - 无修改：按钮 `secondary` 弱化、不可点（`disabled={!dirty}`），避免「点了没反应」。
+  - 有未应用修改：输入框加 `is-dirty`（主色描边），按钮切到 `default` 主色，下方小字「未应用」。
+  - 应用中：按钮「应用中…」；失败保留输入并显示错误。
+- 按钮文案随后果变化：勾选「同步到账号库」时显示「应用并同步」，否则「应用」（让跨项目影响在点击前就可见）。
+- `flush()` 在保存进行中时等待该次结果，而不是返回 false。
+- 关闭时的处理，按容器区分：
+  - 有显式「完成」按钮的对话框（`AccountCostDialog`、`AccountFurnitureDialog`）：点「完成」= 显式提交，继续 `flush()`（已实现，保持）。
+  - 浮动单价弹层、右侧面板切换对象 / 返回：不静默提交，也不静默丢弃；卸载时若有未应用修改，提示「『xx单价』的修改未应用，已放弃」（toast），让丢弃可感知。
+- `PriceInput` 新增 `onDirtyChange` 回调，供外层（如弹层）需要时感知未应用状态。
 
 ### 2. 新建统一改价组件 `PriceField`（A2、A3、D2、暗黑风险）
 新文件 `src/features/interior/components/PriceField.tsx`，替代 `FurniturePriceField` 并用于所有项目内改价入口：
@@ -81,6 +87,7 @@
 - 勾选默认值：该 group/key 在账号默认里为 `undefined` 或 `null` → 勾选；有值 → 不勾选。
 - 勾选时保存顺序：先写账号库，成功后再写项目价；失败则提示并保持输入（沿用当前 `FurniturePriceField` 的逻辑，推广到全部 group）。
 - 勾选说明文案统一写明影响范围（见暗黑风险）。
+- 布局顺序：**勾选项放在输入框与「应用」按钮之前**（先决定作用范围，再输入、再提交），按钮文案随勾选切换「应用 / 应用并同步」。
 - 接入位置：
   - 家具属性面板（替换 `FurniturePriceField`，删除该文件）
   - 浮动编辑器单价弹层 `SelectionEditor.tsx` 389–398
@@ -137,12 +144,12 @@
 ---
 
 ## Implementation checklist
-- [ ] `PriceInput`：移除「应用」按钮，blur / Enter 保存、Esc 还原
-- [ ] `PriceInput`：dirty / saving / error 三种视觉状态（`index.css` 用设计 token）
+- [ ] `PriceInput`：保留「应用」+ Enter 提交、Esc 还原，失焦不提交
+- [ ] `PriceInput`：无修改时按钮禁用；有修改时输入框 `is-dirty` + 按钮主色 +「未应用」小字（`index.css` 用设计 token）
+- [ ] `PriceInput`：支持 `applyLabel`，同步勾选时显示「应用并同步」
 - [ ] `PriceInput`：`flush()` 在保存进行中时等待该次结果
-- [ ] `PriceInput`：卸载时自动保存 dirty 值
-- [ ] `AccountCostDialog` 文案去掉「应用」字样
-- [ ] 新建 `PriceField`：来源标签 + 恢复账号默认 + 同步勾选（全部 7 个 group）
+- [ ] `PriceInput`：卸载时若有未应用修改，toast 提示「修改未应用，已放弃」（对话框「完成」路径仍走 flush 提交）
+- [ ] 新建 `PriceField`：来源标签 + 恢复账号默认 + 同步勾选（全部 7 个 group），勾选项位于输入框之前
 - [ ] `PriceField` 同步勾选默认值：账号库无价 → 勾选，有价 → 不勾选
 - [ ] `PriceField` 同步失败时项目价不变、输入保留、提示错误
 - [ ] 家具属性面板改用 `PriceField`，删除 `FurniturePriceField.tsx`
@@ -169,8 +176,11 @@
 - [ ] 抽取 `ColorSwatches`，家具面板与浮动编辑器共用；自定义色只提交一次
 
 ## Verification checklist
-- [ ] 正向：家具属性面板改价后直接点画布空白处（blur），价格生效并出现成功提示
-- [ ] 正向：浮动单价弹层输入后直接关闭弹层，价格生效
+- [ ] 正向：家具属性面板输入价格后，输入框高亮、按钮变主色并显示「未应用」；点「应用」或回车后生效并恢复常态
+- [ ] 正向：勾选同步后按钮文案为「应用并同步」，取消勾选变回「应用」
+- [ ] 负向：输入价格后点击「同步」勾选，不会触发提交（失焦不保存）
+- [ ] 负向：浮动单价弹层输入后不点应用直接关闭，价格不变并出现「修改未应用，已放弃」提示
+- [ ] 默认：未修改时「应用」按钮为禁用态
 - [ ] 正向：账号库未定价的地面 / 墙面 / 门窗价格，勾选默认开启，保存后账号库中出现该价
 - [ ] 默认：账号库已有价的项目，勾选默认关闭，保存只改当前项目，来源显示「项目覆盖」，「恢复账号默认」可还原
 - [ ] 负向：输入负数 / 非数字，blur 后不保存、输入框标红、原值不变
@@ -186,5 +196,5 @@
 - [ ] 成本页主金额等于成本标签上的金额
 - [ ] 门窗面板显示单价入口，改价后全屋成本「门窗」类别同步变化
 - [ ] 「方案总览」房间面积列表与改造前一致
-- [ ] 运行：`npx tsc --noEmit -p tsconfig.app.json`、`npx eslint src/features/interior`、`npx vitest run src/features/interior`（更新受影响的「应用」按钮相关用例）、`pnpm run build`
+- [ ] 运行：`npx tsc --noEmit -p tsconfig.app.json`、`npx eslint src/features/interior`、`npx vitest run src/features/interior`（更新受影响的价格输入相关用例）、`pnpm run build`
 - [ ] 截图验证：desktop_1280 下选中家具 / 房间 / 墙 / 门窗 / 成本页各一次

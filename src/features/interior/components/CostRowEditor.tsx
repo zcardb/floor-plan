@@ -1,15 +1,10 @@
-import { useContext } from "react";
-import { EditorTooltip } from "@/components/ui/editor-tooltip";
-import { setPrice, type CostRow } from "../model/costs";
-import { priceSource, restorePrice } from "../model/costDefaults";
+import { type CostRow } from "../model/costs";
 import { yuanPrecise } from "../model/money";
 import type { Design } from "../model/types";
-import { CostDefaultsContext } from "./CostDefaultsContext";
 import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
-import { PriceInput } from "./PriceInput";
-import { notify } from "@/lib/notify";
+import { PriceField } from "./PriceField";
 
-/** 全屋口径下一条价格条目：金额、来源与改价入口。 */
+/** 全屋口径下一条价格条目：金额与统一改价入口（来源、恢复、同步账号库）。design 为项目原始数据。 */
 export function CostRowEditor({
   design,
   row,
@@ -19,8 +14,6 @@ export function CostRowEditor({
   row: CostRow;
   change: (fn: (d: Design) => Design) => void;
 }) {
-  const defaults = useContext(CostDefaultsContext),
-    source = priceSource(design, defaults, row.group, row.key);
   return (
     <div className={"cost-detail" + (row.price === null ? " is-unpriced" : "")}>
       <div className="cost-detail-heading">
@@ -32,30 +25,9 @@ export function CostRowEditor({
         )}
       </div>
       <small>
-        {row.quantity.toFixed(row.unit === "件" ? 0 : 2)} {row.unit} · {source}{" "}
-        · 元/{row.unit}
+        {row.quantity.toFixed(row.unit === "件" ? 0 : 2)} {row.unit}
       </small>
-      <PriceInput
-        key={row.group + row.key + String(row.price)}
-        value={row.price}
-        label={row.name + "单价"}
-        onApply={(v) =>
-          change((d) => setPrice(d, row.group, row.key, v, defaults))
-        }
-      />
-      {source === "项目覆盖" && (
-        <EditorTooltip label="恢复账号默认">
-          <button
-            className="back-link"
-            onClick={() => {
-              change((d) => restorePrice(d, row.group, row.key));
-              notify.success(`「${row.name}」已恢复账号默认价`);
-            }}
-          >
-            恢复账号默认
-          </button>
-        </EditorTooltip>
-      )}
+      <PriceField design={design} group={row.group} priceKey={row.key} name={row.name} unit={row.unit} change={change} />
       {row.group === "floorPrices" && (
         <MaterialProcurementEditor
           design={design}

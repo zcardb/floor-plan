@@ -35,8 +35,6 @@ import { SizeFields } from './SizeFields';
 import type { SizeTransaction } from '../model/sizeTransaction';
 import {
   furnitureKey,
-  priceOf,
-  setPrice,
   type PriceGroup,
 } from "../model/costs";
 import { placeEditor, type ScreenRect } from "../model/selectionAnchor";
@@ -44,8 +42,8 @@ import { selectionCost } from "../model/costBreakdown";
 import { yuan } from "../model/money";
 import type { CustomFloor, CustomOpening, CustomWall, Design, Selection } from "../model/types";
 import { applyRoomWall, openingName, openingPriceKey, pickableWalls } from "../model/hardMaterials";
-import { PriceInput } from "./PriceInput";
-import { CostDefaultsContext, useCostDesign } from './CostDefaultsContext';
+import { PriceField } from "./PriceField";
+import { useCostDesign } from './CostDefaultsContext';
 import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
 import { EditorSelect } from './EditorSelect';
 import { RoomSurfaceFields } from './RoomSurfaceFields';
@@ -88,7 +86,7 @@ interface Props {
 const colors = FURNITURE_COLORS;
 export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
   function SelectionEditor(p, ref) {
-    const costDesign = useCostDesign(p.design), defaults = useContext(CostDefaultsContext);
+    const costDesign = useCostDesign(p.design);
     const el = useRef<HTMLDivElement>(null),
       [open, setOpen] = useState<string | null>(null),
       latest = useRef(p),
@@ -382,19 +380,15 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
               </PopoverTrigger>
             </EditorTooltip>
             <PopoverContent className="visual-editor-popover">
-              <h3>
-                {price.name}单价 · 元/{price.unit}
-              </h3>
-              <p>修改影响当前项目所有同款／同材质对象。</p>
-              <PriceInput
-                key={
-                  price.group +
-                  price.key +
-                  priceOf(costDesign, price.group, price.key)
-                }
-                value={priceOf(costDesign, price.group, price.key)}
-                label={price.name + "单价"}
-                onApply={(v) => p.change((d) => setPrice(d, price!.group, price!.key, v, defaults))}
+              <h3>{price.name}单价</h3>
+              <PriceField
+                key={price.group + price.key}
+                design={p.design}
+                group={price.group}
+                priceKey={price.key}
+                name={price.name}
+                unit={price.unit}
+                change={p.change}
               />
               {price.group === "floorPrices" && (
                 <MaterialProcurementEditor

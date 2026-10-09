@@ -1,13 +1,10 @@
-import { useContext } from "react";
 import { Armchair, ArrowLeft, Hammer } from "lucide-react";
 import { EditorTooltip } from "@/components/ui/editor-tooltip";
 import type { CostPart, RoomCost } from "../model/costBreakdown";
-import { setPrice } from "../model/costs";
 import { yuan } from "../model/money";
 import type { Design } from "../model/types";
-import { CostDefaultsContext } from "./CostDefaultsContext";
 import { CostHero } from "./CostHero";
-import { PriceInput } from "./PriceInput";
+import { PriceField } from "./PriceField";
 
 /** 同款/同材质的房间内碎片合并成一行，便于改价。 */
 function mergeParts(parts: CostPart[]): CostPart[] {
@@ -24,7 +21,31 @@ function mergeParts(parts: CostPart[]): CostPart[] {
   }
   return [...merged.values()];
 }
-/** 房间口径：本间硬装分项与房内家具，可直接改单价。 */
+
+/** 一条本间明细：金额 + 统一改价入口（人工为全屋公共项，不在此改价）。 */
+function PartRow({ design, part, highlight, detail, change }: {
+  design: Design; part: CostPart; highlight?: boolean; detail: string;
+  change: (fn: (d: Design) => Design) => void;
+}) {
+  return (
+    <div className={"cost-detail" + (highlight ? " is-highlight" : "")}>
+      <div className="cost-detail-heading">
+        <b>{part.label}</b>
+        {part.price === null ? (
+          <span className="cost-unpriced-tag">未定价</span>
+        ) : (
+          <span>{yuan(part.subtotal)}</span>
+        )}
+      </div>
+      <small>{detail}</small>
+      {part.group !== "labor" && (
+        <PriceField design={design} group={part.group} priceKey={part.key} name={part.label} unit={part.unit} change={change} />
+      )}
+    </div>
+  );
+}
+
+/** 房间口径：本间硬装分项与房内家具，可直接改单价。design 为项目原始数据。 */
 export function RoomCostDetail({
   design,
   room,
@@ -41,17 +62,10 @@ export function RoomCostDetail({
   change: (fn: (d: Design) => Design) => void;
   back: () => void;
 }) {
-  const defaults = useContext(CostDefaultsContext);
   const target = design.rooms.find((r) => r.id === room.roomId),
     hard = mergeParts(room.hard),
     soft = mergeParts(room.soft),
     share = wholeTotal > 0 ? Math.round((room.total / wholeTotal) * 100) : 0;
-  const apply = (part: CostPart, value: number | null) =>
-    change((d) =>
-      part.group === "labor"
-        ? d
-        : setPrice(d, part.group, part.key, value, defaults),
-    );
   return (
     <>
       <div className="panel-heading">
@@ -82,26 +96,8 @@ export function RoomCostDetail({
           硬装 <span>{yuan(room.hardTotal)}</span>
         </h3>
         {hard.map((part) => (
-          <div className="cost-detail" key={part.group + part.key}>
-            <div className="cost-detail-heading">
-              <b>{part.label}</b>
-              {part.price === null ? (
-                <span className="cost-unpriced-tag">未定价</span>
-              ) : (
-                <span>{yuan(part.subtotal)}</span>
-              )}
-            </div>
-            <small>
-              {part.quantity.toFixed(part.unit === "件" ? 0 : 2)} {part.unit}
-              {part.note ? " · " + part.note : ""}
-            </small>
-            <PriceInput
-              key={part.group + part.key + String(part.price)}
-              value={part.price}
-              label={part.label + "单价"}
-              onApply={(v) => apply(part, v)}
-            />
-          </div>
+          <PartRow key={part.group + part.key} design={design} part={part} change={change}
+            detail={`${part.quantity.toFixed(part.unit === "件" ? 0 : 2)} ${part.unit}${part.note ? " · " + part.note : ""}`} />
         ))}
         {!hard.length && (
           <p className="muted-note">
@@ -115,30 +111,8 @@ export function RoomCostDetail({
           房内家具 <small>{soft.reduce((s, p) => s + p.quantity, 0)} 件</small>
         </h3>
         {soft.map((part) => (
-          <div
-            className={
-              "cost-detail" + (part.key === highlightedFurniture ? " is-highlight" : "")
-            }
-            key={part.group + part.key}
-          >
-            <div className="cost-detail-heading">
-              <b>{part.label}</b>
-              {part.price === null ? (
-                <span className="cost-unpriced-tag">未定价</span>
-              ) : (
-                <span>{yuan(part.subtotal)}</span>
-              )}
-            </div>
-            <small>
-              {part.quantity} 件 · 同款联动 · 元/件
-            </small>
-            <PriceInput
-              key={part.group + part.key + String(part.price)}
-              value={part.price}
-              label={part.label + "单价"}
-              onApply={(v) => apply(part, v)}
-            />
-          </div>
+          <PartRow key={part.group + part.key} design={design} part={part} change={change}
+            highlight={part.key === highlightedFurniture} detail={`${part.quantity} 件 · 同款联动`} />
         ))}
         {!soft.length && (
           <p className="muted-note">本间还没有家具；从左侧家具库添加后会实时计入成本。</p>

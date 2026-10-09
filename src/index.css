@@ -3011,16 +3011,37 @@ button.room-cost-row:hover {
   gap: 5px;
 }
 .price-entry .price-control { flex:1; min-width:0; width:100px; }
+.price-entry.is-dirty .price-control {
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.15);
+}
+.price-entry small.price-entry-hint { color: hsl(var(--primary)); }
 .price-sync-option {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 8px;
+  margin-bottom: 6px;
   color: hsl(var(--foreground));
   font-size: 12px;
   cursor: pointer;
 }
 .price-sync-option input { accent-color: hsl(var(--primary)); width: 14px; height: 14px; }
+.price-field-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 10px;
+  color: hsl(var(--muted-foreground));
+}
+.price-source-tag {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+}
+.price-source-tag.is-override { background: hsl(var(--primary) / 0.12); color: hsl(var(--primary)); }
 .price-entry small {
   flex-basis: 100%;
   color: hsl(var(--destructive));
