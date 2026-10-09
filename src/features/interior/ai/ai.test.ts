@@ -92,7 +92,7 @@ describe("房间布局候选清洗与落地", () => {
     { code: bed, back: "sideways" },
   ] };
   it("未知代号与非法方向被丢弃，沿墙位置夹进房间", () => {
-    const items = sanitizeRoomItems({ items: [...raw.items, { code: stand, back: "left", along: 999999 }] }, { zone, ring: master.rings[0], catalog });
+    const items = sanitizeRoomItems({ items: [...raw.items, { code: stand, back: "left", along: 999999 }] }, { zone, catalog });
     expect(items).toHaveLength(5);
     expect(items.every((i) => i.catalogId)).toBe(true);
     const far = items[items.length - 1];
@@ -110,7 +110,7 @@ describe("房间布局候选清洗与落地", () => {
   });
   it("应用：只替换该房间家具，沿用同款外观，账号家具登记进项目目录，方案可通过校验", () => {
     const painted = { ...d, furniture: d.furniture.map((f) => (inRoom([f.cx, f.cy], master) && f.type === "nightstand" ? { ...f, color: "#123456" } : f)) };
-    const items = sanitizeRoomItems(raw, { zone, ring: master.rings[0], catalog });
+    const items = sanitizeRoomItems(raw, { zone, catalog });
     const next = applyRoomLayout(painted, master.id, items, catalog);
     const inside = furnitureInRoom(next, master);
     expect(inside).toHaveLength(4);
@@ -210,5 +210,17 @@ describe("AI 决定户型尺寸", () => {
     expect(sanitizePlan(plan, { catalog })).toMatchObject({ width: 7000, depth: 8000 });
     expect(sanitizePlan(plan, { catalog, width: 9000 })).toMatchObject({ width: 9000, depth: 8000 });
     expect(() => sanitizePlan({ ...plan, width: undefined }, { catalog })).toThrow("尺寸");
+  });
+});
+
+describe("指定家具不因放不下而丢件", () => {
+  it("比房间还大的家具也保留（夹到分区内），指定件数仍然对得上", () => {
+    const catalog = buildAiCatalog();
+    const d = referenceDesign(), master = d.rooms.find((r) => r.id === "master")!;
+    const code = catalog.codeOf("bed:双人床 1.8m")!;
+    const huge = withPickSizes(catalog, [{ catalogId: "bed:双人床 1.8m", count: 1, size: { w: 9000, d: 2000 } }]);
+    const items = sanitizeRoomItems({ items: [{ code, back: "up", along: 99999, gap: -5 }] }, { zone: roomZone(master), catalog: huge, required: [{ code, count: 1 }] });
+    expect(items).toHaveLength(1);
+    expect(items[0].gap).toBe(0);
   });
 });

@@ -103,8 +103,8 @@ export function useRoomAi({ design, catalog, projectId, change }: {
       const { candidate } = await generateRoomCandidate({
         generationId, index, description, images, catalog: aiCatalog.entries, projectId, room: context, plan, existing, required,
       });
-      const items = sanitizeRoomItems(candidate!.result, { zone: roomZone(room), ring: room.rings[0], catalog: aiCatalog, required });
-      return { id: candidate!.candidateId, index, summary: candidate!.summary, result: { items, preview: applyRoomLayout(source, room.id, items, aiCatalog) } };
+      const items = sanitizeRoomItems(candidate!.result, { zone: roomZone(room), catalog: aiCatalog, required });
+      return { id: candidate!.candidateId, index, summary: candidate!.summary, warnings: candidate!.warnings, result: { items, preview: applyRoomLayout(source, room.id, items, aiCatalog) } };
     });
     relaunch.current = launch;
     launch();
