@@ -97,6 +97,7 @@ export function AiCreateProjectForm({ pending, onClose, onSubmit }: { pending: b
       selected={selected}
       onSelect={setPicked}
       onRegenerate={() => { relaunch.current?.(); setPicked(null); }}
+      onRetry={ai.retry}
       preview={(candidate) => <PlanThumbnail design={candidate.result.design} label={`${candidate.summary || "候选户型"}平面预览`} />}
       caption={(candidate) => <>{candidate.summary || `方案 ${candidate.index + 1}`}<small>{candidate.result.design.rooms.length} 个房间 · {candidate.result.design.rooms.reduce((sum, r) => sum + area(r), 0).toFixed(1)} m²</small></>}
     />

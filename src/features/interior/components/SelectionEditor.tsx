@@ -29,8 +29,9 @@ import {
 import { applyRoomFloor, floorMaterialOf, pickableFloors } from "../model/floorMaterials";
 import { WallOptionsMenu } from './WallOptionsMenu';
 import { canDeleteWall, canResizeWall, wallKindName } from '../model/wallPolicy';
-import { length } from "../model/geometry";
+import { length, bbox } from "../model/geometry";
 import { SizeFields } from './SizeFields';
+import { RoomSidesEditor } from './RoomSidesEditor';
 
 import type { SizeTransaction } from '../model/sizeTransaction';
 import {
@@ -308,6 +309,33 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           <EditorTooltip label="常用颜色">
             <ColorSwatches value={f?.color || w?.color || ""} onPick={paint} />
           </EditorTooltip>
+        )}
+        {r && (
+          <Popover
+            open={open === "roomsize"}
+            onOpenChange={(v) => setPanel(v, "roomsize")}
+          >
+            <EditorTooltip label="房间逐边尺寸">
+              <PopoverTrigger asChild>
+                <button className="visual-size-trigger" aria-label="调整房间各边长度">
+                  <Ruler size={15} />
+                  <span>
+                    {formatMeters(bbox(r.rings[0]).x2 - bbox(r.rings[0]).x)} × {formatMeters(bbox(r.rings[0]).y2 - bbox(r.rings[0]).y)} m
+                  </span>
+                  <ChevronDown size={12} />
+                </button>
+              </PopoverTrigger>
+            </EditorTooltip>
+            <PopoverContent
+              className="visual-editor-popover room-size-popover"
+              side="bottom"
+              align="start"
+              collisionPadding={12}
+            >
+              <h3>房间尺寸</h3>
+              <RoomSidesEditor key={r.id} design={p.design} roomId={r.id} transaction={p.transaction} close={() => setOpen(null)} />
+            </PopoverContent>
+          </Popover>
         )}
         {r && (
           <Popover

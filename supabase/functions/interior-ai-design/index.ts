@@ -324,11 +324,14 @@ const friendly = (status: number) =>
 
 class UpstreamError extends Error { constructor(message: string, readonly status: number) { super(message); } }
 
-async function callModel(token: string, session: string, system: string, messages: unknown[]): Promise<string> {
+/** 整户方案 JSON 较长，给足输出长度，避免被截断成不完整的 JSON。 */
+const MAX_TOKENS = 16000;
+
+async function requestModel(token: string, session: string, system: string, messages: unknown[]) {
   const response = await fetch(API, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'X-Session-ID': session, 'X-Enter-Project-ID': PROJECT_ID },
-    body: JSON.stringify({ model: MODEL, system, messages, stream: false, max_tokens: 8192 }),
+    body: JSON.stringify({ model: MODEL, system, messages, stream: false, max_tokens: MAX_TOKENS }),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data?.type === 'error') {
@@ -337,8 +340,16 @@ async function callModel(token: string, session: string, system: string, message
     const status = response.ok ? 502 : response.status;
     throw new UpstreamError(friendly(status), status);
   }
-  const text = (Array.isArray(data?.content) ? data.content : []).filter((c: { type?: string }) => c?.type === 'text').map((c: { text?: string }) => c.text ?? '').join('');
-  if (!text) throw new UpstreamError('AI 没有返回内容', 502);
+  const blocks: { type?: string; text?: string }[] = Array.isArray(data?.content) ? data.content : [];
+  const text = blocks.filter((c) => c?.type === 'text').map((c) => c.text ?? '').join('');
+  if (!text) console.error('empty model output', JSON.stringify({ stop_reason: data?.stop_reason, types: blocks.map((c) => c?.type) }));
+  return text;
+}
+
+/** 偶发的空回复（只有思考块、或网关返回空内容）直接再请求一次，仍为空才算失败。 */
+async function callModel(token: string, session: string, system: string, messages: unknown[]): Promise<string> {
+  const text = await requestModel(token, session, system, messages) || await requestModel(token, session, system, messages);
+  if (!text) throw new UpstreamError('AI 这次没有给出方案，请重试', 502);
   return text;
 }
 

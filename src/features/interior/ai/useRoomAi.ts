@@ -152,6 +152,7 @@ export function useRoomAi({ design, catalog, projectId, change }: {
     selected,
     select: setPicked,
     open, close, updateDraft, send, back, apply, toneOf, regenerate,
+    retry: ai.retry,
     showResults: () => setView("results"),
   };
 }
