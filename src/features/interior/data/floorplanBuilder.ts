@@ -146,8 +146,9 @@ function outline(width: number, depth: number, t: number): Axis[] {
 export const outlineEdgeKey = (i: number) => `e${i + 1}`;
 
 /**
- * 沿不规则外轮廓生成外墙：每条边向外偏移半个墙厚得到中心线，两端各伸出半个墙厚补上转角
- * （与矩形外墙同一做法；凹角处伸出的部分落在相邻外墙墙体内，不侵入室内）。
+ * 沿不规则外轮廓生成外墙：每条边向外偏移半个墙厚得到中心线。
+ * 端点延伸与矩形外墙一致：凸角处伸出一个墙厚把外角补满；凹角处不伸，停在室内转角，
+ * 否则墙体会侵入室内。
  */
 function polygonOutline(ring: Point[], t: number): Axis[] {
   // 有符号面积 > 0 表示顺时针（y 向下的屏幕坐标）。
@@ -156,19 +157,27 @@ function polygonOutline(ring: Point[], t: number): Axis[] {
     return s + a[0] * b[1] - b[0] * a[1];
   }, 0);
   const cw = signed > 0;
+  const n = ring.length;
+  // 顶点 i 是凸角时伸出 t，凹角或共线时不伸。
+  const extension = ring.map((p, i) => {
+    const prev = ring[(i - 1 + n) % n], next = ring[(i + 1) % n];
+    const cross = (p[0] - prev[0]) * (next[1] - p[1]) - (p[1] - prev[1]) * (next[0] - p[0]);
+    return cross !== 0 && cross > 0 === cw ? t : 0;
+  });
   return ring.map((a, i) => {
-    const b = ring[(i + 1) % ring.length];
+    const j = (i + 1) % n, b = ring[j];
     const dir: "h" | "v" = a[1] === b[1] ? "h" : "v";
     // 顺时针时：向右走外侧在上（-y），向下走外侧在右（+x）；逆时针相反。
     const outward = dir === "h" ? (b[0] > a[0] ? -1 : 1) : (b[1] > a[1] ? 1 : -1);
     const sign = cw ? outward : -outward;
     const [p, q] = dir === "h" ? [a[0], b[0]] : [a[1], b[1]];
+    const [from, to] = p < q ? [p - extension[i], q + extension[j]] : [q - extension[j], p + extension[i]];
     return {
       key: outlineEdgeKey(i),
       dir,
       at: (dir === "h" ? a[1] : a[0]) + (sign * t) / 2,
-      from: Math.min(p, q) - t / 2,
-      to: Math.max(p, q) + t / 2,
+      from,
+      to,
       thickness: t,
       kind: "exterior" as WallKind,
     };

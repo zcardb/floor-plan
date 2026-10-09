@@ -41,20 +41,20 @@
 - `supabase/functions/interior-ai-design/index.ts`
 
 ## Implementation checklist
-- [ ] `PlanSpec.outline?: Point[]` 与 `outlineEdgeKey` 导出
-- [ ] `polygonOutline` 按朝向外偏 `t/2`、两端伸出 `t/2`，`buildStructure` 有 `outline` 时用它，无 `outline` 时走原 `outline()`
-- [ ] `sanitize.ts` 的 `parseOutline` 校验横平竖直 / 范围 / 最短边，非法时返回 `undefined`
-- [ ] `sanitizePlan` 的外墙保留名、`spanOf`、门窗 `horizontal` 判断支持 `eK`，结果带 `outline`
-- [ ] 后端 `PLAN_CONTRACT` 去掉「外墙固定是矩形」，加入 `outline` 字段说明、L 形示例与「不要补成矩形」
-- [ ] 后端 `SIZE_LINE` 说明 width / depth 是外接矩形
-- [ ] 后端 `validatePlan` 支持 `outline` 与 `eK` 外墙名，窗 / 入户门判断用新外墙集合
-- [ ] 新增 / 更新 `floorplanBuilder.test.ts`、`ai.test.ts`
-- [ ] 重新部署 `interior-ai-design`
+- [x] `PlanSpec.outline?: Point[]` 与 `outlineEdgeKey` 导出
+- [x] `polygonOutline` 按朝向外偏 `t/2`，凸角伸出 `t`、凹角不伸（与矩形外墙一致），`buildStructure` 有 `outline` 时用它，无 `outline` 时走原 `outline()`
+- [x] `sanitize.ts` 的 `parseOutline` 校验横平竖直 / 范围 / 最短边，非法时返回 `undefined`
+- [x] `sanitizePlan` 的外墙保留名、`spanOf`、门窗 `horizontal` 判断支持 `eK`，结果带 `outline`
+- [x] 后端 `PLAN_CONTRACT` 去掉「外墙固定是矩形」，加入 `outline` 字段说明、L 形示例与「不要补成矩形」
+- [x] 后端 `SIZE_LINE` 说明 width / depth 是外接矩形
+- [x] 后端 `validatePlan` 支持 `outline` 与 `eK` 外墙名，窗 / 入户门判断用新外墙集合
+- [x] 新增 / 更新 `floorplanBuilder.test.ts`、`ai.test.ts`
+- [x] 重新部署 `interior-ai-design`
 
 ## Verification checklist
-- [ ] `pnpm exec tsc --noEmit`、`pnpm lint` 无新错误
-- [ ] `pnpm test` 全绿，含：L 形 6 面外墙、`eK` 门窗保留、非法 `outline` 回退矩形、无 `outline` 仍为 top/right/bottom/left
-- [ ] `pnpm run build` 通过
-- [ ] 内置户型模板（无 `outline`）生成结果不变：现有 `templates` 相关测试不需改动即通过
-- [ ] 部署后预检请求返回 `ok`，未带登录的请求返回 401
+- [x] `pnpm exec tsc --noEmit`、`pnpm lint` 无新错误
+- [ ] `pnpm test`：新增用例全部通过（L 形外墙、`eK` 门窗、非法 outline 回退、矩形 outline 与原矩形几何一致）；另有 2 个失败来自同期合并的 `9916530`（wallRemoval / roomFollow），与本改动无关。原文：L 形 6 面外墙、`eK` 门窗保留、非法 `outline` 回退矩形、无 `outline` 仍为 top/right/bottom/left
+- [x] `pnpm run build` 通过
+- [x] 内置户型模板（无 `outline`）生成结果不变：现有 `templates` 相关测试不需改动即通过
+- [x] 部署后预检请求返回 `ok`，未带登录的请求返回 401
 - [ ] 人工确认（需登录与 AI 额度）：描述「L 形户型，长 12 m × 宽 10 m，右上角缺 4 m × 3 m」或上传不规则户型图，生成方案外墙为不规则轮廓而不是矩形；描述普通矩形户型时仍正常
