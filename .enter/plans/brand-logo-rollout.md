@@ -69,8 +69,23 @@ export function Logo({ size = 24, className = "" }: { size?: number; className?:
 - 用 AvatarFigure 的几何数据（`roller` 道具 + `up` 视线 + 墨色身体）写一份**静态** `public/favicon.svg`：64×64 viewBox，底色与图形色写成固定 HSL（不能用 CSS 变量，文件在 React 之外）：底 `hsl(142 38% 95%)`、图形 `hsl(142 38% 32%)`、墨色 `hsl(33 13% 17%)`、眼睛 `hsl(40 60% 99%)`，外框描边 `hsl(21 52% 40% / .5)`。写完后用 `read_file` 查看渲染结果或与 `AvatarFigure` 的 `roller` 分支逐一比对坐标。
 - `index.html` 把 `<link href="/favicon.ico" rel="alternate icon">` 这一行去掉，只保留 `favicon.svg`（`favicon.ico` 是模板默认图标，作为 alternate 会与新的 SVG 冲突；浏览器标签页优先 SVG，删除可避免旧图标在部分环境继续出现）。`public/favicon.ico` 文件本身保留不动，避免影响其他引用。
 
+### 7. AI 生成失败时，结果区高度保持不变
+
+**原因**（`src/features/interior/components/AiResults.tsx` + `src/index.css:4148-4149`）：
+- 生成中 / 成功的格子 = 正方形预览（`.ai-candidate-preview { aspect-ratio: 1 }`）+ 一行标题（`min-height: 30px`）。
+- 失败的格子被 CSS 改成 `.is-failed .ai-candidate-preview { aspect-ratio: auto }`，同时有重试按钮时不渲染标题，于是每格只剩一个按钮的高度，四格一起塌成截图里那样的细条。
+- 另外失败时会在进度行下面**额外插入**一条 `.ai-error` 红色提示，这一行在生成中时不存在，也会让整体高度跳动。
+
+**改法**（只动这两个文件，复用现有结构与 token）：
+1. `src/index.css`：删掉 `.ai-candidate.is-failed { grid-template-rows: 1fr }` 和 `.ai-candidate.is-failed .ai-candidate-preview { align-content:center; aspect-ratio:auto }` 这两处覆写，让失败格子沿用与生成中相同的正方形预览；重试按钮由 `.ai-candidate-preview` 已有的 `place-items: center` 居中。
+2. `AiResults.tsx` 失败格子：始终渲染一行标题占位，与生成中格子（「方案 N · 生成中」）结构一致——有 `onRetry` 时显示 `方案 N · 生成失败`（普通 `<span>`，不使用 `ai-candidate-error` 类，保持现有测试断言 `not.toContain("ai-candidate-error")` 成立）；没有 `onRetry` 时维持现有的 `ai-candidate-error` 文本。
+3. `AiResults.tsx` 错误提示：不再在进度行下方新增独立的 `.ai-error` 行，把错误原因并入**一直存在**的进度行——全部失败时进度行显示 `AlertCircle` 图标 + `failed[0].error`（无原因时用「生成失败，请返回修改后重试」），用新增修饰类 `.ai-progress.is-error`（`color: hsl(var(--destructive))`）着色。这样「生成中 → 失败」只换文字，不增减行。`.ai-error` 的 CSS 规则若无其它引用则一并删除。
+
+效果：生成中、部分失败、全部失败三种状态下，四个格子都保持正方形，弹窗高度一致。
+
 ## 不改动的部分
 
+- AI 生成逻辑、重试 / 重新生成的行为（`useAiBatch`、`onRetry`、`onRegenerate`）不变，只改展示。
 - 工具栏里 `LayoutTemplate` 的其它用途（2D 视图切换按钮、3D 俯视按钮）是功能图标，不属于 logo，保持原样。
 - 项目管理卡片的 `<LayoutTemplate size={24} />` 空状态占位、`ProjectManager` 的空态插画同样保留。
 - `AssistantAvatarView` / 小助手头像体系、账号圆形头像（`AccountAvatar`）不动 —— 用户只要求 logo 位置。
@@ -87,6 +102,7 @@ export function Logo({ size = 24, className = "" }: { size?: number; className?:
    - 登录弹窗（点工具栏「登录」）：徽标位显示 44px logo，弹窗排版未错位。
    - favicon：浏览器标签页显示新的绿色滚筒刷图标，且不出现旧的灰色方块图标。
 5. 确认组件在浅色主题下对比度正常（`.brand-logo` 的绿色底与深色图形来自 `--success`，与既有 `.assistant-avatar[data-tone="2"]` 完全一致）。
+6. AI 失败布局：实际触发一次生成失败后截图核对，失败格子尺寸与生成中 / 成功格子一致（正方形 + 标题行）。
 
 ## Implementation checklist
 
@@ -97,13 +113,19 @@ export function Logo({ size = 24, className = "" }: { size?: number; className?:
 - [ ] `AuthDialog.tsx` 的 `.dialog-emblem` 用 `<Logo size={44} />` 替换 `<Cloud size={24} />`，并清理 `Cloud` 导入。
 - [ ] 重写 `public/favicon.svg` 为滚筒刷图形（静态 HSL 颜色，64×64 viewBox），坐标与 `AvatarFigure` 的 `roller` 分支一致。
 - [ ] `index.html` 删除 `favicon.ico` 的 alternate 链接，保留 `favicon.svg`。
+- [ ] `src/index.css` 删除 `.ai-candidate.is-failed` 的 `grid-template-rows` 与 `.is-failed .ai-candidate-preview` 的 `aspect-ratio:auto` 覆写，失败格子预览保持 1:1。
+- [ ] `AiResults.tsx` 失败格子始终渲染标题行：有 `onRetry` 时为 `方案 N · 生成失败`（不带 `ai-candidate-error` 类）。
+- [ ] `AiResults.tsx` 移除独立的 `.ai-error` 行，全部失败时把 `AlertCircle` + 错误原因放进进度行，新增 `.ai-progress.is-error` 着色；清理无引用的 `.ai-error` CSS。
 
 ## Verification checklist
 
 - [ ] `pnpm check`（lint + `tsc --noEmit`）无错误，无未使用导入告警。
-- [ ] `pnpm test` 全绿，特别确认 `toolbarMenus.test.tsx` 的 `project-menu-trigger` 文本断言通过。
+- [ ] `pnpm test` 全绿，特别确认 `toolbarMenus.test.tsx` 的 `project-menu-trigger` 文本断言、`aiComponents.test.tsx` 的「失败的方案可以单独重试」用例（含 `not.toContain("ai-candidate-error")`）通过。
 - [ ] `pnpm run build` 成功。
 - [ ] 正向：工作台工具栏、账号管理侧栏、登录弹窗三处都显示同一个绿色滚筒刷 logo，尺寸分别为 24 / 26 / 44。
 - [ ] 负向：工具栏 2D / 俯视按钮、项目管理空状态仍是原来的 `LayoutTemplate` 图标；账号圆形头像未被替换。
 - [ ] 边界：`mobile_390` 视口下工具栏不溢出、logo 不被裁切；`desktop_1280` 下排版与改动前一致。
 - [ ] 边界：浏览器标签页 favicon 为新的绿色图标，不再出现旧的灰色方块。
+- [ ] 正向：AI 创建户型全部失败时，四个格子仍为正方形、居中显示「重试」，标题行为「方案 N · 生成失败」，进度行显示红色错误原因。
+- [ ] 边界：同一弹窗「生成中 → 全部失败」「部分失败」三种状态下结果区高度一致，不出现额外的错误提示行；窄屏（≤600px 单列）下失败格子同样保持正方形。
+- [ ] 负向：成功格子的选中、放大查看、确认创建行为与改动前一致。
