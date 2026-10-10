@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { Furniture } from "../model/types";
+import type { ModelPart, ModelPartFinish } from "../model/furniture3d";
 /** 把一件家具的子网格按材质与投影设置合并，draw call 从几十个降到几个。 */
 function mergeParts(g: THREE.Group) {
   const buckets = new Map<string, { material: THREE.Material; cast: boolean; parts: THREE.BufferGeometry[] }>();
@@ -32,12 +33,14 @@ function mergeParts(g: THREE.Group) {
   }
 }
 const cache = new Map<string, THREE.MeshStandardMaterial>();
-export function mat(color: string, roughness = 0.7) {
-  const key = color + roughness;
+export function mat(color: string, roughness = 0.7, metalness = 0) {
+  const key = `${color}|${roughness}|${metalness}`;
   if (!cache.has(key))
-    cache.set(key, new THREE.MeshStandardMaterial({ color, roughness }));
+    cache.set(key, new THREE.MeshStandardMaterial({ color, roughness, metalness }));
   return cache.get(key)!;
 }
+/** AI 模型部件的表面质感 → 粗糙度 / 金属度。 */
+const FINISH: Record<ModelPartFinish, [number, number]> = { matte: [0.85, 0], gloss: [0.32, 0.05], metal: [0.35, 0.85] };
 export function disposeMaterials() {
   cache.forEach((m) => m.dispose());
   cache.clear();
@@ -100,6 +103,38 @@ function sphere(
   g.add(o);
   return o;
 }
+/**
+ * AI 简易 3D 模型：按比例基本体拼装。部件尺寸与位置都是相对外框的比例
+ * （x、z 为 -0.5~0.5 的中心，y 为 0~1 的底面，w / h / d 为占比），
+ * 因此家具改尺寸时整套模型等比缩放。
+ */
+function buildParts(g: THREE.Group, parts: ModelPart[], w: number, h: number, d: number) {
+  for (const p of parts) {
+    const pw = Math.max(0.005, p.w * w), ph = Math.max(0.005, p.h * h), pd = Math.max(0.005, p.d * d);
+    const [roughness, metalness] = FINISH[p.finish ?? "matte"];
+    const material = mat(p.color, roughness, metalness);
+    let geometry: THREE.BufferGeometry;
+    if (p.kind === "cylinder") {
+      geometry = new THREE.CylinderGeometry(0.5, 0.5, 1, 24);
+      // 单位圆柱沿 y 轴：按轴向旋转后再缩放，圆截面拉成椭圆即贴合外框比例。
+      if (p.axis === "x") geometry.rotateZ(Math.PI / 2);
+      else if (p.axis === "z") geometry.rotateX(Math.PI / 2);
+      geometry.scale(pw, ph, pd);
+    } else if (p.kind === "sphere") {
+      geometry = new THREE.SphereGeometry(1, 20, 14);
+      geometry.scale(pw / 2, ph / 2, pd / 2);
+    } else if (p.round) {
+      geometry = new RoundedBoxGeometry(pw, ph, pd, 2, Math.max(0.001, Math.min(0.03, pw / 4, ph / 4, pd / 4)));
+    } else {
+      geometry = new THREE.BoxGeometry(pw, ph, pd);
+    }
+    const o = new THREE.Mesh(geometry, material);
+    o.position.set(p.x * w, p.y * h + ph / 2, p.z * d);
+    o.castShadow = o.receiveShadow = true;
+    g.add(o);
+  }
+}
+
 function legs(g: THREE.Group, w: number, d: number, h: number) {
   for (const a of [-1, 1])
     for (const b of [-1, 1])
@@ -145,7 +180,9 @@ export function buildFurniture(f: Furniture): THREE.Group {
     d = f.d / 1000,
     c = f.color,
     bz = -d / 2;
-  if (f.type === 'fireplace') {
+  if (f.model3d?.parts.length) {
+    buildParts(g, f.model3d.parts, w, h, d);
+  } else if (f.type === 'fireplace') {
     if (f.shape === 'circle') cylinder(g,w/2,h,c); else box(g,w,h,d,c,0,0,0,true);
     box(g,w*.45,h*.25,.012,'#252525',0,h*.2,d/2+.007);
     cylinder(g,Math.min(w,d)*.14,h*.15,'#525252',0,h,-d*.15);

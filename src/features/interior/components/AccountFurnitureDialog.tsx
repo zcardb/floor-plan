@@ -8,7 +8,7 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import type { LibraryItem } from '../model/types';
 import { categories } from '../data/catalog';
 import { FurnitureVisual, hasViews } from './FurnitureVisual';
-import { FurnitureAiDialog, type FurnitureAiResult } from './FurnitureAiDialog';
+import { FurnitureAiDialog, defaultAdjustImage, type FurnitureAiResult } from './FurnitureAiDialog';
 import { FurnitureFormFields } from './FurnitureFormFields';
 import type { ModelSnapshot } from './FurnitureModelPreview';
 import type { FurnitureView } from '../cloud/useFurnitureImage';
@@ -17,7 +17,8 @@ import { notify } from '@/lib/notify';
 
 /** 表单里除单价外的字段是否改过（单价走账号默认价，单独比较）。 */
 const fieldsChanged = (item: LibraryItem, next: Omit<LibraryItem, 'price'>) =>
-  (['name', 'category', 'type', 'w', 'd', 'height', 'color'] as const).some(key => item[key] !== next[key]) || (item.shape || 'reference') !== (next.shape || 'reference');
+  (['name', 'category', 'type', 'w', 'd', 'height', 'color'] as const).some(key => item[key] !== next[key]) || (item.shape || 'reference') !== (next.shape || 'reference')
+  || JSON.stringify(item.model3d ?? null) !== JSON.stringify(next.model3d ?? null);
 
 /**
  * 家具详情：表单项与「新建你的家具」一致。自定义家具所有项都可改，内置家具只能改账号默认单价。
@@ -47,20 +48,21 @@ export function AccountFurnitureDialog({ item, isCustom, referencePrice, onOpenC
   const patch = (next: Partial<FurnitureDraft>) => { setError(''); setDraft(current => ({ ...current, ...next })); };
 
   /**
-   * 应用 AI 结果：2D 写 imageUrl；3D 写 image3dUrl（效果参考）并把主色写入模型颜色，
-   * 3D 视角与项目 3D 场景用的都是这套程序化模型。不提交表单里其它未保存的修改。
+   * 应用 AI 结果：2D 写俯视图 imageUrl；3D 写 model3d（简易 3D 模型），
+   * 画布 3D 场景与详情预览用的都是它，家具主色仍按表单里的颜色。不提交表单里其它未保存的修改。
    */
-  const applyImage = async ({ url, color }: FurnitureAiResult) => {
+  const applyImage = async ({ url, model3d }: FurnitureAiResult) => {
     if (!saveGeometry) return false;
-    const next = { ...item, ...(activeView === 'top' ? { imageUrl: url } : { image3dUrl: url, ...(color ? { color } : {}) }) };
+    const next: LibraryItem = activeView === 'top'
+      ? { ...item, imageUrl: url }
+      : { ...item, ...(model3d ? { model3d } : {}) };
     if (!(await saveGeometry(next))) return false;
-    if (activeView === 'perspective' && color) setDraft(current => ({ ...current, color }));
     onChanged(next);
     return true;
   };
-  /** 3D 没有效果图时，用实时模型当前视角的截图作为默认素材。 */
+  /** 3D 既无 3D 效果图也无 2D 图时，用实时模型当前视角的截图作默认参考图。 */
   const openAdjust = async () => {
-    const seed = activeView === 'perspective' && !item.image3dUrl ? await snapshot.current?.().catch(() => null) ?? null : null;
+    const seed = activeView === 'perspective' && !defaultAdjustImage(item, 'perspective') ? await snapshot.current?.().catch(() => null) ?? null : null;
     setAdjusting({ seed });
   };
 

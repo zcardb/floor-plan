@@ -14,6 +14,14 @@ describe("账号家具同步到项目", () => {
     expect(next.customCatalog?.[0]).toMatchObject({ name: "皮沙发", w: 2200, color: "#333333", price: 3000, imageUrl: "https://x/a.webp" });
     expect(next.furniture[0]).toMatchObject({ name: "皮沙发", w: 2200, color: "#333333", imageUrl: "https://x/a.webp" });
   });
+  it("AI 3D 模型随账号库同步到目录与已放置家具；内容相同不算变化", () => {
+    const model3d = { version: 1 as const, parts: [{ kind: "box" as const, x: 0, y: 0, z: 0, w: 1, h: 1, d: 1, color: "#aaaaaa" }] };
+    const design = { ...blankDesign(), customCatalog: [entry], furniture: [placed()] };
+    const next = syncAccountFurniture(design, [{ ...entry, model3d }])!;
+    expect(next.customCatalog?.[0]?.model3d).toEqual(model3d);
+    expect(next.furniture[0]?.model3d).toEqual(model3d);
+    expect(syncAccountFurniture(next, [{ ...entry, model3d: JSON.parse(JSON.stringify(model3d)) }])).toBeNull();
+  });
   it("项目里单独改过的尺寸 / 颜色不被覆盖", () => {
     const design = { ...blankDesign(), customCatalog: [entry], furniture: [placed({ w: 1600, color: "#ff0000" })] };
     const next = syncAccountFurniture(design, [{ ...entry, w: 2200, d: 1000, color: "#333333" }])!;

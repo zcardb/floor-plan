@@ -2,6 +2,7 @@ import { isFloorKey, validCustomFloor } from "./floorMaterials";
 import { purgeDemolished } from './wallRemoval';
 import { stripStrayHoleRooms } from './roomHoles';
 import { validFurnitureType, validFurnitureOutline } from './furnitureAppearance';
+import { validModel3d } from './furniture3d';
 import { referenceDesign } from "../data/templates";
 import { length } from "./geometry";
 import { validateProcurement } from "./materialProcurement";
@@ -142,6 +143,7 @@ export function validateDesign(value: unknown): Design {
           item.price !== null &&
           !validPrice(item.price)) ||
         (item.imageUrl !== undefined && !/^https:\/\//.test(item.imageUrl)) ||
+        (item.model3d !== undefined && !validModel3d(item.model3d)) ||
         (item.image3dUrl !== undefined && !/^https:\/\//.test(item.image3dUrl))
       )
         fail();
@@ -217,7 +219,8 @@ export function validateDesign(value: unknown): Design {
   for (const f of v.furniture)
     if (
       (f.height !== undefined && !finite(f.height, 50, 8000)) ||
-      (f.imageUrl !== undefined && !/^https:\/\//.test(f.imageUrl))
+      (f.imageUrl !== undefined && !/^https:\/\//.test(f.imageUrl)) ||
+      (f.model3d !== undefined && !validModel3d(f.model3d))
     )
       fail();
   if (v.costSettings) {

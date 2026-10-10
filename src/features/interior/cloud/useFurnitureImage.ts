@@ -3,6 +3,7 @@ import { FunctionsHttpError } from "@supabase/supabase-js";
 import type { LibraryItem } from '../model/types';
 import { backend } from "../ai/client";
 import type { AiFileRef } from "../ai/referenceImages";
+import { sanitizeModel3d, type FurnitureModel3d } from "../model/furniture3d";
 import { notify } from "@/lib/notify";
 
 async function invoke(name: string, body: object) {
@@ -76,6 +77,26 @@ export async function generateFurnitureImage(
     await wait(2000, cancelled, onWait);
   }
   throw new Error("图片仍在生成，请稍后重试");
+}
+
+/**
+ * 生成家具的简易 3D 模型：后端用可读图的模型照着效果图 / 需求拼出基本体，
+ * 返回前再按前端同一套规则整理一次。失败抛错，由调用方展示重试。
+ */
+export async function generateFurnitureModel(
+  item: LibraryItem,
+  options: { description?: string; images?: string[]; files?: AiFileRef[]; model?: string },
+): Promise<FurnitureModel3d> {
+  const data = await invoke("interior-furniture-model", {
+    item,
+    ...(options.description ? { description: options.description } : {}),
+    ...(options.images?.length ? { images: options.images } : {}),
+    ...(options.files?.length ? { files: options.files } : {}),
+    ...(options.model ? { model: options.model } : {}),
+  });
+  const model3d = sanitizeModel3d(data?.model3d);
+  if (!model3d) throw new Error("AI 没有给出可用的 3D 模型，请重试");
+  return model3d;
 }
 
 export function useFurnitureImage() {

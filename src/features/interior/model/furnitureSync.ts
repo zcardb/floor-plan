@@ -1,12 +1,16 @@
 import type { Design, Furniture, LibraryItem } from './types';
 
 /** 账号家具库改动后同步到项目目录的字段；单价不在其中：账号默认价走成本设置，项目内改价以项目为准。 */
-const CATALOG_FIELDS = ['name', 'category', 'type', 'shape', 'w', 'd', 'height', 'color', 'imageUrl', 'image3dUrl'] as const;
+const CATALOG_FIELDS = ['name', 'category', 'type', 'shape', 'w', 'd', 'height', 'color', 'imageUrl', 'image3dUrl', 'model3d'] as const;
 /** 已放置的家具同步的字段：只更新仍与旧目录一致的字段，项目里单独改过的（例如调过尺寸、换过颜色）保留。 */
-const PLACED_FIELDS = ['name', 'type', 'shape', 'w', 'd', 'height', 'color', 'imageUrl'] as const;
+const PLACED_FIELDS = ['name', 'type', 'shape', 'w', 'd', 'height', 'color', 'imageUrl', 'model3d'] as const;
 
 const norm = (value: unknown) => (value === null || value === '' ? undefined : value);
-const same = (a: unknown, b: unknown) => norm(a) === norm(b);
+/** 3D 模型是对象，每次读取都是新实例，必须按内容比较。 */
+const same = (a: unknown, b: unknown) => {
+  const [x, y] = [norm(a), norm(b)];
+  return x === y || (typeof x === 'object' && typeof y === 'object' && JSON.stringify(x) === JSON.stringify(y));
+};
 
 /**
  * 用账号家具库的最新版本更新项目：项目目录（customCatalog）里同 catalogId 的条目整体跟随，

@@ -1,5 +1,6 @@
 import type { Database } from "@/integrations/supabase/types";
 import type { LibraryItem } from "../model/types";
+import { sanitizeModel3d } from "../model/furniture3d";
 
 type FurnitureRow = Database["public"]["Tables"]["interior_furniture_catalog"]["Row"];
 
@@ -17,4 +18,5 @@ export const furnitureFromRow = (r: FurnitureRow): LibraryItem => ({
   price: r.price === null ? null : Number(r.price),
   imageUrl: r.image_url || undefined,
   image3dUrl: r.image_3d_url || undefined,
+  model3d: sanitizeModel3d(r.model_3d) ?? undefined,
 });

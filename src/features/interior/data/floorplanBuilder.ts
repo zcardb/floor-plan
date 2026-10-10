@@ -317,6 +317,7 @@ export function placeFurniture({ zone, items }: FurnitureZone, resolve: CatalogR
             ...(item.shape ? { shape: item.shape } : {}),
             ...(item.height ? { height: item.height } : {}),
             ...(item.imageUrl ? { imageUrl: item.imageUrl } : {}),
+            ...(item.model3d ? { model3d: item.model3d } : {}),
           }
         : {}),
     });

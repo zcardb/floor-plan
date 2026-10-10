@@ -5,28 +5,32 @@ import { Button } from '@/components/ui/button';
 import { notify } from '@/lib/notify';
 import { AiComposer, type AiComposerValue } from './AiComposer';
 import { AiResults } from './AiResults';
-import { VIEW_LABEL, viewImage } from './FurnitureVisual';
+import { VIEW_LABEL } from './FurnitureVisual';
 import { readyFiles, readyImageUrls, uploadedImage, type AiFileRef, type AiImageDraft } from '../ai/referenceImages';
 import { uploadReferenceImage } from '../ai/client';
 import { useAiBatch } from '../ai/useAiBatch';
 import { DEFAULT_AI_COUNT } from '../ai/useRoomAi';
 import { DEFAULT_AI_ENGINE } from '../ai/models';
-import { generateFurnitureImage, type FurnitureView } from '../cloud/useFurnitureImage';
-import { dominantColorFromImage } from '../cloud/imagePalette';
+import { generateFurnitureImage, generateFurnitureModel, type FurnitureView } from '../cloud/useFurnitureImage';
+import type { FurnitureModel3d } from '../model/furniture3d';
 import { FurnitureModelPreview } from './FurnitureModelPreview';
 import { formatMeters } from '../model/lengthUnits';
 import type { LibraryItem } from '../model/types';
 
 interface Request { description: string; images: string[]; files: AiFileRef[] }
-/** 一个候选：AI 图片；3D 视角另带从图中取出的主色，用来给实时 3D 模型上色。 */
-export interface FurnitureAiResult { url: string; color?: string }
+/** 一个候选：2D 是一张图片；3D 是 AI 拼出的简易 3D 模型（url 仅作参考，可为空）。 */
+export interface FurnitureAiResult { url: string; model3d?: FurnitureModel3d }
 
 /** 默认需求：名称、尺寸与主色，用户可直接改。 */
 export const defaultFurniturePrompt = (item: LibraryItem) =>
   `${item.name}，${formatMeters(item.w)} × ${formatMeters(item.d)}${item.height ? ` × ${formatMeters(item.height)}` : ''} m，主色 ${item.color}`;
 
-/** 默认带上的原图只取当前视角：2D 用 2D 图、3D 用 3D 图，不跨视角混用。 */
-export const defaultAdjustImage = (item: LibraryItem, view: FurnitureView) => viewImage(item, view);
+/**
+ * 默认带上的参考图：2D 用 2D 俯视图本身；3D 建模优先用已有的 3D 效果图，
+ * 没有时退回 2D 俯视图（外形轮廓比参考几何的方块更有参考价值），不跨视角混用。
+ */
+export const defaultAdjustImage = (item: LibraryItem, view: FurnitureView) =>
+  view === 'top' ? item.imageUrl : item.image3dUrl ?? item.imageUrl;
 
 /**
  * 家具图片「AI 调整」：复用 AI 布局 / AI 创建的输入框与候选网格。
@@ -38,7 +42,7 @@ export function FurnitureAiDialog({ item, view, seed, onClose, onApply }: {
   /** 当前视角没有图片时的默认素材（3D 为实时模型截图），打开后自动上传。 */
   seed?: File | null;
   onClose: () => void;
-  /** 保存选中的结果（3D 含模型颜色）；成功返回 true。 */
+  /** 保存选中的结果（3D 存模型）；成功返回 true。 */
   onApply: (result: FurnitureAiResult) => Promise<boolean>;
 }) {
   const [seedDraft] = useState<AiImageDraft | null>(() => !defaultAdjustImage(item, view) && seed
@@ -77,11 +81,18 @@ export function FurnitureAiDialog({ item, view, seed, onClose, onApply }: {
       const run = ++generation.current;
       ai.start(request, count, async (index) => {
         const requestId = crypto.randomUUID();
+        // 3D 视角直接建模：AI 用基本体拼出家具外形，产物本身就是 3D 模型，不再是平面图。
+        if (is3d) {
+          const model3d = await generateFurnitureModel(item, {
+            description: request.description, images: request.images, files: request.files,
+            ...(composer.engine.kind === 'model' ? { model: composer.engine.id } : {}),
+          });
+          if (run !== generation.current) throw new Error('已停止生成');
+          return { id: requestId, index, summary: `方案 ${index + 1}`, result: { url: '', model3d } };
+        }
         const url = await generateFurnitureImage(item, { requestId, view, ...request }, () => run !== generation.current);
         if (!url) throw new Error('已停止生成');
-        // 3D：取 AI 效果图的主色驱动程序化模型，候选与应用后都是同一套 3D 模型。
-        const color = is3d ? await dominantColorFromImage(url) ?? undefined : undefined;
-        return { id: requestId, index, summary: `方案 ${index + 1}`, result: { url, color } };
+        return { id: requestId, index, summary: `方案 ${index + 1}`, result: { url } };
       });
     };
     relaunch.current = launch;
@@ -112,7 +123,7 @@ export function FurnitureAiDialog({ item, view, seed, onClose, onApply }: {
       <DialogHeader>
         <DialogTitle>AI 调整 · {item.name} · {VIEW_LABEL[view]}</DialogTitle>
         <DialogDescription>{is3d
-          ? '默认在当前 3D 效果图（没有时用实时 3D 模型截图）基础上调整；结果以实时 3D 模型预览，应用后更新模型颜色并同步到项目 3D 场景。'
+          ? 'AI 用基本体拼出这件家具的简易 3D 模型：附上效果图或参考图能建模更准，应用后写入项目并同步到 3D 场景。'
           : '默认在当前 2D 俯视图基础上调整；移除附件中的原图即重新生成。预览后选择一张应用。'}</DialogDescription>
       </DialogHeader>
       {mode === 'results' && ai.batch
@@ -124,8 +135,8 @@ export function FurnitureAiDialog({ item, view, seed, onClose, onApply }: {
             onSelect={setPicked}
             onRegenerate={() => { relaunch.current?.(); setPicked(null); }}
             onRetry={ai.retry}
-            preview={candidate => is3d ? <Candidate3d item={item} result={candidate.result} compact /> : <img className="furniture-ai-candidate" src={candidate.result.url} crossOrigin="anonymous" alt={`${item.name}${candidate.summary}`} />}
-            zoomPreview={is3d ? candidate => <Candidate3d item={item} result={candidate.result} /> : undefined}
+            preview={candidate => is3d ? <Candidate3d item={item} model3d={candidate.result.model3d} compact /> : <img className="furniture-ai-candidate" src={candidate.result.url} crossOrigin="anonymous" alt={`${item.name}${candidate.summary}`} />}
+            zoomPreview={is3d ? candidate => <Candidate3d item={item} model3d={candidate.result.model3d} /> : undefined}
             zoomLabel={is3d ? '3D 模型' : '图片'}
           />
           <div className="ai-dialog-actions">
@@ -141,8 +152,8 @@ export function FurnitureAiDialog({ item, view, seed, onClose, onApply }: {
             value={composer}
             label="调整需求"
             hint="例如：换成胡桃木色、扶手改圆角；也可附上参考图或图纸、素材包。"
-            placeholder="描述想怎么调整这件家具的外观…"
-            sendLabel="生成图片"
+            placeholder={is3d ? '描述这件家具的造型细节，例如：白色面板、右侧旋钮、底部四个小支脚…' : '描述想怎么调整这件家具的外观…'}
+            sendLabel={is3d ? '生成 3D 模型' : '生成图片'}
             showEngine={false}
             onDescription={description => setComposer(c => ({ ...c, description }))}
             onImages={fn => setComposer(c => ({ ...c, images: fn(c.images) }))}
@@ -155,10 +166,9 @@ export function FurnitureAiDialog({ item, view, seed, onClose, onApply }: {
   </Dialog>;
 }
 
-/** 3D 候选：按 AI 结果的主色渲染实时 3D 模型，角落附 AI 效果图作参考。 */
-function Candidate3d({ item, result, compact = false }: { item: LibraryItem; result: FurnitureAiResult; compact?: boolean }) {
+/** 3D 候选：直接渲染 AI 拼好的 3D 模型，与项目 3D 场景是同一套几何。 */
+function Candidate3d({ item, model3d, compact = false }: { item: LibraryItem; model3d?: FurnitureModel3d; compact?: boolean }) {
   return <div className="furniture-ai-candidate-3d">
-    <FurnitureModelPreview item={{ ...item, color: result.color ?? item.color }} compact={compact} />
-    <img className="furniture-ai-candidate-ref" src={result.url} crossOrigin="anonymous" alt={`${item.name} AI 效果参考`} />
+    <FurnitureModelPreview item={{ ...item, model3d }} compact={compact} />
   </div>;
 }

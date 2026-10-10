@@ -19,7 +19,7 @@ export function FurnitureModelPreview({ item, onFail, snapshotRef, compact = fal
   fail.current = onFail;
   latest.current = item;
   /** 只在影响几何的字段变化时重建模型。 */
-  const geometryKey = [item.type, item.shape, item.w, item.d, item.height, item.color].join('|');
+  const geometryKey = [item.type, item.shape, item.w, item.d, item.height, item.color, item.model3d ? JSON.stringify(item.model3d.parts) : ''].join('|');
   useEffect(() => {
     const el = host.current;
     if (!el) return;
@@ -110,6 +110,6 @@ export function FurnitureModelPreview({ item, onFail, snapshotRef, compact = fal
   }, [geometryKey, snapshotRef, compact]);
   if (failed) return null;
   return <div className={'furniture-model-preview' + (compact ? ' is-compact' : '')} ref={host} role="img" aria-label={`${item.name}实时 3D 模型预览`}>
-    {!compact && <span className="furniture-model-hint">实时 3D 模型 · 可拖动旋转</span>}
+    {!compact && <span className="furniture-model-hint">{item.model3d ? 'AI 3D 模型' : '参考几何 3D'} · 可拖动旋转</span>}
   </div>;
 }

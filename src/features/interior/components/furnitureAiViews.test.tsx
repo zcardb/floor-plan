@@ -69,10 +69,10 @@ describe("家具 2D / 3D 视角", () => {
     expect(visual(sofa, "top", false)).not.toContain("AI 调整");
     expect(visual(sofa, "top")).toContain("AI 调整");
   });
-  it("AI 调整默认素材按视角对应：2D 用 2D 图、3D 用 3D 图，不跨视角混用", () => {
+  it("AI 调整默认参考图：2D 只用 2D 图；3D 优先 3D 效果图，其次退回 2D 俯视图", () => {
     const withTop = { ...sofa, imageUrl: "https://x/top.webp" };
     expect(defaultAdjustImage(withTop, "top")).toBe("https://x/top.webp");
-    expect(defaultAdjustImage(withTop, "perspective")).toBeUndefined();
+    expect(defaultAdjustImage(withTop, "perspective")).toBe("https://x/top.webp");
     expect(defaultAdjustImage({ ...withTop, image3dUrl: "https://x/3d.webp" }, "perspective")).toBe("https://x/3d.webp");
     expect(defaultAdjustImage({ ...sofa, image3dUrl: "https://x/3d.webp" }, "top")).toBeUndefined();
   });

@@ -60,6 +60,7 @@ export function layoutRoom(design: Design, roomId: string, specs: FurnitureSpec[
           color: look.color,
           ...(look.shape ? { shape: look.shape } : {}),
           ...(look.imageUrl ? { imageUrl: look.imageUrl } : {}),
+          ...(look.model3d ? { model3d: look.model3d } : {}),
           ...(look.height ? { height: look.height } : {}),
         }
       : f;
