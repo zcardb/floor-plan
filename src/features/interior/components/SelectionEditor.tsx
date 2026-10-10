@@ -34,6 +34,7 @@ import { length, bbox, inRoom } from "../model/geometry";
 import { groupIds } from "../model/furnitureGroup";
 import { RoomDeleteMenu } from './RoomDeleteMenu';
 import { SizeFields } from './SizeFields';
+import { SeparatorLengthFields } from './SeparatorLengthFields';
 import { RoomSidesEditor } from './RoomSidesEditor';
 
 import type { SizeTransaction } from '../model/sizeTransaction';
@@ -292,12 +293,29 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             (w ? wallKindName(w) : o ? openingName(p.design, o) : separator ? "房间分隔线" : "")}
         </span>
         {separator && (
-          <EditorTooltip label="分隔线只划分房间，不出现在 3D、不计价">
-            <span className="visual-size-trigger" aria-label="分隔线长度">
-              <Ruler size={15} />
-              <span>{formatMeters(separatorLength(separator))} m</span>
-            </span>
-          </EditorTooltip>
+          <Popover
+            open={open === "separator"}
+            onOpenChange={(v) => setPanel(v, "separator")}
+          >
+            <EditorTooltip label="分隔线长度">
+              <PopoverTrigger asChild>
+                <button className="visual-size-trigger" aria-label="调整分隔线长度">
+                  <Ruler size={15} />
+                  <span>{formatMeters(separatorLength(separator))} m</span>
+                  <ChevronDown size={12} />
+                </button>
+              </PopoverTrigger>
+            </EditorTooltip>
+            <PopoverContent
+              className="visual-editor-popover"
+              side="bottom"
+              align="start"
+              collisionPadding={12}
+            >
+              <h3>分隔线长度</h3>
+              <SeparatorLengthFields key={separator.id} design={p.design} separator={separator} transaction={p.transaction} close={() => setOpen(null)} />
+            </PopoverContent>
+          </Popover>
         )}
         {fields.length > 0 && (
           <Popover

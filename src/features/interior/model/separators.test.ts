@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { blankDesign, designForTemplate } from '../data/templates';
 import { area } from './geometry';
 import { syncRooms } from './roomFollow';
-import { addSeparator, followSeparators, migrateSeparators, removeSeparator } from './separators';
+import { addSeparator, followSeparators, migrateSeparators, moveSeparatorBy, moveSeparatorEnd, removeSeparator, resizeSeparator, separatorEndAttached } from './separators';
+import { separatorEndTarget, separatorShift } from './separatorDrag';
 import type { Design, Point, Separator, Wall } from './types';
 
 const reference = () => designForTemplate('reference');
@@ -59,6 +60,84 @@ describe('分隔线的增删', () => {
     const total = design.rooms.reduce((s, r) => s + area(r), 0);
     expect(total).toBeCloseTo(36, 1);
     expect(design.walls).toBe(d.walls);
+  });
+});
+
+describe('调整分隔线', () => {
+  const split = () => {
+    const { design, id } = addSeparator(blankDesign(), [3000, 0], [3000, 6000]);
+    return { design, id, rooms: design.rooms.map(r => r.id) };
+  };
+
+  it('整线沿法向平移：只取法向分量，房间面积随之改变、id 沿用', () => {
+    const { design, id, rooms } = split();
+    const moved = moveSeparatorBy(design, id, [1000, 777]);
+    const line = moved.separators!.find(s => s.id === id)!;
+    expect(line.a).toEqual([4000, 0]);
+    expect(line.b).toEqual([4000, 6000]);
+    expect(moved.rooms.map(r => r.id)).toEqual(rooms);
+    expect(areaOf(moved, rooms[0]!) + areaOf(moved, rooms[1]!)).toBeCloseTo(36, 1);
+    expect(Math.max(areaOf(moved, rooms[0]!), areaOf(moved, rooms[1]!))).toBeCloseTo(24, 1);
+  });
+
+  it('拖动端点缩短后不再封口，两间房并回一间', () => {
+    const { design, id } = split();
+    expect(moveSeparatorEnd(design, id, 'b', [3000, 3000]).rooms).toHaveLength(1);
+  });
+
+  it('按固定端改长度', () => {
+    const { design, id } = split();
+    const fromA = resizeSeparator(design, id, 2500, 'a').separators!.find(s => s.id === id)!;
+    expect(fromA.a).toEqual([3000, 0]);
+    expect(fromA.b).toEqual([3000, 2500]);
+    const fromB = resizeSeparator(design, id, 2500, 'b').separators!.find(s => s.id === id)!;
+    expect(fromB.a).toEqual([3000, 3500]);
+    expect(fromB.b).toEqual([3000, 6000]);
+  });
+
+  it('太短、重叠、不存在都报错；位置不变返回原对象', () => {
+    const { design, id } = split();
+    expect(() => resizeSeparator(design, id, 5, 'a')).toThrow('太短');
+    const withOther: Design = { ...design, separators: [...design.separators!, sep('o', [4000, 1000], [6000, 1000])] };
+    expect(moveSeparatorEnd(withOther, 'o', 'a', [4500, 1000]).rooms.length).toBeGreaterThan(0);
+    expect(() => resizeSeparator(design, 'nope', 1000, 'a')).toThrow('不存在');
+    expect(() => moveSeparatorEnd(design, 'nope', 'a', [0, 0])).toThrow('不存在');
+    expect(moveSeparatorBy(design, id, [0, 500])).toBe(design);
+  });
+
+  it('另一条分隔线共线重叠时拒绝', () => {
+    const d: Design = { ...blankDesign(), separators: [sep('s', [0, 3000], [3000, 3000]), sep('t', [4000, 3000], [6000, 3000])] };
+    expect(() => moveSeparatorEnd(d, 't', 'a', [2000, 3000])).toThrow('重叠');
+  });
+
+  it('贴墙的一端被识别为固定端', () => {
+    const d: Design = { ...blankDesign(), separators: [sep('s', [0, 3000], [3000, 3000])] };
+    expect(separatorEndAttached(d, d.separators![0]!, 'a')).toBe(true);
+    expect(separatorEndAttached(d, d.separators![0]!, 'b')).toBe(false);
+  });
+});
+
+describe('拖动分隔线的吸附', () => {
+  // 上墙中间伸出一段竖向隔墙（x=3000，y 0–2000），分隔线接在它下面一直到底墙。
+  const stub: Wall = { id: 'stub', a: [3000, 0], b: [3000, 2000], thickness: 200, kind: 'partition' };
+  const design = (): Design => ({ ...blankDesign(), walls: [...blankDesign().walls, stub], separators: [sep('s', [3000, 2000], [3000, 6000])] });
+
+  it('端点只沿自身方向移动，贴近墙端截面时吸到墙端', () => {
+    const d = design();
+    expect(separatorEndTarget(d, 's', 'a', [3400, 2950], 1, true, 50)).toEqual([3000, 2950]);
+    expect(separatorEndTarget(d, 's', 'a', [3000, 2008], 1, true, 50)).toEqual([3000, 2000]);
+    expect(separatorEndTarget(d, 's', 'a', [3000, 7000], 1, true, 50)).toBeUndefined();
+  });
+
+  it('关闭吸附时按步进取整', () => {
+    expect(separatorEndTarget(design(), 's', 'a', [3000, 2008], 1, false, 50)).toEqual([3000, 2000]);
+    expect(separatorEndTarget(design(), 's', 'a', [3000, 2030], 1, false, 50)).toEqual([3000, 2050]);
+  });
+
+  it('整线平移只取法向分量，并吸到隔墙两侧墙面', () => {
+    const d = design();
+    expect(separatorShift(d, 's', [95, 400], 1, true, 50)).toEqual([100, 0]);
+    expect(separatorShift(d, 's', [-130, 0], 1, false, 50)).toEqual([-150, 0]);
   });
 });
 

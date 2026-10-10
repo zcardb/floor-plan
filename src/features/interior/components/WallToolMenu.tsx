@@ -25,7 +25,7 @@ export function WallToolMenu({ tool, setTool }: { tool: Tool; setTool: (tool: To
       <DropdownMenuContent align="start" className="wall-tool-menu">
         {wallTools.map(t => (
           <DropdownMenuItem key={t.tool} onSelect={() => setTool(t.tool)} data-active={t.tool === tool || undefined}>
-            <t.icon />
+            <t.icon size={16} aria-hidden="true" />
             <span className="wall-tool-item">
               <strong>{t.label}</strong>
               <small>{t.hint}</small>

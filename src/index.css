@@ -4422,10 +4422,21 @@ button.ai-candidate:hover { border-color: hsl(var(--primary) / 0.5); }
 .furniture-model-preview.is-compact { cursor: inherit; touch-action: auto; pointer-events: none; }
 .image-lightbox-plan-paper:has(.furniture-ai-candidate-3d) { position: relative; padding: 0; overflow: hidden; }
 
-/* 顶部「墙 ▾」下拉：每项带一行用途说明。 */
-.wall-tool-menu { min-width: 240px; }
-.wall-tool-menu [role="menuitem"] { align-items: flex-start; }
+/* 顶部「墙 ▾」下拉：每项带一行用途说明；图标 16px、标题 13px、说明 11.5px，保持紧凑。 */
+.wall-tool-menu { min-width: 220px; }
+.wall-tool-menu [role="menuitem"] { align-items: flex-start; gap: 9px; padding: 7px 9px; }
+.wall-tool-menu [role="menuitem"] > svg { flex: none; width: 16px; height: 16px; margin-top: 1px; color: hsl(var(--muted-foreground)); }
 .wall-tool-menu [role="menuitem"][data-active] { background: hsl(var(--accent)); }
-.wall-tool-item { display: grid; gap: 2px; }
-.wall-tool-item strong { font-weight: 500; }
-.wall-tool-item small { color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.4; }
+.wall-tool-menu [role="menuitem"][data-active] > svg, .wall-tool-menu [role="menuitem"]:focus > svg { color: hsl(var(--accent-foreground)); }
+.wall-tool-item { display: grid; gap: 1px; max-width: 200px; }
+.wall-tool-item strong { font-size: 13px; line-height: 18px; font-weight: 500; }
+.wall-tool-item small { color: hsl(var(--muted-foreground)); font-size: 11.5px; line-height: 16px; }
+
+/* 选中的房间分隔线：线身可沿法向拖动，两端手柄沿自身方向伸缩。 */
+.plan-separator.is-selected { cursor: move; }
+.selection-overlay .plan-separator-handle.is-vertical { cursor: ns-resize; }
+.selection-overlay .plan-separator-handle.is-horizontal { cursor: ew-resize; }
+.plan-separator-length { fill: var(--plan-selection); stroke: var(--plan-porcelain); stroke-width: 0.25em; paint-order: stroke; font-weight: 600; font-variant-numeric: tabular-nums; }
+.separator-length-fields { display: grid; gap: 10px; }
+.separator-length-fields .wall-split-segmented { display: flex; margin-top: 6px; }
+.separator-length-fields .wall-split-segmented > button { flex: 1; }

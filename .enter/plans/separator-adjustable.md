@@ -78,19 +78,19 @@ export function resizeSeparator(d: Design, id: string, length: number, anchor: '
 
 ## 实施清单
 
-- [ ] `sep`：`placeSeparator` 校验（太短 / 共线重叠 / 不存在）+ `moveSeparator`、`moveSeparatorBy`、`resizeSeparator` 三个导出函数落在 `separators.ts`
-- [ ] `sep`：三个函数都返回 `deriveRooms` 后的新设计，且无改动时返回原对象
-- [ ] `sep`：`PlanSeparators` 选中时渲染两端手柄（`data-handle="sepa"/"sepb"`、含放大的透明命中圆）
-- [ ] `sep`：`PlanCanvas` 命中手柄 → `sependpoint` 拖动，走 `resolveWallPoint` 正交吸附
-- [ ] `sep`：`PlanCanvas` 命中线身 → `sepmove` 拖动，位移只投影到自身法向
-- [ ] `sep`：拖动中 `preview` 实时刷新房间填充与面积；模型抛错的帧跳过，停在最后有效位置
-- [ ] `sep`：`finish()` 提交时房间数变化给出既有提示；一步撤销可回到拖动前
-- [ ] `sep`：拖动中沿分隔线显示长度标注
-- [ ] `ui`：`SelectionEditor` 的长度 span 换成按钮 + `Popover`，键盘可打开
-- [ ] `ui`：`SeparatorLengthFields` 长度输入即改即生效、非法输入回滚
-- [ ] `ui`：固定端默认取贴墙的一端，切换后长度不变、另一端正对墙面伸缩
-- [ ] `ui`：`WallToolMenu` 菜单项图标 16px；`wallTools.ts` 三条 hint 缩短
-- [ ] `ui`：`.wall-tool-menu` 字号 / 行距 / 内边距按上文调整，文字无溢出
+- [x] `sep`：`placeSeparator` 校验（太短 / 共线重叠 / 不存在）+ `moveSeparator`、`moveSeparatorBy`、`resizeSeparator` 三个导出函数落在 `separators.ts`
+- [x] `sep`：三个函数都返回 `deriveRooms` 后的新设计，且无改动时返回原对象
+- [x] `sep`：`PlanSeparators` 选中时渲染两端手柄（`data-handle="sepa"/"sepb"`、含放大的透明命中圆）
+- [x] `sep`：`PlanCanvas` 命中手柄 → `sependpoint` 拖动，走 `resolveWallPoint` 正交吸附
+- [x] `sep`：`PlanCanvas` 命中线身 → `sepmove` 拖动，位移只投影到自身法向
+- [x] `sep`：拖动中 `preview` 实时刷新房间填充与面积；模型抛错的帧跳过，停在最后有效位置
+- [x] `sep`：`finish()` 提交时房间数变化给出既有提示；一步撤销可回到拖动前
+- [x] `sep`：拖动中沿分隔线显示长度标注
+- [x] `ui`：`SelectionEditor` 的长度 span 换成按钮 + `Popover`，键盘可打开
+- [x] `ui`：`SeparatorLengthFields` 长度输入即改即生效、非法输入回滚
+- [x] `ui`：固定端默认取贴墙的一端，切换后长度不变、另一端正对墙面伸缩
+- [x] `ui`：`WallToolMenu` 菜单项图标 16px；`wallTools.ts` 三条 hint 缩短
+- [x] `ui`：`.wall-tool-menu` 字号 / 行距 / 内边距按上文调整，文字无溢出
 
 ## 验证清单
 
@@ -119,7 +119,7 @@ export function resizeSeparator(d: Design, id: string, length: number, anchor: '
 
 构建与测试范围
 
-- [ ] `pnpm exec vitest run src/features/interior/model/separators.test.ts src/features/interior/model/roomDerive.test.ts src/features/interior/components/Workbench.test.tsx`
-- [ ] `pnpm run lint`
-- [ ] `pnpm run build`
+- [x] `pnpm exec vitest run src/features/interior/model/separators.test.ts src/features/interior/model/roomDerive.test.ts src/features/interior/components/Workbench.test.tsx`
+- [x] `pnpm run lint`
+- [x] `pnpm run build`
 - [ ] 预览中人工复核一次：图片 306 那张图里的分隔线选中后能拖端点与线身，工具条能改长度

@@ -105,6 +105,73 @@ export function addSeparator(d: Design, a: Point, b: Point): { design: Design; i
   return { design: deriveRooms({ ...d, separators: [...(d.separators ?? []), { id, a, b }] }), id };
 }
 
+/** 与另一条分隔线共线且沿方向重叠超过 1 mm。 */
+function overlapsOther(lines: Separator[], self: Separator) {
+  const u = unit(sub(self.b, self.a));
+  if (!u) return false;
+  const L = separatorLength(self);
+  return lines.some(o => {
+    if (o.id === self.id) return false;
+    if (Math.abs(cross(sub(o.a, self.a), u)) > 0.5 || Math.abs(cross(sub(o.b, self.a), u)) > 0.5) return false;
+    const t1 = dot(sub(o.a, self.a), u), t2 = dot(sub(o.b, self.a), u);
+    return Math.min(L, Math.max(t1, t2)) - Math.max(0, Math.min(t1, t2)) > 1;
+  });
+}
+
+/** 把分隔线放到新位置并重算房间；位置没变时返回原对象。 */
+function placeSeparator(d: Design, id: string, a: Point, b: Point): Design {
+  const old = d.separators?.find(s => s.id === id);
+  if (!old) throw new Error('分隔线不存在，请重新选择');
+  if (old.a[0] === a[0] && old.a[1] === a[1] && old.b[0] === b[0] && old.b[1] === b[1]) return d;
+  const next = { ...old, a, b };
+  if (separatorLength(next) < MIN_LENGTH) throw new Error('分隔线太短');
+  const separators = d.separators!.map(s => (s.id === id ? next : s));
+  if (overlapsOther(separators, next)) throw new Error('分隔线不能重叠');
+  return deriveRooms({ ...d, separators }, d.rooms);
+}
+
+const findSeparator = (d: Design, id: string) => {
+  const s = d.separators?.find(l => l.id === id);
+  if (!s) throw new Error('分隔线不存在，请重新选择');
+  return s;
+};
+
+/** 拖动一端到新位置。 */
+export function moveSeparatorEnd(d: Design, id: string, end: 'a' | 'b', to: Point): Design {
+  const s = findSeparator(d, id);
+  return end === 'a' ? placeSeparator(d, id, to, s.b) : placeSeparator(d, id, s.a, to);
+}
+
+/** 整条线平移：只取沿自身法向的分量（拖动端点留在原来那面墙上）。 */
+export function moveSeparatorBy(d: Design, id: string, delta: Point): Design {
+  const s = findSeparator(d, id), u = unit(sub(s.b, s.a));
+  if (!u) return d;
+  const n: Point = [-u[1], u[0]], k = dot(delta, n);
+  return placeSeparator(d, id, add(s.a, n, k), add(s.b, n, k));
+}
+
+/** 以 anchor 那一端为基准改长度，另一端沿原方向伸缩。 */
+export function resizeSeparator(d: Design, id: string, length: number, anchor: 'a' | 'b'): Design {
+  if (!Number.isFinite(length)) throw new Error('长度无效');
+  const s = findSeparator(d, id), u = unit(sub(s.b, s.a));
+  if (!u) throw new Error('分隔线太短');
+  return anchor === 'a' ? placeSeparator(d, id, s.a, add(s.a, u, length)) : placeSeparator(d, id, add(s.b, u, -length), s.b);
+}
+
+/** 端点是否贴在墙面或另一条分隔线上（用于默认固定端）。 */
+export function separatorEndAttached(d: Design, s: Separator, end: 'a' | 'b') {
+  const p = s[end], direction = unit(sub(s.b, s.a));
+  if (!direction) return false;
+  const standing = d.walls.filter(w => !d.demolished.includes(w.id) && w.kind !== 'low');
+  if (attachedFace(p, direction, standing)) return true;
+  return (d.separators ?? []).some(o => {
+    if (o.id === s.id) return false;
+    const v = sub(o.b, o.a), L2 = dot(v, v);
+    const t = L2 ? Math.max(0, Math.min(1, dot(sub(p, o.a), v) / L2)) : 0;
+    return Math.hypot(...sub(p, add(o.a, v, t))) <= TOUCH;
+  });
+}
+
 /** 删除分隔线并重算房间（被它分开的两间房并回一间）。 */
 export function removeSeparator(d: Design, id: string): Design {
   if (!d.separators?.some(s => s.id === id)) throw new Error('分隔线不存在，请重新选择');

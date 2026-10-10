@@ -43,6 +43,8 @@ import { resolveWallPoint,steppedPointOnWall,validateWallSegment,type WallSnap }
 import { useWallDrawing } from './useWallDrawing';
 import { useSeparatorDrawing } from './useSeparatorDrawing';
 import { PlanSeparators } from './PlanSeparators';
+import { moveSeparatorBy, moveSeparatorEnd } from '../model/separators';
+import { separatorEndTarget, separatorShift } from '../model/separatorDrag';
 import { OpeningDistances } from './OpeningDistances';
 import { connectedWallPoly } from '../model/wallConnections';
 import { WallHoverOverlay } from './WallHoverOverlay';
@@ -127,6 +129,8 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     current = useRef(design);
   current.current = design;
   const [box, setBox] = useState<Rect | null>(null);
+  /** 正在拖动分隔线（端点或整线）：在线旁标注实时长度。 */
+  const [separatorDragging, setSeparatorDragging] = useState(false);
   const group = groupIds(design, selection);
   const dimensionLayout = useMemo(() => perimeterDimensions({ walls: design.walls, demolished: design.demolished, dimensionSettings: design.dimensionSettings }), [design.walls, design.demolished, design.dimensionSettings]);
   const [view, setView] = useState({ x: -2000, y: -2000, s: 0.05 }),
@@ -324,12 +328,19 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     drag.current = null;
     showGuides([]);
     setBox(null);
+    setSeparatorDragging(false);
     if (!dr) return;
     if (cancel) {
       preview(dr.before);
       return;
     }
     const d = current.current;
+    if (dr.kind === 'sepmove' || dr.kind === 'sependpoint') {
+      if (!dr.moved || d === dr.before) return;
+      commit(d, dr.before);
+      if (d.rooms.length !== dr.before.rooms.length) notify.info("房间划分已更新，请检查名称与地面材质");
+      return;
+    }
     if (dr.kind === 'marquee') {
       // 框选模式下点击（没有拖出框）与平时一样：选中房间或取消选择。
       if (!dr.moved || !dr.end) return select(dr.room ? { kind: 'room', id: dr.room } : null);
@@ -482,8 +493,15 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         if (tool === 'separator') {
           select(null); separatorDrawing.down(p, e.pointerId, [e.clientX, e.clientY]); return;
         }
+        if (tool === 'select' && !marquee && selection?.kind === 'separator' && (handle === 'sepa' || handle === 'sepb')) {
+          // 选中分隔线的端点手柄：沿分隔线方向伸缩。
+          drag.current = { ...base, kind: 'sependpoint', id: selection.id, room: handle === 'sepa' ? 'a' : 'b' };
+          return;
+        }
         if (sid && tool === 'select' && !marquee && !fid) {
+          // 点中即选中；按住拖动时整条线沿法向平移。
           select({ kind: 'separator', id: sid });
+          drag.current = { ...base, kind: 'sepmove', id: sid };
           return;
         }
         if (isOpeningTool(tool) && wid) {
@@ -615,9 +633,24 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         if (Math.hypot(e.clientX - dr.screen[0], e.clientY - dr.screen[1]) > 5 && !dr.moved) {
           dr.moved = true;
           if (dr.kind === 'wallmove') select({ kind: 'wall', id: dr.id! });
+          if (dr.kind === 'sepmove' || dr.kind === 'sependpoint') setSeparatorDragging(true);
         }
         if (!dr.moved) return;
         if (dr.kind === 'wallclick') return;
+        if (dr.kind === 'sepmove' || dr.kind === 'sependpoint') {
+          const step = dragStep(dr.before);
+          try {
+            if (dr.kind === 'sepmove') {
+              preview(moveSeparatorBy(dr.before, dr.id!, separatorShift(dr.before, dr.id!, [p[0] - dr.start[0], p[1] - dr.start[1]], view.s, layers.snap, step)));
+            } else {
+              const end = dr.room as 'a' | 'b', to = separatorEndTarget(dr.before, dr.id!, end, p, view.s, layers.snap, step);
+              if (to) preview(moveSeparatorEnd(dr.before, dr.id!, end, to));
+            }
+          } catch {
+            // 太短或与另一条分隔线重叠：停在最后一次有效位置。
+          }
+          return;
+        }
         if (dr.kind === 'marquee') {
           dr.end = p;
           setBox(normalizeRect(dr.start, p));
@@ -878,7 +911,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           </g>
         );
       })}
-      <PlanSeparators design={design} selectedId={selection?.kind === 'separator' ? selection.id : undefined} scale={view.s} />
+      <PlanSeparators design={design} selectedId={selection?.kind === 'separator' ? selection.id : undefined} scale={view.s} dragging={separatorDragging} />
       {layers.labels &&
         design.rooms
           .filter((r) => r.counted !== false)
