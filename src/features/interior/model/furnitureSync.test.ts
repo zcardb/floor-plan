@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { blankDesign } from "../data/templates";
-import { syncAccountFurniture } from "./furnitureSync";
+import { syncAccountFurniture, syncAccountMaterials } from "./furnitureSync";
 import { furnitureDraftOf, parseFurnitureDraft } from "./furnitureDraft";
 import type { Furniture, LibraryItem } from "./types";
 
@@ -34,5 +34,21 @@ describe("家具表单草稿", () => {
     expect(parseFurnitureDraft({ ...furnitureDraftOf(entry), shape: "circle", w: "1.2" })).toMatchObject({ w: 1200, d: 1200 });
     expect(parseFurnitureDraft({ ...furnitureDraftOf(entry), w: "0.01" })).toBeNull();
     expect(parseFurnitureDraft({ ...furnitureDraftOf(entry), price: "-1" })).toBeNull();
+  });
+});
+
+describe("账号硬装库同步到项目", () => {
+  it("同 key 副本跟随名称 / 颜色 / 尺寸，单价保留项目副本", () => {
+    const design = { ...blankDesign(), customFloors: [{ key: "f1", name: "旧砖", pattern: "tile" as const, length: 800, width: 800, color: "#eeeeee", price: 120 }], customWalls: [{ key: "w1", name: "乳胶漆", color: "#ffffff", price: 30 }] };
+    const next = syncAccountMaterials(design, {
+      customFloors: [{ key: "f1", name: "新砖", pattern: "seamless", color: "#cccccc", price: 999 }],
+      customWalls: [{ key: "w1", name: "乳胶漆", color: "#ffffff", price: 50 }],
+    })!;
+    expect(next.customFloors?.[0]).toEqual({ key: "f1", name: "新砖", pattern: "seamless", color: "#cccccc", price: 120 });
+    expect(next.customWalls).toBe(design.customWalls);
+  });
+  it("没有变化返回 null", () => {
+    const design = { ...blankDesign(), customOpenings: [{ key: "o1", name: "推拉门", kind: "door" as const, width: 900, height: 2100, price: 800 }] };
+    expect(syncAccountMaterials(design, { customOpenings: [{ ...design.customOpenings[0], price: 1 }] })).toBeNull();
   });
 });

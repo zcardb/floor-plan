@@ -9,7 +9,7 @@ import { DimensionEditDialog } from './DimensionEditDialog';
 import { WallSplitDialog } from './WallSplitDialog';
 import { CompassRose } from './CompassRose';
 import { northAngle } from '../model/northAngle';
-import { syncAccountFurniture } from '../model/furnitureSync';
+import { syncAccountFurniture, syncAccountMaterials } from '../model/furnitureSync';
 import { splitWall as splitWallModel } from '../model/wallSplit';
 import { removeWall as removeWallModel } from '../model/wallRemoval';
 import { removeRoom } from '../model/roomFurniture';
@@ -275,6 +275,12 @@ export function Workbench(p: Props) {
     const next = syncAccountFurniture(designRef.current, accountFurnitureItems);
     if (next) sync(next);
   }, [p.loggedIn, readOnly, d.customCatalog, accountFurnitureItems, sync, designRef]);
+  // 账号硬装库（地面 / 墙面 / 门窗 / 屋面 / 吊顶）里改过的材料同步到本项目副本（单价以项目为准）。
+  useEffect(() => {
+    if (!p.loggedIn || readOnly) return;
+    const next = syncAccountMaterials(designRef.current, { customFloors: floorCatalog.items, customWalls: wallCatalog.items, customOpenings: openingCatalog.items, customRoofs: roofCatalog.items, customCeilings: ceilingCatalog.items });
+    if (next) sync(next);
+  }, [p.loggedIn, readOnly, d.customFloors, d.customWalls, d.customOpenings, d.customRoofs, d.customCeilings, floorCatalog.items, wallCatalog.items, openingCatalog.items, roofCatalog.items, ceilingCatalog.items, sync, designRef]);
   // 登录后读取账号地面 / 墙面 / 门窗 / 屋面 / 吊顶 / 家具库；新建弹窗关闭后刷新，让刚建的材料立即可选。
   useEffect(() => {
     if (!p.loggedIn || customOpen) return;
