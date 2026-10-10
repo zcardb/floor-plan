@@ -12,10 +12,14 @@ import { useAiBatch } from '../ai/useAiBatch';
 import { DEFAULT_AI_COUNT } from '../ai/useRoomAi';
 import { DEFAULT_AI_ENGINE } from '../ai/models';
 import { generateFurnitureImage, type FurnitureView } from '../cloud/useFurnitureImage';
+import { dominantColorFromImage } from '../cloud/imagePalette';
+import { FurnitureModelPreview } from './FurnitureModelPreview';
 import { formatMeters } from '../model/lengthUnits';
 import type { LibraryItem } from '../model/types';
 
 interface Request { description: string; images: string[]; files: AiFileRef[] }
+/** 一个候选：AI 图片；3D 视角另带从图中取出的主色，用来给实时 3D 模型上色。 */
+export interface FurnitureAiResult { url: string; color?: string }
 
 /** 默认需求：名称、尺寸与主色，用户可直接改。 */
 export const defaultFurniturePrompt = (item: LibraryItem) =>
@@ -34,8 +38,8 @@ export function FurnitureAiDialog({ item, view, seed, onClose, onApply }: {
   /** 当前视角没有图片时的默认素材（3D 为实时模型截图），打开后自动上传。 */
   seed?: File | null;
   onClose: () => void;
-  /** 保存选中的图片；成功返回 true。 */
-  onApply: (url: string) => Promise<boolean>;
+  /** 保存选中的结果（3D 含模型颜色）；成功返回 true。 */
+  onApply: (result: FurnitureAiResult) => Promise<boolean>;
 }) {
   const [seedDraft] = useState<AiImageDraft | null>(() => !defaultAdjustImage(item, view) && seed
     ? { id: crypto.randomUUID(), preview: URL.createObjectURL(seed), uploading: true, kind: 'image', name: seed.name, ext: 'png' } : null);
@@ -58,7 +62,8 @@ export function FurnitureAiDialog({ item, view, seed, onClose, onApply }: {
     return () => { alive = false; };
   }, [seedDraft, seed]);
   const [mode, setMode] = useState<'input' | 'results'>('input'), [picked, setPicked] = useState<number | null>(null), [applying, setApplying] = useState(false);
-  const ai = useAiBatch<Request, { url: string }>();
+  const ai = useAiBatch<Request, FurnitureAiResult>();
+  const is3d = view === 'perspective';
   /** 每次发送 / 返回 / 关闭都换代：旧任务停止轮询，迟到结果丢弃。 */
   const generation = useRef(0), relaunch = useRef<(() => void) | null>(null);
   useEffect(() => () => { generation.current++; }, []);
@@ -74,7 +79,9 @@ export function FurnitureAiDialog({ item, view, seed, onClose, onApply }: {
         const requestId = crypto.randomUUID();
         const url = await generateFurnitureImage(item, { requestId, view, ...request }, () => run !== generation.current);
         if (!url) throw new Error('已停止生成');
-        return { id: requestId, index, summary: `方案 ${index + 1}`, result: { url } };
+        // 3D：取 AI 效果图的主色驱动程序化模型，候选与应用后都是同一套 3D 模型。
+        const color = is3d ? await dominantColorFromImage(url) ?? undefined : undefined;
+        return { id: requestId, index, summary: `方案 ${index + 1}`, result: { url, color } };
       });
     };
     relaunch.current = launch;
@@ -92,7 +99,7 @@ export function FurnitureAiDialog({ item, view, seed, onClose, onApply }: {
     if (chosen?.status !== 'ready' || applying) return;
     setApplying(true);
     try {
-      if (await onApply(chosen.candidate.result.url)) { notify.success(`「${item.name}」${VIEW_LABEL[view]}已更新`); close(); }
+      if (await onApply(chosen.candidate.result)) { notify.success(`「${item.name}」${is3d ? '3D 模型' : VIEW_LABEL[view]}已更新`); close(); }
     } catch (cause) {
       notify.error(`「${item.name}」图片保存失败`, cause);
     } finally {
@@ -104,7 +111,9 @@ export function FurnitureAiDialog({ item, view, seed, onClose, onApply }: {
     <DialogContent className="ai-dialog">
       <DialogHeader>
         <DialogTitle>AI 调整 · {item.name} · {VIEW_LABEL[view]}</DialogTitle>
-        <DialogDescription>默认在当前{view === 'top' ? '2D 俯视图' : '3D 视角图（没有时用实时 3D 模型截图）'}基础上调整；移除附件中的原图即重新生成。预览后选择一张应用。</DialogDescription>
+        <DialogDescription>{is3d
+          ? '默认在当前 3D 效果图（没有时用实时 3D 模型截图）基础上调整；结果以实时 3D 模型预览，应用后更新模型颜色并同步到项目 3D 场景。'
+          : '默认在当前 2D 俯视图基础上调整；移除附件中的原图即重新生成。预览后选择一张应用。'}</DialogDescription>
       </DialogHeader>
       {mode === 'results' && ai.batch
         ? <div className="ai-create-results">
@@ -115,13 +124,15 @@ export function FurnitureAiDialog({ item, view, seed, onClose, onApply }: {
             onSelect={setPicked}
             onRegenerate={() => { relaunch.current?.(); setPicked(null); }}
             onRetry={ai.retry}
-            preview={candidate => <img className="furniture-ai-candidate" src={candidate.result.url} crossOrigin="anonymous" alt={`${item.name}${candidate.summary}`} />}
+            preview={candidate => is3d ? <Candidate3d item={item} result={candidate.result} compact /> : <img className="furniture-ai-candidate" src={candidate.result.url} crossOrigin="anonymous" alt={`${item.name}${candidate.summary}`} />}
+            zoomPreview={is3d ? candidate => <Candidate3d item={item} result={candidate.result} /> : undefined}
+            zoomLabel={is3d ? '3D 模型' : '图片'}
           />
           <div className="ai-dialog-actions">
             <Button type="button" variant="ghost" disabled={applying} onClick={back}><ArrowLeft />{ai.running ? '停止并返回修改' : '返回修改'}</Button>
             <span />
             <Button type="button" variant="outline" disabled={applying} onClick={close}>取消</Button>
-            <Button type="button" loading={applying} disabled={chosen?.status !== 'ready'} onClick={() => void apply()}>{applying ? '正在保存…' : '应用图片'}</Button>
+            <Button type="button" loading={applying} disabled={chosen?.status !== 'ready'} onClick={() => void apply()}>{applying ? '正在保存…' : is3d ? '应用到 3D 模型' : '应用图片'}</Button>
           </div>
         </div>
         : <div className="ai-create-form">
@@ -142,4 +153,12 @@ export function FurnitureAiDialog({ item, view, seed, onClose, onApply }: {
         </div>}
     </DialogContent>
   </Dialog>;
+}
+
+/** 3D 候选：按 AI 结果的主色渲染实时 3D 模型，角落附 AI 效果图作参考。 */
+function Candidate3d({ item, result, compact = false }: { item: LibraryItem; result: FurnitureAiResult; compact?: boolean }) {
+  return <div className="furniture-ai-candidate-3d">
+    <FurnitureModelPreview item={{ ...item, color: result.color ?? item.color }} compact={compact} />
+    <img className="furniture-ai-candidate-ref" src={result.url} crossOrigin="anonymous" alt={`${item.name} AI 效果参考`} />
+  </div>;
 }

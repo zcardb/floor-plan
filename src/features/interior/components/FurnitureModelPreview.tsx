@@ -3,14 +3,18 @@ import type { LibraryItem } from '../model/types';
 import { toFurnitureModel } from '../model/furnitureModel';
 
 /**
- * 3D 视角的兜底：没有 AI 效果图时，直接按参考几何渲染画布里那套程序化模型，
- * 可以拖动旋转，让「项目里 3D 能看到」的家具在详情弹窗里也看得到。
+ * 家具的 3D 呈现：按参考几何渲染画布 3D 场景里那套程序化模型，可以拖动旋转，
+ * 详情弹窗的 3D 视角与「AI 调整」的 3D 候选都用它，和项目里看到的是同一件 3D 家具。
  * three 只在真正需要时下载（和场景同一份模块）。
  * snapshotRef：截取当前视角为 PNG，供「AI 调整」作为 3D 的默认素材。
  */
 export type ModelSnapshot = () => Promise<File | null>;
 
-export function FurnitureModelPreview({ item, onFail, snapshotRef }: { item: LibraryItem; onFail?: () => void; snapshotRef?: MutableRefObject<ModelSnapshot | null> }) {
+export function FurnitureModelPreview({ item, onFail, snapshotRef, compact = false }: {
+  item: LibraryItem; onFail?: () => void; snapshotRef?: MutableRefObject<ModelSnapshot | null>;
+  /** 候选卡片等小尺寸场景：不显示操作提示、不投影，降低多个画布同时渲染的开销。 */
+  compact?: boolean;
+}) {
   const host = useRef<HTMLDivElement>(null), [failed, setFailed] = useState(false), fail = useRef(onFail), latest = useRef(item);
   fail.current = onFail;
   latest.current = item;
@@ -49,8 +53,8 @@ export function FurnitureModelPreview({ item, onFail, snapshotRef }: { item: Lib
         Object.assign(sun.shadow.camera, { left: -radius * 3, right: radius * 3, top: radius * 3, bottom: -radius * 3, near: 0.1, far: radius * 12 });
         sun.position.set(radius * 2.2, radius * 3.4, radius * 2.6);
         scene.add(sun, sun.target, new THREE.HemisphereLight('#fff9ec', '#b4a58e', 1.6));
-        renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
-        renderer.shadowMap.enabled = true;
+        renderer.setPixelRatio(Math.min(devicePixelRatio, compact ? 1.25 : 1.5));
+        renderer.shadowMap.enabled = !compact;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.domElement.className = 'furniture-model-canvas';
         el.prepend(renderer.domElement);
@@ -62,6 +66,8 @@ export function FurnitureModelPreview({ item, onFail, snapshotRef }: { item: Lib
         orbit.minPolarAngle = 0.15;
         orbit.maxPolarAngle = Math.PI * 0.49;
         orbit.target.set(0, 0, 0);
+        // 小卡片里是静态预览：不接管指针（点击用于选中），只在尺寸变化时重绘。
+        orbit.enabled = !compact;
         camera.position.set(radius * 1.65, radius * 1.3, radius * 2.3);
         orbit.update();
         const resize = () => {
@@ -70,13 +76,14 @@ export function FurnitureModelPreview({ item, onFail, snapshotRef }: { item: Lib
           renderer.setSize(w, h, false);
           camera.aspect = w / h;
           camera.updateProjectionMatrix();
+          if (compact) renderer.render(scene, camera);
         };
         resize();
         const observer = new ResizeObserver(resize);
         observer.observe(el);
         let raf = 0;
         const loop = () => { raf = requestAnimationFrame(loop); orbit.update(); renderer.render(scene, camera); };
-        loop();
+        if (!compact) loop();
         if (snapshotRef) snapshotRef.current = () => {
           // 截图用弹窗视觉区的底色，避免透明背景；同一任务内渲染后立即读取画面。
           scene.background = new THREE.Color(getComputedStyle(el.parentElement ?? el).backgroundColor);
@@ -100,9 +107,9 @@ export function FurnitureModelPreview({ item, onFail, snapshotRef }: { item: Lib
       } catch { if (!stopped) { setFailed(true); fail.current?.(); } }
     })();
     return () => { stopped = true; cleanup(); };
-  }, [geometryKey, snapshotRef]);
+  }, [geometryKey, snapshotRef, compact]);
   if (failed) return null;
-  return <div className="furniture-model-preview" ref={host} role="img" aria-label={`${item.name}实时 3D 模型预览`}>
-    <span className="furniture-model-hint">参考几何实时 3D · 可拖动旋转</span>
+  return <div className={'furniture-model-preview' + (compact ? ' is-compact' : '')} ref={host} role="img" aria-label={`${item.name}实时 3D 模型预览`}>
+    {!compact && <span className="furniture-model-hint">实时 3D 模型 · 可拖动旋转</span>}
   </div>;
 }

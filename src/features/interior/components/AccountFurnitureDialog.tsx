@@ -8,7 +8,7 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import type { LibraryItem } from '../model/types';
 import { categories } from '../data/catalog';
 import { FurnitureVisual, hasViews } from './FurnitureVisual';
-import { FurnitureAiDialog } from './FurnitureAiDialog';
+import { FurnitureAiDialog, type FurnitureAiResult } from './FurnitureAiDialog';
 import { FurnitureFormFields } from './FurnitureFormFields';
 import type { ModelSnapshot } from './FurnitureModelPreview';
 import type { FurnitureView } from '../cloud/useFurnitureImage';
@@ -46,11 +46,15 @@ export function AccountFurnitureDialog({ item, isCustom, referencePrice, onOpenC
   const failure = commitError || error;
   const patch = (next: Partial<FurnitureDraft>) => { setError(''); setDraft(current => ({ ...current, ...next })); };
 
-  /** 应用 AI 图片：2D 写 imageUrl、3D 写 image3dUrl，只改图片，不提交表单里未保存的修改。 */
-  const applyImage = async (url: string) => {
+  /**
+   * 应用 AI 结果：2D 写 imageUrl；3D 写 image3dUrl（效果参考）并把主色写入模型颜色，
+   * 3D 视角与项目 3D 场景用的都是这套程序化模型。不提交表单里其它未保存的修改。
+   */
+  const applyImage = async ({ url, color }: FurnitureAiResult) => {
     if (!saveGeometry) return false;
-    const next = { ...item, ...(activeView === 'top' ? { imageUrl: url } : { image3dUrl: url }) };
+    const next = { ...item, ...(activeView === 'top' ? { imageUrl: url } : { image3dUrl: url, ...(color ? { color } : {}) }) };
     if (!(await saveGeometry(next))) return false;
+    if (activeView === 'perspective' && color) setDraft(current => ({ ...current, color }));
     onChanged(next);
     return true;
   };

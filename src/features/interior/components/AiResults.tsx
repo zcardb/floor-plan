@@ -14,12 +14,16 @@ export interface AiEcho {
  * 候选方案网格：顶部回显本次请求；每个格子先是生成中，完成即显示真实几何预览，
  * 失败的格子只留一个重试按钮。进度只统计真实完成的请求。
  */
-export function AiResults<T>({ echo, slots, selected, onSelect, preview, caption, onRegenerate, onRetry }: {
+export function AiResults<T>({ echo, slots, selected, onSelect, preview, zoomPreview = preview, zoomLabel = "平面图", caption, onRegenerate, onRetry }: {
   echo: AiEcho;
   slots: AiSlot<T>[];
   selected: number | null;
   onSelect: (index: number) => void;
   preview: (candidate: AiCandidate<T>) => ReactNode;
+  /** 放大查看时的内容（默认与卡片相同），例如可拖动旋转的 3D 模型。 */
+  zoomPreview?: (candidate: AiCandidate<T>) => ReactNode;
+  /** 放大查看的内容名称，用于无障碍标签。 */
+  zoomLabel?: string;
   caption?: (candidate: AiCandidate<T>) => ReactNode;
   /** 生成结束后显示「重新生成」：同样的需求再来一批。 */
   onRegenerate?: () => void;
@@ -74,9 +78,9 @@ export function AiResults<T>({ echo, slots, selected, onSelect, preview, caption
         </div>;
       })}
     </div>
-    <MediaPreview open={!!bigCandidate} label={bigCandidate ? `${titleOf(bigCandidate)}平面图` : "方案平面图"} onClose={() => setEnlarged(null)}>
+    <MediaPreview open={!!bigCandidate} label={bigCandidate ? `${titleOf(bigCandidate)}${zoomLabel}` : `方案${zoomLabel}`} onClose={() => setEnlarged(null)}>
       {bigCandidate && <figure className="image-lightbox-plan">
-        <div className="image-lightbox-plan-paper">{preview(bigCandidate)}</div>
+        <div className="image-lightbox-plan-paper">{zoomPreview(bigCandidate)}</div>
         <figcaption>{titleOf(bigCandidate)}</figcaption>
       </figure>}
     </MediaPreview>
