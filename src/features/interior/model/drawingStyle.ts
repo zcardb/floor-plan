@@ -6,7 +6,9 @@ export const LAYER_STYLES: Record<DrawingLayer, LayerStyle> = {
   WALLS: { stroke: '#514a40', strokeWidth: 8, fill: '#514a40' },
   DEMOLISHED: { stroke: '#ad5145', strokeWidth: 10, dash: [80, 50] },
   ROOMS: { stroke: '#b7afa3', strokeWidth: 6 },
-  OPENINGS: { stroke: '#514a40', strokeWidth: 10 },
+  SEPARATORS: { stroke: '#5b6c7a', strokeWidth: 6, dash: [80, 50] },
+  DOORS: { stroke: '#514a40', strokeWidth: 10 },
+  WINDOWS: { stroke: '#514a40', strokeWidth: 10 },
   FURNITURE: { stroke: '#6f655a', strokeWidth: 6 },
   STAIRS: { stroke: '#6f655a', strokeWidth: 6 },
   ROOM_LABELS: { stroke: '#514a40', strokeWidth: 0 },
@@ -22,11 +24,30 @@ export const DXF_LAYER_STYLES: Record<DxfLayerName, DxfLayerStyle> = {
   WALL_HATCH: { color: 8, lineweight: 0, lineType: 'CONTINUOUS' },
   DEMOLISHED: { color: 1, lineweight: 35, lineType: 'DASHED' },
   ROOMS: { color: 8, lineweight: 18, lineType: 'CONTINUOUS' },
-  OPENINGS: { color: 4, lineweight: 25, lineType: 'CONTINUOUS' },
+  SEPARATORS: { color: 8, lineweight: 18, lineType: 'DASHED' },
+  DOORS: { color: 4, lineweight: 25, lineType: 'CONTINUOUS' },
+  WINDOWS: { color: 5, lineweight: 25, lineType: 'CONTINUOUS' },
   FURNITURE: { color: 30, lineweight: 18, lineType: 'CONTINUOUS' },
   STAIRS: { color: 6, lineweight: 18, lineType: 'CONTINUOUS' },
   ROOM_LABELS: { color: 2, lineweight: 18, lineType: 'CONTINUOUS' },
   DIMENSIONS: { color: 3, lineweight: 13, lineType: 'CONTINUOUS' },
+};
+/**
+ * DXF 图层名采用 AIA CAD Layer Guidelines / 美国国家 CAD 标准（NCS）的建筑专业（A-）命名，
+ * 在 AutoCAD、Revit、ArchiCAD 等软件里打开即可按图层识别。内部仍用语义化的键，写文件时映射。
+ */
+export const CAD_LAYER_NAMES: Record<DxfLayerName, string> = {
+  WALLS: 'A-WALL',
+  WALL_HATCH: 'A-WALL-PATT',
+  DEMOLISHED: 'A-WALL-DEMO',
+  ROOMS: 'A-AREA',
+  SEPARATORS: 'A-AREA-BNDY',
+  DOORS: 'A-DOOR',
+  WINDOWS: 'A-GLAZ',
+  FURNITURE: 'A-FURN',
+  STAIRS: 'A-FLOR-STRS',
+  ROOM_LABELS: 'A-AREA-IDEN',
+  DIMENSIONS: 'A-ANNO-DIMS',
 };
 /** DASHED linetype pattern in model millimetres, matching the SVG/PDF demolished-wall dash. */
 export const DXF_DASHED_PATTERN = [LAYER_STYLES.DEMOLISHED.dash![0], -LAYER_STYLES.DEMOLISHED.dash![1]];

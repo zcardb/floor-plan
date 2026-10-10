@@ -6,11 +6,13 @@ import { PAYLOAD_MARKER } from './designPayload';
 const escape = (text: string) => text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]!));
 const number = (n: number) => Number(n.toFixed(5));
 const INKSCAPE = 'http://www.inkscape.org/namespaces/inkscape';
+/** 单个虚线对象（垭口过梁线）的虚线节奏，与拆除墙、分隔线一致。 */
+const DASH = LAYER_STYLES.SEPARATORS.dash!;
 export const SVG_PAYLOAD_NS = 'https://zhujian.studio/ns/design';
 
 function element(e: DrawingEntity): string {
   if (e.kind === 'polyline')
-    return `<${e.closed ? 'polygon' : 'polyline'} points="${e.points.map(([x, y]) => `${number(x)},${number(y)}`).join(' ')}"/>`;
+    return `<${e.closed ? 'polygon' : 'polyline'} points="${e.points.map(([x, y]) => `${number(x)},${number(y)}`).join(' ')}"${e.dashed ? ` stroke-dasharray="${DASH.join(' ')}"` : ''}/>`;
   if (e.kind === 'text') {
     const [x, y] = e.point, style = LAYER_STYLES[e.layer];
     return `<text x="${number(x)}" y="${number(y + e.height * TEXT_BASELINE_SHIFT)}" font-size="${e.height}" fill="${style.stroke}" stroke="none" text-anchor="middle"${e.rotation ? ` transform="rotate(${number(e.rotation)} ${number(x)} ${number(y)})"` : ''}>${escape(e.text)}</text>`;

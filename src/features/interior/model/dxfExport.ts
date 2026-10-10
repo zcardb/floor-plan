@@ -6,7 +6,7 @@ import type { DxfBlock, DxfLayer } from '@tarikjabiri/dxf';
 import type { DrawingDocument, DrawingEntity } from './drawingDocument';
 import type { Point } from './types';
 import { PAYLOAD_MARKER } from './designPayload';
-import { DXF_DASHED_PATTERN, DXF_LAYER_STYLES, DXF_WALL_HATCH_LAYER, type DxfLayerName } from './drawingStyle';
+import { CAD_LAYER_NAMES, DXF_DASHED_PATTERN, DXF_LAYER_STYLES, DXF_WALL_HATCH_LAYER, type DxfLayerName } from './drawingStyle';
 /** Max characters per DXF 999 comment line (R2000+ string limit is 2049 single-byte chars). */
 export const DXF_COMMENT_CHUNK = 2000;
 /** Text style with an SHX big font so AutoCAD renders Chinese instead of `?`. */
@@ -16,7 +16,7 @@ const cad = ([x,y]:Point) => point3d(x,-y,0);
 const degrees = (radians:number) => ((-radians*180/Math.PI)%360+360)%360;
 
 function writeEntity(target:DxfBlock,entity:DrawingEntity){
-  const options={layerName:entity.layer};
+  const options={layerName:CAD_LAYER_NAMES[entity.layer],...(entity.kind==='polyline'&&entity.dashed?{lineType:'DASHED'}:{})};
   if(entity.kind==='polyline'){
     if(entity.points.length===2&&!entity.closed)target.addLine(cad(entity.points[0]),cad(entity.points[1]),options);
     else target.addLWPolyline(entity.points.map(([x,y])=>({point:{x,y:-y}})),{...options,flags:entity.closed?LWPolylineFlags.Closed:LWPolylineFlags.None});
@@ -60,7 +60,7 @@ export function serializeDxf(document:DrawingDocument,payload?:string):string{
   writer.setVariable('$EXTMAX',{10:document.bounds.x2,20:-document.bounds.y,30:0});
   writer.addLType('DASHED','__ __ __',DXF_DASHED_PATTERN);
   for(const [name,style] of Object.entries(DXF_LAYER_STYLES) as [DxfLayerName,typeof DXF_LAYER_STYLES[DxfLayerName]][])
-    setLayerLineweight(writer.addLayer(name,style.color,style.lineType==='DASHED'?'DASHED':'Continuous'),style.lineweight);
+    setLayerLineweight(writer.addLayer(CAD_LAYER_NAMES[name],style.color,style.lineType==='DASHED'?'DASHED':'Continuous'),style.lineweight);
   const style=writer.addDimStyle('STUDIO_METERS');
   Object.assign(style,{DIMTXT:180,DIMASZ:120,DIMTSZ:60,DIMEXO:35,DIMEXE:120,DIMLFAC:0.001,DIMDEC:2,DIMLUNIT:2,DIMPOST:'<> m',DIMGAP:90,DIMTAD:1,DIMTMOVE:1,DIMZIN:0});
   for(const block of document.blocks){
@@ -74,16 +74,16 @@ export function serializeDxf(document:DrawingDocument,payload?:string):string{
     if(e.layer==='WALLS'&&e.kind==='polyline'&&e.closed&&e.points.length>2){
       const boundary=new HatchBoundaryPaths();
       boundary.addPolylineBoundary(new HatchPolylineBoundary(e.points.map(([x,y])=>vertex(x,-y))));
-      writer.modelSpace.addHatch(boundary,pattern({name:HatchPredefinedPatterns.SOLID}),{layerName:DXF_WALL_HATCH_LAYER});
+      writer.modelSpace.addHatch(boundary,pattern({name:HatchPredefinedPatterns.SOLID}),{layerName:CAD_LAYER_NAMES[DXF_WALL_HATCH_LAYER]});
     }
     writeEntity(writer.modelSpace,e);
   }
   for(const insert of document.inserts)
-    writer.modelSpace.addInsert(insert.block,cad(insert.point),{layerName:insert.layer,rotationAngle:degrees(insert.rotation)});
+    writer.modelSpace.addInsert(insert.block,cad(insert.point),{layerName:CAD_LAYER_NAMES[insert.layer],rotationAngle:degrees(insert.rotation)});
   document.dimensions.forEach((dim,index)=>{
     const block=writer.blocks.addBlock(`*D${index+1}`,writer.document.objects,false);block.flags=BlockFlags.AnonymousBlock;
     for(const entity of dim.display)writeEntity(block,entity);
-    writer.modelSpace.addEntity(new DisplayBlockDimension(cad(dim.first),cad(dim.second),{layerName:dim.layer,blockName:block.name,
+    writer.modelSpace.addEntity(new DisplayBlockDimension(cad(dim.first),cad(dim.second),{layerName:CAD_LAYER_NAMES[dim.layer],blockName:block.name,
       definitionPoint:cad(dim.lineSecond),middlePoint:cad(dim.label),styleName:'STUDIO_METERS',
       ActualMeasurement:dim.measurement,rotation:((-dim.rotation)%360+360)%360}));
   });

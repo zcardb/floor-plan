@@ -10,11 +10,12 @@ import { furnitureDrawing, furnitureLayer } from './furnitureDrawing';
 import { isStairs, stairSpec } from './stairs';
 import { isBearingWall, wallKindName } from './wallPolicy';
 
-export type DrawingLayer = 'WALLS' | 'DEMOLISHED' | 'ROOMS' | 'OPENINGS' | 'FURNITURE' | 'STAIRS' | 'ROOM_LABELS' | 'DIMENSIONS';
+export type DrawingLayer = 'WALLS' | 'DEMOLISHED' | 'ROOMS' | 'SEPARATORS' | 'DOORS' | 'WINDOWS' | 'FURNITURE' | 'STAIRS' | 'ROOM_LABELS' | 'DIMENSIONS';
 /** Object grouping for vector exports (SVG/PDF). DXF geometry ignores it. */
 export interface DrawingGroup { id: string; name: string }
 export type DrawingEntity = (
-  | { kind: 'polyline'; points: Point[]; closed: boolean; layer: DrawingLayer }
+  /** `dashed`：单个对象用虚线（如垭口上方的过梁投影线），其余沿用图层线型。 */
+  | { kind: 'polyline'; points: Point[]; closed: boolean; layer: DrawingLayer; dashed?: boolean }
   | { kind: 'arc'; center: Point; radius: number; start: number; end: number; clockwise: boolean; layer: DrawingLayer }
   | { kind: 'circle'; center: Point; radius: number; layer: DrawingLayer }
   /** `major` is the semi-major axis vector from the centre; `ratio` = minor / major (≤ 1). */
@@ -25,11 +26,13 @@ export type DrawingEntity = (
 export interface DrawingBlock { name: string; entities: DrawingEntity[] }
 /** One placed symbol (DXF INSERT); `rotation` is in radians, drawing (y-down) coordinates. */
 export interface DrawingInsert { block: string; point: Point; rotation: number; layer: DrawingLayer; groupId: string }
-export const DRAWING_LAYERS: DrawingLayer[] = ['WALLS', 'DEMOLISHED', 'ROOMS', 'OPENINGS', 'FURNITURE', 'STAIRS', 'ROOM_LABELS', 'DIMENSIONS'];
+export const DRAWING_LAYERS: DrawingLayer[] = ['WALLS', 'DEMOLISHED', 'ROOMS', 'SEPARATORS', 'DOORS', 'WINDOWS', 'FURNITURE', 'STAIRS', 'ROOM_LABELS', 'DIMENSIONS'];
 export const DRAWING_LAYER_NAMES: Record<DrawingLayer, string> = {
-  WALLS: '墙体', DEMOLISHED: '拆除墙体', ROOMS: '房间', OPENINGS: '门窗', FURNITURE: '家具', STAIRS: '楼梯',
+  WALLS: '墙体', DEMOLISHED: '拆除墙体', ROOMS: '房间', SEPARATORS: '房间分隔线', DOORS: '门', WINDOWS: '窗', FURNITURE: '家具', STAIRS: '楼梯',
   ROOM_LABELS: '房间名称', DIMENSIONS: '尺寸标注',
 };
+/** 门窗所在图层：门和垭口归 DOORS（A-DOOR），窗归 WINDOWS（A-GLAZ）。 */
+export const openingLayer = (o: Pick<Opening, 'kind'>): DrawingLayer => (o.kind === 'window' ? 'WINDOWS' : 'DOORS');
 const ALL_LAYERS: Layers = { grid: false, dims: true, labels: true, furn: true, bearing: false, snap: false };
 /** Exports always contain every layer, independent of canvas visibility toggles. */
 export function createExportDocument(d: Design): DrawingDocument {
@@ -69,14 +72,17 @@ export function readableRotation(degrees: number): number {
 
 /** Opening symbol in local coordinates: wall direction is +x, opening centre at the origin. */
 export function openingDrawing(o: Opening, thickness: number): DrawingEntity[] {
-  const half = o.width / 2, t = thickness / 2;
-  // 垭口：只画洞口两侧贯穿墙厚的边线，没有门扇与开启弧线。
-  if (o.kind === 'passage') return [-half, half].map(x => drawingLine([x, -t], [x, t], 'OPENINGS'));
-  if (o.kind === 'window') return [{ kind: 'polyline', closed: true, layer: 'OPENINGS', points: [[-half, -t], [half, -t], [half, t], [-half, t]] },
-    drawingLine([-half, 0], [half, 0], 'OPENINGS')];
+  const half = o.width / 2, t = thickness / 2, layer = openingLayer(o);
+  // 垭口：洞口两侧贯穿墙厚的边线 + 上方过梁投影的虚线（剖切面以上的构件按制图惯例画虚线），没有门扇与开启弧线。
+  if (o.kind === 'passage') return [
+    ...[-half, half].map(x => drawingLine([x, -t], [x, t], layer)),
+    ...[-t, t].map((y): DrawingEntity => ({ ...drawingLine([-half, y], [half, y], layer), dashed: true } as DrawingEntity)),
+  ];
+  if (o.kind === 'window') return [{ kind: 'polyline', closed: true, layer, points: [[-half, -t], [half, -t], [half, t], [-half, t]] },
+    drawingLine([-half, 0], [half, 0], layer)];
   const { mirrorX, mirrorY } = doorOrientation(o), hinge: Point = [-half * mirrorX, 0];
   const a: Point = [-half * mirrorX, -o.width * mirrorY], b: Point = [half * mirrorX, 0];
-  return [drawingLine(hinge, a, 'OPENINGS'), { kind: 'arc', layer: 'OPENINGS', center: hinge, radius: o.width,
+  return [drawingLine(hinge, a, layer), { kind: 'arc', layer, center: hinge, radius: o.width,
     start: Math.atan2(a[1] - hinge[1], a[0] - hinge[0]), end: Math.atan2(b[1] - hinge[1], b[0] - hinge[0]), clockwise: mirrorX * mirrorY > 0 }];
 }
 
@@ -140,6 +146,9 @@ export function createDrawingDocument(d: Design, layers: Layers): DrawingDocumen
         { kind: 'text', point: [p[0], p[1] + 250], height: 160, rotation: 0, text: `${area(r).toFixed(2)} m²`, layer: 'ROOM_LABELS' });
     }
   }
+  // 房间分隔线：无厚度的虚线，划分房间但不是墙。
+  for (const s of d.separators ?? [])
+    entities.push({ ...drawingLine(s.a, s.b, 'SEPARATORS'), group: { id: s.id, name: '房间分隔线' } });
   for (const o of d.openings) {
     const wall = valid.find(w => w.id === o.wallId);
     if (!wall || d.demolished.includes(wall.id)) continue;
@@ -150,7 +159,7 @@ export function createDrawingDocument(d: Design, layers: Layers): DrawingDocumen
     const prefix = o.kind === 'door' ? 'DOOR' : o.kind === 'window' ? 'WIN' : 'PASS';
     const block = blocks.name(`${prefix}_${Math.round(o.width)}x${Math.round(wall.thickness)}`,
       JSON.stringify([o.kind, o.width, wall.thickness, o.kind === 'door' ? [mirrorX, mirrorY] : 0]), local);
-    inserts.push({ block, point: p, rotation, layer: 'OPENINGS', groupId: o.id });
+    inserts.push({ block, point: p, rotation, layer: openingLayer(o), groupId: o.id });
     entities.push(...local.map(e => ({ ...transformEntity(e, p, rotation), group })));
   }
   if (layers.furn) for (const f of d.furniture) {

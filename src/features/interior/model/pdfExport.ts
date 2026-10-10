@@ -63,8 +63,11 @@ export async function serializePdf(document: DrawingDocument, options: { fontByt
       if (e.kind === 'text') { drawText(page, font, e, at, k, style.stroke); continue; }
       const points = (e.kind === 'arc' ? arcPoints(e) : e.kind === 'polyline' ? e.points : ellipsePoints(e)).map(at);
       const closed = e.kind === 'polyline' ? e.closed : e.kind !== 'arc';
+      const dashed = e.kind === 'polyline' && e.dashed && !style.dash;
+      if (dashed) page.pushOperators(pushGraphicsState(), setDashPattern(LAYER_STYLES.SEPARATORS.dash!.map(v => v * k), 0));
       page.pushOperators(moveTo(...points[0]), ...points.slice(1).map(p => lineTo(...p)),
         ...(closed ? [closePath()] : []), closed && style.fill ? fillAndStroke() : stroke());
+      if (dashed) page.pushOperators(popGraphicsState());
     }
     page.pushOperators(popGraphicsState(), endMarkedContent());
   }
