@@ -28,6 +28,7 @@ import {
 import { snapFurniture, sameGuides, type AlignmentGuide } from '../model/furnitureAlignment';
 import { AlignmentGuides } from './AlignmentGuides';
 import {
+  isOpeningTool,
   uid,
   type Design,
   type Layers,
@@ -49,6 +50,7 @@ import { perimeterDimensions, planDrawingBounds, type DimensionSegment } from '.
 import type { DimensionBinding } from '../model/dimensionBinding';
 import { PerimeterDimensions } from './PerimeterDimensions';
 import { doorOrientation } from '../model/doorOrientation';
+import { defaultOpeningSize } from '../model/hardMaterials';
 import { dragOpening } from '../model/openingDrag';
 import { isCompletionClick, supportsPointerCompletion } from '../model/toolCompletion';
 export interface CanvasHandle {
@@ -453,13 +455,13 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         if (tool === 'wall') {
           select(null); wallDrawing.down(p, e.pointerId, [e.clientX, e.clientY]); return;
         }
-        if ((tool === "door" || tool === "window") && wid) {
+        if (isOpeningTool(tool) && wid) {
           const wall = design.walls.find((w) => w.id === wid)!;
           if (isBearingWall(wall)) {
             notify.fail("承重墙不可新增开口");
             return;
           }
-          const width = tool === "door" ? 900 : 1200,
+          const width = defaultOpeningSize(tool).width,
             L = length(wall);
           if (width > L) {
             notify.fail("此墙段长度不足");
@@ -505,7 +507,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           base.offset = [p[0] - f.cx, p[1] - f.cy];
         } else if (oid) {
           select({ kind: "opening", id: oid });
-          if (tool === 'door' || tool === 'window') finishTool();
+          if (isOpeningTool(tool)) finishTool();
           base.kind = 'openingmove';
           base.id = oid;
         } else if (wid && tool === "select") {
@@ -766,7 +768,27 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
               height={w.thickness}
               fill="var(--plan-porcelain)"
             />
-            {o.kind === "window" ? (
+            {o.kind === "passage" ? (
+              <>
+                {[-o.width / 2, o.width / 2].map((jamb) => (
+                  <path
+                    key={jamb}
+                    d={`M${jamb} ${-w.thickness / 2}V${w.thickness / 2}`}
+                    stroke="var(--plan-ink)"
+                    strokeWidth={15}
+                  />
+                ))}
+                {[-w.thickness / 2, w.thickness / 2].map((edge) => (
+                  <path
+                    key={edge}
+                    d={`M${-o.width / 2} ${edge}H${o.width / 2}`}
+                    stroke="var(--plan-ink)"
+                    strokeWidth={8}
+                    strokeDasharray="50 40"
+                  />
+                ))}
+              </>
+            ) : o.kind === "window" ? (
               <>
                 <rect
                   x={-o.width / 2}
