@@ -55,26 +55,26 @@
 `model/wallPolicy.ts`、`model/geometry.ts`、`model/roomSides.ts`、`model/dimensionWallEdit.ts`、`model/structureBand.ts`、`model/selectionEdits.ts`、`components/SizeFields.tsx`、`components/SelectionEditor.tsx`、`components/PropertyPanel.tsx`、`components/RoomSidesEditor.tsx`（均在 `src/features/interior/` 下）。
 
 ## Implementation checklist
-- [ ] `canResizeWall` 只按「非承重 且 未拆除」判断；`canEditWall` 删除且无残留引用
-- [ ] 新增 `BEARING_WALL_LOCKED`，SizeFields / SelectionEditor / PropertyPanel / selectionEdits 统一使用
-- [ ] 全仓（非测试）不再出现「复制该项目」「此项目创建时锁定」「结构尺寸已锁定」「外围尺寸已锁定」
-- [ ] `roomSides` 去掉 `locked` 分支与 `ROOM_STRUCTURE_LOCKED`；RoomSidesEditor 去掉横幅
-- [ ] `dimensionWallEdit` 去掉参考户型锁定分支
-- [ ] `structureBand` 去掉户型边界校验，更新承重连接文案
-- [ ] PropertyPanel 墙体状态 / 说明按承重与否显示
-- [ ] `rebuildRooms` 改为按实际墙体轮廓求封闭区域，保留旧房间属性继承
-- [ ] `blankFrameIntact` + `resizeBlank` 统一拒绝；PropertyPanel 外框不完整时禁用三项尺寸
-- [ ] `structureUnlocked` 五处写入移除，类型标 `@deprecated`，校验与指纹剔除保留
-- [ ] 同步更新钉住旧行为的测试：`wallPolicy.test.ts`、`components/structureUnlock.test.tsx`、`roomSides.test.ts`、`dimensionWallEdit.test.ts`、`wallSplit.test.ts` / `wallRemoval.test.ts`（resizeBlank 新文案）、`ai.test.ts`、`useProjects.test.ts`、`templateState.test.ts` 中的相关断言
+- [x] `canResizeWall` 只按「非承重 且 未拆除」判断；`canEditWall` 删除且无残留引用
+- [x] 新增 `BEARING_WALL_LOCKED`，SizeFields / SelectionEditor / PropertyPanel / selectionEdits 统一使用
+- [x] 全仓（非测试）不再出现「复制该项目」「此项目创建时锁定」「结构尺寸已锁定」「外围尺寸已锁定」
+- [x] `roomSides` 去掉 `locked` 分支与 `ROOM_STRUCTURE_LOCKED`；RoomSidesEditor 去掉横幅
+- [x] `dimensionWallEdit` 去掉参考户型锁定分支
+- [x] `structureBand` 去掉户型边界校验，更新承重连接文案
+- [x] PropertyPanel 墙体状态 / 说明按承重与否显示
+- [x] `rebuildRooms` 改为按实际墙体轮廓求封闭区域，保留旧房间属性继承
+- [x] `blankFrameIntact` + `resizeBlank` 统一拒绝；PropertyPanel 外框不完整时禁用三项尺寸
+- [x] `structureUnlocked` 五处写入移除，类型标 `@deprecated`，校验与指纹剔除保留
+- [x] 同步更新钉住旧行为的测试：`wallPolicy.test.ts`、`components/structureUnlock.test.tsx`、`roomSides.test.ts`、`dimensionWallEdit.test.ts`、`wallSplit.test.ts` / `wallRemoval.test.ts`（resizeBlank 新文案）、`ai.test.ts`、`useProjects.test.ts`、`templateState.test.ts` 中的相关断言
 
 ## Verification checklist
-- [ ] 正向：无 `structureUnlocked` 的旧参考户型，外围墙 / 隔墙 / 矮墙 `canResizeWall` 为真，`editSelection` 改长度成功
-- [ ] 正向：空白户型外围墙可移动（`moveWallWithJoints`）与改长度，向外移动后房间面积变大、房间 id 与名称不变
-- [ ] 正向：空白户型外围墙未动时，新 `rebuildRooms` 结果与原外框算法一致（房间数、面积）
-- [ ] 负向：承重墙（原始或手动标记）`canResizeWall` 为假，`editSelection` 抛 `BEARING_WALL_LOCKED`；取消标记后可编辑
-- [ ] 负向：拖动隔墙时，端点相连的承重墙不被拉伸（只当滑轨）
-- [ ] 边界：空白户型外围墙被移动 / 改厚 / 分割 / 删除后，`resizeBlank` 改尺寸抛新文案；参数不变时原样返回
-- [ ] 组件：选中旧项目的普通墙，尺寸弹窗显示输入框而非锁定文案；选中承重墙显示 `BEARING_WALL_LOCKED`
-- [ ] 承重墙上的门窗仍可编辑尺寸并显示承重提醒
-- [ ] `pnpm exec vitest run src/features/interior` 全部通过（基线中 `dimensionWallEdit.test.ts:87` 已有 1 个失败，与本次无关，单独说明）
-- [ ] `pnpm run lint` 与 `pnpm run build` 通过
+- [x] 正向：无 `structureUnlocked` 的旧参考户型，外围墙 / 隔墙 / 矮墙 `canResizeWall` 为真，`editSelection` 改长度成功
+- [x] 正向：空白户型外围墙可移动（`moveWallWithJoints`）与改长度，向外移动后房间面积变大、房间 id 与名称不变
+- [x] 正向：空白户型外围墙未动时，新 `rebuildRooms` 结果与原外框算法一致（房间数、面积）
+- [x] 负向：承重墙（原始或手动标记）`canResizeWall` 为假，`editSelection` 抛 `BEARING_WALL_LOCKED`；取消标记后可编辑
+- [x] 负向：拖动隔墙时，端点相连的承重墙不被拉伸（只当滑轨）
+- [x] 边界：空白户型外围墙被移动 / 改厚 / 分割 / 删除后，`resizeBlank` 改尺寸抛新文案；参数不变时原样返回
+- [x] 组件：选中旧项目的普通墙，尺寸弹窗显示输入框而非锁定文案；选中承重墙显示 `BEARING_WALL_LOCKED`
+- [x] 承重墙上的门窗仍可编辑尺寸并显示承重提醒
+- [x] `pnpm exec vitest run src/features/interior` 全部通过（基线中 `dimensionWallEdit.test.ts:87` 已有 1 个失败，与本次无关，单独说明）
+- [x] `pnpm run lint` 与 `pnpm run build` 通过
