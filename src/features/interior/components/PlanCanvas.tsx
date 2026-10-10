@@ -53,6 +53,7 @@ import { doorOrientation } from '../model/doorOrientation';
 import { defaultOpeningSize } from '../model/hardMaterials';
 import { dragOpening } from '../model/openingDrag';
 import { isCompletionClick, supportsPointerCompletion } from '../model/toolCompletion';
+import { furnitureCorners, furnitureInRect, groupBounds, groupIds, moveGroup, normalizeRect, selectionOf, type Rect } from '../model/furnitureGroup';
 export interface CanvasHandle {
   zoom: (k: number) => void;
   fit: () => void;
@@ -79,6 +80,8 @@ interface Props {
   startWallTool?: () => void;
   onDimensionSelect?: (segment: DimensionSegment) => void;
   selectedDimension?: DimensionBinding;
+  /** 框选模式：在空白处左键拖动画框批量选家具（关闭时拖动空白处平移画布）。 */
+  marquee?: boolean;
 }
 interface Drag {
   pid: number;
@@ -87,6 +90,10 @@ interface Drag {
   screen: Point;
   before: Design;
   id?: string;
+  /** 整组拖动时参与移动的家具。 */
+  ids?: string[];
+  /** 框选的当前角点（图纸坐标）。 */
+  end?: Point;
   room?: string;
   offset?: Point;
   view?: { x: number; y: number; s: number };
@@ -111,12 +118,15 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     startWallTool,
     onDimensionSelect,
     selectedDimension,
+    marquee = false,
   },
   ref,
 ) {
   const svg = useRef<SVGSVGElement>(null),
     current = useRef(design);
   current.current = design;
+  const [box, setBox] = useState<Rect | null>(null);
+  const group = groupIds(design, selection);
   const dimensionLayout = useMemo(() => perimeterDimensions({ walls: design.walls, demolished: design.demolished, dimensionSettings: design.dimensionSettings }), [design.walls, design.demolished, design.dimensionSettings]);
   const [view, setView] = useState({ x: -2000, y: -2000, s: 0.05 }),
     vr = useRef(view);
@@ -167,7 +177,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     if (
       !matrix ||
       !pts.length ||
-      (selection?.kind === "furniture" && !layers.furn)
+      (selection?.kind === "furniture" || selection?.kind === "group") && !layers.furn
     ) {
       onAnchor(null);
       return;
@@ -311,12 +321,23 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     const dr = drag.current;
     drag.current = null;
     showGuides([]);
+    setBox(null);
     if (!dr) return;
     if (cancel) {
       preview(dr.before);
       return;
     }
     const d = current.current;
+    if (dr.kind === 'marquee') {
+      // 框选模式下点击（没有拖出框）与平时一样：选中房间或取消选择。
+      if (!dr.moved || !dr.end) return select(dr.room ? { kind: 'room', id: dr.room } : null);
+      return select(layers.furn ? selectionOf(furnitureInRect(d, normalizeRect(dr.start, dr.end))) : null);
+    }
+    if (dr.kind === 'groupmove') {
+      if (!dr.moved) return select({ kind: 'furniture', id: dr.id! });
+      if (d !== dr.before) commit(d, dr.before);
+      return;
+    }
     if ((dr.kind === 'wallmove' || dr.kind === 'wallclick') && !dr.moved) {
       // 单击墙身（没有拖动）：切到绘墙，并以吸附点作为第一段墙的起点；双击才选中墙（见 completeTool）。
       if (!startWallTool) return select({ kind: 'wall', id: dr.id! });
@@ -390,7 +411,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
   return (
     <svg
       ref={svg}
-      className={"plan-canvas tool-" + tool}
+      className={"plan-canvas tool-" + tool + (marquee && tool === 'select' ? " marquee-on" : "")}
       viewBox={`${view.x} ${view.y} ${size.w / view.s} ${size.h / view.s}`}
       role="application"
       aria-label="户型平面编辑画布"
@@ -496,15 +517,25 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         } else if (handle && selection) {
           const selectedWall = selection.kind === 'wall' ? design.walls.find(w => w.id === selection.id) : null;
           if (selectedWall && !canResizeWall(design, selectedWall)) return;
+          if (selection.kind === 'group') return;
           base.kind = handle === "a" || handle === "b" ? "endpoint" : handle;
           base.id = selection.id;
           base.room = handle;
+        } else if (fid && group.includes(fid)) {
+          // 拖动整组中的任意一件：整组一起平移。
+          base.kind = 'groupmove';
+          base.id = fid;
+          base.ids = group;
         } else if (fid) {
           const f = design.furniture.find((f) => f.id === fid)!;
           select({ kind: "furniture", id: fid });
           base.kind = "move";
           base.id = fid;
           base.offset = [p[0] - f.cx, p[1] - f.cy];
+        } else if (marquee && tool === 'select') {
+          // 框选模式：从墙、门窗或空白处起拖都是画框（家具上起拖仍是移动家具）。
+          base.kind = 'marquee';
+          base.room = el.closest("[data-room]")?.getAttribute("data-room") || undefined;
         } else if (oid) {
           select({ kind: "opening", id: oid });
           if (isOpeningTool(tool)) finishTool();
@@ -576,6 +607,16 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         }
         if (!dr.moved) return;
         if (dr.kind === 'wallclick') return;
+        if (dr.kind === 'marquee') {
+          dr.end = p;
+          setBox(normalizeRect(dr.start, p));
+          return;
+        }
+        if (dr.kind === 'groupmove') {
+          const moveBy = stepDelta([p[0] - dr.start[0], p[1] - dr.start[1]], dragStep(dr.before));
+          preview(moveGroup(dr.before, dr.ids!, moveBy));
+          return;
+        }
         if (dr.kind === "pan") {
           setView({
             ...dr.view!,
@@ -858,6 +899,39 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       {tool === 'select' && <WallHoverOverlay walls={design.walls} demolished={design.demolished} candidate={selectHover} connection={null} scale={view.s} label={startWallTool && !readOnly ? '点击开始绘墙，双击选中' : undefined} />}
       <AlignmentGuides guides={guides} scale={view.s} />
       {selection?.kind === 'opening' && <OpeningDistances design={design} openingId={selection.id} scale={view.s} />}
+      {box && (
+        <rect
+          data-export-hide="true"
+          className="plan-marquee"
+          x={box.x1}
+          y={box.y1}
+          width={box.x2 - box.x1}
+          height={box.y2 - box.y1}
+          strokeWidth={1.5 / view.s}
+          strokeDasharray={`${6 / view.s} ${4 / view.s}`}
+          pointerEvents="none"
+        />
+      )}
+      {group.length > 0 && layers.furn && (
+        <g data-export-hide="true" className="selection-overlay" pointerEvents="none">
+          {design.furniture.filter(f => group.includes(f.id)).map(f => (
+            <polygon
+              key={f.id}
+              points={furnitureCorners(f).map(p => p.join(',')).join(' ')}
+              fill="var(--plan-selection-soft)"
+              stroke="var(--plan-selection)"
+              strokeWidth={1.5 / view.s}
+            />
+          ))}
+          <polygon
+            points={groupBounds(design, group).map(p => p.join(',')).join(' ')}
+            fill="none"
+            stroke="var(--plan-selection)"
+            strokeWidth={1.5 / view.s}
+            strokeDasharray={`${5 / view.s} ${3 / view.s}`}
+          />
+        </g>
+      )}
       {selection && (
         <g data-export-hide="true" className="selection-overlay">
           {selection.kind === "room" &&
