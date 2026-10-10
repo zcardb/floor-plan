@@ -48,7 +48,7 @@ describe('墙体悬停：到两端的距离', () => {
   it('起笔后和关闭吸附仍跟随原始鼠标测距，不误导点击连接', () => {
     const design = { ...blankDesign(), walls: [vertical] };
     const raw: Point = [100, 4000];
-    const hover = resolveWallHover(raw, design, 0.1);
+    const hover = resolveWallHover(raw, design, 0.1, 50);
     for (const connection of [resolveWallPoint(raw, design, 0.1, true, [-3000, 3000]), resolveWallPoint(raw, design, 0.1, false)]) {
       const html = renderToStaticMarkup(createElement(WallHoverOverlay, { walls: [vertical], candidate: hover, connection, scale: 0.1 }));
       expect(readings(html)).toEqual(['4.00', '2.00']);

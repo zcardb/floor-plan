@@ -39,7 +39,7 @@ import {
 import { FurnitureShape } from "./FurnitureShape";
 import { MaterialDefs } from "./Materials";
 import { selectionPoints, localWallPoint, type ScreenRect } from "../model/selectionAnchor";
-import { resolveWallPoint,validateWallSegment,type WallSnap } from '../model/wallDrawing';
+import { resolveWallPoint,steppedPointOnWall,validateWallSegment,type WallSnap } from '../model/wallDrawing';
 import { useWallDrawing } from './useWallDrawing';
 import { OpeningDistances } from './OpeningDistances';
 import { connectedWallPoly } from '../model/wallConnections';
@@ -137,12 +137,12 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
   // 选择模式悬停墙体时的测距点（与绘墙悬停共用 WallHoverOverlay）。
   const [selectHover, setSelectHover] = useState<WallSnap | null>(null);
   const clearSelectHover = () => setSelectHover(h => (h ? null : h));
-  /** 墙身上的绘墙起点：与绘墙相同的吸附（端点、洞口边、交点），吸不到时取墙中心线上的最近点。 */
+  /** 墙身上的绘墙起点：端点、洞口边吸附优先，否则在该墙上沿墙按拖动步进取整（悬停圆点与单击起点一致）。 */
   const wallStartPoint = (p: Point, wallId: string): WallSnap => {
     const d = current.current, snapped = resolveWallPoint(p, d, vr.current.s, layers.snap);
-    if (snapped.target) return snapped;
+    if (snapped.target?.kind === 'endpoint' || snapped.target?.kind === 'opening') return snapped;
     const wall = d.walls.find(w => w.id === wallId)!;
-    return { point: nearestOnWall(p, wall).point, target: { wallId, kind: 'intersection' } };
+    return { point: steppedPointOnWall(p, wall, dragStep(d)), target: { wallId, kind: 'intersection' } };
   };
   const hoverWall = (target: EventTarget | null, p: Point) => {
     const id = (target as Element | null)?.closest?.('[data-wall]')?.getAttribute('data-wall');

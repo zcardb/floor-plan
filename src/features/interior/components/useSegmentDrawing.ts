@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { notify } from "@/lib/notify";
-import { resolveWallPoint, resolveWallHover, type WallSnap } from '../model/wallDrawing';
+import { dragStep } from '../model/dragStep';
+import { resolveDrawPoint, resolveWallHover, type WallSnap } from '../model/wallDrawing';
 import type { Design, Point } from '../model/types';
 
 export function useSegmentDrawing(enabled: boolean, design: React.RefObject<Design>, scale: number, snap: boolean,
@@ -29,8 +30,9 @@ export function useSegmentDrawing(enabled: boolean, design: React.RefObject<Desi
     return () => window.removeEventListener('keydown', key);
   }, [enabled, clear]);
   const move = (p: Point) => {
-    setHover(resolveWallHover(p, design.current, latest.current.scale));
-    const result = resolveWallPoint(p, design.current, latest.current.scale, latest.current.snap, chain.current?.start);
+    const d = design.current, step = dragStep(d);
+    setHover(resolveWallHover(p, d, latest.current.scale, step));
+    const result = resolveDrawPoint(p, d, latest.current.scale, latest.current.snap, step, chain.current?.start);
     setCandidate(result);
     if (chain.current) setDraft({ a: chain.current.start, b: result.point, target: result.target });
     return result;

@@ -1,5 +1,6 @@
+import { snapToDragStep } from './dragStep';
 import { length,nearestOnWall } from './geometry';
-import type { Design,Point } from './types';
+import type { Design,Point,Wall } from './types';
 export interface WallSnap { point:Point; target?:{wallId:string;kind:'endpoint'|'intersection'|'opening'} }
 const snapRank={endpoint:0,opening:1,intersection:2} as const;
 export function resolveWallPoint(raw:Point,d:Design,scale:number,snap:boolean,start?:Point,exclude?:string):WallSnap {
@@ -32,10 +33,39 @@ export function resolveWallPoint(raw:Point,d:Design,scale:number,snap:boolean,st
   candidates.sort((a,b)=>a.kind===b.kind?a.distance-b.distance:snapRank[a.kind]-snapRank[b.kind]);
   const found=candidates[0];return found?{point:[...found.point],target:{wallId:found.wallId,kind:found.kind}}:{point};
 }
-export function resolveWallHover(raw:Point,d:Design,scale:number):WallSnap {
+/** 沿墙偏移按步进取整（以墙起点为 0）；离墙终点比离最近整步更近时取终点，两端都能点到。 */
+export function stepOffsetOnWall(w:Wall,offset:number,step:number){
+  const L=length(w),snapped=snapToDragStep(offset,step);
+  if(L-offset<Math.abs(snapped-offset))return L;
+  return Math.max(0,Math.min(L,snapped));
+}
+/** 点投影到墙中心线后，沿墙按步进取整的点。 */
+export function steppedPointOnWall(p:Point,w:Wall,step:number):Point {
+  const L=length(w);
+  if(L<0.001)return [...w.a];
+  const t=stepOffsetOnWall(w,nearestOnWall(p,w).offset,step)/L;
+  return [w.a[0]+(w.b[0]-w.a[0])*t,w.a[1]+(w.b[1]-w.a[1])*t];
+}
+export function resolveWallHover(raw:Point,d:Design,scale:number,step:number):WallSnap {
   const result=resolveWallPoint(raw,d,scale,true);
   const wall=result.target&&d.walls.find(w=>w.id===result.target?.wallId);
-  return wall?{...result,point:nearestOnWall(raw,wall).point}:{point:[...raw]};
+  return wall?{...result,point:steppedPointOnWall(raw,wall,step)}:{point:[...raw]};
+}
+/**
+ * 绘墙落点：端点、洞口边吸附优先；有起点时 T 形交点也以吸附为准，否则沿轴向按步进取整墙长；
+ * 无起点时墙身上的点沿墙按步进取整，空白处按步进对齐网格。
+ */
+export function resolveDrawPoint(raw:Point,d:Design,scale:number,snap:boolean,step:number,start?:Point):WallSnap {
+  const result=resolveWallPoint(raw,d,scale,snap,start);
+  const kind=result.target?.kind;
+  if(kind==='endpoint'||kind==='opening')return result;
+  if(start){
+    if(kind)return result;
+    return {point:[start[0]+snapToDragStep(result.point[0]-start[0],step),start[1]+snapToDragStep(result.point[1]-start[1],step)]};
+  }
+  const wall=kind&&d.walls.find(w=>w.id===result.target?.wallId);
+  if(wall)return {...result,point:steppedPointOnWall(result.point,wall,step)};
+  return {point:[snapToDragStep(result.point[0],step),snapToDragStep(result.point[1],step)]};
 }
 export function validateWallSegment(d:Design,a:Point,b:Point,exclude?:string){
   const candidate={a,b},L=length(candidate as Design['walls'][number]);
