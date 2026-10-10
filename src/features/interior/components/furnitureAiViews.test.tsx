@@ -58,7 +58,11 @@ describe("家具 2D / 3D 视角", () => {
     expect(visual(sofa, "top")).toContain('aria-checked="true" aria-label="2D 俯视图"');
     expect(visual(sofa, "perspective")).toContain("布艺沙发实时 3D 模型预览");
     expect(visual(sofa, "perspective")).toContain("AI 调整");
-    expect(visual({ ...sofa, image3dUrl: "https://x/3d.webp" }, "perspective")).toContain("https://x/3d.webp");
+    const with3d = visual({ ...sofa, image3dUrl: "https://x/3d.webp" }, "perspective");
+    // 有 AI 效果图时 3D 仍是实时模型，效果图只作角落参考。
+    expect(with3d).toContain("布艺沙发实时 3D 模型预览");
+    expect(with3d).toContain("furniture-visual-ref");
+    expect(with3d).toContain("https://x/3d.webp");
   });
   it("硬装没有 3D 视角切换；没有保存权限时不显示 AI 调整", () => {
     expect(visual({ ...sofa, category: "门窗" }, "top")).not.toContain("预览视角");

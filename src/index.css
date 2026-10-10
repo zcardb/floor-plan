@@ -4245,7 +4245,7 @@ button.ai-candidate:hover { border-color: hsl(var(--primary) / 0.5); }
 }
 .furniture-detail-dialog > div:first-child { text-align: left; padding-right: 28px; }
 .furniture-detail-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 400px) minmax(0, 1fr); gap: 24px; }
-.furniture-detail-side { min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: grid; align-content: start; gap: 20px; padding-right: 4px; }
+.furniture-detail-side { min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: grid; align-content: start; gap: 20px; }
 .cms-detail-actions.furniture-detail-actions { justify-content: flex-end; padding-top: 14px; border-top: 1px solid hsl(var(--border)); }
 .furniture-detail-actions .cost-sync { margin: 0 auto 0 0; }
 
@@ -4303,3 +4303,26 @@ button.ai-candidate:hover { border-color: hsl(var(--primary) / 0.5); }
 .wall-split-step.is-secondary .wall-split-result > span { font-size: 10px; line-height: 14px; }
 .wall-split-step.is-secondary .wall-split-result > b { font-size: 11px; line-height: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .wall-split-step.is-secondary .wall-split-result.is-active > span, .wall-split-step.is-secondary .wall-split-result.is-active > b { color: hsl(var(--primary)); }
+
+/*
+ * 焦点光圈不被裁切：滚动容器（overflow 非 visible）会裁掉子元素伸出边框的焦点样式——
+ * 输入框 / 下拉的 ring-4（4px）、按钮的 outline 2px + offset 3px。
+ * 这些容器统一留出 --focus-bleed 内边距，再用等量负外边距抵消，视觉位置不变。
+ */
+:root { --focus-bleed: 6px; }
+.furniture-detail-side,
+.cms-detail-scroll,
+.room-sides-list,
+.wall-split-contacts,
+.account-furniture-list,
+.project-list { padding: var(--focus-bleed); margin: calc(var(--focus-bleed) * -1); }
+.toolbar-scroll { padding: var(--focus-bleed); margin: calc(var(--focus-bleed) * -1); }
+
+/* AI 调整 · 3D：候选是实时 3D 模型，右下角附 AI 效果图作参考 */
+.furniture-ai-candidate-3d { position: absolute; inset: 0; }
+.furniture-model-preview.is-compact { cursor: inherit; touch-action: auto; pointer-events: none; }
+.furniture-ai-candidate-ref,
+.furniture-visual-ref { position: absolute; right: 8px; bottom: 8px; z-index: 1; width: 22%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; border: 2px solid hsl(var(--card)); box-shadow: 0 1px 4px hsl(var(--foreground) / 0.16); pointer-events: none; }
+.furniture-visual-ref { right: 12px; bottom: 12px; width: 72px; }
+.image-lightbox-plan-paper:has(.furniture-ai-candidate-3d) { position: relative; padding: 0; overflow: hidden; }
+.image-lightbox-plan-paper .furniture-ai-candidate-ref { width: 18%; right: 14px; bottom: 14px; }
