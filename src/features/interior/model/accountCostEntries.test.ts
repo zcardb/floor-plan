@@ -5,12 +5,21 @@ import { accountCostEntries, accountCostSource, costCategories, filterCostEntrie
 import { setPrice, priceOf } from './costs';
 
 const entries = accountCostEntries([], {});
+const stairCount = library.filter(item => item.type === 'stairs').length;
 describe('账号成本分类与清单', () => {
-  it('五类硬装材料并复用家具分类，不含施工', () => {
-    expect(costCategories).toEqual(['地面', '墙面', '门窗', '屋面', '吊顶', ...categories]);
+  it('五类硬装材料 + 楼梯，并复用家具分类，不含施工', () => {
+    expect(costCategories).toEqual(['地面', '墙面', '门窗', '屋面', '吊顶', '楼梯', ...categories]);
     expect(entries.some(entry => entry.group === 'constructionPrices')).toBe(false);
     expect(entries).toHaveLength(25 + library.length);
     expect(entries.find(entry => entry.key === library[0].catalogId)?.category).toBe(library[0].category);
+  });
+  it('楼梯归入硬装 · 楼梯，按件计价；旧账号副本即使分类是客厅也按楼梯归类', () => {
+    const stairs = filterCostEntries(entries, '楼梯', '', '硬装');
+    expect(stairs).toHaveLength(stairCount);
+    expect(stairs.every(entry => entry.group === 'furniturePrices' && entry.unit === '件')).toBe(true);
+    const legacy = accountCostEntries([{ catalogId: 'custom-stairs', category: '客厅', type: 'stairs', name: '旧楼梯', w: 1000, d: 3000, color: '#eee' }], {});
+    expect(legacy.find(entry => entry.key === 'custom-stairs')).toMatchObject({ category: '楼梯', major: '硬装' });
+    expect(filterCostEntries(entries, '客厅', '楼梯')).toHaveLength(0);
   });
   it('按catalogId合并去重，名称与分类共同筛选', () => {
     const merged = accountCostEntries([{ ...library[0], name: '我的测试床' }], {});
@@ -20,8 +29,8 @@ describe('账号成本分类与清单', () => {
     expect(filterCostEntries(merged, '全部', '')).toHaveLength(entries.length);
   });
   it('硬装软装切换仅展示对应大类，搜索不跨类泄露', () => {
-    expect(filterCostEntries(entries, '全部', '', '硬装')).toHaveLength(25);
-    expect(filterCostEntries(entries, '全部', '', '软装')).toHaveLength(library.length);
+    expect(filterCostEntries(entries, '全部', '', '硬装')).toHaveLength(25 + stairCount);
+    expect(filterCostEntries(entries, '全部', '', '软装')).toHaveLength(library.length - stairCount);
     expect(filterCostEntries(entries, '全部', '地板', '软装')).toHaveLength(0);
     expect(filterCostEntries(entries, '卧室', '床', '软装').every(entry => entry.category === '卧室')).toBe(true);
   });

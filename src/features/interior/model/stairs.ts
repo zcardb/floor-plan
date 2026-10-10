@@ -16,6 +16,9 @@ export const STAIR_FLIGHT_MIN = 300, STAIR_FLIGHT_MAX = 5000;
 export const STAIR_RULES = { flightWidth: 750, treadDepth: 220, riserHeight: 200, spiralMeasureOffset: 250 };
 const SPIRAL_SWEEP = (300 * Math.PI) / 180;
 
+/** 楼梯在账号家具库与成本中归入「硬装 · 楼梯」，仍按件计价。按 type 判断，旧数据与账号副本同样适用。 */
+export const STAIR_CATEGORY = '楼梯';
+export const isStairs = (item: { type: string }) => item.type === 'stairs';
 export const stairPreset = (form: StairForm) => STAIR_PRESETS.find(p => p.form === form)!;
 export const stairCatalogId = (preset: StairPreset) => `stairs:${preset.name}`;
 export const isStairForm = (form: unknown): form is StairForm => STAIR_FORMS.includes(form as StairForm);
@@ -29,7 +32,7 @@ export function validStairSpec(spec: unknown): boolean {
 export const stairSpec = (f: Pick<Furniture, 'w' | 'stair'>): StairSpec => f.stair ?? { form: 'straight', flightWidth: f.w, steps: 12 };
 
 export const stairLibrary: LibraryItem[] = STAIR_PRESETS.map(p => ({
-  catalogId: stairCatalogId(p), category: '客厅', type: 'stairs', name: p.name, w: p.w, d: p.d, color: '#e6dccc',
+  catalogId: stairCatalogId(p), category: STAIR_CATEGORY, type: 'stairs', name: p.name, w: p.w, d: p.d, color: '#e6dccc',
   stair: { form: p.form, flightWidth: p.flightWidth, steps: p.steps },
 }));
 

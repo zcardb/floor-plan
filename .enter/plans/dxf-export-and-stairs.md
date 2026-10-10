@@ -93,32 +93,36 @@ export interface StairSpec { form: StairForm; flightWidth: number /*mm*/; steps:
 ---
 
 ## Implementation checklist
-- [ ] `drawingStyle.ts`：新增 `DXF_LAYER_STYLES`，覆盖 7 个图层加 WALL_HATCH（ACI 颜色、线宽、线型）
-- [ ] `dxfExport.ts`：定义 DASHED 线型，图层按表设置颜色和线型，组码 370 写入线宽，设置 `$LWDISPLAY=1`
-- [ ] `drawingDocument.ts`：新增 `circle`/`ellipse` 图元、`transformEntity`、`openingDrawing`，以及 `blocks`/`inserts` 字段；bounds 覆盖新图元
-- [ ] `furnitureDrawing.ts`：相似变换下圆/椭圆输出 circle/ellipse，非等比变换回退折线；支持 `<text>`
-- [ ] `svgExport.ts` / `pdfExport.ts`：渲染 circle/ellipse
-- [ ] `dxfExport.ts`：写出 CIRCLE、ELLIPSE；WALLS 闭合多段线写出 SOLID HATCH 到 WALL_HATCH 层
-- [ ] `dxfExport.ts`：块定义加 INSERT，被代替的 group 不再写散线；尺寸匿名块逻辑不变
-- [ ] `types.ts`：新增 `StairForm`、`StairSpec`，`Furniture.stair?`、`LibraryItem.stair?`
-- [ ] `model/stairs.ts`：`STAIR_PRESETS`、`stairSpec`（老数据回退）、`stairLayout`（5 类、梯段宽夹取）、`stairMetrics`（踏步宽、踏步高、规范提示）、`applyStairForm`
-- [ ] `validation.ts`：校验 `stair` 字段
-- [ ] `components/StairPlan.tsx` 和 `FurnitureShape.tsx` 的 stairs 分支；`index.css` 新增 `.stair-label`
-- [ ] `catalog.ts`：单个楼梯条目替换为 5 个预设条目
-- [ ] `components/StairEditor.tsx`：类别卡片、梯段宽、踏步数、推导信息、规范提示；在 `SelectionEditor.tsx` 中只对 `type==='stairs'` 显示
+- [x] `drawingStyle.ts`：新增 `DXF_LAYER_STYLES`，覆盖 7 个图层加 WALL_HATCH（ACI 颜色、线宽、线型）
+- [x] `dxfExport.ts`：定义 DASHED 线型，图层按表设置颜色和线型，组码 370 写入线宽，设置 `$LWDISPLAY=1`
+- [x] `drawingDocument.ts`：新增 `circle`/`ellipse` 图元、`transformEntity`、`openingDrawing`，以及 `blocks`/`inserts` 字段；bounds 覆盖新图元
+- [x] `furnitureDrawing.ts`：相似变换下圆/椭圆输出 circle/ellipse，非等比变换回退折线；支持 `<text>`
+- [x] `svgExport.ts` / `pdfExport.ts`：渲染 circle/ellipse
+- [x] `dxfExport.ts`：写出 CIRCLE、ELLIPSE；WALLS 闭合多段线写出 SOLID HATCH 到 WALL_HATCH 层
+- [x] `dxfExport.ts`：块定义加 INSERT，被代替的 group 不再写散线；尺寸匿名块逻辑不变
+- [x] `types.ts`：新增 `StairForm`、`StairSpec`，`Furniture.stair?`、`LibraryItem.stair?`
+- [x] `model/stairs.ts`：`STAIR_PRESETS`、`stairSpec`（老数据回退）、`stairLayout`（5 类、梯段宽夹取）、`stairMetrics`（踏步宽、踏步高、规范提示）、`applyStairForm`
+- [x] `validation.ts`：校验 `stair` 字段
+- [x] `components/StairPlan.tsx` 和 `FurnitureShape.tsx` 的 stairs 分支；`index.css` 新增 `.stair-label`
+- [x] `catalog.ts`：单个楼梯条目替换为 5 个预设条目
+- [x] `components/StairEditor.tsx`：类别卡片、梯段宽、踏步数、推导信息、规范提示；在 `SelectionEditor.tsx` 中只对 `type==='stairs'` 显示
 
 ## Verification checklist
-- [ ] 正向（`drawingExport.test.ts`）：用 `dxf-parser` 回读，各图层颜色、线型与表一致，DEMOLISHED 为 DASHED，图层记录 370 等于表中线宽
-- [ ] 正向：含圆桌的方案导出后有 CIRCLE；WALLS 闭合多段线数 = HATCH 数；INSERT 数 = 家具数 + 未拆除墙上的门窗数；同尺寸的两件沙发共用一个块
-- [ ] 正向：SVG 中圆桌是 `<circle>`；PDF 仍能回读，OCG 数不变
-- [ ] 正向（`stairs.test.tsx`）：5 类楼梯都能渲染；直跑 n=14 时有 13 条 `<line>`；改 steps 后踏步线数随之变化；螺旋楼梯有 2 个 `<circle>`；每类都有"上"字和箭头路径
-- [ ] 正向：`StairEditor` 切换为 U 型后 w/d/flightWidth/steps 等于预设，cx/cy/rot 不变；踏步数修改提交后 `validateDesign` 往返仍保留 `stair`
-- [ ] 正向：楼梯导出 DXF 后，块内含 TEXT"上"；SVG/DXF/JSON 往返用例仍满足深度相等
-- [ ] 默认值：没有 `stair` 字段的老楼梯，渲染为 11 条踏步线的直跑，`validateDesign` 能通过
-- [ ] 负向：`steps` 为 2、41 或 12.5，`form: 'x'`，`flightWidth: 100`，`validateDesign` 都报错
-- [ ] 负向：`walls: []` 时三种导出仍抛"没有可导出的有效墙体"；无载荷的外部 DXF 仍走识别流程
-- [ ] 边界：外框缩到 1000×1000 时，L 型、U 型、三跑都不会画出负尺寸或 NaN（梯段宽被夹取）；踏步宽 < 220 mm 时规范提示出现，满足时不出现
-- [ ] 更新 `Library.test.tsx`：硬装分类下出现 5 种楼梯，点击"添加直跑楼梯"后带 `stair` 字段
-- [ ] 构建：`pnpm test` 全绿，`pnpm lint` 无新增错误，`pnpm exec tsc --noEmit` 和 `pnpm run build` 通过
+- [x] 正向（`drawingExport.test.ts`）：用 `dxf-parser` 回读，各图层颜色、线型与表一致，DEMOLISHED 为 DASHED，图层记录 370 等于表中线宽
+- [x] 正向：含圆桌的方案导出后有 CIRCLE；WALLS 闭合多段线数 = HATCH 数；INSERT 数 = 家具数 + 未拆除墙上的门窗数；同尺寸的两件沙发共用一个块
+- [x] 正向：SVG 中圆桌是 `<circle>`；PDF 仍能回读，OCG 数不变
+- [x] 正向（`stairs.test.tsx`）：5 类楼梯都能渲染；直跑 n=14 时有 13 条 `<line>`；改 steps 后踏步线数随之变化；螺旋楼梯有 2 个 `<circle>`；每类都有"上"字和箭头路径
+- [x] 正向：`StairEditor` 切换为 U 型后 w/d/flightWidth/steps 等于预设，cx/cy/rot 不变；踏步数修改提交后 `validateDesign` 往返仍保留 `stair`
+- [x] 正向：楼梯导出 DXF 后，块内含 TEXT"上"；SVG/DXF/JSON 往返用例仍满足深度相等
+- [x] 默认值：没有 `stair` 字段的老楼梯，渲染为 11 条踏步线的直跑，`validateDesign` 能通过
+- [x] 负向：`steps` 为 2、41 或 12.5，`form: 'x'`，`flightWidth: 100`，`validateDesign` 都报错
+- [x] 负向：`walls: []` 时三种导出仍抛"没有可导出的有效墙体"；无载荷的外部 DXF 仍走识别流程
+- [x] 边界：外框缩到 1000×1000 时，L 型、U 型、三跑都不会画出负尺寸或 NaN（梯段宽被夹取）；踏步宽 < 220 mm 时规范提示出现，满足时不出现
+- [x] 更新 `Library.test.tsx`：硬装分类下出现 5 种楼梯，点击"添加直跑楼梯"后带 `stair` 字段
+- [x] 构建：`pnpm test` 全绿，`pnpm lint` 无新增错误，`pnpm exec tsc --noEmit` 和 `pnpm run build` 通过
 - [ ] 截图：`desktop_1280` 下选中楼梯，查看编辑面板和画布图样
 - [ ] 人工确认（沙箱里没有 AutoCAD）：在 AutoCAD 中打开导出文件，检查图层颜色、线宽、拆除墙虚线、墙体实心填充，以及家具能否整块选中
+
+## 追加：楼梯归入硬装
+- [x] 账号家具库「硬装」新增「楼梯」分类（含旧账号副本，按 type 判断）
+- [x] 全屋成本新增「楼梯」类，计入硬装总额，仍按件计价；房内楼梯计入本间硬装

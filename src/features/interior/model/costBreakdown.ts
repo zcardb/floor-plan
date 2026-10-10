@@ -11,6 +11,7 @@ import { floorMaterialOf } from "./floorMaterials";
 import { openingName, openingPriceKey, roofSurfaceArea, surfaceMaterialOf, wallMaterialOf } from "./hardMaterials";
 import { area, inRoom } from "./geometry";
 import type { Design, Opening, Selection } from "./types";
+import { isStairs } from "./stairs";
 
 /** 一条成本明细：归类、数量、单价与金额，并带上可直接改价的 key。 */
 export interface CostPart {
@@ -183,14 +184,15 @@ export function costBreakdown(d: Design): CostBreakdown {
       price: item.amount,
       subtotal: item.amount,
     });
-  // 家具：中心点落在哪间算哪间，房外家具进公共项并按同款合并。
+  // 家具：中心点落在哪间算哪间，房外家具进公共项并按同款合并；楼梯计入该间硬装。
   const outside = new Map<string, CostPart>();
   for (const f of d.furniture) {
     const key = furnitureKey(f),
       price = priceOf(d, "furniturePrices", key),
       owner = d.rooms.find((r) => inRoom([f.cx, f.cy], r));
     if (owner) {
-      byId.get(owner.id)?.soft.push({
+      const room = byId.get(owner.id);
+      (isStairs(f) ? room?.hard : room?.soft)?.push({
         group: "furniturePrices",
         key,
         label: f.name,

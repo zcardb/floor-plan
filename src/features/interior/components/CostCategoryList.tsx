@@ -4,20 +4,24 @@ import { EditorTooltip } from "@/components/ui/editor-tooltip";
 import type { CostRow, PriceGroup } from "../model/costs";
 import { yuan } from "../model/money";
 import type { Design } from "../model/types";
+import { STAIR_CATEGORY } from "../model/stairs";
 import { CostRowEditor } from "./CostRowEditor";
 import { LaborEditor } from "./LaborEditor";
 
 type Labor = NonNullable<NonNullable<Design["costSettings"]>["labor"]>;
-const categories: { id: PriceGroup | "labor"; label: string; hint: string }[] = [
+const categories: { id: PriceGroup | "labor" | "stairs"; label: string; hint: string }[] = [
   { id: "floorPrices", label: "地面", hint: "含损耗 / 采购取整" },
   { id: "wallPrices", label: "墙面", hint: "周长 × 层高，扣除门窗" },
   { id: "openingPrices", label: "门窗", hint: "按开口面积 m²" },
   { id: "roofPrices", label: "屋面", hint: "房间面积 ÷ cos 坡度" },
   { id: "ceilingPrices", label: "吊顶", hint: "按房间面积" },
+  { id: "stairs", label: "楼梯", hint: "按件计价" },
   { id: "constructionPrices", label: "拆改与新建", hint: "长度 × 层高" },
   { id: "labor", label: "人工", hint: "独立总价条目" },
   { id: "furniturePrices", label: "软装", hint: "同款家具单价联动" },
 ];
+const inCategory = (row: CostRow, id: string) =>
+  id === "stairs" ? row.category === STAIR_CATEGORY : row.group === id && !row.category;
 
 /** 全屋口径：按类别折叠的价格明细。 */
 export function CostCategoryList({
@@ -44,7 +48,7 @@ export function CostCategoryList({
   return (
     <div className="cost-categories">
       {categories.map((cat) => {
-        const all = rows.filter((r) => r.group === cat.id && r.quantity > 0),
+        const all = rows.filter((r) => inCategory(r, cat.id) && r.quantity > 0),
           list = onlyUnpriced ? all.filter((r) => r.price === null) : all,
           isLabor = cat.id === "labor",
           unpriced = all.filter((r) => r.price === null).length,

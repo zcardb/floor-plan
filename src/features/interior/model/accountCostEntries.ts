@@ -3,11 +3,13 @@ import { builtinFloors, customFloorMaterial, type FloorMaterial } from './floorM
 import { priceOf, type PriceGroup } from './costs';
 import { HARD_CATEGORIES, ceilingMaterials, customWallMaterial, openingKinds, roofMaterials, wallMaterials, type WallMaterial } from './hardMaterials';
 import type { AccountCostSettings } from './costDefaults';
+import { STAIR_CATEGORY, isStairs } from './stairs';
 import type { CustomFloor, CustomOpening, CustomWall, Design, LibraryItem } from './types';
 
 export type CostMajor = '硬装' | '软装';
 export type CostEntry = { group: PriceGroup; key: string; name: string; category: string; unit: string; major: CostMajor; furniture?: LibraryItem; floor?: FloorMaterial; wall?: WallMaterial; opening?: CustomOpening; custom?: boolean };
-export const materialCostCategories = HARD_CATEGORIES;
+/** 账号家具库与成本的硬装分类：五类材料 + 楼梯（楼梯按件计价，没有「新建材料」表单）。 */
+export const materialCostCategories = [...HARD_CATEGORIES, STAIR_CATEGORY];
 export const costCategories = [...materialCostCategories, ...categories];
 export type AccountSurfaces = { roofs?: CustomWall[]; ceilings?: CustomWall[] };
 export function accountCostEntries(items: LibraryItem[], settings: AccountCostSettings, floors: CustomFloor[] = [], walls: CustomWall[] = [], openings: CustomOpening[] = [], { roofs = [], ceilings = [] }: AccountSurfaces = {}): CostEntry[] {
@@ -23,7 +25,8 @@ export function accountCostEntries(items: LibraryItem[], settings: AccountCostSe
     ...openingKinds.map(({ value, label }) => ({ key: value, name: label, ...hard, group: 'openingPrices' as const, category: '门窗' })),
     ...surface('roofPrices', '屋面', roofs, roofMaterials),
     ...surface('ceilingPrices', '吊顶', ceilings, ceilingMaterials),
-    ...furniture.map(item => ({ group: 'furniturePrices' as const, key: item.catalogId!, name: item.name, category: item.category, major: '软装' as const, furniture: item, custom: customIds.has(item.catalogId), unit: '件' })),
+    ...furniture.map(item => ({ group: 'furniturePrices' as const, key: item.catalogId!, name: item.name, furniture: item, custom: customIds.has(item.catalogId), unit: '件',
+      ...(isStairs(item) ? { category: STAIR_CATEGORY, major: '硬装' as const } : { category: item.category, major: '软装' as const }) })),
   ];
 }
 export function filterCostEntries(entries: CostEntry[], category: string, query: string, major?: CostMajor) {

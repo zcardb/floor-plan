@@ -13,6 +13,7 @@ import type {
 } from "./types";
 import { openingHeight, openingName, openingPriceKey, openingSill, roofSurfaceArea, surfaceMaterialOf, wallMaterialOf } from "./hardMaterials";
 export { wallMaterials } from "./hardMaterials";
+import { STAIR_CATEGORY, isStairs } from "./stairs";
 export type PriceGroup =
   | "floorPrices"
   | "wallPrices"
@@ -30,6 +31,8 @@ export interface CostRow {
   price: number | null;
   subtotal: number;
   reference?: boolean;
+  /** 价格组之外的展示分类；楼梯为「楼梯」（归硬装，按件计价）。 */
+  category?: typeof STAIR_CATEGORY;
 }
 export const validPrice = (value: unknown): value is number =>
   typeof value === "number" &&
@@ -192,7 +195,7 @@ export function calculateCosts(d: Design, defaults?: AccountCostSettings) {
   };
   for (const f of d.furniture)
     add(
-      soft,
+      isStairs(f) ? hard : soft,
       "furniturePrices",
       furnitureKey(f),
       [...(d.customCatalog || []), ...library].find(
@@ -201,6 +204,8 @@ export function calculateCosts(d: Design, defaults?: AccountCostSettings) {
       1,
       "件",
     );
+  // 楼梯在全屋明细里单独成「楼梯」类，单价仍沿用家具价格组。
+  for (const row of hard) if (row.group === "furniturePrices") row.category = STAIR_CATEGORY;
   for (const r of d.rooms) {
     add(
       hard,

@@ -123,6 +123,18 @@ describe("按房间成本分摊", () => {
       2000,
     );
   });
+  it("楼梯计入硬装（全屋明细「楼梯」类、本间硬装），仍按件计价", () => {
+    const d = setPrice(twoRoomDesign(), "furniturePrices", "stairs:直跑楼梯", 9000);
+    d.furniture = [{ id: "st", type: "stairs", name: "直跑楼梯", catalogId: "stairs:直跑楼梯", cx: 2000, cy: 3000, w: 1000, d: 3600, rot: 0, color: "#e6dccc" }];
+    const c = calculateCosts(d), b = costBreakdown(d);
+    expect(c.soft).toHaveLength(0);
+    expect(c.hard.find((r) => r.group === "furniturePrices")).toMatchObject({ category: "楼梯", unit: "件", quantity: 1, subtotal: 9000 });
+    expect(c.softTotal).toBe(0);
+    const big = b.rooms.find((r) => r.roomId === "big")!;
+    expect(big.hard.some((p) => p.key === "stairs:直跑楼梯" && p.subtotal === 9000)).toBe(true);
+    expect(big.softTotal).toBe(0);
+    expect(b.roomTotal + b.sharedTotal).toBeCloseTo(c.total, 1);
+  });
   it("只贴一间房边界的窗全额归该房间，不做 0.5 分摊", () => {
     const d = setPrice(twoRoomDesign(), "openingPrices", "window", 800);
     d.walls.push({
