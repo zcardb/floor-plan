@@ -26,7 +26,7 @@ export function AssistantManager() {
   };
   const { items, loading, error } = assistants;
   return <div className="assistant-manager">
-    <CmsPageHeader eyebrow="AI 设计" title="小助手" description="把常用的设计偏好写成 Prompt，生成户型和布局时一键调用。" actions={<>
+    <CmsPageHeader title="小助手" description="把常用的设计偏好写成 Prompt，生成户型和布局时一键调用。" actions={<>
       <EditorTooltip label="刷新" disabled={loading}>
         <Button variant="outline" className="cms-icon-button" aria-label="刷新" disabled={loading} onClick={() => void assistants.load()}><RefreshCw className={loading ? "animate-spin" : ""} /></Button>
       </EditorTooltip>

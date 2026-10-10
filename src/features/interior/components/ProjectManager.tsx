@@ -93,7 +93,7 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
   const loadingList = refreshing || (projects.loading && !rowAction.pending);
 
   return <>
-    <CmsPageHeader eyebrow="设计工作台" title="项目管理" description="把每个空间的灵感，保存成独立方案。" actions={<>
+    <CmsPageHeader title="项目管理" description="把每个空间的灵感，保存成独立方案。" actions={<>
         <EditorTooltip label="刷新" disabled={loadingList}>
           <Button variant="outline" className="cms-refresh-button cms-icon-button" aria-label="刷新" disabled={loadingList} aria-busy={loadingList} onClick={() => void refresh()}><RefreshCw className={loadingList ? 'animate-spin' : ''} /></Button>
         </EditorTooltip>

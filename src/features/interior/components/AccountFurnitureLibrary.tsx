@@ -48,7 +48,7 @@ export function AccountFurnitureLibrary({ catalog, floors = [], walls = [], open
   const open = (entry: CostEntry) => entry.furniture ? setDetail(entry.furniture) : setEditing(entry);
   const customIds = new Set(catalog.items.map(item => item.catalogId));
   return <div className="account-cost-page">
-    <CmsPageHeader eyebrow="工作室素材库" title="账号家具库" description="家具、地面、墙面、门窗、屋面与吊顶都在这里管理，设好单价后各项目直接沿用。" actions={<>
+    <CmsPageHeader title="账号家具库" description="家具、地面、墙面、门窗、屋面与吊顶都在这里管理，设好单价后各项目直接沿用。" actions={<>
       {(busy || failure || commit.saved) && <span className={'cms-sync-pill' + (failure && !busy ? ' is-error' : '')} role="status">{busy ? <><Loader2 size={13} className="animate-spin"/>正在保存…</> : failure ? <><AlertCircle size={13}/>修改尚未保存</> : <><Check size={13}/>已保存并生效</>}</span>}
       <EditorTooltip label="新建家具" disabled={locked}>
         <Button className="cms-create-button" disabled={locked} onClick={() => onNew(category)}><Plus/>新建家具</Button>

@@ -63,7 +63,7 @@ describe('新建家具默认分类', () => {
     const costs = { settings: {}, saving: false } as ReturnType<typeof useAccountCosts>;
     let tab = 'projects';
     const page = () => render(() => AccountCMS({ projects, costs, opened: () => {}, tab, onTab: next => { tab = next; } }));
-    const menu = nodes(page()).find(node => node.type === 'button' && Array.isArray(node.props.children) && node.props.children.includes('家具管理'));
+    const menu = nodes(page()).find(node => node.type === 'button' && node.props['aria-label'] === '家具管理');
     (menu!.props.onClick as () => void)();
     const library = nodes(page()).find(node => node.type === AccountFurnitureLibrary)!;
     (library.props.onNew as (value: string) => void)(category);
@@ -117,7 +117,7 @@ describe('新建家具默认分类', () => {
   it('账号页导航只保留项目管理与家具管理', () => {
     const projects = { session: { user: { id: 'owner', email: 'test@example.com' } } } as ReturnType<typeof useProjects>;
     const costs = { settings: {}, saving: false } as ReturnType<typeof useAccountCosts>;
-    const labels = nodes(render(() => AccountCMS({ projects, costs, opened: () => {}, tab: 'projects', onTab: () => {} }))).filter(node => node.type === 'button' && Array.isArray(node.props.children)).flatMap(node => (node.props.children as unknown[]).filter(child => typeof child === 'string'));
+    const labels = nodes(render(() => AccountCMS({ projects, costs, opened: () => {}, tab: 'projects', onTab: () => {} }))).filter(node => node.type === 'button' && typeof node.props['aria-label'] === 'string').map(node => node.props['aria-label'] as string);
     expect(labels).toContain('项目管理'); expect(labels).toContain('家具管理'); expect(labels).not.toContain('成本管理');
   });
   it('账号页新建家具或地面后自动刷新对应列表', () => {
@@ -126,7 +126,7 @@ describe('新建家具默认分类', () => {
     const costs = { settings: {}, saving: false } as ReturnType<typeof useAccountCosts>;
     let tab = 'projects';
     const page = () => render(() => AccountCMS({ projects, costs, opened: () => {}, tab, onTab: next => { tab = next; } }));
-    const menu = nodes(page()).find(node => node.type === 'button' && Array.isArray(node.props.children) && node.props.children.includes('家具管理'));
+    const menu = nodes(page()).find(node => node.type === 'button' && node.props['aria-label'] === '家具管理');
     (menu!.props.onClick as () => void)();
     const library = nodes(page()).find(node => node.type === AccountFurnitureLibrary)!;
     expect(library.props.floors).toEqual([]);

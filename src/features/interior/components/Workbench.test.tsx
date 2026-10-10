@@ -39,6 +39,7 @@ import { WallSplitDialog } from './WallSplitDialog';
 import { PropertyPanel } from './PropertyPanel';
 import { SelectionEditor } from './SelectionEditor';
 import { ProjectMenu } from './ProjectMenu';
+import { Logo } from './Logo';
 import { Button } from '@/components/ui/button';
 import { ExportMenu } from './ExportMenu';
 import { AccountMenu } from './AccountMenu';
@@ -263,7 +264,7 @@ describe('账号家具库并入左侧家具库', () => {
   });
 });
 describe('单行顶部工具栏', () => {
-  it('只有一行工具栏：项目菜单在最左，视图、导出、账号在右；无帮助按钮和旧 header', () => {
+  it('只有一行工具栏：品牌 logo 在最左、紧跟项目菜单，视图、导出、账号在右；无帮助按钮和旧 header', () => {
     const tree = render();
     expect(tree.some(n => typeof n.props.className === 'string' && (n.props.className as string).includes('main-header'))).toBe(false);
     const toolbar = tree.find(n => n.props.className === 'main-toolbar')!;
@@ -271,7 +272,9 @@ describe('单行顶部工具栏', () => {
     const order = [ProjectMenu, ExportMenu, AccountMenu].map(type => inside.findIndex(n => n.type === type));
     expect(order.every(i => i >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
-    expect(nodes((toolbar.props.children as ReactNode[])[0])[0].type).toBe(ProjectMenu);
+    const lead = toolbar.props.children as ReactNode[];
+    expect(nodes(lead[0])[0].type).toBe(Logo);
+    expect(nodes(lead[1])[0].type).toBe(ProjectMenu);
     expect(tree.some(n => n.props['aria-label'] === '操作帮助')).toBe(false);
     expect(tree.some(n => n.props['aria-label'] === '视图')).toBe(true);
     expect(tree.some(n => n.props['aria-label'] === '文件' || n.props['aria-label'] === '图层')).toBe(false);

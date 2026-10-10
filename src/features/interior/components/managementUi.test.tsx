@@ -62,8 +62,9 @@ describe('管理端精简与加载分支', () => {
     expect(html.indexOf('cms-refresh-button')).toBeGreaterThan(-1);
     expect(html.indexOf('cms-refresh-button')).toBeLessThan(html.indexOf('新建项目'));
     expect(html).toMatch(/<button[^>]*cms-refresh-button[^>]*aria-label="刷新"/);
-    // 页头与家具库同结构：小标题 + 标题 + 说明，操作在页头而不在筛选面板
-    expect(html).toContain('设计工作台');
+    // 页头与家具库同结构：标题 + 说明（不再有小标题），操作在页头而不在筛选面板
+    expect(html).toContain('项目管理');
+    expect(html).not.toContain('cms-page-eyebrow');
     expect(html.indexOf('新建项目')).toBeLessThan(html.indexOf('cost-controls'));
     expect(html).toContain('我的项目');
     expect(html).not.toContain('正在读取');

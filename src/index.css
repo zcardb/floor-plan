@@ -267,13 +267,30 @@
 }
 @layer components {
   .account-cms { display:grid; grid-template-columns:220px minmax(0,1fr); height:100dvh; background:hsl(var(--background)); }
-  .cms-sidebar { display:flex; flex-direction:column; padding:28px 18px; border-right:1px solid hsl(var(--border)); background:hsl(var(--card)); }
-  .cms-brand { display:grid; gap:10px; padding:10px 12px 36px; color:hsl(var(--primary)); }
-  .cms-brand small { color:hsl(var(--muted-foreground)); }
-  .cms-sidebar nav { display:grid; gap:8px; }
-  .cms-sidebar nav button { display:flex; align-items:center; gap:10px; padding:11px 13px; border-radius:9px; text-align:left; }
+  .cms-sidebar { display:flex; flex-direction:column; padding:16px 12px 12px; border-right:1px solid hsl(var(--border)); background:hsl(var(--card)); }
+  /* 侧栏按常见 SaaS 侧栏的节奏：品牌行 → 20px → 导航（36px 行高、2px 间距）→ 底部账号区以分隔线收尾。 */
+  .cms-brand { display:flex; align-items:center; gap:8px; padding:4px 8px 20px; color:hsl(var(--primary)); }
+  .cms-brand b { font-size:18px; font-weight:700; letter-spacing:2px; }
+  .cms-sidebar nav { display:grid; gap:2px; }
+  .cms-sidebar nav button { display:flex; align-items:center; gap:10px; height:36px; padding:0 10px; border-radius:8px; text-align:left; font-size:13px; color:hsl(var(--foreground)); transition:background .15s ease; }
+  .cms-sidebar nav button:hover:not(.active) { background:hsl(var(--secondary)); }
   .cms-sidebar nav button.active { background:hsl(var(--accent)); color:hsl(var(--accent-foreground)); font-weight:600; }
-  .cms-account { margin-top:auto; display:flex; align-items:center; padding-top:12px; }
+  .cms-account { margin-top:auto; display:flex; align-items:center; padding-top:10px; border-top:1px solid hsl(var(--border)); }
+  .account-cms { transition:grid-template-columns .2s ease; }
+  .cms-collapse { display:grid; place-items:center; width:28px; height:28px; margin-left:auto; border-radius:6px; color:hsl(var(--muted-foreground)); transition:background .15s ease,color .15s ease; }
+  .cms-collapse:hover { background:hsl(var(--secondary)); color:hsl(var(--foreground)); }
+  .cms-collapse:focus-visible { outline:2px solid hsl(var(--ring)); outline-offset:1px; }
+  /* 收起：60px 图标栏，文字隐藏、名称靠 tooltip；只在桌面端生效，窄屏侧栏本来就是顶部条。 */
+  @media(min-width:701px) {
+    .account-cms.is-collapsed { grid-template-columns:60px minmax(0,1fr); }
+    .is-collapsed .cms-sidebar { padding:16px 8px 12px; }
+    .is-collapsed .cms-brand { flex-direction:column; gap:12px; padding:4px 0 16px; }
+    .is-collapsed .cms-brand b, .is-collapsed .cms-sidebar nav button > span, .is-collapsed .cms-account-name { display:none; }
+    .is-collapsed .cms-collapse { margin-left:0; }
+    .is-collapsed .cms-sidebar nav button { justify-content:center; padding:0; }
+    .is-collapsed .cms-account { justify-content:center; }
+    .is-collapsed .cms-account-trigger { margin-left:0; padding:4px; }
+  }
   .cms-account-trigger { display:flex; align-items:center; gap:8px; padding:5px 8px; margin-left:-8px; min-width:0; max-width:100%; border-radius:9px; text-align:left; transition:background .18s ease; }
   .cms-account-trigger:hover { background:hsl(var(--secondary)); }
   .cms-account-trigger .account-avatar { transition:box-shadow .2s ease; }
@@ -372,11 +389,10 @@
   .cms-detail-hint { display:flex; align-items:flex-start; gap:6px; }
   .cms-detail-actions { display:flex; align-items:center; justify-content:space-between; gap:12px; }
   @media(max-width:700px) { .cms-toolbar { gap:10px; } .cms-search { min-width:0; width:100%; } .cms-filter-bar { width:100%; } .cms-filter-bar button { padding:10px 14px; } .cms-item-grid { grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; } .cms-item-visual { height:104px; } .cms-detail-body { grid-template-columns:minmax(0,1fr); gap:16px; } .cms-detail-visual { height:150px; } .cms-detail-actions { flex-direction:column-reverse; align-items:stretch; } .cms-detail-action { justify-content:center; } .cms-progress-track { flex:1 1 100%; } }
-  @media(max-width:700px) { .account-cms { grid-template-columns:1fr; grid-template-rows:auto minmax(0,1fr); } .cms-sidebar { padding:12px; border-right:0; border-bottom:1px solid hsl(var(--border)); } .cms-brand { padding:0 0 10px; display:flex; align-items:center; } .cms-brand small { display:none; } .cms-sidebar nav { grid-template-columns:repeat(2,1fr); gap:3px; } .cms-sidebar nav button { padding:12px 6px; gap:6px; justify-content:center; } .cms-account { margin-top:8px; padding-top:10px; } .cms-main { padding:22px 16px; } .cms-heading { align-items:flex-start; gap:12px; } .cms-heading h1 { font-size:22px; } .cms-heading p { font-size:12px; } }
+  @media(max-width:700px) { .account-cms { grid-template-columns:1fr; grid-template-rows:auto minmax(0,1fr); } .cms-sidebar { padding:12px; border-right:0; border-bottom:1px solid hsl(var(--border)); } .cms-brand { padding:0 0 10px; display:flex; align-items:center; } .cms-collapse { display:none; } .cms-brand small { display:none; } .cms-sidebar nav { grid-template-columns:repeat(2,1fr); gap:3px; } .cms-sidebar nav button { padding:12px 6px; gap:6px; justify-content:center; } .cms-account { margin-top:8px; padding-top:10px; } .cms-main { padding:22px 16px; } .cms-heading { align-items:flex-start; gap:12px; } .cms-heading h1 { font-size:22px; } .cms-heading p { font-size:12px; } }
   .account-cost-page { max-width:1160px; margin:0 auto; }
   /* 管理端统一页头：小标题 + 标题 + 说明，主操作固定右侧；两页同一结构。 */
   .cms-page-header-text { min-width:0; }
-  .cms-page-eyebrow { display:block; margin-bottom:10px; font-size:10px; letter-spacing:.14em; color:hsl(var(--primary)); font-weight:600; }
   .cms-sync-pill { display:inline-flex; align-items:center; gap:5px; min-height:26px; padding:0 10px; border:1px solid hsl(var(--primary)/.2); border-radius:999px; background:hsl(var(--accent)); color:hsl(var(--accent-foreground)); font-size:11px; font-weight:500; white-space:nowrap; }
   .cms-sync-pill.is-error { border-color:hsl(var(--destructive)/.25); background:hsl(var(--destructive)/.06); color:hsl(var(--destructive)); }
   /* 统一搜索框：底色与面板区分，右侧为快捷键提示或匹配数 + 清空。 */
@@ -512,7 +528,6 @@
   .cms-loading-heading--page .cms-skeleton-description { width:min(360px,70%); }
   .cms-loading-actions { display:flex; align-items:center; gap:8px; }
   .cms-skeleton-icon-action { width:36px; height:36px; border-radius:8px; }
-  .cms-skeleton-eyebrow { width:72px; height:10px; }
   .cms-loading-panel { display:grid; gap:16px; padding:18px; border:1px solid hsl(var(--border)); border-radius:12px; background:hsl(var(--card)); }
   .cms-loading-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:16px; border-bottom:1px solid hsl(var(--border)); }
   .cms-skeleton-search { flex:1 1 auto; height:40px; border-radius:10px; }
@@ -2123,11 +2138,8 @@
     gap: 15px !important;
   }
   .dialog-emblem {
-    padding: 13px;
-    background: hsl(var(--accent));
-    border-radius: 10px;
+    display: flex;
     width: max-content;
-    color: hsl(var(--primary));
     margin-bottom: 4px;
   }
   .auth-dialog h2 {
@@ -4132,7 +4144,9 @@ button.room-cost-row:hover {
 .ai-regenerate:hover { background: hsl(var(--accent)); border-color: hsl(var(--primary) / 0.4); color: hsl(var(--primary)); }
 .ai-regenerate:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
 .ai-progress { display: flex; align-items: center; gap: 6px; font-size: var(--fs-control); color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
-.ai-error { display: flex; align-items: flex-start; overflow-wrap: anywhere; gap: 6px; padding: 8px 10px; border-radius: var(--ctl-radius-in); background: hsl(var(--destructive) / 0.08); color: hsl(var(--destructive)); font-size: var(--fs-control); }
+/* 全部失败时错误原因直接写在进度行里，不额外插一行，生成中 → 失败只换文字、不改高度。 */
+.ai-progress.is-error { align-items: flex-start; color: hsl(var(--destructive)); overflow-wrap: anywhere; }
+.ai-progress.is-error > svg { flex: none; margin-top: 2px; }
 .ai-candidate-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .ai-candidate-cell { position: relative; display: grid; }
 .ai-candidate-zoom { position: absolute; top: 12px; left: 12px; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: hsl(var(--card) / 0.92); color: hsl(var(--foreground)); box-shadow: 0 1px 4px hsl(var(--foreground) / 0.18); cursor: zoom-in; opacity: 0; transition: opacity .15s ease, background .15s ease; }
@@ -4145,8 +4159,8 @@ button.room-cost-row:hover {
 .ai-candidate > span small { font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
 button.ai-candidate:hover { border-color: hsl(var(--primary) / 0.5); }
 .ai-candidate.is-selected { border-color: hsl(var(--primary)); box-shadow: 0 0 0 2px hsl(var(--primary) / 0.25); }
-.ai-candidate.is-failed { color: hsl(var(--destructive)); grid-template-rows: 1fr; }
-.ai-candidate.is-failed .ai-candidate-preview { align-content: center; aspect-ratio: auto; }
+/* 失败格子与生成中 / 成功格子同尺寸：保持 1:1 预览 + 标题行，重试按钮居中。 */
+.ai-candidate.is-failed > span { color: hsl(var(--destructive)); }
 .ai-candidate-retry { display: inline-flex; align-items: center; gap: 4px; height: var(--ctl-sm); padding: 0 12px; border-radius: 999px; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: var(--fs-control); box-shadow: 0 1px 4px hsl(var(--foreground) / 0.12); transition: color .15s ease, border-color .15s ease; }
 .ai-candidate-retry:hover { border-color: hsl(var(--primary) / 0.6); color: hsl(var(--primary)); }
 .ai-candidate-retry:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
@@ -4232,6 +4246,12 @@ button.ai-candidate:hover { border-color: hsl(var(--primary) / 0.5); }
 
 /* 小助手头像：6 种色调，基于主题色板 */
 .assistant-avatar { display: inline-grid; place-items: center; flex: none; border-radius: 30%; overflow: hidden; background: hsl(var(--accent)); color: hsl(var(--primary)); }
+/* 品牌标志（Logo.tsx）：透明底；屋身 = 主色，烟囱滚筒 = success 绿，眼白 = 卡片底色，瞳孔 = 前景墨色。与 public/favicon.svg 同款。 */
+.brand-logo { display: block; flex: none; overflow: visible; }
+.brand-logo-house { fill: hsl(var(--primary)); stroke: hsl(var(--primary)); stroke-width: 6; stroke-linejoin: round; }
+.brand-logo-roller { fill: hsl(var(--success)); }
+.brand-logo-eye { fill: hsl(var(--card)); }
+.brand-logo-pupil { fill: hsl(var(--foreground)); }
 .assistant-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .avatar-figure { width: 92%; height: 92%; overflow: visible; }
 .avatar-ink { fill: hsl(var(--foreground)); }

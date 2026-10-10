@@ -10,8 +10,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { EditorTooltip } from "@/components/ui/editor-tooltip";
 import { Input } from "@/components/ui/input";
-import { Mail, LockKeyhole, Cloud } from "lucide-react";
+import { Mail, LockKeyhole } from "lucide-react";
 import { notify } from "@/lib/notify";
+import { Logo } from "./Logo";
 const authInput =
   "h-auto border-0 bg-transparent px-0 py-0 text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 md:text-xs max-[700px]:text-base";
 export function AuthDialog({
@@ -32,7 +33,7 @@ export function AuthDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="auth-dialog">
         <div className="dialog-emblem">
-          <Cloud size={24} />
+          <Logo size={44} />
         </div>
         <DialogHeader>
           <DialogTitle>

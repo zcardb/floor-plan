@@ -1,5 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="hsl(21, 52%, 40%)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-  <rect width="18" height="7" x="3" y="3" rx="1" />
-  <rect width="9" height="7" x="3" y="14" rx="1" />
-  <rect width="5" height="7" x="16" y="14" rx="1" />
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- 与 src/features/interior/components/Logo.tsx 同一图形：陶土色小屋 + 吉祥物大眼 + 绿色滚筒烟囱，透明底 -->
+  <rect x="41" y="6" width="9" height="16" rx="3" fill="hsl(142 38% 32%)"/>
+  <path d="M32 9 L56 29 V55 H8 V29 Z" fill="hsl(21 52% 40%)" stroke="hsl(21 52% 40%)" stroke-width="6" stroke-linejoin="round"/>
+  <ellipse cx="24.5" cy="40" rx="5.2" ry="7.2" fill="hsl(40 60% 99%)"/>
+  <ellipse cx="39.5" cy="40" rx="5.2" ry="7.2" fill="hsl(40 60% 99%)"/>
+  <ellipse cx="25.3" cy="37.2" rx="2.4" ry="3.4" fill="hsl(33 13% 17%)"/>
+  <ellipse cx="40.3" cy="37.2" rx="2.4" ry="3.4" fill="hsl(33 13% 17%)"/>
 </svg>

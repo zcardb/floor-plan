@@ -49,23 +49,24 @@ export function AiResults<T>({ echo, slots, selected, onSelect, preview, zoomPre
     </section>
     <ImagePreview src={zoomed === null ? null : echo.images[zoomed] ?? null} alt={`参考图 ${(zoomed ?? 0) + 1}`} onClose={() => setZoomed(null)} />
     <div className="ai-progress-row">
-      <p className="ai-progress" role="status" aria-live="polite">
-        {running && <Loader2 size={13} className="animate-spin" />}
-        {running ? `正在生成 ${slots.length} 个方案 · 已完成 ${done} / ${slots.length}` : ready ? `已生成 ${ready} 个方案${failed.length ? `，${failed.length} 个失败` : ""} · 选择一个应用` : "方案生成失败"}
-      </p>
+      {!running && !ready
+        ? <p className="ai-progress is-error" role="alert"><AlertCircle size={14} />{failed[0]?.error ?? "生成失败，请返回修改后重试"}</p>
+        : <p className="ai-progress" role="status" aria-live="polite">
+          {running && <Loader2 size={13} className="animate-spin" />}
+          {running ? `正在生成 ${slots.length} 个方案 · 已完成 ${done} / ${slots.length}` : `已生成 ${ready} 个方案${failed.length ? `，${failed.length} 个失败` : ""} · 选择一个应用`}
+        </p>}
       {!running && warnings > 0 && <span className="ai-note">其中 {warnings} 处尺寸或间距可能需要微调</span>}
       {onRegenerate && !running && <button type="button" className="ai-regenerate" onClick={onRegenerate}><RefreshCw size={13} />重新生成</button>}
     </div>
-    {!running && !ready && <p className="ai-error" role="alert"><AlertCircle size={15} />{failed[0]?.error ?? "生成失败，请返回修改后重试"}</p>}
     <div className="ai-candidate-grid" role="radiogroup" aria-label="候选方案">
       {slots.map((slot, i) => {
         if (slot.status === "pending") return <div key={i} className="ai-candidate is-pending" aria-busy="true"><div className="ai-candidate-preview"><Loader2 size={15} className="animate-spin" /></div><span>方案 {i + 1} · 生成中</span></div>;
-        // 失败只用重试按钮表达：错误原因放在 title / aria-label 里，界面上不再显示图标与说明。
+        // 失败格子与生成中同尺寸（1:1 预览 + 标题行），预览里只放重试按钮；错误原因在 title / aria-label 里。
         if (slot.status === "failed") return <div key={i} className="ai-candidate is-failed">
           <div className="ai-candidate-preview">
             {onRetry && <button type="button" className="ai-candidate-retry" title={slot.error} aria-label={`方案 ${i + 1} 生成失败：${slot.error}。点击重试`} onClick={() => onRetry(i)}><RotateCw size={13} />重试</button>}
           </div>
-          {!onRetry && <span className="ai-candidate-error" title={slot.error}>方案 {i + 1} 生成失败</span>}
+          {onRetry ? <span>方案 {i + 1} · 生成失败</span> : <span className="ai-candidate-error" title={slot.error}>方案 {i + 1} 生成失败</span>}
         </div>;
         const active = selected === i;
         // 选中与放大是两个独立按钮（按钮不能嵌套）：点卡片选中，点左上角放大查看。

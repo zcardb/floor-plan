@@ -5,6 +5,7 @@ import { ExportMenu, type ExportFormat } from './ExportMenu';
 import { ProjectMenu, type ProjectNavigation } from './ProjectMenu';
 import { WorkbenchBanner } from './WorkbenchBanner';
 import { AccountMenu } from './AccountMenu';
+import { Logo } from './Logo';
 import { DimensionEditDialog } from './DimensionEditDialog';
 import { WallSplitDialog } from './WallSplitDialog';
 import { CompassRose } from './CompassRose';
@@ -782,6 +783,7 @@ export function Workbench(p: Props) {
       }
     >
       <div className="main-toolbar">
+        <Logo size={24} />
         <ProjectMenu
           {...p.projectNavigation}
           project={p.project}

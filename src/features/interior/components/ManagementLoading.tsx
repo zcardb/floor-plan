@@ -7,7 +7,6 @@ const keys = (n: number) => Array.from({ length: n }, (_, i) => i);
 function Heading({ actions }: { actions: ('icon' | 'button')[] }) {
   return <div className="cms-loading-heading cms-loading-heading--page" aria-hidden="true">
     <div className="cms-loading-heading-text">
-      <span className="cms-skeleton cms-skeleton-eyebrow" />
       <span className="cms-skeleton cms-skeleton-title" />
       <span className="cms-skeleton cms-skeleton-description" />
     </div>
