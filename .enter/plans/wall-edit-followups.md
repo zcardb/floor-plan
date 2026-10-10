@@ -8,7 +8,8 @@
 2. 增加家具的 3D 视角预览：左侧 2D 图的左上角放一个 2D / 3D 切换按钮。
 3. 2D、3D 两张图都能用 AI 调整 / 重新生成，生成弹窗复用「AI 布局 / AI 创建」那套弹窗（输入框 + 参考附件 + 数量 + 候选结果网格）；不要名称输入框，标题直接用家具名称。
    - 补充：调整 = 默认把当前家具图片带进附件区；重新生成 = 不带原图。界面不区分两种，只有一个入口，默认调整模式（移除附件即重新生成）。
-4. 所有 AI 弹窗的附件除图片外，还要能导入常用素材：DXF、PDF、ZIP 素材包。
+4. 所有 AI 弹窗的附件除图片外，还要能导入常用素材：DXF、PDF、ZIP 素材包，以及家装常用的其它素材类型。
+   - 补充：能转成图片的一律转成参考图（DXF、DW… 等线稿类，PDF，ZIP，3D 模型）；转不了的素材（原始 3D 工程文件等）照常上传保存，但标注「AI 暂不读取内容」。
 
 用户没有回答追问，按推荐方案执行：
 - 「3D 视角」= AI 生成的 3D 透视效果图，与现有 2D 俯视符号图一样由 AI 生成、可重新生成（沿用项目已在用的 Seedream 5 图片模型）。
@@ -52,17 +53,20 @@
 - `model/types.ts`：`LibraryItem` 增加 `image3dUrl?: string`；`model/validation.ts` 与 `imageUrl` 同样校验必须是 https。
 - `cloud/useFurnitureCatalog.ts`：读写映射 `image_3d_url ↔ image3dUrl`。
 
-### 6. 附件支持 DXF / PDF / ZIP（`components/AiComposer.tsx` + 新模块 `ai/referenceFiles.ts`）
-- 文件选择 `accept` 增加 `.dxf,.pdf,.zip`；拖入 / 选择时先经 `expandReferenceFiles(files, room)` 转成图片文件，再交给现有 `images.add` 上传（粘贴仍只取图片）。
+### 6. 附件支持家装常用素材（`components/AiComposer.tsx` + 新模块 `ai/referenceFiles.ts`）
+- 文件选择 `accept` 扩为：图片（jpg / png / webp / gif）、`.dxf`、`.pdf`、`.zip`、`.obj`、`.stl`、`.glb`、`.gltf`、`.3ds`、`.dwg`、`.skp`、`.rvt`、`.max`、`.ifc`、`.fbx`；拖入 / 选择时先经 `expandReferenceFiles(files, room)` 处理，再交给现有 `images.add` 上传（粘贴仍只取图片）。
+- 能转成参考图的：
   - 图片：原样。
   - DXF：复用 `model/externalDxf/dxfSource.ts` 的 `readDxfSource` 取线段，绘到画布（浅底深线、等比居中，长边 2048px）导出 PNG。
   - PDF：动态加载 `pdfjs-dist`，按剩余名额渲染前几页为 PNG。
-  - ZIP：动态加载 `fflate` 解包，跳过 `__MACOSX` 与隐藏文件，按扩展名递归处理其中的图片 / DXF / PDF。
-- 总数仍受 `AI_IMAGE_LIMIT`（4 张）限制，超出、无法识别或解析失败都用 `notify` 说明原因，不静默丢弃。
+  - ZIP：动态加载 `fflate` 解包，跳过 `__MACOSX` 与隐藏文件，按扩展名递归处理其中的图片 / DXF / PDF / 3D 模型。
+  - 3D 模型（`.obj` 为主，`.stl` / `.glb` / `.gltf` / `.3ds` / `.fbx` / `.ifc` 尽力解析）：解析顶点后取轴测投影画成线稿 PNG（与 DXF 同一套画布工具）。
+- 转不了的工程文件（`.dwg`、`.skp`、`.rvt`、`.max` 等专有格式）：原文件直传进素材库，附件上标注「AI 暂不读取内容」，不假装能解析。
+- 总数仍受 `AI_IMAGE_LIMIT`（4 张）限制；超出名额、无法识别、解析失败都用 `notify` 说明原因，不静默丢弃。
 - 转换期间在缩略图区显示「正在解析素材…」，并把它算进「上传中」，发送按钮禁用。
-- 提示文案：「添加参考图或素材（图片 / DXF / PDF / ZIP，也可粘贴或拖入）」；拖入提示「松开以添加参考素材」。
+- 提示文案：「添加参考图或素材（图片 / DXF / PDF / ZIP / 3D 模型，也可粘贴或拖入）」；拖入提示「松开以添加参考素材」；附件区下方一行小字列出支持的类型与「专有工程文件仅保存、AI 不读取」。
 - 因为 `AiComposer` 是共用组件，AI 布局、AI 创建户型、家具 AI 生成三处同时生效。
-- 新增依赖：`pdfjs-dist`、`fflate`（都按需动态加载，不进首屏包）。
+- 新增依赖：`pdfjs-dist`、`fflate`（都按需动态加载，不进首屏包）；3D 模型解析用轻量自写解析器，不引入 three 之外的加载器。
 
 ## Implementation checklist
 - [ ] `AccountFurnitureDialog.tsx`：弹窗放大到约 880px，左图区加大；底部按钮整体右对齐（删除在前、完成在后）
@@ -75,16 +79,16 @@
 - [ ] 迁移：`interior_furniture_catalog` 加可空列 `image_3d_url`
 - [ ] `types.ts` / `validation.ts` / `useFurnitureCatalog.ts`：`image3dUrl` 字段、https 校验、读写映射
 - [ ] 应用候选：2D 写 `imageUrl`、3D 写 `image3dUrl`，经 `saveGeometry` 保存并 `onChanged` 刷新详情左图
-- [ ] 新增 `ai/referenceFiles.ts`：图片原样、DXF → PNG（复用 `readDxfSource`）、PDF → 前几页 PNG（`pdfjs-dist`）、ZIP 解包递归（`fflate`）；总数受 4 张限制，失败 / 超额有提示
-- [ ] `AiComposer.tsx`：`accept` 加 `.dxf,.pdf,.zip`；选择 / 拖入走 `expandReferenceFiles`；解析中禁用发送并显示状态；提示文案更新
+- [ ] 新增 `ai/referenceFiles.ts`：图片原样、DXF → PNG（复用 `readDxfSource`）、PDF → 前几页 PNG（`pdfjs-dist`）、ZIP 解包递归（`fflate`）、3D 模型 → 轴测线稿 PNG（`.obj` 必做，其余尽力）；转不了的专有格式原样上传并标记「AI 暂不读取」；总数受 4 张限制，失败 / 超额有提示
+- [ ] `AiComposer.tsx`：`accept` 扩到图片 + `.dxf,.pdf,.zip,.obj,.stl,.glb,.gltf,.3ds,.dwg,.skp,.rvt,.max,.ifc,.fbx`；选择 / 拖入走 `expandReferenceFiles`；解析中禁用发送并显示状态；提示文案与支持类型小字更新；「AI 暂不读取」的附件在缩略图上标注
 - [ ] `index.css`：`FurnitureVisual` 切换按钮、空状态、放大后的弹窗布局样式（使用设计令牌）
 
 ## Verification checklist
-- [ ] 单测 `ai/referenceFiles.test.ts`：图片原样返回；简单 DXF（两条线）转出 1 张 PNG；ZIP 内含 1 图 + 1 DXF + 1 个 `.txt` → 得到 2 张、忽略 txt；超过剩余名额时只返回前 N 张
+- [ ] 单测 `ai/referenceFiles.test.ts`：图片原样返回；简单 DXF（两条线）转出 1 张 PNG；简单 `.obj`（一个三角形）转出 1 张 PNG；ZIP 内含 1 图 + 1 DXF + 1 个 `.txt` → 得到 2 张、忽略 txt；`.skp` 原文件上传且标记为不读取；超过剩余名额时只返回前 N 张
 - [ ] 单测：`validateDesign` / 家具库校验拒绝非 https 的 `image3dUrl`，接受 https
-- [ ] 组件测试：`FurnitureVisual` 默认 2D、切到 3D 无图时显示「尚未生成 3D 视角图」；内置家具不显示重新生成按钮
+- [ ] 组件测试：`FurnitureVisual` 默认 2D、切到 3D 无图时显示「尚未生成 3D 视角图」；内置家具不显示 AI 调整按钮
 - [ ] 组件测试：`FurnitureAiDialog` 不渲染名称输入框与模型选择器，标题包含家具名；有 2D 图时附件区默认显示这张图；3D 无图时默认附件为 2D 图；两张都没有时附件区为空
-- [ ] 组件测试：`AiComposer` 默认仍渲染模型选择器（`showEngine` 默认值不破坏 AI 布局 / AI 创建）；文件选择 `accept` 包含 `.dxf,.pdf,.zip`
+- [ ] 组件测试：`AiComposer` 默认仍渲染模型选择器（`showEngine` 默认值不破坏 AI 布局 / AI 创建）；文件选择 `accept` 包含 `.dxf`、`.pdf`、`.zip`、`.obj`、`.dwg`；解析素材时发送按钮禁用
 - [ ] `pnpm exec vitest run src/features/interior` 全部通过（已知的 `dimensionWallEdit` 失败除外，属另一会话）
 - [ ] `pnpm lint` 0 error；`pnpm run build` 通过，且 `pdfjs-dist` / `fflate` 为独立分包
 - [ ] 后端函数部署后：不带 `view` 的旧请求仍生成俯视图；`images` 含非 https 地址返回 400
