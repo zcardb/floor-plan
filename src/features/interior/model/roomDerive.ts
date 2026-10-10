@@ -2,6 +2,7 @@ import polygonClipping from 'polygon-clipping';
 import { bbox, inRing, length, rect, wallPoly } from './geometry';
 import { connectedWallPoly } from './wallConnections';
 import { JOIN_TOLERANCE, baseName, freeName, netArea, openRing, wallFootprints } from './roomRegions';
+import { migrateSeparators } from './separators';
 import { uid, type Design, type Point, type Room, type Separator, type Wall } from './types';
 
 /** 房间面积门槛（mm²，即 0.3 m²）：飘窗、储物间都能成房间，墙垛碎块不算。 */
@@ -93,9 +94,10 @@ const boxesMeet = (a: ReturnType<typeof bbox>, b: ReturnType<typeof bbox>) => a.
  * - 一间房被切开：重叠最大的一块保留原 id，其余新建，名称加序号、材质照旧；
  * - 几间房并成一块：沿用重叠最大的那间；
  * - 全新围出的区域：「房间 n」，木地板。
- * 结果与当前房间完全一致时返回原对象。
+ * 结果与当前房间完全一致时返回原对象。旧数据（没有 separators）先按旧房间轮廓迁移。
  */
 export function deriveRooms(d: Design, previous: Room[] = d.rooms): Design {
+  if (!d.separators) return migrateSeparators(d);
   const pieces = enclosedRegions(d).filter(isRoomSized);
   const prev = previous
     .filter(r => r.rings[0] && r.rings[0].length >= 3)

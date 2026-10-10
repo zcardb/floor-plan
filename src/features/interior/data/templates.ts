@@ -326,7 +326,7 @@ export function blankDesign({ width, depth }: BlankSize = DEFAULT_BLANK_SIZE): D
 export const TEMPLATE_PRESETS: TemplatePreset[] = [
   { id: 'reference', name: '三室两厅两卫 · 原木之家', layout: '三室两厅两卫', description: '原木风格 · 双卫 · 完整家具方案', area: 125, build: referenceDesign },
   ...NEW_TEMPLATE_PRESETS,
-].map((preset) => ({ ...preset, build: () => migrateSeparators(mergeAllSplits(preset.build()).design) }));
+].map((preset) => ({ ...preset, build: () => migrateSeparators(mergeAllSplits(preset.build(), { keepBearingRuns: true }).design) }));
 export const presetById = (id: string) => TEMPLATE_PRESETS.find(p => p.id === id);
 export const designForTemplate = (id: string): Design => (presetById(id) ?? TEMPLATE_PRESETS[0]).build();
 

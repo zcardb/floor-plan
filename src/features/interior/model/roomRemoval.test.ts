@@ -78,7 +78,10 @@ describe('删除房间', () => {
     for (const room of d.rooms) {
       try {
         const result = removeRoom(d, room.id);
-        expect(result.design.rooms.map(r => r.id)).toEqual(d.rooms.filter(r => r.id !== room.id).map(r => r.id));
+        const ids = result.design.rooms.map(r => r.id);
+        // 其余房间保持顺序；不再被墙围住而消失的相邻房间会在 exposed 里列出。
+        expect(ids).toEqual(d.rooms.filter(r => r.id !== room.id && ids.includes(r.id)).map(r => r.id));
+        expect(result.exposed).toEqual(d.rooms.filter(r => r.id !== room.id && !ids.includes(r.id)).map(r => r.name));
         expect(result.removedWalls).toBeGreaterThan(0);
         expect(validateDesign(JSON.parse(JSON.stringify(result.design)))).toBeTruthy();
         done++;

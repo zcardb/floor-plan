@@ -33,6 +33,7 @@ import { initialSceneState } from './useSceneLifecycle';
 import { blankDesign, referenceDesign } from '../data/templates';
 import { PlanCanvas } from './PlanCanvas';
 import { Library } from './Library';
+import { WallToolMenu } from './WallToolMenu';
 import { DimensionEditDialog } from './DimensionEditDialog';
 import { WallSplitDialog } from './WallSplitDialog';
 import { PropertyPanel } from './PropertyPanel';
@@ -157,9 +158,16 @@ describe('尺寸驱动墙体提交链', () => {
   });
 });
 describe('2D 常用工具与顶部工具栏', () => {
-  it('直接展示选择、框选、垭口、门、窗（绘墙改为单击墙身进入），并切换对应画布工具及选中态', () => {
-    expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['选择', '框选', '垭口', '门', '窗']);
-    for (const [label, tool] of [['选择', 'select'], ['垭口', 'passage'], ['门', 'door'], ['窗', 'window']]) {
+  it('直接展示选择、框选、墙 ▾、门、窗，墙下拉切换墙 / 垭口 / 房间分隔线', () => {
+    expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['选择', '框选', '门', '窗']);
+    const menu = () => tools(render()).find(node => node.type === WallToolMenu)!;
+    expect(menu()).toBeDefined();
+    for (const tool of ['wall', 'passage', 'separator'] as const) {
+      (menu().props.setTool as (tool: string) => void)(tool);
+      expect(state.values[1]).toBe(tool);
+      expect(menu().props.tool).toBe(tool);
+    }
+    for (const [label, tool] of [['选择', 'select'], ['门', 'door'], ['窗', 'window']]) {
       const button = tools(render()).find(node => node.props.label === label)!;
       (button.props.onClick as () => void)();
       expect(state.values[1]).toBe(tool);
@@ -212,7 +220,8 @@ describe('2D 常用工具与顶部工具栏', () => {
   });
   it('可编辑的参考户型（游客/复制项目）开放绘墙和门窗，3D 保持原有工具', () => {
     state.design = referenceDesign();
-    expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['选择', '框选', '垭口', '门', '窗']);
+    expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['选择', '框选', '门', '窗']);
+    expect(tools(render()).some(node => node.type === WallToolMenu)).toBe(true);
     expect(render().find(n => n.type === Library)!.props.structureTools).toBe(true);
     const more = tools(render()).find(node => node.props['aria-label'] === '更多')!;
     expect(more.props.className).toContain('compact-only');
@@ -223,6 +232,7 @@ describe('2D 常用工具与顶部工具栏', () => {
     state.design = referenceDesign();
     const tree = render({ project: { id: 'builtin', name: '模板', state: state.design, builtin: true } as Project });
     expect(tools(tree).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['选择']);
+    expect(tools(tree).some(node => node.type === WallToolMenu)).toBe(false);
     expect(tree.find(n => n.type === Library)!.props.structureTools).toBe(false);
   });
 });

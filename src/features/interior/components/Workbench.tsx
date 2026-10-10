@@ -16,7 +16,7 @@ import { clearRoomFurniture } from '../model/roomFurniture';
 import { removeRoom as removeRoomModel, type RoomRemoval } from '../model/roomRemoval';
 import { groupIds, moveGroup, removeGroup } from '../model/furnitureGroup';
 import { deriveRooms } from '../model/roomDerive';
-import { migrateSeparators } from '../model/separators';
+import { migrateSeparators, removeSeparator } from '../model/separators';
 import { followWallFurniture } from '../model/furnitureFollow';
 import { splitAtJunctionsOf } from '../model/wallAutoSplit';
 import { mergeWall as mergeWallModel, wallMergeGroup } from '../model/wallMerge';
@@ -52,7 +52,6 @@ import {
   RotateCcw,
   RotateCw,
   Ruler,
-  RectangleVertical,
   ScanLine,
   Settings2,
   ShieldCheck,
@@ -102,6 +101,7 @@ import { useAiCatalog } from "../ai/useAiCatalog";
 import { AiRoomDialog } from "./AiRoomDialog";
 import { library } from "../data/catalog";
 import { Library } from "./Library";
+import { WallToolMenu } from './WallToolMenu';
 import { RoomList } from "./RoomList";
 import { PropertyPanel } from "./PropertyPanel";
 import { CostPanel } from "./CostPanel";
@@ -514,6 +514,15 @@ export function Workbench(p: Props) {
       if (opening) notify.success(`已删除${openingKindLabel(opening.kind)}，可撤销恢复`);
     }
     else if (s.kind === "wall") return removeWall(s.id);
+    else if (s.kind === "separator") {
+      const before = designRef.current;
+      try {
+        commit(removeSeparator(before, s.id), before);
+      } catch (cause) {
+        return notify.fail(cause instanceof Error ? cause.message : "无法删除分隔线");
+      }
+      notify.success("已删除房间分隔线，两侧房间已合并，可撤销恢复");
+    }
     else if (s.kind === "group") {
       const ids = groupIds(d, s), count = ids.length;
       if (!count) return setSelection(null);
@@ -547,7 +556,7 @@ export function Workbench(p: Props) {
       const parts = [`已删除「${room.name}」及 ${result.removedWalls} 面独立墙`];
       if (result.protectedWalls) parts.push(`${result.protectedWalls} 面承重墙保留`);
       if (result.furniture) parts.push(`清理 ${result.furniture} 件家具`);
-      if (result.exposed.length) parts.push(`${result.exposed.join("、")} 现在与本区域连成一片`);
+      if (result.exposed.length) parts.push(`${result.exposed.join("、")} 不再被墙围住，已一并移除`);
       notify.success(parts.join("，") + "，可撤销恢复");
     },
     [readOnly, confirm, commit, designRef],
@@ -726,7 +735,9 @@ export function Workbench(p: Props) {
   const tip =
     tool === "wall"
       ? "点击起点与转角连续绘墙 · 可拖动起段 · 双击 / 右键 / Enter 完成 · Esc 取消草稿"
-      : isOpeningTool(tool)
+      : tool === "separator"
+        ? "点击起点与转角绘制房间分隔线 · 两端贴墙即把空间分成两个房间 · 双击 / 右键 / Enter 完成 · Esc 取消"
+        : isOpeningTool(tool)
         ? "点击墙体放置门窗或垭口，选中后可沿墙拖动或使用可视编辑工具条调整"
         : view === "3d"
           ? "拖动旋转 · 滚轮缩放 · 选中家具可移动 · 点击门开关"
@@ -837,9 +848,7 @@ export function Workbench(p: Props) {
             )}
             {structureTools && (
               <>
-                <ToolButton label="垭口" active={tool === "passage"} onClick={() => setTool("passage")}>
-                  <RectangleVertical size={16} />
-                </ToolButton>
+                <WallToolMenu tool={tool} setTool={setTool} />
                 <ToolButton label="门" active={tool === "door"} onClick={() => setTool("door")}>
                   <DoorOpen size={16} />
                 </ToolButton>
@@ -1022,6 +1031,7 @@ export function Workbench(p: Props) {
       >
         <Library
           add={(it) => add(it)}
+          tool={tool}
           setTool={(t) => {
             setTool(t);
             setDrawer(null);

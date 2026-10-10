@@ -86,20 +86,22 @@ describe('本机方案存储', () => {
     expect(readGuests()).toEqual([]);
   });
 
-  it('不同模板各自保留改动，刷新恢复最后选择', () => {
+  it('不同模板各自保留改动，刷新默认选中原木之家', () => {
     use(fakeStorage());
     const a=createProject('studio'), b=createProject('two-bed');
     a.state.furniture[0].cx+=100;b.state.furniture[0].cy+=200;
     expect(writeGuestDefault(a).ok).toBe(true);expect(writeGuestDefault(b).ok).toBe(true);
     expect(readGuestDefault('studio').state.furniture[0].cx).toBe(a.state.furniture[0].cx);
-    expect(readGuestDefault().state.templateId).toBe('two-bed');
-    expect(readGuestDefault().state.furniture[0].cy).toBe(b.state.furniture[0].cy);
+    expect(readGuestDefault('two-bed').state.furniture[0].cy).toBe(b.state.furniture[0].cy);
+    expect(readGuestDefault().state.templateId).toBe('reference');
   });
 
-  it('清理历史恢复副本，保留其它键', () => {
+  it('清理历史恢复副本与废弃键，保留其它键', () => {
     const storage = use(fakeStorage());
     storage.setItem('interior-recovery-u1-p1', '{}');
     storage.setItem('interior-recovery-u1-p2', '{}');
+    storage.setItem('interior-guest-default-v1', '{}');
+    storage.setItem('interior-guest-template-v1', 'two-bed');
     storage.setItem('unrelated', 'keep');
     purgeRecoveryCopies();
     expect(Array.from(storage.map.keys())).toEqual(['unrelated']);

@@ -195,6 +195,8 @@
     --plan-demolished: hsl(16 50% 60% / 0.2);
     --plan-bearing: hsl(5 61% 42%);
     --plan-window: hsl(207 28% 48%);
+    /* 房间分隔线：比墙浅、比网格深的冷灰蓝虚线，和墙体明显区分。 */
+    --plan-separator: hsl(207 22% 42%);
     --shadow-panel: 0 8px 32px hsl(33 20% 15% / 0.09);
     --shadow-float: 0 4px 16px hsl(33 20% 15% / 0.08);
     --avatar-ink: 40 60% 99%;
@@ -847,11 +849,25 @@
     margin: 0;
   }
   .structural-items {
-    display: flex;
-    gap: 6px;
+    display: grid;
+    gap: 10px;
     margin: 0 13px 14px;
   }
-  .structural-items button {
+  .structural-group {
+    display: grid;
+    gap: 6px;
+  }
+  .structural-group > h4 {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 500;
+    color: hsl(var(--muted-foreground));
+  }
+  .structural-group > div {
+    display: flex;
+    gap: 6px;
+  }
+  .structural-group button {
     display: flex;
     gap: 5px;
     align-items: center;
@@ -861,6 +877,10 @@
     flex: 1;
     padding: 7px 2px;
     font-size: 10px;
+  }
+  .structural-group button.active {
+    border-color: hsl(var(--primary));
+    color: hsl(var(--primary));
   }
   .stage {
     grid-column: 2;
@@ -949,8 +969,15 @@
   .plan-wall {
     cursor: pointer;
   }
-  .tool-wall {
+  .tool-wall,
+  .tool-separator {
     cursor: crosshair;
+  }
+  .plan-separator {
+    cursor: pointer;
+  }
+  .plan-separator:hover line + line {
+    stroke: var(--plan-selection);
   }
   /* 框选模式：画布十字光标，拖动的选框用主色半透明 + 虚线。 */
   .plan-canvas.marquee-on {
@@ -4374,3 +4401,11 @@ button.ai-candidate:hover { border-color: hsl(var(--primary) / 0.5); }
 .furniture-ai-candidate-3d { position: absolute; inset: 0; }
 .furniture-model-preview.is-compact { cursor: inherit; touch-action: auto; pointer-events: none; }
 .image-lightbox-plan-paper:has(.furniture-ai-candidate-3d) { position: relative; padding: 0; overflow: hidden; }
+
+/* 顶部「墙 ▾」下拉：每项带一行用途说明。 */
+.wall-tool-menu { min-width: 240px; }
+.wall-tool-menu [role="menuitem"] { align-items: flex-start; }
+.wall-tool-menu [role="menuitem"][data-active] { background: hsl(var(--accent)); }
+.wall-tool-item { display: grid; gap: 2px; }
+.wall-tool-item strong { font-weight: 500; }
+.wall-tool-item small { color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.4; }

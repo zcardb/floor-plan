@@ -6,12 +6,13 @@ vi.mock('react',async original=>({...await original<typeof import('react')>(),us
   if(!(index in state.values))state.values[index]=initial;
   return [state.values[index],(value:unknown)=>{state.values[index]=value;}];
 }}));
-import { Library } from './Library';
+import { Library, StructuralItems } from './Library';
 import { BrickWall } from 'lucide-react';
 type Node=ReactElement<Record<string,unknown>>;
 function nodes(tree:ReactNode):Node[]{
   if(Array.isArray(tree))return tree.flatMap(nodes);
   if(!isValidElement<Record<string,unknown>>(tree))return [];
+  if(tree.type===StructuralItems)return nodes(StructuralItems(tree.props as Parameters<typeof StructuralItems>[0]));
   return [tree,...nodes(tree.props.children as ReactNode)];
 }
 function harness(structureTools=true){
@@ -36,8 +37,10 @@ describe('硬装分类入口',()=>{
     expect(h.add).toHaveBeenCalledWith(expect.objectContaining({name:'直跑楼梯',w:1000,d:3600,stair:{form:'straight',flightWidth:1000,steps:14}}));
     expect(tree.some(n=>n.props['aria-label']==='添加三人沙发')).toBe(false);
     expect(tree.some(n=>n.type==='button'&&Array.isArray(n.props.children)&&n.props.children.includes('墙体'))).toBe(false);
-    for(const [label,tool] of [['门','door'],['窗','window']]){
+    expect(tree.filter(n=>n.type==='h4').map(n=>n.props.children)).toEqual(['墙','门窗']);
+    for(const [label,tool] of [['墙','wall'],['垭口','passage'],['房间分隔线','separator'],['门','door'],['窗','window']]){
       const button=tree.find(n=>n.type==='button'&&Array.isArray(n.props.children)&&n.props.children.includes(label))!;
+      expect(button,label).toBeDefined();
       (button.props.onClick as ()=>void)();expect(h.setTool).toHaveBeenLastCalledWith(tool);
     }
   });

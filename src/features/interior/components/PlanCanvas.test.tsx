@@ -20,6 +20,7 @@ vi.mock('react', async importOriginal => {
   };
 });
 vi.mock('./useWallDrawing', () => ({ useWallDrawing: () => ({ clear: vi.fn(), clearHover: vi.fn(), down: vi.fn(), move: vi.fn(), up: vi.fn() }) }));
+vi.mock('./useSeparatorDrawing', () => ({ useSeparatorDrawing: () => ({ clear: vi.fn(), clearHover: vi.fn(), down: vi.fn(), move: vi.fn(), up: vi.fn() }) }));
 import { PlanCanvas } from './PlanCanvas';
 import { PerimeterDimensions } from './PerimeterDimensions';
 import { OpeningDistances } from './OpeningDistances';

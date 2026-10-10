@@ -26,14 +26,22 @@ describe('承重标记方案兼容性', () => {
     expect(next.walls.some(w => w.id === 'inner')).toBe(false); expect(next.demolished).toEqual([]);
     expect(legacy.demolished).toEqual(['inner']); expect(legacy.walls.some(w => w.id === 'inner')).toBe(true);
   });
-  it('加载时清掉房间轮廓里的墙带碎洞，正常方案往返不变', () => {
-    const d = blankDesign();
-    const room = d.rooms[0]!;
+  it('旧项目加载时补齐分隔线并按墙重算房间：轮廓里的墙带碎洞消失，名称与 id 保留', () => {
+    const { separators: _omit, ...legacy } = blankDesign();
+    const room = legacy.rooms[0]!;
     const hole: Point[] = [[3000, 3000], [3000, 3350], [3120, 3350], [3120, 3000]];
-    const withHole = { ...d, rooms: [{ ...room, rings: [...room.rings, hole] }] };
-    expect(validateDesign(withHole).rooms[0]!.rings).toHaveLength(1);
-    expect(validateDesign(JSON.parse(JSON.stringify(withHole))).rooms[0]!.rings).toHaveLength(1);
-    expect(validateDesign(JSON.parse(JSON.stringify(d)))).toEqual(d);
-    expect(withHole.rooms[0]!.rings).toHaveLength(2);
+    const withHole = { ...legacy, rooms: [{ ...room, rings: [...room.rings, hole] }] };
+    const loaded = validateDesign(JSON.parse(JSON.stringify(withHole)));
+    expect(loaded.separators).toEqual([]);
+    expect(loaded.rooms).toHaveLength(1);
+    expect(loaded.rooms[0]!.rings).toHaveLength(1);
+    expect([loaded.rooms[0]!.id, loaded.rooms[0]!.name]).toEqual([room.id, room.name]);
+    expect(validateDesign(JSON.parse(JSON.stringify(loaded)))).toEqual(loaded);
+  });
+  it('分隔线格式错误时拒绝加载', () => {
+    const d = blankDesign();
+    expect(() => validateDesign({ ...d, separators: [{ id: 's', a: [0, 0], b: [5, 0] }] })).toThrow();
+    expect(() => validateDesign({ ...d, separators: [{ id: 's', a: [0, 0] }] })).toThrow();
+    expect(validateDesign({ ...d, separators: [{ id: 's', a: [0, 0], b: [500, 0] }] }).separators).toHaveLength(1);
   });
 });

@@ -11,16 +11,24 @@ import {
   DoorOpen,
   ScanLine,
   BrickWall,
+  type LucideIcon,
 } from "lucide-react";
 import { categories, library } from "../data/catalog";
 import { formatMeters } from '../model/lengthUnits';
 import { FurnitureShape } from "./FurnitureShape";
 import { EditorTooltip } from '@/components/ui/editor-tooltip';
 import type { LibraryItem, Tool } from "../model/types";
+import { wallTools } from './wallTools';
 const libraryCategories = [...categories, '硬装'];
+/** 「硬装」里的构件按钮：墙（墙 / 垭口 / 房间分隔线）与门窗（门 / 窗），可按名称搜索。 */
+const structuralGroups: { title: string; items: { tool: Tool; label: string; icon: LucideIcon; hint?: string }[] }[] = [
+  { title: '墙', items: wallTools },
+  { title: '门窗', items: [{ tool: 'door', label: '门', icon: DoorOpen }, { tool: 'window', label: '窗', icon: ScanLine }] },
+];
 const categoryIcons: Record<string, typeof Armchair> = { 卧室: BedDouble, 客厅: Armchair, 餐厨: UtensilsCrossed, 卫浴: Bath, 家电: Monitor, 书房: BookOpen, 硬装: BrickWall };
 export function Library({
   add,
+  tool,
   setTool,
   structureTools,
   customItems = [],
@@ -30,6 +38,8 @@ export function Library({
 }: {
   readOnly?: boolean;
   add: (i: LibraryItem) => void;
+  /** 当前工具，用于高亮对应的构件按钮。 */
+  tool?: Tool;
   setTool: (t: Tool) => void;
   structureTools: boolean;
   customItems?: LibraryItem[];
@@ -86,21 +96,7 @@ export function Library({
           );
         })}
       </div>
-      {/* 墙体不再单独给入口：单击画布上的墙身即可开始绘墙。 */}
-      {structureTools && (category === '硬装' || !!query && ['门', '窗'].some(name => name.includes(query))) && (
-        <div className="structural-items">
-          <EditorTooltip label="门">
-            <button onClick={() => setTool("door")}>
-              <DoorOpen size={18} />门
-            </button>
-          </EditorTooltip>
-          <EditorTooltip label="窗">
-            <button onClick={() => setTool("window")}>
-              <ScanLine size={18} />窗
-            </button>
-          </EditorTooltip>
-        </div>
-      )}
+      {structureTools && <StructuralItems query={query} show={category === '硬装' || !!query} tool={tool} setTool={setTool} />}
       <div className="library-tip">
         <Plus size={14} />
         <p>
@@ -155,5 +151,32 @@ export function Library({
         <div className="empty-small">没有找到家具，试试其他关键词。</div>
       )}
     </>
+  );
+}
+
+/** 「硬装」的构件按钮分组（无内部状态，可直接展开测试）。 */
+export function StructuralItems({ query, show, tool, setTool }: { query: string; show: boolean; tool?: Tool; setTool: (t: Tool) => void }) {
+  if (!show) return null;
+  const groups = structuralGroups
+    .map(g => ({ ...g, items: g.items.filter(item => !query || item.label.includes(query) || g.title.includes(query)) }))
+    .filter(g => g.items.length);
+  if (!groups.length) return null;
+  return (
+    <div className="structural-items">
+      {groups.map(g => (
+        <section key={g.title} className="structural-group" aria-label={g.title}>
+          <h4>{g.title}</h4>
+          <div>
+            {g.items.map(item => (
+              <EditorTooltip key={item.tool} label={item.hint ?? item.label}>
+                <button className={tool === item.tool ? 'active' : ''} onClick={() => setTool(item.tool)}>
+                  <item.icon size={18} />{item.label}
+                </button>
+              </EditorTooltip>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
   );
 }

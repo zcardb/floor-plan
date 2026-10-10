@@ -59,6 +59,7 @@ import { DoorOrientationControls } from './DoorOrientationControls';
 import { StairEditor } from './StairEditor';
 import { changeDoorOrientation } from '../model/doorOrientation';
 import { useEditorDrag } from './useEditorDrag';
+import { separatorLength } from '../model/separators';
 import type { AiEntryTone } from '../ai/useRoomAi';
 export interface SelectionEditorHandle {
   update: (r: ScreenRect | null) => void;
@@ -176,6 +177,10 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         sel?.kind === "opening"
           ? p.design.openings.find((o) => o.id === sid)
           : null,
+      separator =
+        sel?.kind === "separator"
+          ? p.design.separators?.find((l) => l.id === sid)
+          : null,
       group = groupIds(p.design, sel);
     const roomFurniture = r ? p.design.furniture.filter(f => inRoom([f.cx, f.cy], r)).length : 0;
     const deletableWall = w && canDeleteWall(w);
@@ -261,7 +266,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         name: "墙体施工",
         unit: "m²",
       };
-    if (!f && !w && !r && !o && group.length < 2) return null;
+    if (!f && !w && !r && !o && !separator && group.length < 2) return null;
     // 工具条直接显示选中对象的金额贡献：房间为本间合计，家具为单价，门窗/墙体为施工金额。
     const cost = p.showCosts ? selectionCost(costDesign, p.selection) : null,
       costLabel =
@@ -284,8 +289,16 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           {group.length > 1 && `已选中 ${group.length} 件家具`}
           {f?.name ||
             r?.name ||
-            (w ? wallKindName(w) : o ? openingName(p.design, o) : "")}
+            (w ? wallKindName(w) : o ? openingName(p.design, o) : separator ? "房间分隔线" : "")}
         </span>
+        {separator && (
+          <EditorTooltip label="分隔线只划分房间，不出现在 3D、不计价">
+            <span className="visual-size-trigger" aria-label="分隔线长度">
+              <Ruler size={15} />
+              <span>{formatMeters(separatorLength(separator))} m</span>
+            </span>
+          </EditorTooltip>
+        )}
         {fields.length > 0 && (
           <Popover
             open={open === "size"}
@@ -468,7 +481,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </EditorTooltip>
           </>
         )}
-        {(f || o || deletableWall || group.length > 1) && (
+        {(f || o || deletableWall || separator || group.length > 1) && (
           <EditorTooltip label={group.length > 1 ? "删除选中家具" : "删除对象"} shortcut="Delete">
             <button type="button" aria-label={group.length > 1 ? "删除选中家具" : "删除对象"} onClick={p.remove}>
               <Trash2 size={15} />
@@ -476,7 +489,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           </EditorTooltip>
         )}
         {r && <RoomDeleteMenu furniture={roomFurniture} clear={p.remove} removeRoom={p.removeRoom ? () => p.removeRoom!(r.id) : undefined} />}
-        {group.length < 2 && (
+        {group.length < 2 && !separator && (
           <EditorTooltip label="详细属性">
             <button type="button" aria-label="详细属性" onClick={p.details}>
               <Settings2 size={15} />

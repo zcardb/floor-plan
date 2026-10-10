@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { referenceDesign } from '../data/templates';
+import { designForTemplate, referenceDesign } from '../data/templates';
 import { applyRoomFloor, builtinFloors, floorMaterialOf, floorMaterialsOf, pickableFloors } from './floorMaterials';
 import { validateDesign } from './validation';
 import { calculateCosts, priceOf } from './costs';
@@ -9,7 +9,7 @@ import type { CustomFloor, Design } from './types';
 const tile: CustomFloor = { key: 'custom-11111111-1111-4111-8111-111111111111', name: '仿古砖', pattern: 'tile', length: 600, width: 300, color: '#c9b79a', price: 180 };
 const poured: CustomFloor = { key: 'custom-22222222-2222-4222-8222-222222222222', name: '整体浇筑', pattern: 'seamless', color: '#b8b8b0', price: null };
 const withFloors = (): Design => {
-  const d = referenceDesign();
+  const d = designForTemplate('reference');
   return { ...d, customFloors: [tile, poured], rooms: d.rooms.map((r, i) => (i === 0 ? { ...r, mat: tile.key } : i === 1 ? { ...r, mat: poured.key } : r)) };
 };
 
@@ -63,7 +63,7 @@ describe('房间直接选择账号地面库', () => {
     expect(pickableFloors(referenceDesign(), []).every(f => !f.fromAccount)).toBe(true);
   });
   it('首次选择账号地面写入项目并应用，可保存往返；再次选择不重复追加', () => {
-    const d = referenceDesign(), room = d.rooms[0].id;
+    const d = designForTemplate('reference'), room = d.rooms[0].id;
     const once = applyRoomFloor(d, room, concrete.key, [concrete]);
     expect(once.customFloors).toEqual([concrete]);
     expect(once.rooms[0].mat).toBe(concrete.key);

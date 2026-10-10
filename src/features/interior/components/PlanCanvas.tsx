@@ -41,6 +41,8 @@ import { MaterialDefs } from "./Materials";
 import { selectionPoints, localWallPoint, type ScreenRect } from "../model/selectionAnchor";
 import { resolveWallPoint,steppedPointOnWall,validateWallSegment,type WallSnap } from '../model/wallDrawing';
 import { useWallDrawing } from './useWallDrawing';
+import { useSeparatorDrawing } from './useSeparatorDrawing';
+import { PlanSeparators } from './PlanSeparators';
 import { OpeningDistances } from './OpeningDistances';
 import { connectedWallPoly } from '../model/wallConnections';
 import { WallHoverOverlay } from './WallHoverOverlay';
@@ -145,6 +147,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
   /** 选择模式单击墙身进入绘墙时的墙与起点；紧接着双击即选中这面墙。 */
   const wallClickStart = useRef<{ wallId: string; point: Point } | null>(null);
   const wallDrawing = useWallDrawing(tool === 'wall', current, view.s, layers.snap, commit, finishTool);
+  const separatorDrawing = useSeparatorDrawing(tool === 'separator', current, view.s, layers.snap, commit, finishTool);
   // 选择模式悬停墙体时的测距点（与绘墙悬停共用 WallHoverOverlay）。
   const [selectHover, setSelectHover] = useState<WallSnap | null>(null);
   const clearSelectHover = () => setSelectHover(h => (h ? null : h));
@@ -393,6 +396,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     const selectWall = clicked && draftStart && Math.hypot(draftStart[0] - clicked.point[0], draftStart[1] - clicked.point[1]) < 0.1
       && current.current.walls.some(w => w.id === clicked.wallId) ? clicked.wallId : null;
     wallDrawing.clear();
+    separatorDrawing.clear();
     drag.current = null;
     showGuides([]);
     mouseDown.current = null;
@@ -437,6 +441,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         if (points.current.size === 2) {
           finish(true);
           wallDrawing.clear();
+          separatorDrawing.clear();
           const [a, b] = [...points.current.values()];
           pinch.current = {
             distance: Math.hypot(a[0] - b[0], a[1] - b[1]),
@@ -461,7 +466,8 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           fid = el.closest("[data-fid]")?.getAttribute("data-fid"),
           wid = wallEl?.getAttribute("data-wall"),
           oid = el.closest("[data-opening]")?.getAttribute("data-opening"),
-          handle = el.closest("[data-handle]")?.getAttribute("data-handle");
+          handle = el.closest("[data-handle]")?.getAttribute("data-handle"),
+          sid = el.closest("[data-separator]")?.getAttribute("data-separator");
         if (readOnly) {
           if (fid) select({ kind: 'furniture', id: fid });
           else if (oid) select({ kind: 'opening', id: oid });
@@ -472,6 +478,13 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         }
         if (tool === 'wall') {
           select(null); wallDrawing.down(p, e.pointerId, [e.clientX, e.clientY]); return;
+        }
+        if (tool === 'separator') {
+          select(null); separatorDrawing.down(p, e.pointerId, [e.clientX, e.clientY]); return;
+        }
+        if (sid && tool === 'select' && !marquee && !fid) {
+          select({ kind: 'separator', id: sid });
+          return;
         }
         if (isOpeningTool(tool) && wid) {
           const wall = design.walls.find((w) => w.id === wid)!;
@@ -594,6 +607,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         const p = mm(e);
         onCoord(p);
         if (tool === 'wall') { wallDrawing.move(p); return; }
+        if (tool === 'separator') { separatorDrawing.move(p); return; }
         const dr = drag.current;
         if (tool === 'select' && !dr) hoverWall(e.target, p);
         if (!dr) return;
@@ -698,13 +712,15 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           return;
         }
         if (tool === 'wall') wallDrawing.up(mm(e), e.pointerId, [e.clientX, e.clientY]);
+        else if (tool === 'separator') separatorDrawing.up(mm(e), e.pointerId, [e.clientX, e.clientY]);
         else finish();
       }}
-      onPointerLeave={() => { wallDrawing.clearHover(); clearSelectHover(); }}
+      onPointerLeave={() => { wallDrawing.clearHover(); separatorDrawing.clearHover(); clearSelectHover(); }}
       onPointerCancel={(e) => {
         points.current.delete(e.pointerId);
         pinch.current = null;
         wallDrawing.clear();
+        separatorDrawing.clear();
         finish(true);
       }}
     >
@@ -862,6 +878,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           </g>
         );
       })}
+      <PlanSeparators design={design} selectedId={selection?.kind === 'separator' ? selection.id : undefined} scale={view.s} />
       {layers.labels &&
         design.rooms
           .filter((r) => r.counted !== false)
@@ -893,6 +910,14 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       {layers.dims && <PerimeterDimensions layout={dimensionLayout} onSelect={tool === 'select' ? onDimensionSelect : undefined} selected={selectedDimension} />}
       {tool==='wall' && wallDrawing.draft && Math.hypot(wallDrawing.draft.b[0]-wallDrawing.draft.a[0],wallDrawing.draft.b[1]-wallDrawing.draft.a[1])>0 && <g data-export-hide="true" pointerEvents="none"><polygon points={connectedWallPoly({id:'draft',...wallDrawing.draft,thickness:design.thickness,kind:'partition'},design.walls,design.demolished).map(p=>p.join(',')).join(' ')} fill="var(--plan-selection-soft)" stroke="var(--plan-selection)" strokeWidth={1/view.s}/><MeasureLine a={wallDrawing.draft.a} b={wallDrawing.draft.b} scale={view.s}/></g>}
       {tool === 'wall' && <WallHoverOverlay walls={design.walls} demolished={design.demolished} candidate={wallDrawing.hover} connection={wallDrawing.candidate} scale={view.s} />}
+      {tool === 'separator' && separatorDrawing.draft && (
+        <g data-export-hide="true" pointerEvents="none">
+          <line x1={separatorDrawing.draft.a[0]} y1={separatorDrawing.draft.a[1]} x2={separatorDrawing.draft.b[0]} y2={separatorDrawing.draft.b[1]}
+            stroke="var(--plan-selection)" strokeWidth={2 / view.s} strokeDasharray={`${8 / view.s} ${5 / view.s}`} />
+          <MeasureLine a={separatorDrawing.draft.a} b={separatorDrawing.draft.b} scale={view.s} />
+        </g>
+      )}
+      {tool === 'separator' && <WallHoverOverlay walls={design.walls} demolished={design.demolished} candidate={separatorDrawing.hover} connection={separatorDrawing.candidate} scale={view.s} />}
       {tool === 'select' && <WallHoverOverlay walls={design.walls} demolished={design.demolished} candidate={selectHover} connection={null} scale={view.s} label={startWallTool && !readOnly ? '点击开始绘墙，双击选中' : undefined} />}
       <AlignmentGuides guides={guides} scale={view.s} />
       {selection?.kind === 'opening' && <OpeningDistances design={design} openingId={selection.id} scale={view.s} />}

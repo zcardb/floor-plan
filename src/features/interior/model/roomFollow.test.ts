@@ -15,25 +15,30 @@ const box = (d: Design, id: string) => {
 };
 const meta = (d: Design) => d.rooms.map(r => [r.id, r.name, r.mat, r.wallMat, r.counted]);
 
-// w44：主卧（上）与子女房（下）之间的隔墙，中心线 y=3490，厚 240
+/** 主卧（上）与子女房（下）之间、中心线 y=3490 且经过 x=8000 的那段墙。 */
+const between = (d: Design) => d.walls.find(w => w.a[1] === 3490 && w.b[1] === 3490 && Math.min(w.a[0], w.b[0]) < 8000 && Math.max(w.a[0], w.b[0]) > 8000)!;
+const spanOf = (w: Wall) => Math.min(Math.max(w.a[0], w.b[0]), 10270) - Math.max(Math.min(w.a[0], w.b[0]), 6600);
 describe('墙体变化后房间按「墙 + 分隔线」重算', () => {
   it('平移隔墙时两侧房间跟着墙面走，房间元数据与数量不变', () => {
-    const before = reference(), next = syncRooms(before, shift(before, 'w44', 100));
+    const before = reference(), wall = between(before), next = syncRooms(before, shift(before, wall.id, 100));
     expect(box(next, 'master')[3]).toBeCloseTo(3470);
-    expect(box(next, 'child')[1]).toBeCloseTo(3710);
+    // 墙下移 100 mm：主卧多出、子女房少掉同样一条 100 mm 宽的带子。
+    const strip = (spanOf(wall) * 100) / 1e6;
+    expect(area(room(before, 'child')) - area(room(next, 'child'))).toBeCloseTo(strip, 1);
+    expect(area(room(next, 'master')) - area(room(before, 'master'))).toBeCloseTo(strip, 1);
     expect(room(next, 'kid').rings).toEqual(room(before, 'kid').rings);
     expect(meta(next)).toEqual(meta(before));
   });
 
   it('移动墙体时飘窗仍是独立房间，轮廓不变形', () => {
-    const before = reference(), next = syncRooms(before, shift(before, 'w44', 100));
+    const before = reference(), next = syncRooms(before, shift(before, between(before).id, 100));
     expect(room(next, 'bay1').rings).toEqual(room(before, 'bay1').rings);
     expect(room(next, 'bay2').rings).toEqual(room(before, 'bay2').rings);
   });
 
   it('隔墙越过对面墙时不报错，被挤掉的房间消失、其余照常', () => {
     const before = reference();
-    const next = syncRooms(before, shift(before, 'w44', -3500));
+    const next = syncRooms(before, shift(before, between(before).id, -3500));
     expect(next.rooms.length).toBeGreaterThan(0);
     expect(next.rooms.every(r => area(r) >= 0.3)).toBe(true);
   });

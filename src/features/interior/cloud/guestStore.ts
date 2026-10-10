@@ -2,10 +2,11 @@ import { notify } from "@/lib/notify";
 import { createProject } from "../data/templates";
 import { validateDesign } from "../model/validation";
 import type { Project } from "../model/types";
-import { isPresetId } from '../data/templatePresets';
 
 export const GUEST_KEY = "interior-guest-projects-v2";
-export const GUEST_DEFAULT_KEY = "interior-guest-default-v1";
+export const GUEST_DEFAULT_KEY = "interior-guest-default-v2";
+/** 已废弃的键：旧版原木之家默认方案（整圈承重墙）与「上次选择的模板」。 */
+const LEGACY_KEYS = ["interior-guest-default-v1", "interior-guest-template-v1"];
 const RECOVERY_PREFIX = "interior-recovery-";
 
 export type WriteResult = { ok: true } | { ok: false; cause: unknown };
@@ -53,21 +54,15 @@ export function readGuests(): Project[] {
   }
 }
 
-/** 读取游客正在编辑的默认方案（不属于方案列表）。 */
-export const LAST_GUEST_TEMPLATE_KEY = 'interior-guest-template-v1';
+/** 读取游客正在编辑的默认方案（不属于方案列表）。打开应用时默认选中原木之家。 */
 export const guestKeyFor = (id: string) => id === 'reference' ? GUEST_DEFAULT_KEY : `interior-guest-default-${id}`;
-export function lastGuestTemplate(): string {
-  try { const id = localStorage.getItem(LAST_GUEST_TEMPLATE_KEY); return isPresetId(id) ? id : 'reference'; } catch { return 'reference'; }
-}
 export function writeGuestDefault(project: Project): WriteResult {
   try {
-    const id = project.state.templateId ?? 'reference';
-    localStorage.setItem(guestKeyFor(id), JSON.stringify(project));
-    localStorage.setItem(LAST_GUEST_TEMPLATE_KEY, id);
+    localStorage.setItem(guestKeyFor(project.state.templateId ?? 'reference'), JSON.stringify(project));
     return { ok: true };
   } catch (cause) { return { ok: false, cause }; }
 }
-export function readGuestDefault(templateId = lastGuestTemplate()): Project {
+export function readGuestDefault(templateId = 'reference'): Project {
   try {
     const raw = localStorage.getItem(guestKeyFor(templateId));
     if (raw) {
@@ -88,9 +83,10 @@ export function writeGuests(projects: Project[]): WriteResult {
   }
 }
 
-/** 清掉历史版本写入的本机恢复副本死数据（该机制已移除，只留占用的存储）。 */
+/** 清掉历史版本写入的本机恢复副本与已废弃键的死数据。 */
 export function purgeRecoveryCopies(): void {
   try {
+    for (const key of LEGACY_KEYS) localStorage.removeItem(key);
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const key = localStorage.key(i);
       if (key && key.startsWith(RECOVERY_PREFIX)) localStorage.removeItem(key);

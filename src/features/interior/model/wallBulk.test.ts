@@ -28,6 +28,17 @@ describe('清空分割', () => {
     const plain = blankDesign();
     expect(mergeAllSplits(plain)).toEqual({ design: plain, merged: 0, skipped: 0 });
   });
+  it('keepBearingRuns：承重段与相邻非承重段不合并，默认仍合并', () => {
+    const base = blankDesign();
+    const split = splitWall(base, 'outer-0', [1000]).design;
+    const marked = setWallBearing(split, 'outer-0', true);
+    expect(bearingWalls(marked)).toHaveLength(1);
+    const kept = mergeAllSplits(marked, { keepBearingRuns: true }).design;
+    expect(kept.walls).toHaveLength(marked.walls.length);
+    expect(bearingWalls(kept).map(length)).toEqual(bearingWalls(marked).map(length));
+    const all = mergeAllSplits(marked).design;
+    expect(all.walls).toHaveLength(base.walls.length);
+  });
   it('分割段上的承重标记合并后保留', () => {
     const split = splitWall(blankDesign(), 'outer-0', [1000]).design;
     const marked = setWallBearing(split, split.walls[split.walls.length - 1].id, true);

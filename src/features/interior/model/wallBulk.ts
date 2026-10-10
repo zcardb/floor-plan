@@ -7,11 +7,16 @@ import type { Design, Point, Wall, WallKind } from './types';
 /** 合并后整面墙的类型优先级：外围 > 承重 > 隔墙 > 矮墙。 */
 const KIND_RANK: Record<WallKind, number> = { exterior: 3, bearing: 2, partition: 1, low: 0 };
 
+export interface MergeOptions {
+  /** 承重与非承重墙段交界处断开，不合并（模板生成时用，保留原始承重小段）。 */
+  keepBearingRuns?: boolean;
+}
+
 /**
  * 同一直线上首尾相接或重叠的墙段链：不论类型、厚度、颜色，交界处也不打断；真实空隙不桥接。
- * 只返回含 2 段及以上的链。
+ * 开启 keepBearingRuns 时，承重状态变化处断链。只返回含 2 段及以上的链。
  */
-export function collinearWallChains(design: Design): Wall[][] {
+export function collinearWallChains(design: Design, opts: MergeOptions = {}): Wall[][] {
   const live = design.walls.filter(w => !design.demolished.includes(w.id) && length(w) >= tolerance);
   const seen = new Set<string>();
   const chains: Wall[][] = [];
@@ -26,7 +31,8 @@ export function collinearWallChains(design: Design): Wall[][] {
     line.forEach(c => seen.add(c.w.id));
     let chain: Wall[] = [], hi = -Infinity;
     for (const c of line) {
-      if (chain.length && c.lo > hi + tolerance) {
+      const bearingChange = opts.keepBearingRuns && chain.length > 0 && isBearingWall(chain[chain.length - 1]) !== isBearingWall(c.w);
+      if (chain.length && (c.lo > hi + tolerance || bearingChange)) {
         if (chain.length > 1) chains.push(chain);
         chain = [];
         hi = -Infinity;
@@ -63,9 +69,9 @@ function chainBase(design: Design, chain: Wall[]): Wall {
  * 清空分割：每条直线上相连的墙段一拉到底合并为一整面墙（交界、类型变化处都不打断）。
  * 合并会造成门窗重叠/越界的那条线保持原样，段数计入 skipped。
  */
-export function mergeAllSplits(design: Design): { design: Design; merged: number; skipped: number } {
+export function mergeAllSplits(design: Design, opts: MergeOptions = {}): { design: Design; merged: number; skipped: number } {
   let d = design, merged = 0, skipped = 0;
-  for (const chain of collinearWallChains(design)) {
+  for (const chain of collinearWallChains(design, opts)) {
     try {
       d = combineCollinearWalls(d, chain, chainBase(d, chain)).design;
       merged += chain.length - 1;

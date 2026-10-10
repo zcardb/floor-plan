@@ -24,6 +24,10 @@ export function selectionPoints(d: Design, s: Selection): Point[] {
     const w = d.walls.find((w) => w.id === s.id);
     return w ? connectedWallPoly(w, d.walls, d.demolished) : [];
   }
+  if (s.kind === "separator") {
+    const line = d.separators?.find((l) => l.id === s.id);
+    return line ? [line.a, line.b] : [];
+  }
   const o = d.openings.find((o) => o.id === s.id),
     w = d.walls.find((w) => w.id === o?.wallId);
   if (!o || !w) return [];

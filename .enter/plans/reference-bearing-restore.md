@@ -22,17 +22,17 @@
    - `guestStore.test.ts`：「刷新恢复最后选择」改为「刷新默认选中原木之家，各模板改动仍保留」；新增旧 v1 键被清理的断言。
 
 ## Implementation checklist
-- [ ] `collinearWallChains` 支持 `keepBearingRuns`，承重状态变化处断链
-- [ ] `mergeAllSplits` 透传 `keepBearingRuns`，默认行为不变
-- [ ] `TEMPLATE_PRESETS` 构建时使用 `{ keepBearingRuns: true }`
-- [ ] `readGuestDefault` 默认模板改为 `'reference'`，移除 `lastGuestTemplate` / `LAST_GUEST_TEMPLATE_KEY` 的读写
-- [ ] `GUEST_DEFAULT_KEY` 升级为 v2，`purgeRecoveryCopies` 删除旧 v1 默认方案键与上次模板键
-- [ ] 补充/更新上述三处测试
+- [x] `collinearWallChains` 支持 `keepBearingRuns`，承重状态变化处断链
+- [x] `mergeAllSplits` 透传 `keepBearingRuns`，默认行为不变
+- [x] `TEMPLATE_PRESETS` 构建时使用 `{ keepBearingRuns: true }`
+- [x] `readGuestDefault` 默认模板改为 `'reference'`，移除 `lastGuestTemplate` / `LAST_GUEST_TEMPLATE_KEY` 的读写
+- [x] `GUEST_DEFAULT_KEY` 升级为 v2，`purgeRecoveryCopies` 删除旧 v1 默认方案键与上次模板键
+- [x] 补充/更新上述三处测试
 
 ## Verification checklist
-- [ ] 正向：原木之家预览中只有角落小段为红色承重墙，外墙其余部分为外围墙颜色
-- [ ] 正向：原木之家所有门仍可沿墙拖动（现有 `templateAutoMerge` 用例通过）
-- [ ] 默认：游客模式刷新后默认打开原木之家；切换到其他模板并编辑后刷新，仍回到原木之家，且其他模板的改动切回时仍在
-- [ ] 回归：手动「清空分割」仍把承重段与相邻墙合并为一整面承重墙（现有 wallBulk 用例通过）
-- [ ] 边界：其他 5 个模板（无承重墙）合并结果不变
-- [ ] 运行 `pnpm test`、`pnpm lint`、`pnpm exec tsc --noEmit`、`pnpm run build`
+- [x] 正向：原木之家预览中只有角落小段为红色承重墙，外墙其余部分为外围墙颜色
+- [x] 正向：原木之家所有门仍可沿墙拖动（现有 `templateAutoMerge` 用例通过）
+- [x] 默认：游客模式刷新后默认打开原木之家；切换到其他模板并编辑后刷新，仍回到原木之家，且其他模板的改动切回时仍在
+- [x] 回归：手动「清空分割」仍把承重段与相邻墙合并为一整面承重墙（现有 wallBulk 用例通过）
+- [x] 边界：其他 5 个模板（无承重墙）合并结果不变
+- [x] 运行 `pnpm test`、`pnpm lint`、`pnpm exec tsc --noEmit`、`pnpm run build`

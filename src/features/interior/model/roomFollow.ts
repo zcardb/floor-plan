@@ -1,6 +1,6 @@
 import { deriveRooms } from './roomDerive';
 import { dropOrphanFurniture } from './roomFurniture';
-import { followSeparators } from './separators';
+import { followSeparators, migrateSeparators } from './separators';
 import type { Design } from './types';
 
 /**
@@ -9,6 +9,12 @@ import type { Design } from './types';
  * 结构没变时返回 after 本身。
  */
 export function syncRooms(before: Design, after: Design): Design {
+  // 旧数据：分隔线按改动前的房间轮廓迁移，再参与这次同步。
+  if (!after.separators) {
+    const migrated = migrateSeparators(before);
+    before = migrated;
+    after = { ...after, separators: migrated.separators };
+  }
   const followed = followSeparators(before, after);
   const derived = deriveRooms(followed, after.rooms);
   return derived === after ? after : dropOrphanFurniture(before, derived);

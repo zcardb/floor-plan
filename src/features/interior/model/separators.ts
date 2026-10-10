@@ -209,6 +209,8 @@ export function migrateSeparators(d: Design): Design {
     for (let i = 0; i < group.length; i++)
       for (let j = i + 1; j < group.length; j++)
         for (const line of midlines(group[i]!, group[j]!, maxGap))
-          for (const [a, b] of uncovered(line, walls)) separators.push({ id: uid(), a: roundPoint(a), b: roundPoint(b) });
+          for (const [a, b] of uncovered(line, walls))
+            // 迁移结果要可复现（同一模板每次生成都一样），id 按序号编排。
+            separators.push({ id: `separator-${separators.length + 1}`, a: roundPoint(a), b: roundPoint(b) });
   return deriveRooms({ ...bare, separators }, d.rooms);
 }
