@@ -9,6 +9,7 @@ import { placeEditor } from './selectionAnchor';
 import { editSelection } from './selectionEdits';
 import { placementGaps, wallPlacement } from './wallPlacement';
 import { keepOpeningsInPlace, openingsFitWalls } from './openingAnchor';
+import { dragStep, stepDelta } from './dragStep';
 import type { Design, Furniture, Wall } from './types';
 
 const furn = (id: string, cx: number, cy: number, w = 1000, d = 600, rot = 0): Furniture =>
@@ -134,6 +135,19 @@ describe('门窗与贴墙家具按到墙两端的净距定位', () => {
     const next = editSelection(d, s, { gapA: 200 });
     expect(next.furniture.find(f => f.id === 'cab')).toMatchObject({ cx: 2900, cy: 700 });
     expect(wallPlacement(d, { kind: 'furniture', id: 'free' })).toBeNull();
+  });
+});
+
+describe('拖动步进', () => {
+  it('默认 5 cm；按图纸 x / y 取整位移', () => {
+    expect(dragStep({})).toBe(50);
+    expect(stepDelta([74, -26], 50)).toEqual([50, -50]);
+  });
+  it('给出墙方向时沿墙 / 垂直墙分别取整（斜墙也整步移动）', () => {
+    const s = Math.SQRT1_2, d = stepDelta([80 * s, 80 * s], 50, [s, s]);
+    // 沿墙 80 → 100，垂直墙 0 → 0。
+    expect(d[0]).toBeCloseTo(100 * s);
+    expect(d[1]).toBeCloseTo(100 * s);
   });
 });
 

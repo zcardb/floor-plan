@@ -14,6 +14,7 @@ import { splitAtJunctions } from '../model/wallAutoSplit';
 import { followWallFurniture } from '../model/furnitureFollow';
 import { moveWallWithJoints } from '../model/wallMove';
 import { keepOpeningsInPlace, openingsFitWalls } from '../model/openingAnchor';
+import { dragStep, snapToDragStep, stepDelta } from '../model/dragStep';
 import {
   area,
   center,
@@ -591,8 +592,10 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           wall = next.walls.find((w) => w.id === dr.id);
         if (f) {
           if (dr.kind === "move") {
-            // 先吸附，再把结果裁到墙面内侧：家具既贴墙对齐，也不会嵌进或越过墙。
-            const snapped = snapFurniture(f, [p[0] - dr.offset![0], p[1] - dr.offset![1]], next, layers.snap, 8 / view.s);
+            // 先按步进取整位移，再吸附、裁到墙面内侧：家具整步移动，贴墙对齐时以吸附为准。
+            const moveBy = stepDelta([p[0] - dr.start[0], p[1] - dr.start[1]], dragStep(next));
+            const goal: Point = [dr.start[0] + moveBy[0], dr.start[1] + moveBy[1]];
+            const snapped = snapFurniture(f, [goal[0] - dr.offset![0], goal[1] - dr.offset![1]], next, layers.snap, 8 / view.s);
             const last = current.current.furniture.find((o) => o.id === f.id) ?? f;
             [f.cx, f.cy] = blockFurnitureMove(f, [last.cx, last.cy], snapped.point, next);
             showGuides(snapped.guides);
@@ -605,30 +608,37 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           if (dr.kind === "size") {
             const a = (f.rot * Math.PI) / 180,
               dx = p[0] - f.cx,
-              dy = p[1] - f.cy;
+              dy = p[1] - f.cy,
+              step = dragStep(next);
             f.w = Math.max(
               100,
-              Math.round(((dx * Math.cos(a) + dy * Math.sin(a)) * 2) / 10) * 10,
+              snapToDragStep((dx * Math.cos(a) + dy * Math.sin(a)) * 2, step),
             );
             f.d = Math.max(
               100,
-              Math.round(((-dx * Math.sin(a) + dy * Math.cos(a)) * 2) / 10) *
-                10,
+              snapToDragStep((-dx * Math.sin(a) + dy * Math.cos(a)) * 2, step),
             );
           }
         }
         if (wall) {
           if (dr.kind === "wallmove") {
-            const dx = Math.round((p[0] - dr.start[0]) / 10) * 10,
-              dy = Math.round((p[1] - dr.start[1]) / 10) * 10;
+            const L = length(wall);
+            // 沿墙 / 垂直墙两个方向分别按步进取整（横平竖直的墙即图纸 x / y）。
+            const delta = stepDelta([p[0] - dr.start[0], p[1] - dr.start[1]], dragStep(dr.before),
+              [(wall.b[0] - wall.a[0]) / L, (wall.b[1] - wall.a[1]) / L]);
             // 墙端连着其他墙时沿连接墙滑动，贴墙家具沿法向跟着走。
-            const moved = moveWallWithJoints(dr.before, wall.id, [dx, dy]);
+            const moved = moveWallWithJoints(dr.before, wall.id, delta);
             if (moved) preview(followWallFurniture(dr.before, moved));
             return;
           } else if (dr.kind === "endpoint") {
             const key = dr.room as "a" | "b",
               other = key === "a" ? wall.b : wall.a,
-              q = resolveWallPoint(p,next,view.s,layers.snap,other,wall.id).point;
+              start = dr.before.walls.find((w) => w.id === wall.id)![key],
+              raw = resolveWallPoint(p,next,view.s,layers.snap,other,wall.id);
+            // 没有吸附到确定点时按步进取整端点的位移；吸到墙、端点或洞口边时以吸附为准。
+            const q: Point = raw.target ? raw.point
+              : [start[0] + snapToDragStep(raw.point[0] - start[0], dragStep(dr.before)),
+                 start[1] + snapToDragStep(raw.point[1] - start[1], dragStep(dr.before))];
             wall[key] = q;
             try { validateWallSegment(next,wall.a,wall.b,wall.id); } catch { return; }
             if (length(wall) < 100) return;
