@@ -54,9 +54,10 @@ describe("AI 附件：图片 + 家装素材", () => {
 describe("家具 2D / 3D 视角", () => {
   const visual = (item: LibraryItem, view: "top" | "perspective", adjust = true) =>
     html(createElement(FurnitureVisual, { item, view, onView: () => {}, onAdjust: adjust ? () => {} : undefined }));
-  it("软装：默认 2D；切到 3D 无图时提示尚未生成", () => {
+  it("软装：默认 2D；切到 3D 无图时实时渲染参考几何模型", () => {
     expect(visual(sofa, "top")).toContain('aria-checked="true" aria-label="2D 俯视图"');
-    expect(visual(sofa, "perspective")).toContain("尚未生成 3D 视角图");
+    expect(visual(sofa, "perspective")).toContain("布艺沙发实时 3D 模型预览");
+    expect(visual(sofa, "perspective")).toContain("AI 调整");
     expect(visual({ ...sofa, image3dUrl: "https://x/3d.webp" }, "perspective")).toContain("https://x/3d.webp");
   });
   it("硬装没有 3D 视角切换；没有保存权限时不显示 AI 调整", () => {

@@ -4268,3 +4268,9 @@ button.ai-candidate:hover { border-color: hsl(var(--primary) / 0.5); }
   .cms-detail-actions.furniture-detail-actions { flex-direction: row; flex-wrap: wrap; align-items: center; }
   .furniture-detail-actions .cost-sync { flex: 1 1 100%; }
 }
+
+/* 家具详情 3D：没有 AI 效果图时实时渲染参考几何模型 */
+.furniture-model-preview { position: absolute; inset: 0; cursor: grab; touch-action: none; }
+.furniture-model-preview:active { cursor: grabbing; }
+.furniture-model-canvas { display: block; width: 100%; height: 100%; }
+.furniture-model-hint { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); padding: 4px 10px; border-radius: 999px; background: hsl(var(--card) / 0.88); border: 1px solid hsl(var(--border)); color: hsl(var(--muted-foreground)); font-size: 11px; white-space: nowrap; pointer-events: none; }

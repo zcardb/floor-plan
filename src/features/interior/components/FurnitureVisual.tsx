@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { Box, Sparkles, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { HARD_CATEGORIES } from '../model/hardMaterials';
 import type { LibraryItem } from '../model/types';
 import type { FurnitureView } from '../cloud/useFurnitureImage';
 import { FurnitureShape } from './FurnitureShape';
+import { FurnitureModelPreview } from './FurnitureModelPreview';
 
 export const VIEW_LABEL: Record<FurnitureView, string> = { top: '2D 俯视图', perspective: '3D 视角图' };
 
@@ -15,7 +17,8 @@ export const hasViews = (item: LibraryItem) => !HARD_CATEGORIES.includes(item.ca
 
 /**
  * 家具详情左侧视觉区：软装家具左上角给 2D / 3D 切换、右上角给「AI 调整」；
- * 硬装只有 2D 一张图，不显示视角切换。2D 无图时显示参考符号，3D 无图时给一句说明与生成入口。
+ * 硬装只有 2D 一张图，不显示视角切换。2D 无图时显示参考符号；3D 无图时实时渲染与项目 3D 场景
+ * 相同的参考几何模型，WebGL 不可用时才退回说明与生成入口。
  */
 export function FurnitureVisual({ item, view, onView, onAdjust }: {
   item: LibraryItem;
@@ -23,7 +26,8 @@ export function FurnitureVisual({ item, view, onView, onAdjust }: {
   onView: (view: FurnitureView) => void;
   onAdjust?: () => void;
 }) {
-  const views = hasViews(item), image = viewImage(item, views ? view : 'top');
+  const views = hasViews(item), image = viewImage(item, views ? view : 'top'), [modelFailed, setModelFailed] = useState(false);
+  const empty3d = views && view === 'perspective' && !image;
   return <div className="furniture-visual">
     {views && <div className="furniture-visual-views" role="radiogroup" aria-label="预览视角">
       {(['top', 'perspective'] as const).map(v => <button key={v} type="button" role="radio" aria-checked={view === v}
@@ -31,10 +35,11 @@ export function FurnitureVisual({ item, view, onView, onAdjust }: {
         {v === 'top' ? <Square size={13} /> : <Box size={13} />}{v === 'top' ? '2D' : '3D'}
       </button>)}
     </div>}
-    {onAdjust && (image || !views || view === 'top') && <Button type="button" size="sm" variant="secondary" className="furniture-visual-ai" onClick={onAdjust}>
+    {onAdjust && !(empty3d && modelFailed) && <Button type="button" size="sm" variant="secondary" className="furniture-visual-ai" onClick={onAdjust}>
       <Sparkles size={14} />AI 调整
     </Button>}
-    <div className="furniture-visual-stage">
+    {empty3d && !modelFailed && <FurnitureModelPreview item={item} onFail={() => setModelFailed(true)} />}
+    {!(empty3d && !modelFailed) && <div className="furniture-visual-stage">
       {image
         ? <img src={image} crossOrigin="anonymous" alt={`${item.name}${VIEW_LABEL[views ? view : 'top']}`} />
         : !views || view === 'top'
@@ -44,6 +49,6 @@ export function FurnitureVisual({ item, view, onView, onAdjust }: {
             <p>尚未生成 3D 视角图</p>
             {onAdjust && <Button type="button" size="sm" onClick={onAdjust}><Sparkles size={14} />AI 生成</Button>}
           </div>}
-    </div>
+    </div>}
   </div>;
 }
