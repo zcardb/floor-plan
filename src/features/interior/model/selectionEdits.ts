@@ -2,6 +2,7 @@ import { length, norm } from "./geometry";
 import { BEARING_WALL_LOCKED, canResizeWall } from './wallPolicy';
 import { syncRooms } from './roomFollow';
 import { placementShift, wallPlacement } from './wallPlacement';
+import { openingHeight, openingSill } from './hardMaterials';
 import type { Design, Selection } from "./types";
 
 /**
@@ -17,7 +18,8 @@ function withPlacement(d: Design, s: Selection, values: { gapA?: number; gapB?: 
   const wall = placement.wall, L = length(wall);
   const ux = (wall.b[0] - wall.a[0]) / L, uy = (wall.b[1] - wall.a[1]) / L;
   if (s?.kind === 'opening') return { values: { offset: d.openings.find(o => o.id === s.id)!.offset + shift } };
-  const f = d.furniture.find(f => f.id === s!.id)!;
+  if (s?.kind !== 'furniture') throw new Error('该对象当前没有贴着的墙段');
+  const f = d.furniture.find(f => f.id === s.id)!;
   return { values: { cx: f.cx + ux * shift, cy: f.cy + uy * shift } };
 }
 
@@ -26,7 +28,7 @@ export function editSelection(
   s: Selection,
   raw: Record<string, number>,
 ): Design {
-  if (!s) return d;
+  if (!s || s.kind === 'group') return d;
   // 净距输入在其他尺寸生效之后再换算，保证同时改宽度与净距时两者都准确。
   if (raw.gapA !== undefined || raw.gapB !== undefined) {
     const { gapA, gapB, ...rest } = raw;
@@ -120,11 +122,7 @@ export function editSelection(
       )
     )
       throw new Error("开口与同墙其它门窗重叠");
-    if (
-      (n.height ?? (n.kind === "door" ? 2100 : 1600)) +
-        (n.kind === "window" ? (n.sill ?? 800) : 0) >
-      d.height
-    )
+    if (openingHeight(n) + openingSill(n) > d.height)
       throw new Error("开口顶部不可超过层高");
     return { ...d, openings: d.openings.map((g) => (g.id === s.id ? n : g)) };
   }

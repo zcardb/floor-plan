@@ -1,6 +1,6 @@
 import { length, nearestOnWall } from './geometry';
 import { splitEdgeSnap } from './wallSplit';
-import type { Design, Point, Wall } from './types';
+import type { Design, OpeningKind, Point, Wall } from './types';
 
 const epsilon = 0.01;
 /** Contacts closer than this are the same junction and merge into one cut. */
@@ -17,7 +17,7 @@ export interface WallContact {
   /** True when the junction sits inside one of this wall's door/window openings. */
   blocked: boolean;
   /** Door/window edge contact: the opening and which of its two edges this is. */
-  opening?: { id: string; kind: 'door' | 'window'; edge: 'start' | 'end' };
+  opening?: { id: string; kind: OpeningKind; edge: 'start' | 'end' };
 }
 
 /**

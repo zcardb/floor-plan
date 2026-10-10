@@ -18,7 +18,7 @@ export const hasViews = (item: LibraryItem) => !HARD_CATEGORIES.includes(item.ca
 /**
  * 家具详情左侧视觉区：软装家具左上角给 2D / 3D 切换、右上角给「AI 调整」；
  * 硬装只有 2D 一张图，不显示视角切换。2D 无图时显示参考符号；3D 始终实时渲染与项目 3D 场景
- * 相同的模型（AI 效果图只作右下角参考），WebGL 不可用时才退回效果图或生成入口。
+ * 相同的模型，WebGL 不可用时才退回效果图或生成入口。
  */
 export function FurnitureVisual({ item, view, onView, onAdjust, snapshotRef }: {
   item: LibraryItem;
@@ -41,7 +41,6 @@ export function FurnitureVisual({ item, view, onView, onAdjust, snapshotRef }: {
       <Sparkles size={14} />AI 调整
     </Button>}
     {live3d && <FurnitureModelPreview item={item} snapshotRef={snapshotRef} onFail={() => setModelFailed(true)} />}
-    {live3d && image && <img className="furniture-visual-ref" src={image} crossOrigin="anonymous" alt={`${item.name} AI 效果参考`} />}
     {!live3d && <div className="furniture-visual-stage">
       {image
         ? <img src={image} crossOrigin="anonymous" alt={`${item.name}${VIEW_LABEL[views ? view : 'top']}`} />

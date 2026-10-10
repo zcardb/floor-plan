@@ -10,7 +10,6 @@ import {
   Plus,
   DoorOpen,
   ScanLine,
-  SquareDashed,
   BrickWall,
 } from "lucide-react";
 import { categories, library } from "../data/catalog";
@@ -87,14 +86,9 @@ export function Library({
           );
         })}
       </div>
-      {structureTools && (category === '硬装' || !!query && ['墙体', '门', '窗'].some(name => name.includes(query))) && (
+      {/* 墙体不再单独给入口：单击画布上的墙身即可开始绘墙。 */}
+      {structureTools && (category === '硬装' || !!query && ['门', '窗'].some(name => name.includes(query))) && (
         <div className="structural-items">
-          <EditorTooltip label="墙体">
-            <button onClick={() => setTool("wall")}>
-              <SquareDashed size={18} />
-              墙体
-            </button>
-          </EditorTooltip>
           <EditorTooltip label="门">
             <button onClick={() => setTool("door")}>
               <DoorOpen size={18} />门

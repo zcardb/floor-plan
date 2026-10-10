@@ -1,6 +1,7 @@
 import { area, bbox, center, length } from './geometry';
 import { connectedWallPoly, wallSectionPolygons } from './wallConnections';
 import { doorOrientation } from './doorOrientation';
+import { openingKindLabel } from './hardMaterials';
 import { dimensionSettings } from './dimensionSettings';
 import { dimensionLabelOffset, perimeterDimensions } from './perimeterDimensions';
 import { formatMeters } from './lengthUnits';
@@ -86,8 +87,12 @@ export function createDrawingDocument(d: Design, layers: Layers): DrawingDocumen
     const L = length(wall), ux = (wall.b[0] - wall.a[0]) / L, uy = (wall.b[1] - wall.a[1]) / L;
     const p: Point = [wall.a[0] + ux * o.offset, wall.a[1] + uy * o.offset];
     const local = (x: number, y: number): Point => [p[0] + ux * x - uy * y, p[1] + uy * x + ux * y];
-    const group = { id: o.id, name: o.kind === 'window' ? '窗' : '门' };
-    if (o.kind === 'window') {
+    const group = { id: o.id, name: openingKindLabel(o.kind) };
+    if (o.kind === 'passage') {
+      // 垭口：只画洞口两侧贯穿墙厚的边线，没有门扇与开启弧线。
+      for (const x of [-o.width / 2, o.width / 2])
+        entities.push({ ...drawingLine(local(x, -wall.thickness / 2), local(x, wall.thickness / 2), 'OPENINGS'), group });
+    } else if (o.kind === 'window') {
       entities.push({ kind: 'polyline', closed: true, layer: 'OPENINGS', group, points: [local(-o.width / 2, -wall.thickness / 2), local(o.width / 2, -wall.thickness / 2), local(o.width / 2, wall.thickness / 2), local(-o.width / 2, wall.thickness / 2)] },
         { ...drawingLine(local(-o.width / 2, 0), local(o.width / 2, 0), 'OPENINGS'), group });
     } else {

@@ -33,7 +33,8 @@ describe('硬装分类入口',()=>{
     (item.props.onClick as ()=>void)();
     expect(h.add).toHaveBeenCalledWith(expect.objectContaining({name:'楼梯',w:1000,d:3000}));
     expect(tree.some(n=>n.props['aria-label']==='添加三人沙发')).toBe(false);
-    for(const [label,tool] of [['墙体','wall'],['门','door'],['窗','window']]){
+    expect(tree.some(n=>n.type==='button'&&Array.isArray(n.props.children)&&n.props.children.includes('墙体'))).toBe(false);
+    for(const [label,tool] of [['门','door'],['窗','window']]){
       const button=tree.find(n=>n.type==='button'&&Array.isArray(n.props.children)&&n.props.children.includes(label))!;
       (button.props.onClick as ()=>void)();expect(h.setTool).toHaveBeenLastCalledWith(tool);
     }

@@ -52,7 +52,6 @@ import {
   Settings2,
   ShieldCheck,
   ShieldOff,
-  SquareDashed,
   Sun,
   Trash2,
   Undo2,
@@ -782,13 +781,6 @@ export function Workbench(p: Props) {
             </ToolButton>
             {structureTools && (
               <>
-                <ToolButton
-                  label="绘墙"
-                  active={tool === "wall"}
-                  onClick={() => setTool("wall")}
-                >
-                  <SquareDashed size={16} />
-                </ToolButton>
                 <ToolButton label="门" active={tool === "door"} onClick={() => setTool("door")}>
                   <DoorOpen size={16} />
                 </ToolButton>

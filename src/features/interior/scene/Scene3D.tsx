@@ -1008,9 +1008,10 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         r.helper.material.dispose();
         r.helper = null;
       }
+      const selected = props.selection;
       const obj =
-        props.selection?.kind === "furniture"
-          ? r.furn.children.find((o) => o.userData.fid === props.selection?.id)
+        selected?.kind === "furniture"
+          ? r.furn.children.find((o) => o.userData.fid === selected.id)
           : null;
       if (obj && props.layers.furn) {
         r.helper = new THREE.BoxHelper(obj, "#b5653a");

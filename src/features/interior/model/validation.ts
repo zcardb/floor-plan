@@ -7,7 +7,7 @@ import { referenceDesign } from "../data/templates";
 import { length } from "./geometry";
 import { validateProcurement } from "./materialProcurement";
 import { normalizeFurniture, validPrice } from "./costs";
-import { isSurfaceKey, isWallKey, ROOF_SLOPE_MAX, validCustomOpening, validCustomWall } from "./hardMaterials";
+import { isOpeningKind, isSurfaceKey, isWallKey, ROOF_SLOPE_MAX, validCustomOpening, validCustomWall } from "./hardMaterials";
 import type { Design, Room } from "./types";
 const fail = () => {
   throw new Error("方案格式不正确或数据超出允许范围");
@@ -171,7 +171,7 @@ export function validateDesign(value: unknown): Design {
     const w = v.walls.find((w) => w.id === o.wallId);
     if (
       !w ||
-      !["door", "window"].includes(o.kind) ||
+      !isOpeningKind(o.kind) ||
       (o.hinge !== undefined && !['start', 'end'].includes(o.hinge)) ||
       (o.swingSide !== undefined && o.swingSide !== -1 && o.swingSide !== 1) ||
       !finite(o.width, 100, 10000) ||

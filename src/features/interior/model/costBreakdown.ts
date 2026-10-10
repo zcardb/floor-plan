@@ -241,7 +241,7 @@ export function selectionCost(
   d: Design,
   s: Selection,
 ): { label: string; amount: number | null; unit: string } | null {
-  if (!s) return null;
+  if (!s || s.kind === "group") return null;
   if (s.kind === "room") {
     const room = costBreakdown(d).rooms.find((r) => r.roomId === s.id);
     return room ? { label: "本间", amount: room.total, unit: "元" } : null;

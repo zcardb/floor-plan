@@ -4318,8 +4318,7 @@ button.ai-candidate:hover { border-color: hsl(var(--primary) / 0.5); }
 .project-list { padding: var(--focus-bleed); margin: calc(var(--focus-bleed) * -1); }
 .toolbar-scroll { padding: var(--focus-bleed); margin: calc(var(--focus-bleed) * -1); }
 
-/* AI 调整 · 3D：候选就是 AI 拼出的 3D 模型；详情 3D 视角右下角可附旧的效果图作参考 */
+/* AI 调整 · 3D：候选就是 AI 拼出的 3D 模型 */
 .furniture-ai-candidate-3d { position: absolute; inset: 0; }
 .furniture-model-preview.is-compact { cursor: inherit; touch-action: auto; pointer-events: none; }
-.furniture-visual-ref { position: absolute; right: 12px; bottom: 12px; z-index: 1; width: 72px; aspect-ratio: 1; object-fit: cover; border-radius: 8px; border: 2px solid hsl(var(--card)); box-shadow: 0 1px 4px hsl(var(--foreground) / 0.16); pointer-events: none; }
 .image-lightbox-plan-paper:has(.furniture-ai-candidate-3d) { position: relative; padding: 0; overflow: hidden; }

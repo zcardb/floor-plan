@@ -33,8 +33,8 @@
 
 ### 放置工具与界面
 - [ ] `components/PlanCanvas.tsx`：放置开口的判断从 `door || window` 扩展到 `passage`，宽度取 `defaultOpeningSize(tool).width`；点到已有开口时结束工具的判断同样扩展
-- [ ] `components/Workbench.tsx`：工具栏在「门」「窗」后面增加「垭口」按钮；操作提示文案覆盖垭口；删除后的提示改用 `openingKindLabel`
-- [ ] `components/Library.tsx`：硬装构件里增加「垭口」入口，搜索关键词也加上「垭口」
+- [ ] `components/Workbench.tsx`：在顶部主工具栏的结构工具组里（截图红框位置）**紧跟「绘墙」后面**加一个「垭口」`ToolButton`，顺序为 选择 · 绘墙 · 垭口 · 门 · 窗。它和门、窗一样受 `structureTools` 控制，激活态为 `tool === "passage"`，图标用 `RectangleVertical`；选中后点击墙体即可在点击位置生成垭口，放好自动切回「选择」。操作提示文案加上垭口；删除后的提示改用 `openingKindLabel`
+- [ ] 左侧素材库（`Library.tsx`）不加入口，垭口只从顶部工具栏放置
 - [ ] `components/PropertyPanel.tsx`：标题、默认高度、删除按钮文案、图标改用新的 helper；开向设置仍然只对门显示
 - [ ] `components/SelectionEditor.tsx` 和 `components/SizeFields.tsx`：默认高度改用 `defaultOpeningSize`（窗台高输入框仍只对窗显示）
 - [ ] `components/OpeningVariantSelect.tsx`：标准款名称改用 `openingKinds` 里的 `standard` 字段（显示为「标准垭口」）
@@ -51,7 +51,7 @@
 - [ ] `model/wallRemoval.test.ts` 或新增测试：在参考户型厨房和餐厅之间的隔墙上加垭口后，两个房间仍然独立存在，费用里出现「垭口」条目
 
 ## 验证清单
-- [ ] 正向：2D 平面图选择垭口工具点击隔墙，画布上出现两条边线和虚线过梁，没有门扇；选中后可以沿墙拖动，可以修改宽和高
+- [ ] 正向：顶部工具栏「绘墙」右边出现「垭口」按钮（与门、窗同组）；点击后按钮高亮，再点击隔墙，画布上出现两条边线和虚线过梁，没有门扇；选中后可以沿墙拖动，可以修改宽和高
 - [ ] 正向：切换到 3D，洞口从地面开到 2.1 m，上方保留过梁，没有门扇，漫游可以穿过
 - [ ] 正向：费用面板「门窗」类目出现「垭口」，按 m² 计价；可以新建自定义垭口款式并切换使用
 - [ ] 负向：承重墙上放垭口仍然提示「承重墙不可新增开口」；墙段长度不够或与已有开口重叠时给出相应提示

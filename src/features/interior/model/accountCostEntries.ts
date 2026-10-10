@@ -1,7 +1,7 @@
 import { categories, library } from '../data/catalog';
 import { builtinFloors, customFloorMaterial, type FloorMaterial } from './floorMaterials';
 import { priceOf, type PriceGroup } from './costs';
-import { HARD_CATEGORIES, ceilingMaterials, customWallMaterial, roofMaterials, wallMaterials, type WallMaterial } from './hardMaterials';
+import { HARD_CATEGORIES, ceilingMaterials, customWallMaterial, openingKinds, roofMaterials, wallMaterials, type WallMaterial } from './hardMaterials';
 import type { AccountCostSettings } from './costDefaults';
 import type { CustomFloor, CustomOpening, CustomWall, Design, LibraryItem } from './types';
 
@@ -20,7 +20,7 @@ export function accountCostEntries(items: LibraryItem[], settings: AccountCostSe
     ...[...floors.map(floor => [floor.key, customFloorMaterial(floor)] as const), ...Object.entries(builtinFloors)].map(([key, floor]) => ({ group: 'floorPrices' as const, key, name: floor.name, category: '地面', major: '硬装' as const, floor, custom: !!floor.custom, unit: settings.procurement?.[key]?.unit || 'm²' })),
     ...surface('wallPrices', '墙面', walls, wallMaterials),
     ...openings.map(opening => ({ ...hard, group: 'openingPrices' as const, key: opening.key, name: opening.name, category: '门窗', opening, custom: true })),
-    ...[{ key: 'door', name: '门' }, { key: 'window', name: '窗' }].map(item => ({ ...item, ...hard, group: 'openingPrices' as const, category: '门窗' })),
+    ...openingKinds.map(({ value, label }) => ({ key: value, name: label, ...hard, group: 'openingPrices' as const, category: '门窗' })),
     ...surface('roofPrices', '屋面', roofs, roofMaterials),
     ...surface('ceilingPrices', '吊顶', ceilings, ceilingMaterials),
     ...furniture.map(item => ({ group: 'furniturePrices' as const, key: item.catalogId!, name: item.name, category: item.category, major: '软装' as const, furniture: item, custom: customIds.has(item.catalogId), unit: '件' })),

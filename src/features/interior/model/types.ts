@@ -12,10 +12,12 @@ export interface Wall {
   exteriorRootId?: string;
   color?: string;
 }
+export type OpeningKind = "door" | "window" | "passage";
 export interface Opening {
   id: string;
   wallId: string;
-  kind: "door" | "window";
+  /** passage = 垭口：无门扇的落地洞口，只有宽、高与沿墙位置（离地高度恒为 0）。 */
+  kind: OpeningKind;
   offset: number;
   width: number;
   open?: boolean;
@@ -116,7 +118,7 @@ export interface CustomWall {
 export interface CustomOpening {
   key: string;
   name: string;
-  kind: "door" | "window";
+  kind: OpeningKind;
   width: number;
   height: number;
   price: number | null;
@@ -148,8 +150,15 @@ export interface Project {
 export type Selection = {
   kind: "furniture" | "room" | "wall" | "opening";
   id: string;
+} | {
+  /** 框选得到的一组家具（≥2 件）。 */
+  kind: "group";
+  ids: string[];
 } | null;
-export type Tool = "select" | "wall" | "door" | "window";
+/** 选择的稳定标识（成组选择为组内 id 拼接），用于 key 与依赖比较。 */
+export const selectionKey = (s: Selection) => !s ? '' : s.kind === 'group' ? `group:${s.ids.join(',')}` : `${s.kind}:${s.id}`;
+export type Tool = "select" | "wall" | OpeningKind;
+export const isOpeningTool = (tool: Tool): tool is OpeningKind => tool === "door" || tool === "window" || tool === "passage";
 export interface Layers {
   grid: boolean;
   dims: boolean;

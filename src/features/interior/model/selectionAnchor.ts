@@ -1,6 +1,7 @@
 import { length } from "./geometry";
 import { connectedWallPoly } from './wallConnections';
 import { doorSwingPoints } from './doorOrientation';
+import { furnitureCorners, groupBounds } from './furnitureGroup';
 import type { Design, Point, Selection } from "./types";
 export interface ScreenRect {
   left: number;
@@ -11,19 +12,11 @@ export interface ScreenRect {
 }
 export function selectionPoints(d: Design, s: Selection): Point[] {
   if (!s) return [];
+  if (s.kind === "group") return groupBounds(d, s.ids);
   if (s.kind === "furniture") {
     const f = d.furniture.find((f) => f.id === s.id);
     if (!f) return [];
-    const a = (f.rot * Math.PI) / 180;
-    return [
-      [-1, -1],
-      [1, -1],
-      [1, 1],
-      [-1, 1],
-    ].map(([x, y]) => [
-      f.cx + ((x * f.w) / 2) * Math.cos(a) - ((y * f.d) / 2) * Math.sin(a),
-      f.cy + ((x * f.w) / 2) * Math.sin(a) + ((y * f.d) / 2) * Math.cos(a),
-    ]);
+    return furnitureCorners(f);
   }
   if (s.kind === "room")
     return d.rooms.find((r) => r.id === s.id)?.rings[0] || [];

@@ -1,5 +1,5 @@
 import { area, length } from "./geometry";
-import type { CustomOpening, CustomWall, Design, Opening, Room } from "./types";
+import type { CustomOpening, CustomWall, Design, Opening, OpeningKind, Room } from "./types";
 
 export const WALL_CATEGORY = "墙面";
 export const OPENING_CATEGORY = "门窗";
@@ -51,12 +51,21 @@ export const surfaceKindOfCategory = (category: string): SurfaceKind | undefined
 export const ROOF_SLOPE_MAX = 60;
 /** 屋面斜面面积：同坡度的平/单坡/双坡/四坡都等于投影面积 ÷ cos(坡度)。 */
 export const roofSurfaceArea = (room: Room) => area(room) / Math.cos(((room.roofSlope ?? 0) * Math.PI) / 180);
-export const openingKinds: { value: Opening["kind"]; label: string }[] = [
-  { value: "door", label: "门" },
-  { value: "window", label: "窗" },
-];
-export const defaultOpeningSize = (kind: Opening["kind"]) =>
-  kind === "door" ? { width: 900, height: 2100 } : { width: 1200, height: 1600 };
+const OPENING_KINDS: Record<OpeningKind, { label: string; standard: string; width: number; height: number }> = {
+  door: { label: "门", standard: "标准门", width: 900, height: 2100 },
+  window: { label: "窗", standard: "标准窗", width: 1200, height: 1600 },
+  passage: { label: "垭口", standard: "标准垭口", width: 1200, height: 2100 },
+};
+export const openingKinds: { value: OpeningKind; label: string }[] =
+  (Object.keys(OPENING_KINDS) as OpeningKind[]).map((value) => ({ value, label: OPENING_KINDS[value].label }));
+export const isOpeningKind = (v: unknown): v is OpeningKind =>
+  typeof v === "string" && Object.prototype.hasOwnProperty.call(OPENING_KINDS, v);
+export const openingKindLabel = (kind: OpeningKind) => OPENING_KINDS[kind].label;
+export const standardOpeningName = (kind: OpeningKind) => OPENING_KINDS[kind].standard;
+export const defaultOpeningSize = (kind: OpeningKind) => ({ width: OPENING_KINDS[kind].width, height: OPENING_KINDS[kind].height });
+/** 离地高度：只有窗有窗台，门与垭口恒为 0。 */
+export const openingSill = (o: Pick<Opening, "kind" | "sill">) => (o.kind === "window" ? (o.sill ?? 800) : 0);
+export const openingHeight = (o: Pick<Opening, "kind" | "height">) => o.height ?? defaultOpeningSize(o.kind).height;
 
 const CUSTOM_KEY = /^custom-[0-9a-f-]{36}$/i;
 const validName = (v: unknown) => typeof v === "string" && !!v.trim() && v.length <= 100;
@@ -75,7 +84,7 @@ export function validCustomOpening(o: unknown): o is CustomOpening {
   if (!o || typeof o !== "object") return false;
   const v = o as CustomOpening;
   return typeof v.key === "string" && CUSTOM_KEY.test(v.key) && validName(v.name) &&
-    (v.kind === "door" || v.kind === "window") && within(v.width, 100, 10000) &&
+    isOpeningKind(v.kind) && within(v.width, 100, 10000) &&
     within(v.height, 100, 8000) && validPriceValue(v.price);
 }
 
@@ -97,7 +106,7 @@ export const isWallKey = (d: Pick<Design, "customWalls">, key: string) => isSurf
 export const openingPriceKey = (o: Pick<Opening, "kind" | "variant">) => o.variant ?? o.kind;
 export function openingName(d: Pick<Design, "customOpenings">, o: Pick<Opening, "kind" | "variant">): string {
   const custom = o.variant ? d.customOpenings?.find((c) => c.key === o.variant) : undefined;
-  return custom?.name || (o.kind === "door" ? "门" : "窗");
+  return custom?.name || openingKindLabel(o.kind);
 }
 
 export interface Pickable<T> { key: string; item: T; fromAccount: boolean }

@@ -1,5 +1,5 @@
 import type { Side } from "../data/floorplanBuilder";
-import type { LibraryItem } from "../model/types";
+import type { LibraryItem, OpeningKind } from "../model/types";
 
 /** 发给模型的目录条目：模型只引用 code；catalogId 只给后端落库用，不进提示词。 */
 export interface AiCatalogEntry {
@@ -31,7 +31,7 @@ export interface AiPlanSnapshot {
   width: number;
   depth: number;
   walls: { a: [number, number]; b: [number, number]; thickness: number; kind: string }[];
-  openings: { kind: "door" | "window"; at: [number, number]; width: number; rooms: string[] }[];
+  openings: { kind: OpeningKind; at: [number, number]; width: number; rooms: string[] }[];
   rooms: { id: string; name: string; area: number; ring: [number, number][] }[];
   furniture: { room: string; name: string; cx: number; cy: number; w: number; d: number; rot: number }[];
 }
@@ -44,7 +44,7 @@ export interface AiRoomContext {
   name: string;
   area: number;
   zone: [number, number, number, number];
-  openings: { kind: "door" | "window"; edge: AiEdge; along: number; width: number }[];
+  openings: { kind: OpeningKind; edge: AiEdge; along: number; width: number }[];
 }
 
 /** 模型输出的家具（房间布局与整户家具共用）。 */

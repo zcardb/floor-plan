@@ -11,7 +11,7 @@ import type {
   Point,
   Room,
 } from "./types";
-import { openingName, openingPriceKey, roofSurfaceArea, surfaceMaterialOf, wallMaterialOf } from "./hardMaterials";
+import { openingHeight, openingName, openingPriceKey, openingSill, roofSurfaceArea, surfaceMaterialOf, wallMaterialOf } from "./hardMaterials";
 export { wallMaterials } from "./hardMaterials";
 export type PriceGroup =
   | "floorPrices"
@@ -91,9 +91,9 @@ export function setPrice(
   };
 }
 export function openingDimensions(o: Opening, d: Design) {
-  const sill = o.kind === "window" ? (o.sill ?? 800) : 0,
+  const sill = openingSill(o),
     height = Math.min(
-      o.height ?? (o.kind === "door" ? 2100 : 1600),
+      openingHeight(o),
       Math.max(0, d.height - sill),
     );
   return { sill, height, area: (o.width * height) / 1e6 };
