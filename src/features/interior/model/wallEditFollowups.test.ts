@@ -10,7 +10,8 @@ import { editSelection } from './selectionEdits';
 import { placementGaps, wallPlacement } from './wallPlacement';
 import { keepOpeningsInPlace, openingsFitWalls } from './openingAnchor';
 import { dragStep, stepDelta } from './dragStep';
-import { addEnclosedRooms } from './roomEnclosed';
+import { addEnclosedRooms, reconcileRoomsWithWalls } from './roomEnclosed';
+import { fitFurnitureIntoRoom, fitsInRoom } from './roomFit';
 import type { Design, Furniture, Wall } from './types';
 
 const furn = (id: string, cx: number, cy: number, w = 1000, d = 600, rot = 0): Furniture =>
@@ -236,5 +237,37 @@ describe('墙围出的空白区域自动成为房间', () => {
   it('空白户型不处理（由按墙重算负责）', () => {
     const d = { ...enclosedGap(), template: 'blank' as const };
     expect(addEnclosedRooms(d)).toBe(d);
+  });
+});
+
+describe('视觉上相接的墙按连接划分房间', () => {
+  it('隔墙端头离墙差几厘米也把房间拆成两个', () => {
+    const d = design();
+    // 右间加一面横墙，右端离外墙内表面差 40 mm（视觉上已相接）。
+    d.walls = [...d.walls, { id: 'cut', kind: 'partition', a: [2500, 3000], b: [5960, 3000], thickness: 120 }];
+    const next = reconcileRoomsWithWalls(d);
+    expect(next.rooms).toHaveLength(3);
+    expect(next.rooms[1]!.id).toBe('right');
+    expect(next.rooms[2]!.name).toBe(`${d.rooms[1]!.name.replace(/\s+\d+$/, '')} 2`);
+  });
+  it('墙离得远（真实开口）时不拆', () => {
+    const d = design();
+    d.walls = [...d.walls, { id: 'cut', kind: 'partition', a: [2500, 3000], b: [5000, 3000], thickness: 120 }];
+    expect(reconcileRoomsWithWalls(d).rooms).toHaveLength(2);
+  });
+});
+
+describe('家具收进目标房间', () => {
+  const lRoom = { id: 'l', name: 'L', mat: 'wood', rings: [[[0, 0], [4000, 0], [4000, 2000], [2000, 2000], [2000, 4000], [0, 4000]] as [number, number][]] };
+  const sofa = (cx: number, cy: number) => ({ id: 's', type: 'sofa', name: '沙发', cx, cy, w: 1800, d: 800, rot: 0, color: '#aaa' });
+  it('落在 L 形缺口里的家具平移回房间内', () => {
+    const { furniture, moved } = fitFurnitureIntoRoom([sofa(3000, 3000)], lRoom);
+    expect(moved).toBe(1);
+    expect(fitsInRoom(furniture[0]!, lRoom)).toBe(true);
+  });
+  it('本来就在房间里的不动；哪儿都放不下的不摆', () => {
+    expect(fitFurnitureIntoRoom([sofa(1000, 1000)], lRoom).furniture[0]).toMatchObject({ cx: 1000, cy: 1000 });
+    const huge = { ...sofa(1000, 1000), w: 5000, d: 5000 };
+    expect(fitFurnitureIntoRoom([huge], lRoom)).toMatchObject({ furniture: [], dropped: 1 });
   });
 });

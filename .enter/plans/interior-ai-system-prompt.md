@@ -72,23 +72,23 @@
 
 ## Implementation checklist
 
-- [ ] `PLANNING_RULES` 常量包含第 1 节列出的 15 类规则，且逐条与本项目数据能力对齐（无高度／窗台数据处明确写「按类别保守判断，不宣称已通过」）。
-- [ ] `system` 组装改为 `PLANNING_RULES → LIVING_SENSE → 模式契约 → agent.instructions → 小助手要求`。
-- [ ] `LIVING_SENSE` 去掉与共用块重复的门窗／高柜挡窗表述，保留功能房间配置常识与 700/800 mm 数值。
-- [ ] `PLAN_CONTRACT` 保留需求理解、分区、几何与完整输出约定，删除与共用块重复的条目。
-- [ ] `ROOM_CONTRACT` 保留 `zone / back / along / gap` 取值边界、指定家具件数规则与输出格式，其余引用共用块。
-- [ ] 两份契约的输出约定都写明：检查结论不进入 JSON、不新增字段。
-- [ ] 输出约定写明 `hinge` 的语义、输出条件与省略时的默认值，并与 `sanitize.ts` 的 `start` 默认、from→to 坐标较小端一致。
-- [ ] `checkItems` 对「椅类 × 桌类」的部分收拢重叠不再记 soft，条件为未被完全包含且至少一个方向伸出 ≥100 mm。
-- [ ] `checkItems` 对地毯的现有放行、越界 soft、其他类型重叠阈值保持原样。
-- [ ] `SIZE_LINE`、`DIRECTIONS`、`DOOR_RULE`、修复轮与 best 选择逻辑未被改动。
+- [x] `PLANNING_RULES` 常量包含第 1 节列出的 15 类规则，且逐条与本项目数据能力对齐（无高度／窗台数据处明确写「按类别保守判断，不宣称已通过」）。
+- [x] `system` 组装改为 `PLANNING_RULES → LIVING_SENSE → 模式契约 → agent.instructions → 小助手要求`。
+- [x] `LIVING_SENSE` 去掉与共用块重复的门窗／高柜挡窗表述，保留功能房间配置常识与 700/800 mm 数值。
+- [x] `PLAN_CONTRACT` 保留需求理解、分区、几何与完整输出约定，删除与共用块重复的条目。
+- [x] `ROOM_CONTRACT` 保留 `zone / back / along / gap` 取值边界、指定家具件数规则与输出格式，其余引用共用块。
+- [x] 两份契约的输出约定都写明：检查结论不进入 JSON、不新增字段。
+- [x] 输出约定写明 `hinge` 的语义、输出条件与省略时的默认值，并与 `sanitize.ts` 的 `start` 默认、from→to 坐标较小端一致。
+- [x] `checkItems` 对「椅类 × 桌类」的部分收拢重叠不再记 soft，条件为未被完全包含且至少一个方向伸出 ≥100 mm。
+- [x] `checkItems` 对地毯的现有放行、越界 soft、其他类型重叠阈值保持原样。
+- [x] `SIZE_LINE`、`DIRECTIONS`、`DOOR_RULE`、修复轮与 best 选择逻辑未被改动。
 
 ## Verification checklist
 
-- [ ] `pnpm lint` 通过（提示词模板字符串不触发 unused / 转义相关告警）。
-- [ ] `pnpm exec tsc --noEmit` 通过。
-- [ ] `pnpm test`（`vitest run src/features/interior`）全部通过，前端解析与落库行为无回归。
-- [ ] `pnpm run build` 通过。
+- [x] `pnpm lint` 通过（提示词模板字符串不触发 unused / 转义相关告警）。
+- [x] `pnpm exec tsc --noEmit` 通过。
+- [x] `pnpm test`（`vitest run src/features/interior`）全部通过，前端解析与落库行为无回归。
+- [x] `pnpm run build` 通过。
 - [ ] 在预览里生成一套整户 3 房户型：返回候选成功，且提示词要求的门窗未被挪动、没有家具压门洞。
 - [ ] 对其中一个房间做家具重排：候选成功，且**不再**因「椅子收进桌下」产生 soft 提示（对比改动前的 warnings 数量）。
 - [ ] 反向检查：故意放入明显越界或穿墙的家具项，仍被 soft/hard 捕获（放行范围没有扩大）。
