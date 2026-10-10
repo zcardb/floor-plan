@@ -9,6 +9,7 @@ import { AiResults } from "./AiResults";
 import { PlanThumbnail } from "./PlanThumbnail";
 import { planToDesign } from "../ai/apply";
 import { generatePlanCandidate, markCandidateApplied } from "../ai/client";
+import { planExamples } from "../ai/examples";
 import { readyFiles, readyImageUrls } from "../ai/referenceImages";
 import { sanitizePlan } from "../ai/sanitize";
 import { useAiBatch } from "../ai/useAiBatch";
@@ -57,9 +58,10 @@ export function AiCreateProjectForm({ pending, onClose, onSubmit }: { pending: b
     const request: PlanRequest = { description, images: readyImageUrls(composer.images) };
     const files = readyFiles(composer.images);
     const aiCatalog = catalog, count = composer.count, engine = engineFields(composer.engine);
+    const examples = planExamples(aiCatalog);
     const launch = () => ai.start(request, count, async (index, generationId) => {
       const { candidate } = await generatePlanCandidate({
-        generationId, index, description, images: request.images, files, catalog: aiCatalog.entries, ...engine,
+        generationId, index, description, images: request.images, files, catalog: aiCatalog.entries, examples, ...engine,
       });
       const spec = sanitizePlan(candidate!.result, { catalog: aiCatalog });
       return { id: candidate!.candidateId, index, summary: candidate!.summary, warnings: candidate!.warnings, result: { design: planToDesign(spec, aiCatalog) } };

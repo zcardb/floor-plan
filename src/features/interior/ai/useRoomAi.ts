@@ -5,6 +5,7 @@ import type { Design } from "../model/types";
 import { applyRoomLayout, layoutRoom } from "./apply";
 import { generateRoomCandidate, markCandidateApplied } from "./client";
 import { furnitureInRoom, planSnapshot, roomContext, roomZone } from "./context";
+import { roomExamples } from "./examples";
 import { initialPicks, pickNames, requiredOf, withPickSizes } from "./picks";
 import { readyFiles, readyImageUrls, type AiImageDraft } from "./referenceImages";
 import { sanitizeRoomItems } from "./sanitize";
@@ -101,9 +102,10 @@ export function useRoomAi({ design, catalog, projectId, change }: {
     const existing = furnitureInRoom(source, room).slice(0, 60).map((f) => ({ name: f.name, w: Math.round(f.w), d: Math.round(f.d) }));
     const request: AiRoomRequest = { roomId: room.id, roomName: room.name, description, images, furniture: pickNames(draft.picks, aiCatalog), catalog: aiCatalog };
     const count = draft.count, engine = engineFields(draft.engine);
+    const examples = roomExamples(aiCatalog, context);
     const launch = () => ai.start(request, count, async (index, generationId) => {
       const { candidate } = await generateRoomCandidate({
-        generationId, index, description, images, files, catalog: aiCatalog.entries, projectId, room: context, plan, existing, required, ...engine,
+        generationId, index, description, images, files, catalog: aiCatalog.entries, projectId, room: context, plan, existing, required, examples, ...engine,
       });
       const items = sanitizeRoomItems(candidate!.result, { zone: roomZone(room), catalog: aiCatalog, required });
       // 家具只摆在目标房间内：放不下的不摆（不会落到别的房间），计入需微调提示。

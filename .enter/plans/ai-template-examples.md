@@ -47,26 +47,26 @@
 系统规则文本、模型列表、修复轮逻辑、`sanitizePlan` / `planToDesign` 的落地逻辑、模板本身的外观与家具。
 
 ## Implementation checklist
-- [ ] `templatePresets.ts`：`TemplatePreset.spec` 可选字段，5 套算法模板提供 `spec()`，`build()` 结果与改动前一致
-- [ ] `templates.ts`：`TEMPLATE_PRESETS` 保留 `spec`
-- [ ] `ai/examples.ts`：`planExamples()` 输出 5 条，房间 box 为墙中心线坐标，家具只含 `code/back/along/gap`，无 `hinge`
-- [ ] `ai/examples.ts`：覆盖尺寸家具映射到同 type 最近尺寸条目；越界 / 非法重叠件被剔除
-- [ ] `ai/examples.ts`：`roomExamples()` 按房间类别返回 ≤ 3 条，含 zone 尺寸、门窗、items；无同类返回 `[]`
-- [ ] `ai/types.ts`、`ai/client.ts`：新增范例类型与 `examples` 字段
-- [ ] `AiCreateProjectDialog.tsx` 与 `useRoomAi.ts` 发送 `examples`
-- [ ] 后端 `guard` 校验 `examples` 数量与大小，超限返回 400 中文提示
-- [ ] 后端 `planPrompt` / `roomPrompt` 在目录后、用户需求前插入范例段落与「不要照抄」说明
-- [ ] 后端 `checkItems`：stove / ksink 完全在 counter 内不报重叠
-- [ ] 部署 `interior-ai-design`
+- [x] `templatePresets.ts`：`TemplatePreset.spec` 可选字段，5 套算法模板提供 `spec()`，`build()` 结果与改动前一致
+- [x] `templates.ts`：`TEMPLATE_PRESETS` 保留 `spec`
+- [x] `ai/examples.ts`：`planExamples()` 输出 5 条，房间 box 为墙中心线坐标，家具只含 `code/back/along/gap`，无 `hinge`
+- [x] `ai/examples.ts`：覆盖尺寸家具映射到同 type 最近尺寸条目；越界 / 非法重叠件被剔除
+- [x] `ai/examples.ts`：`roomExamples()` 按房间类别返回 ≤ 3 条，含 zone 尺寸、门窗、items；无同类返回 `[]`
+- [x] `ai/types.ts`、`ai/client.ts`：新增范例类型与 `examples` 字段
+- [x] `AiCreateProjectDialog.tsx` 与 `useRoomAi.ts` 发送 `examples`
+- [x] 后端 `guard` 校验 `examples` 数量与大小，超限返回 400 中文提示
+- [x] 后端 `planPrompt` / `roomPrompt` 在目录后、用户需求前插入范例段落与「不要照抄」说明
+- [x] 后端 `checkItems`：stove / ksink 完全在 counter 内不报重叠
+- [x] 部署 `interior-ai-design`
 
 ## Verification checklist
-- [ ] 新增 `ai/examples.test.ts`：
+- [x] 新增 `ai/examples.test.ts`：
   - 正向：`planExamples(buildAiCatalog())` 返回 5 条；每条经 `sanitizePlan` + `planToDesign` 成功，房间数与模板一致
   - 正向：所有家具代号都能在目录 `byCode` 中找到；每件家具占地在所属房间 zone 内，且无非法重叠
   - 边界：房间 box 贴外轮廓的边保持 0 / width / depth，内墙侧边比净空 box 外扩 60
   - 正向：`roomExamples` 对「主卧」返回卧室范例、对「厨房」返回厨房范例；负向：对「储藏间」返回 `[]`
   - 负向：目录里没有某 type 时，该件被跳过而不是抛错
-- [ ] `templatePresets.test.ts` / `templateAutoMerge.test.ts` 仍通过（`build()` 不变）
-- [ ] `pnpm vitest run src/features/interior/ai src/features/interior/data`
-- [ ] `pnpm tsc --noEmit` 与 `pnpm run build`
+- [x] `templatePresets.test.ts` / `templateAutoMerge.test.ts` 仍通过（`build()` 不变）
+- [x] `pnpm vitest run src/features/interior/ai src/features/interior/data`
+- [x] `pnpm tsc --noEmit` 与 `pnpm run build`
 - [ ] 部署后在预览里用默认需求「AI 创建户型」生成 2 个方案、对一个卧室做「AI 布局」，查看后端日志里首轮 hard/soft 问题数，确认请求未超限、方案可正常创建

@@ -55,6 +55,26 @@ export interface AiPlacedItem {
   gap?: number;
 }
 
+/** 整户范例：一段需求 + 按输出约定写好的标准答案（由算法模板序列化而来）。 */
+export interface AiPlanExample {
+  requirement: string;
+  output: {
+    summary: string;
+    width: number;
+    depth: number;
+    walls: { key: string; dir: "h" | "v"; at: number; from: number; to: number }[];
+    rooms: { id: string; name: string; mat: string; box: [number, number, number, number] }[];
+    openings: { wall: string; kind: OpeningKind; at: number; width: number; into?: Side }[];
+    furniture: { room: string; items: AiPlacedItem[] }[];
+  };
+}
+
+/** 单房间范例：房间净空尺寸与门窗（与真实请求同一格式）+ 标准答案。 */
+export interface AiRoomExample {
+  room: { name: string; width: number; depth: number; openings: AiRoomContext["openings"] };
+  output: { items: AiPlacedItem[] };
+}
+
 export interface AiCandidate<T> {
   id: string;
   index: number;

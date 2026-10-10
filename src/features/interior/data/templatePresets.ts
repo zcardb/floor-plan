@@ -10,6 +10,8 @@ export interface TemplatePreset {
   /** Indoor outline area, not developer-advertised gross floor area. */
   area: number;
   build: () => Design;
+  /** 算法模板的户型描述（与 AI 输出同一套简写），用作 AI 生成的范例；手绘模板没有。 */
+  spec?: () => PlanSpec;
 }
 
 /** A circulation spine joins the bedrooms, bathroom, kitchen and south-facing living space. */
@@ -69,11 +71,15 @@ const definitions = [
   { id: 'wide-hall', name: '通透横厅', layout: '三室两厅一卫', description: '宽厅改善 · 餐客贯通 · 宽景阳台', width: 13900, depth: 10000, beds: 3, service: 2800, bedroomDepth: 3800, balcony: 1400 },
 ];
 
-export const NEW_TEMPLATE_PRESETS: TemplatePreset[] = definitions.map((d) => ({
-  id: d.id, name: `${d.layout} · ${d.name}`, layout: d.layout, description: d.description,
-  area: Math.round(d.width * d.depth / 1e6),
-  build: () => buildPlan(apartment(d.id, d.beds, d.width, d.depth, d.service, d.bedroomDepth, d.balcony)),
-}));
+export const NEW_TEMPLATE_PRESETS: TemplatePreset[] = definitions.map((d) => {
+  const spec = () => apartment(d.id, d.beds, d.width, d.depth, d.service, d.bedroomDepth, d.balcony);
+  return {
+    id: d.id, name: `${d.layout} · ${d.name}`, layout: d.layout, description: d.description,
+    area: Math.round(d.width * d.depth / 1e6),
+    build: () => buildPlan(spec()),
+    spec,
+  };
+});
 
 export const PRESET_IDS = ['reference', ...definitions.map((d) => d.id)];
 export const isPresetId = (id: unknown): id is string => typeof id === 'string' && PRESET_IDS.includes(id);

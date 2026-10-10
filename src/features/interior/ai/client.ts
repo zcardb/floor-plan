@@ -1,5 +1,5 @@
 import { FunctionsHttpError } from "@supabase/supabase-js";
-import type { AiCatalogEntry, AiPlanSnapshot, AiRequiredItem, AiRoomContext } from "./types";
+import type { AiCatalogEntry, AiPlanExample, AiPlanSnapshot, AiRequiredItem, AiRoomContext, AiRoomExample } from "./types";
 
 export const AI_FUNCTION = "interior-ai-design";
 export const AI_COUNT_OPTIONS = [1, 2, 3, 4] as const;
@@ -48,10 +48,15 @@ export interface AiRoomRequest extends AiRequestBase {
   /** 房间里已有的家具（名称 + 尺寸），让方案接着现状调整。 */
   existing: { name: string; w: number; d: number }[];
   required: AiRequiredItem[];
+  /** 同类模板房间的标准答案，帮模型学会坐标与摆法。 */
+  examples?: AiRoomExample[];
 }
 
 /** 整户户型：长宽、几室几厅几卫都写在 description 里，尺寸由模型决定。 */
-export type AiPlanRequest = AiRequestBase;
+export interface AiPlanRequest extends AiRequestBase {
+  /** 算法模板序列化出的整户标准答案。 */
+  examples?: AiPlanExample[];
+}
 
 /** 只把中文说明展示给用户；英文原文（网络错误、上游报错）换成可操作的提示。 */
 export const friendlyError = (message: string | undefined, fallback = "生成失败，请重试") =>

@@ -87,6 +87,8 @@ interface Body {
   plan?: unknown;
   existing?: { name: string; w: number; d: number }[];
   required?: { code: string; count: number }[];
+  /** 模板标准答案范例（前端按本批目录序列化），只用来示范格式与摆法，不决定房间数量与尺寸。 */
+  examples?: unknown[];
   /** 直接选择的模型；与 assistantId 二选一，都没有时用默认模型。 */
   model?: string;
   /** 用户自己的小助手：后端读取它的模型与 Prompt。 */
@@ -108,6 +110,11 @@ function guard(raw: unknown): Body | string {
   if (b.projectId !== undefined && (typeof b.projectId !== 'string' || !UUID.test(b.projectId))) return '项目编号无效';
   if (b.model !== undefined && (typeof b.model !== 'string' || !MODELS[b.model])) return '不支持的模型';
   if (b.assistantId !== undefined && (typeof b.assistantId !== 'string' || !UUID.test(b.assistantId))) return '小助手编号无效';
+  if (b.examples !== undefined) {
+    const max = b.mode === 'room' ? 4 : 6;
+    if (!Array.isArray(b.examples) || b.examples.length > max || !b.examples.every((e) => !!e && typeof e === 'object' && JSON.stringify(e).length <= 20_000))
+      return '范例数据无效（数量或体积超限）';
+  }
   if (b.mode === 'room') {
     const r = b.room;
     if (!r || !str(r.roomId, 100) || !str(r.name, 100) || !Array.isArray(r.zone) || r.zone.length !== 4 || !r.zone.every((n) => finite(n)) || !Array.isArray(r.openings)) return '房间信息无效';
@@ -244,9 +251,10 @@ const ROOM_CONTRACT = `你是资深室内设计师，为一套户型中的「目
 本房间要求：
 1. 家具间不能实体穿插（地毯压在家具下、椅子部分收进桌下属于正常重叠，不算碰撞），也不能越过 zone 或压到墙体与其他房间的家具上。
 2. 结合整套户型：门连通哪些房间、相邻房间的功能与现有家具；门窗的位置、宽度和开向是既定条件，家具要迁就门窗。
-3. 「指定家具」不为空时，只能使用指定的代号，且每个代号的件数必须与指定件数完全相同，不得增减或加入其他家具；为空时由你从目录中挑选适合该房间功能的家具。
-4. 输出前按上面的规划原则与生活常识逐件核对位置、朝向和使用空间（上下床、开柜门、拉椅子、通行），问题在输出前改掉。
-5. 自检结论不写进 JSON，不新增字段。`;
+3. 台面类家具（橱柜台面）是操作面：灶台、水槽按实际做法嵌在台面里，占地完全落在台面范围内，不算重叠；台面长度不够时沿同一面墙连续排布多段台面。
+4. 「指定家具」不为空时，只能使用指定的代号，且每个代号的件数必须与指定件数完全相同，不得增减或加入其他家具；为空时由你从目录中挑选适合该房间功能的家具。
+5. 输出前按上面的规划原则与生活常识逐件核对位置、朝向和使用空间（上下床、开柜门、拉椅子、通行），问题在输出前改掉。
+6. 自检结论不写进 JSON，不新增字段。`;
 
 const PLAN_CONTRACT = `你是住宅空间规划与户型设计助手。根据用户的文字需求（可能附参考图），设计一套功能合理、连通顺畅、尺寸自洽的单层户型，包括外轮廓、内墙、房间、门窗与家具。只输出一个 JSON 对象，不要输出解释或 Markdown。
 
@@ -372,6 +380,18 @@ function replyText(protocol: Protocol, data: ReplyData | null | undefined): stri
 /** 放在每次请求末尾再强调一次：方案思路的差异不能落到门窗上，门上不放家具。 */
 const DOOR_RULE = '【最高优先级】户型中的门窗位置、宽度、开向严格按需求还原，不得擅自修改；方案之间的差异只体现在分区和家具上。任何家具都不能压在门洞上或挡住门扇开启。';
 
+/**
+ * 范例段落：系统算法模板序列化出的标准答案，示范坐标约定与家具摆法。
+ * 放在目录之后、用户需求之前；明确要求不照抄房间数量与尺寸。
+ */
+function examplesText(b: Body): string {
+  if (!b.examples?.length) return '';
+  const lead = b.mode === 'room'
+    ? '参考范例（系统算法生成并通过校验的同类房间标准答案：room 是房间净空宽 width（x 方向）× 深 depth（y 方向）与门窗位置，output 是正确的家具输出）。学习它们的 back / along / gap 写法、贴墙方式、家具间距和避让门窗的做法；不要照抄，一切以下面的目标房间与用户需求为准：'
+    : '参考范例（系统算法生成并通过校验的标准答案：坐标约定、墙中心线、房间轮廓、门窗、家具 back / along / gap 与代号用法都完全正确）。学习它们的输出格式、尺寸尺度、墙与房间的对齐方式和家具摆法；不要照抄范例的房间数量、尺寸和布局，一切以下面的用户需求为准：';
+  return [lead, ...b.examples.map((e, i) => `范例 ${i + 1}：${JSON.stringify(e)}`)].join(NL);
+}
+
 function roomPrompt(b: Body) {
   const names = new Map(b.catalog.map((e) => [e.code, e.name]));
   const required = b.required!.length
@@ -384,6 +404,7 @@ function roomPrompt(b: Body) {
     `指定家具：${required}`,
     `整套户型（墙 a→b、门窗中心 at 与连通房间 rooms、房间轮廓 ring、其他房间家具）：${JSON.stringify(b.plan)}`,
     `家具目录（代号 名称 | 分类 | 类型 | 宽×深 mm）：${NL}${catalogText(b.catalog)}`,
+    examplesText(b),
     `用户需求：${b.description.trim()}`,
     b.images.length ? '附有参考图，请参考其中的风格与布局意图，但家具仍只能来自目录。' : '',
     `这是同一批里的第 ${b.index + 1} 个方案，思路：${DIRECTIONS[b.index % DIRECTIONS.length]}。`,
@@ -398,6 +419,7 @@ function planPrompt(b: Body) {
   return [
     SIZE_LINE,
     `家具目录（代号 名称 | 分类 | 类型 | 宽×深 mm）：${NL}${catalogText(b.catalog)}`,
+    examplesText(b),
     `用户需求：${b.description.trim()}`,
     b.images.length ? '附有参考图（可能是户型图或风格图），请参考其中的布局与风格意图。' : '',
     `这是同一批里的第 ${b.index + 1} 个方案，请给出与常见做法略有不同的分区思路：${DIRECTIONS[b.index % DIRECTIONS.length]}。`,
@@ -447,6 +469,16 @@ function tuckedSeat(typeA: string, boxA: ReturnType<typeof footprint>, typeB: st
   return Math.max(table.x1 - seat.x1, seat.x2 - table.x2, table.y1 - seat.y1, seat.y2 - table.y2) >= 100;
 }
 
+/** 灶台、水槽嵌在橱柜台面上是正常做法（完全落在台面占地内），不报重叠。 */
+const COUNTER_INSETS = new Set(['stove', 'ksink']);
+function insetOnCounter(typeA: string, boxA: ReturnType<typeof footprint>, typeB: string, boxB: ReturnType<typeof footprint>) {
+  const [inset, counter] = COUNTER_INSETS.has(typeA) && typeB === 'counter' ? [boxA, boxB]
+    : typeA === 'counter' && COUNTER_INSETS.has(typeB) ? [boxB, boxA] : [null, null];
+  if (!inset || !counter) return false;
+  const t = 30;
+  return inset.x1 >= counter.x1 - t && inset.y1 >= counter.y1 - t && inset.x2 <= counter.x2 + t && inset.y2 <= counter.y2 + t;
+}
+
 /** 一组家具的结构 + 几何校验：代号、方向（hard），是否出界、是否互相重叠（soft）。 */
 function checkItems(items: unknown, zone: [number, number, number, number], byCode: Map<string, Entry>, label: string, found: Issues): Placed[] {
   const errors = found.hard;
@@ -469,6 +501,7 @@ function checkItems(items: unknown, zone: [number, number, number, number], byCo
       const overlapY = Math.min(box.y2, other.box.y2) - Math.max(box.y1, other.box.y1);
       if (overlap <= 50 || overlapY <= 50) continue;
       if (tuckedSeat(e.type, box, other.type, other.box)) continue;
+      if (insetOnCounter(e.type, box, other.type, other.box)) continue;
       found.soft.push(`${label} ${p.code}（${e.name}）与 ${other.name} 重叠 ${Math.round(overlap)}×${Math.round(overlapY)} mm`);
     }
     boxes.push({ name: e.name, type: e.type, box });
