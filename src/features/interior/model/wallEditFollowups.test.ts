@@ -10,7 +10,7 @@ import { editSelection } from './selectionEdits';
 import { placementGaps, wallPlacement } from './wallPlacement';
 import { keepOpeningsInPlace, openingsFitWalls } from './openingAnchor';
 import { dragStep, stepDelta } from './dragStep';
-import { addEnclosedRooms, reconcileRoomsWithWalls } from './roomEnclosed';
+import { deriveRooms } from './roomDerive';
 import { fitFurnitureIntoRoom, fitsInRoom } from './roomFit';
 import type { Design, Furniture, Wall } from './types';
 
@@ -210,33 +210,27 @@ describe('编辑栏避开门窗距离标注', () => {
 });
 
 describe('墙围出的空白区域自动成为房间', () => {
-  // 外框 6000 × 6000，左右两间各占 y 0–6000；加一面横墙把右间下半截隔开后再去掉右间下半截的房间轮廓，模拟「隔出来却没有房间」。
-  const enclosedGap = (): Design => {
+  // 外框 6000 × 6000，左右两间各占 y 0–6000；加一面横墙把右间下半截隔开。
+  const withCut = (): Design => {
     const d = design();
     d.walls = [...d.walls, { id: 'cut', kind: 'partition', a: [2500, 4000], b: [6000, 4000], thickness: 200 }];
     d.rooms = [d.rooms[0]!, { ...d.rooms[1]!, rings: [rect(2600, 0, 3400, 3900)] }];
     return d;
   };
-  it('补出新房间「房间」，已有房间不变', () => {
-    const before = enclosedGap(), next = addEnclosedRooms(before);
-    expect(next.rooms.slice(0, 2)).toEqual(before.rooms);
+  it('之前不属于任何房间的区域补成「房间 n」，已有房间保留 id 与名称', () => {
+    const before = withCut(), next = deriveRooms(before);
+    expect(next.rooms.map(r => r.id).slice(0, 2)).toEqual(['left', 'right']);
     expect(next.rooms).toHaveLength(3);
     const added = next.rooms[2]!;
-    expect(added.name).toBe('房间');
+    expect(added.name).toBe('房间 1');
     const xs = added.rings[0]!.map(p => p[0]), ys = added.rings[0]!.map(p => p[1]);
     expect(Math.min(...xs)).toBeCloseTo(2600);
     expect(Math.min(...ys)).toBeCloseTo(4100);
     expect(Math.max(...ys)).toBeCloseTo(6000);
   });
-  it('房间已铺满时不新增；房间轮廓与墙面之间的细缝不算房间', () => {
-    const d = design();
-    expect(addEnclosedRooms(d)).toBe(d);
-    const gap = { ...d, rooms: [d.rooms[0]!, { ...d.rooms[1]!, rings: [rect(2700, 0, 3300, 6000)] }] };
-    expect(addEnclosedRooms(gap)).toBe(gap);
-  });
-  it('空白户型不处理（由按墙重算负责）', () => {
-    const d = { ...enclosedGap(), template: 'blank' as const };
-    expect(addEnclosedRooms(d)).toBe(d);
+  it('房间已与墙一致时原样返回', () => {
+    const d = deriveRooms(design());
+    expect(deriveRooms(d)).toBe(d);
   });
 });
 
@@ -245,15 +239,15 @@ describe('视觉上相接的墙按连接划分房间', () => {
     const d = design();
     // 右间加一面横墙，右端离外墙内表面差 40 mm（视觉上已相接）。
     d.walls = [...d.walls, { id: 'cut', kind: 'partition', a: [2500, 3000], b: [5960, 3000], thickness: 120 }];
-    const next = reconcileRoomsWithWalls(d);
+    const next = deriveRooms(d);
     expect(next.rooms).toHaveLength(3);
     expect(next.rooms[1]!.id).toBe('right');
-    expect(next.rooms[2]!.name).toBe(`${d.rooms[1]!.name.replace(/\s+\d+$/, '')} 2`);
+    expect(next.rooms[2]!.name).toBe('客厅 2');
   });
   it('墙离得远（真实开口）时不拆', () => {
     const d = design();
     d.walls = [...d.walls, { id: 'cut', kind: 'partition', a: [2500, 3000], b: [5000, 3000], thickness: 120 }];
-    expect(reconcileRoomsWithWalls(d).rooms).toHaveLength(2);
+    expect(deriveRooms(d).rooms).toHaveLength(2);
   });
 });
 
