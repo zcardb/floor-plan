@@ -6,7 +6,7 @@
 2. **转向**：L 型、U 型、三跑可以选左转或右转，右转和左转互为镜像。
 3. **每跑单独设梯段宽**：L 型、U 型有 2 跑，三跑有 3 跑。平台大小跟着各跑宽度变化。
 
-不做：标注文字切换“上/下”、文字保持正向、每跑单独设踏步数、3D 视图改动。
+不做：标注文字切换“上/下”、画布上文字保持正向（只在导出时按规范保证文字正向）、每跑单独设踏步数、3D 视图改动。
 
 ## 一、数据（`model/types.ts`，`StairSpec` 只新增可选字段，旧数据不受影响）
 ```ts
@@ -50,9 +50,29 @@ export interface StairSpec {
   - “转向”（只在 L 型、U 型、三跑时显示）：右转 / 左转
 - 所有修改都走 `p.change`，所以撤销和保存沿用现有机制。
 
-## 四、联动（不需要额外改动，只需验证）
+## 四、导出符合 CAD/DXF 规范（本次楼梯 + 以后所有新增家具和设计元素）
+你要求以后所有新增或调整的家具、设计元素，导出时都要符合业界 CAD/DXF 规范。本次落实四点，并把规则固化下来：
+
+1. **楼梯单独成层**：参照天正的 `STAIR` 图层和 AIA 的 `A-FLOR-STRS`，新增 `STAIRS` 图层（ACI 6，线宽 0.18，CONTINUOUS），图层中文名为“楼梯”。
+   - 改动位置：`DrawingLayer`、`DRAWING_LAYERS`、`DRAWING_LAYER_NAMES`、`LAYER_STYLES`、`DXF_LAYER_STYLES`。
+   - `furnitureDrawing` 对楼梯输出 `STAIRS` 图层，其他家具仍为 `FURNITURE`。
+   - 图块名改为 `STAIR_<类别>_<w>x<d>`。图块签名包含整个 `stair`，所以方向、转向、各跑宽度不同的楼梯不会共用一个块。
+2. **文字始终可读**：制图标准（GB/T 50001 和 ISO 128）要求文字从图纸下方或右侧阅读。导出时，凡是会被转成倒字的文字（角度落在 (90°, 270°]）都加 180°。文字本身是居中对齐的，所以位置不变。这一步放在 `transformEntity` 和 `furnitureDrawing` 的文字分支里，以后所有家具文字都自动生效。
+3. **图块内只放几何**：DXF 的 INSERT 旋转时会连带旋转块内文字。因此块内只保留线、弧、圆，文字（如“上”）作为模型空间的 TEXT 单独写在同一图层，旋转角已按第 2 点处理。`dxfExport` 跳过已用 INSERT 代替的 group 时，文字除外。
+4. **镜像写进几何，不用负比例**：左转楼梯直接生成镜像坐标，不使用 X 比例为 −1 的 INSERT，因为负比例块在 CAD 里炸开后，文字和标注都会反向。
+
+**规则固化**：在 `CodeGuideline.md` 新增“导出规范（CAD / DXF）”一节，以后新增家具或设计元素都必须满足：
+- 所有平面图元都经过 `FurnitureShape` 和 `furnitureDrawing`，或直接用 `DrawingEntity` 表达，只使用已支持的 SVG 标签（line、rect、circle、ellipse、path、text、g）。
+- 新的对象类别要有自己的图层，并在 `DXF_LAYER_STYLES` 里登记 ACI 颜色、线宽和线型；单位为毫米，文字样式使用 `STUDIO_CN`。
+- 重复出现的符号写成 BLOCK + INSERT，块名可读，按几何签名去重；块内不放文字。
+- 文字从下方或右侧可读；镜像必须写进几何，不使用负比例插入。
+- 必须在 `drawingExport.test.ts` 里有回读测试：能被 DXF 解析、图层正确、没有 NaN。
+
+另外加一条通用的守护测试：素材库里每一种家具都能导出 DXF，被 `dxf-parser` 回读后没有 NaN，所用图层都在 `DXF_LAYER_STYLES` 中登记，所有 TEXT 的旋转角都不落在 (90°, 270°]。
+
+## 五、联动（不需要额外改动，只需验证）
 - 画布、缩略图、SVG/PDF/DXF 导出都通过 `StairPlan` 或 `furnitureDrawing` 取图样，会自动带上方向和宽度。
-- DXF 图块签名里已经包含整个 `f.stair` 对象，所以方向不同的楼梯会生成不同的块。
+- SVG 和 PDF 会多出一个“楼梯”图层，PDF 的 OCG 数相应加 1。
 
 ## Implementation checklist
 - [ ] `types.ts`：`StairSpec` 增加 `flightWidths?`、`reverse?`、`hand?`
@@ -60,6 +80,10 @@ export interface StairSpec {
 - [ ] `stairs.ts`：L 型、U 型、三跑按每跑宽度计算几何和平台，宽度会被夹取
 - [ ] `stairs.ts`：新增 `flightMarks`；`reverse` 反转 walk、箭头、起步点、“上”字、折断线；`hand: 'left'` 对 L/U/三跑做 x 取负
 - [ ] `StairEditor.tsx`：`MeterField`、每跑宽度栏、行走方向和转向两个 `EditorSelect`
+- [ ] 新增 `STAIRS` 图层：`drawingDocument.ts`、`drawingStyle.ts`（两张样式表）、`furnitureDrawing.ts` 的图层选择；楼梯块名 `STAIR_*`
+- [ ] 文字可读方向：新增 `readableRotation`，在 `transformEntity` 和 `furnitureDrawing` 的文字分支中应用
+- [ ] 块内不放文字：`createDrawingDocument` 注册块时滤掉文字；`dxfExport` 对文字不按 inserted group 跳过
+- [ ] `CodeGuideline.md` 新增“导出规范（CAD / DXF）”一节
 
 ## Verification checklist
 - [ ] 正向：直跑 `reverse: true` 时，起步圆点 y < 0（在上端），箭头终点 y > 0；踏步线数量不变
@@ -70,4 +94,9 @@ export interface StairSpec {
 - [ ] 默认：没有新字段的楼梯渲染结果与当前一致（现有 stairs 测试保持通过）
 - [ ] 负向：`flightWidths` 长度不对、某项为 100、`hand: 'up'`、`reverse: 'yes'`，`validateDesign` 都会拒绝
 - [ ] 边界：外框 1000×1000，每跑宽 3000，L/U/三跑都不出现 NaN 或负尺寸
+- [ ] DXF：旋转 180° 的楼梯导出后，“上”是模型空间的 TEXT，图层为 STAIRS，旋转角不落在 (90°, 270°]；对应块内没有 TEXT；INSERT 的块名以 `STAIR_` 开头
+- [ ] DXF：左转楼梯的 INSERT 没有负的 X 比例（组码 41 缺省或为正）；左转和右转生成不同的块
+- [ ] DXF：STAIRS 图层的 ACI、线宽、线型与样式表一致
+- [ ] 守护测试：素材库全部家具导出 DXF 后都能回读，没有 NaN，图层都已登记，所有 TEXT 的旋转角都不落在 (90°, 270°]
+- [ ] PDF：OCG 数等于 `DRAWING_LAYERS` 的长度（现在是 8）
 - [ ] 构建：`pnpm test` 全绿，`pnpm run build` 通过，改动文件的 eslint 无错误
