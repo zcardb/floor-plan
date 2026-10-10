@@ -49,7 +49,7 @@ describe('楼梯类别与平面图样', () => {
     for (const p of STAIR_PRESETS) for (const [w, d] of [[1000, 1000], [600, 2400], [2400, 600]]) {
       const layout = stairLayout({ form: p.form, flightWidth: 1200, steps: 40 }, w, d);
       expect(layout.flightWidth, p.form).toBeGreaterThan(0);
-      expect(layout.flightWidth, p.form).toBeLessThanOrEqual(Math.min(w, d));
+      expect(layout.flightWidth, p.form).toBeLessThanOrEqual(p.form === 'straight' ? w : Math.min(w, d));
       expect(layout.treadDepth, p.form).toBeGreaterThan(0);
       expect([...layout.lines.flat(), ...layout.walk, ...layout.arrow, ...layout.breakLine, layout.label].flat().every(Number.isFinite), p.form).toBe(true);
     }

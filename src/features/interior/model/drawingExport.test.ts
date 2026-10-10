@@ -9,6 +9,7 @@ import { library } from '../data/catalog';
 import { createDrawingDocument, createExportDocument } from './drawingDocument';
 import { serializeDrawing, drawingFile, projectJsonFile, serializeProjectJson } from './drawingExport';
 import { DXF_SAVED_BY, DXF_TEXT_STYLE, serializeDxf } from './dxfExport';
+import { DXF_LAYER_STYLES } from './drawingStyle';
 import { serializePdf } from './pdfExport';
 import { drawingScale, drawingSheet } from './drawingScale';
 import { DWG_ERROR, FOREIGN_SVG_ERROR, parseDesignFile } from './designImport';
@@ -99,7 +100,8 @@ describe('工程交换图',()=>{
       expect(dim.dimensionType & 32).toBe(32);
       expect(Math.hypot(dim.linearOrAngularPoint2.x-dim.linearOrAngularPoint1.x,dim.linearOrAngularPoint2.y-dim.linearOrAngularPoint1.y)).toBeCloseTo(dim.actualMeasurement);
     }
-    expect(parsed.entities.some(e=>e.type==='ARC')).toBe(true);
+    // 门的开启弧线在门图块内，模型空间只有 INSERT。
+    expect(Object.values(parsed.blocks).some(b=>b.entities?.some(e=>e.type==='ARC'))).toBe(true);
     expect(parsed.entities.some(e=>e.type==='TEXT' && 'text' in e && e.text==='客厅 & <书房>')).toBe(true);
     expect(text).toContain('STUDIO_METERS');expect(text).not.toContain('NaN');
     const manual=dimensions.find(e=>e.layer==='DIMENSIONS');expect(manual).toBeDefined();
@@ -174,6 +176,29 @@ describe('工程交换图',()=>{
     await expect(parseDesignFile(file('a.json','{"version":2}'))).rejects.toThrow();
     await expect(parseDesignFile(file('big.json','{}',6*1024*1024))).rejects.toThrow('5 MB');
     await expect(parseDesignFile(file('a.png','x'))).rejects.toThrow();
+  });
+  it('CAD 规范：图层颜色 / 线宽 / 线型，拆除墙虚线，墙体实心填充，圆形写成 CIRCLE，家具门窗写成图块',()=>{
+    const d=fixture();
+    d.furniture.push({id:'table',type:'roundtable',name:'圆桌',cx:1500,cy:1500,w:1000,d:1000,rot:0,color:'#e2cfb4'},
+      {id:'sofa2',type:'sofa',name:'沙发',cx:4500,cy:3000,w:1800,d:800,rot:90,color:'#a08060'});
+    const document=createExportDocument(d),text=serializeDxf(document);
+    const parsed=new DxfParser().parseSync(text)!;
+    for(const [name,style] of Object.entries(DXF_LAYER_STYLES)){
+      const layer=dxfRecord(text,'LAYER',name);
+      expect(layer?.get('62'),name).toBe(String(style.color));
+      expect(layer?.get('370'),name).toBe(String(style.lineweight));
+      expect(layer?.get('6')?.toUpperCase(),name).toBe(style.lineType);
+    }
+    expect(dxfRecord(text,'LTYPE','DASHED')).toBeDefined();
+    const walls=document.entities.filter(e=>e.layer==='WALLS'&&e.kind==='polyline'&&e.closed);
+    expect(dxfTags(text).filter(([c,v])=>c==='0'&&v==='HATCH')).toHaveLength(walls.length);
+    const inserts=parsed.entities.filter(e=>e.type==='INSERT');
+    expect(inserts).toHaveLength(d.furniture.length+d.openings.length);
+    expect(new Set(inserts.filter(e=>e.layer==='FURNITURE').map(e=>'name' in e?e.name:''))).toEqual(new Set(['FURN_sofa_1800x800','FURN_roundtable_1000x1000']));
+    expect(parsed.blocks['FURN_roundtable_1000x1000']?.entities?.some(e=>e.type==='CIRCLE')).toBe(true);
+    expect(parsed.entities.some(e=>e.layer==='FURNITURE'&&e.type!=='INSERT')).toBe(false);
+    expect(serializeDrawing(d,'svg')).toMatch(/<circle cx="1500" cy="1500" r="500"\/>/);
+    expect(handseedValid(text)).toBe(true);expect(text).not.toContain('NaN');
   });
   it('所有当前家具几何均可矢量导出，含楼梯踏步、植物变换和多子路径',()=>{
     for(const item of library){const geometry=furnitureDrawing({...item,id:'item',cx:100,cy:-100,rot:35});
