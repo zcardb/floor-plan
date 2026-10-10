@@ -1,11 +1,11 @@
 import { isFloorKey, validCustomFloor } from "./floorMaterials";
 import { purgeDemolished } from './wallRemoval';
-import { stripStrayHoleRooms } from './roomHoles';
 import { validFurnitureType, validFurnitureOutline } from './furnitureAppearance';
 import { validModel3d } from './furniture3d';
 import { validStairSpec } from './stairs';
 import { referenceDesign } from "../data/templates";
 import { length } from "./geometry";
+import { migrateSeparators } from "./separators";
 import { validateProcurement } from "./materialProcurement";
 import { normalizeFurniture, validPrice } from "./costs";
 import { isOpeningKind, isSurfaceKey, isWallKey, ROOF_SLOPE_MAX, validCustomOpening, validCustomWall } from "./hardMaterials";
@@ -99,6 +99,13 @@ export function validateDesign(value: unknown): Design {
       keys.add(item.key);
     }
   };
+  if (v.separators !== undefined) {
+    if (!Array.isArray(v.separators) || v.separators.length > 2000) fail();
+    for (const s of v.separators) {
+      id(s.id);
+      if (!point(s.a) || !point(s.b) || Math.hypot(s.b[0] - s.a[0], s.b[1] - s.a[1]) < 20) fail();
+    }
+  }
   customList(v.customWalls, validCustomWall);
   customList(v.customOpenings, validCustomOpening);
   customList(v.customRoofs, validCustomWall);
@@ -281,15 +288,12 @@ export function validateDesign(value: unknown): Design {
       }
     }
   }
-  return structuredClone({
+  // 旧项目没有分隔线：按旧房间轮廓补齐分隔线并重算房间（名称、材质沿用）。
+  return migrateSeparators(structuredClone({
     ...v,
-    // 房间轮廓里的墙垛碎洞（并房/切房残留的墙带）在加载时一并清掉。
-    rooms: stripStrayHoleRooms(
-      v.rooms.map((r) => normalizeRoomSurfaces(v, r)),
-      v.thickness,
-    ),
+    rooms: v.rooms.map((r) => normalizeRoomSurfaces(v, r)),
     furniture: v.furniture.map(normalizeFurniture),
-  });
+  }));
 }
 /** 屋面 / 吊顶为纯计价字段：未知材料清除，坡度截断到 0–60°。 */
 function normalizeRoomSurfaces(d: Design, r: Room): Room {

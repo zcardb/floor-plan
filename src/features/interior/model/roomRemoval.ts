@@ -1,7 +1,6 @@
-import { inRoom, length, rebuildRooms } from './geometry';
-import { openRoomIds } from './roomEnclosure';
+import { inRoom, length } from './geometry';
+import { deriveRooms } from './roomDerive';
 import { clearRoomFurniture } from './roomFurniture';
-import { stripStrayHoles } from './roomHoles';
 import { healSplitsAround } from './wallHeal';
 import { canDeleteWall } from './wallPolicy';
 import { splitWall } from './wallSplit';
@@ -92,7 +91,7 @@ export interface RoomRemoval {
   protectedWalls: number;
   /** 一并删除的家具件数。 */
   furniture: number;
-  /** 删除后与本房间原位置连通、不再被墙围住的相邻房间（保留，仅提示）。 */
+  /** 删除后与本房间原位置连通、不再被墙围住而一并消失的相邻房间名称。 */
   exposed: string[];
 }
 
@@ -115,13 +114,13 @@ export function removeRoom(design: Design, roomId: string): RoomRemoval {
     walls: cut.walls.filter(w => !ids.has(w.id)),
     openings: cut.openings.filter(o => !ids.has(o.wallId)),
   };
-  const wasOpen = openRoomIds(design), opened = openRoomIds(next);
-  if (!opened.has(roomId))
-    throw new Error('删除独立墙后这块区域仍被承重墙或共用墙围合，无法删除房间');
-  const exposed = design.rooms.filter(r => r.id !== roomId && opened.has(r.id) && !wasOpen.has(r.id)).map(r => r.name);
   for (const wall of pieces) next = healSplitsAround(next, wall);
-  next = rebuildRooms({ ...next, rooms: next.rooms.filter(r => r.id !== roomId) });
+  // 房间由「墙 + 分隔线」重算：这块区域仍被围住时，它会以原 id 重新出现。
+  next = deriveRooms(next, design.rooms);
+  if (next.rooms.some(r => r.id === roomId))
+    throw new Error('删除独立墙后这块区域仍被承重墙或共用墙围合，无法删除房间');
   if (!next.rooms.length) throw new Error('删除后将没有房间，无法删除这个房间');
-  next = stripStrayHoles(next);
+  const left = new Set(next.rooms.map(r => r.id));
+  const exposed = design.rooms.filter(r => r.id !== roomId && !left.has(r.id)).map(r => r.name);
   return { design: next, removedWalls: pieces.length, protectedWalls, furniture: design.furniture.length - next.furniture.length, exposed };
 }
