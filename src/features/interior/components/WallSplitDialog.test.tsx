@@ -108,7 +108,7 @@ describe('接触点分割', () => {
   it('交换 A/B 后勾选不变、距离按新 A 显示，提交仍为存储方向', () => {
     const h = harness(junctions(), 'host');
     h.click('接触点分割'); h.click('交换 A/B');
-    expect(h.render().some(n => n.props.children === `接触点 1 · 距 A 5.00 m` || (Array.isArray(n.props.children) && n.props.children.join('') === '接触点 1 · 距 A 5.00 m'))).toBe(true);
+    expect(h.render().some(n => n.props.children === '距 A 5.00 m')).toBe(true);
     expect(h.preview().intervals).toEqual([0, 1000, 2050, 2950, 4000, 6000]);
     h.click('应用分割');
     // Card 1 is next to the shown A (stored b), so it maps back to the last stored segment.
@@ -129,8 +129,14 @@ describe('接触点分割', () => {
     expect(h.byLabel('接触点 2').props['aria-pressed']).toBe(true);
     expect(h.preview().intervals).toEqual([0, 2550, 3450, 6000]);
   });
+  it('有接触点时默认接触点分割；没有时默认单点分割', () => {
+    expect(harness(junctions(), 'host').preview().intervals).toEqual([0, 1000, 2050, 2950, 4000, 6000]);
+    hooks.values = [];
+    expect(harness().preview().intervals).toEqual([0, 300, harness().L]);
+  });
   it('单点/两点模式的快捷标签写入点 1 或最近聚焦的输入框，跳过洞口内的接触点', () => {
     const h = harness(junctions(), 'host');
+    h.click('单点分割');
     expect(h.render().filter(n => n.props.className === 'wall-split-chip')).toHaveLength(4);
     h.click('填入接触点 2 距离');
     expect(h.value('wall-split-first')).toBe('2.05'); expect(h.preview().intervals).toEqual([0, 2050, 6000]);

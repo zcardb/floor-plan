@@ -15,10 +15,11 @@ import type { Design } from '../model/types';
 import { notify } from '@/lib/notify';
 
 type SplitMode = 1 | 2 | 'contact';
+/** 接触点分割放第一位并作为默认（默认效应）：大多数分割都是在相接墙处断开。 */
 const modes: { value: SplitMode; label: string }[] = [
+  { value: 'contact', label: '接触点分割' },
   { value: 1, label: '单点分割' },
   { value: 2, label: '两点分割' },
-  { value: 'contact', label: '接触点分割' },
 ];
 const kinds = { tee: 'T 形交接', cross: '十字穿过', opening: '门窗洞口' } as const;
 const StepTitle = ({ no, children }: { no: number; children: React.ReactNode }) =>
@@ -29,13 +30,14 @@ export function WallSplitDialog({ design, wallId, onApply, onClose }: {
 }) {
   const wall = design.walls.find(w => w.id === wallId)!;
   const L = length(wall);
-  const [mode, setMode] = useState<SplitMode>(1);
+  const contacts = useMemo(() => wallContacts(design, wallId), [design, wallId]);
+  const usable = contacts.filter(c => !c.blocked);
+  // 有可用接触点时默认按接触点分割；没有时退回单点分割。
+  const [mode, setMode] = useState<SplitMode>(() => usable.length ? 'contact' : 1);
   const [reversed, setReversed] = useState(false);
   const [first, setFirst] = useState(meterDraft(Math.min(300, L / 2)));
   const [second, setSecond] = useState(meterDraft(Math.min(800, L * 0.75)));
   const [focus, setFocus] = useState<'first' | 'second'>('first');
-  const contacts = useMemo(() => wallContacts(design, wallId), [design, wallId]);
-  const usable = contacts.filter(c => !c.blocked);
   // Picked junctions are held by offset, so a re-cut wall keeps the selection the user sees.
   const [picked, setPicked] = useState<number[]>(() => usable.map(c => c.offset));
   const [selected, setSelected] = useState(0);
@@ -81,8 +83,8 @@ export function WallSplitDialog({ design, wallId, onApply, onClose }: {
       <DialogHeader><DialogTitle>分割墙段</DialogTitle><DialogDescription>分割后各段可单独编辑；墙体位置和总长不变。</DialogDescription></DialogHeader>
       <div className="wall-split-modebar">
         <div className="wall-split-segmented" role="group" aria-label="分割模式">
-          {modes.map(({ value, label }) => <button key={label} type="button" aria-pressed={mode === value} className={mode === value ? 'is-active' : ''}
-            onClick={() => { setMode(value); setSelected(0); setError(''); }}>{label}</button>)}
+          {modes.map(({ value, label }) => <button key={label} type="button" aria-label={label} aria-pressed={mode === value} className={mode === value ? 'is-active' : ''}
+            onClick={() => { setMode(value); setSelected(0); setError(''); }}>{label}{value === 'contact' && usable.length > 0 && <em className="wall-split-badge">推荐</em>}</button>)}
         </div>
         <span className="wall-split-count">{wallDisplayName(design, wall)} · 全长 {formatMeters(L)} m</span>
       </div>
@@ -108,8 +110,8 @@ export function WallSplitDialog({ design, wallId, onApply, onClose }: {
                 {contacts.map((contact, i) => <button key={contact.offset} type="button" disabled={contact.blocked}
                   aria-label={`接触点 ${i + 1}${contact.blocked ? '（位于门窗洞口内）' : ''}`} aria-pressed={picked.includes(contact.offset)}
                   className={picked.includes(contact.offset) ? 'wall-split-contact is-active' : 'wall-split-contact'} onClick={() => toggle(contact.offset)}>
-                  <i className="wall-split-check" aria-hidden="true">{picked.includes(contact.offset) && <Check size={11} strokeWidth={3} />}</i>
-                  <span>接触点 {i + 1} · 距 A {formatMeters(contactDistances(L, [contact.offset], reversed)[0]!)} m</span>
+                  <i className="wall-split-check" aria-hidden="true">{picked.includes(contact.offset) && <Check size={12} strokeWidth={3} />}</i>
+                  <span className="wall-split-contact-title"><b>接触点 {i + 1}</b><em className="wall-split-contact-dist">{`距 A ${formatMeters(contactDistances(L, [contact.offset], reversed)[0]!)} m`}</em></span>
                   <small>{contact.blocked ? '位于门窗洞口内，不能作为分割点' : contact.opening
                     ? `${contact.opening.kind === 'door' ? '门' : '窗'}洞口${edgeLabel(contact)}边缘`
                     : <><span>{kinds[contact.kind]}</span> · {contact.wallIds.map(id => { const w = design.walls.find(x => x.id === id); return w ? wallDisplayName(design, w) : '相接墙'; }).join('、')}</>}</small>
@@ -124,17 +126,22 @@ export function WallSplitDialog({ design, wallId, onApply, onClose }: {
               {mode === 2 && <div><Label htmlFor="wall-split-second">点 2</Label><Input id="wall-split-second" inputMode="decimal" value={second} aria-invalid={showValidation} aria-describedby={describedBy}
                 onChange={edit(setSecond)} onFocus={() => setFocus('second')} onBlur={() => setTouched(true)} /></div>}
             </div>
-            {usable.length > 0 && <div className="wall-split-chips" role="group" aria-label="接触点快捷填入">
-              {usable.map((contact, i) => <button key={contact.offset} type="button" className="wall-split-chip" aria-label={`填入接触点 ${i + 1} 距离`}
-                onClick={() => setDistance(contact.offset)}>接触点 {i + 1} · {formatMeters(contactDistances(L, [contact.offset], reversed)[0]!)} m</button>)}
+            {usable.length > 0 && <div className="wall-split-quick">
+              <span className="wall-split-quick-label">一键填入接触点</span>
+              <div className="wall-split-chips" role="group" aria-label="接触点快捷填入">
+                {usable.map((contact, i) => <button key={contact.offset} type="button" className="wall-split-chip" aria-label={`填入接触点 ${i + 1} 距离`}
+                  onClick={() => setDistance(contact.offset)}>接触点 {i + 1}<b>{formatMeters(contactDistances(L, [contact.offset], reversed)[0]!)} m</b></button>)}
+              </div>
             </div>}
             {showValidation ? <p id="wall-split-error" role="alert" className="wall-split-error">{draft.error}</p>
               : <p id="wall-split-hint" className="wall-split-hint">{draft.error ? '输入有效距离后显示结果' : '每段至少 0.05 m，不能落在门窗洞口内'}</p>}
           </div>}
-          <div className="wall-split-step"><StepTitle no={2}>应用后选中哪一段</StepTitle>
+          {/* 次要设置：应用后默认选中哪一段，弱化展示，不和第 1 步抢注意力。 */}
+          <div className="wall-split-step is-secondary"><span className="wall-split-substep">应用后选中</span>
             {count > 0 ? <div className="wall-split-results">{shown.map((segment, i) => <button key={i} type="button" aria-label={`选中第 ${i + 1} 段`} aria-pressed={selected === i}
+              title={i === 0 ? '靠近 A' : i === count - 1 ? '靠近 B' : '中间段'}
               className={selected === i ? 'wall-split-result is-active' : 'wall-split-result'} onClick={() => setSelected(i)}>
-              <span>第 {i + 1} 段</span><b>{formatMeters(segment)} m</b><small>{i === 0 ? '靠近 A' : i === count - 1 ? '靠近 B' : '中间段'}</small>
+              <span>第 {i + 1} 段</span><b>{formatMeters(segment)} m</b>
             </button>)}</div> : <p className="wall-split-hint">距离有效后可选择墙段</p>}
           </div>
           <p className="wall-split-note">{inherit}</p>
