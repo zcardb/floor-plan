@@ -103,7 +103,6 @@ import { AiRoomDialog } from "./AiRoomDialog";
 import { library } from "../data/catalog";
 import { Library } from "./Library";
 import { WallToolMenu } from './WallToolMenu';
-import { RoomList } from "./RoomList";
 import { PropertyPanel } from "./PropertyPanel";
 import { CostPanel } from "./CostPanel";
 import { PanelModeTabs } from "./PanelModeTabs";
@@ -195,7 +194,6 @@ export function Workbench(p: Props) {
   /** 框选开关：开启时 2D 画布左键拖动空白处为框选家具，关闭时为平移。 */
   const [marquee, setMarquee] = useState(false);
   const [Scene, setScene] = useState<SceneComponent | null>(null),
-    [roomFocus, setRoomFocus] = useState<string | null>(null),
     [hideLib, setHideLib] = useState(false),
     [hidePanel, setHidePanel] = useState(false),
     [drawer, setDrawer] = useState<"lib" | "panel" | null>(null),
@@ -386,15 +384,6 @@ export function Workbench(p: Props) {
     } catch {
       if (mounted.current) lifecycle.fail("module");
     }
-  };
-  const focusRoom = (id: string) => {
-    setRoomFocus(id);
-    if (view === "2d") {
-      if (id === "all") canvas.current?.fit();
-      else select({ kind: "room", id });
-    } else if (id === "all" && sceneOptions.mode === "walk")
-      setSceneOptions((o) => ({ ...o, mode: "orbit" }));
-    else scene.current?.flyTo(id);
   };
   const add = useCallback(
     (it: LibraryItem, point?: Point) => {
@@ -1042,13 +1031,6 @@ export function Workbench(p: Props) {
           customItems={[...projectCatalog, ...accountFurniture]}
           onNew={p.loggedIn && !readOnly ? () => setCustomOpen(true) : undefined}
           readOnly={readOnly}
-          rooms={
-            <RoomList
-              rooms={d.rooms}
-              active={selection?.kind === "room" ? selection.id : roomFocus}
-              onPick={focusRoom}
-            />
-          }
         />
       </aside>
       <main className="stage" ref={stage}>
