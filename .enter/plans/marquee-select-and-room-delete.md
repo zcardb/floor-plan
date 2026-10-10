@@ -13,6 +13,7 @@
    关闭时左键拖动仍是平移画布（不占用现有平移手势）。选中后拖动其中任意一件，整批家具一起移动，相对位置不变。
 2. **房间的两个删除操作**：清空房间家具（Delete / Backspace，保持现状）+ 删除房间（下拉菜单新增），
    删除房间 = 清除房内家具 + 删除该房间独立墙及墙上门窗（承重墙与共用墙保留并提示）。
+3. **顶部工具栏顺序调整**：「撤销 / 重做」挪到「重置方案 / 清空」的右边。
 
 ## 现状（关键代码位置）
 
@@ -121,6 +122,15 @@ export type Selection = { kind: "furniture" | "room" | "wall" | "opening"; id: s
     执行前用 `useConfirm` 二次确认（与 `clearSplits` 等危险操作一致）。
 - `Workbench` 把 `removeRoom` 透传给 `SelectionEditor`（只在 2D 选择模式可用）。
 
+### 5. 工具栏顺序（撤销 / 重做 移到 重置方案 / 清空 右侧）
+
+- `Workbench.tsx` 工具栏（~L853–896）当前顺序：`选择/绘墙/门/窗` | `撤销 重做` | `重置方案 清空▾`。
+- 调整为：`选择/框选/绘墙/门/窗` | `重置方案 清空▾`（`tool-group danger-actions`）| `撤销 重做`（`tool-group`），
+  只移动两个 JSX 块与中间的 `toolbar-divider`，按钮本身、快捷键、禁用逻辑不变。
+- 窄屏（≤600px）`danger-actions` 本就隐藏：调整后保证不出现两条相邻分隔线
+  （给 `danger-actions` 前的分隔线也加同样的隐藏规则，或把分隔线放进 `danger-actions` 组内）。
+- `Workbench.test.tsx` 中按 `className === 'tool-group danger-actions'` 查找的测试不受顺序影响，保持通过。
+
 ## 需要修改 / 新增的文件
 
 - 新增：`src/features/interior/model/rectSelect.ts`(+`.test.ts`)、`model/furnitureGroup.ts`(+`.test.ts`)、
@@ -146,6 +156,7 @@ export type Selection = { kind: "furniture" | "room" | "wall" | "opening"; id: s
 - [ ] `roomRemoval.removeRoom` 逐面复用 `removeWall` 的愈合 / 并房 / 清理流水线，并清除房内家具
 - [ ] `removeRoom` 在房间仍被围合（共用墙 / 承重墙）时抛错，不产生半拆状态（提交前完成全部校验）
 - [ ] `SelectionEditor` 房间工具条改为下拉：「清空房间家具（Delete）」+ 二次确认的「删除房间」，`Workbench` 透传 `removeRoom`
+- [ ] `Workbench` 工具栏把「撤销 / 重做」组移到「重置方案 / 清空」组右侧，窄屏下不出现重复分隔线
 
 ## Verification checklist
 
@@ -161,5 +172,6 @@ export type Selection = { kind: "furniture" | "room" | "wall" | "opening"; id: s
   - 单选家具的移动 / 吸附 / 靠墙阻挡行为与改动前一致；
   - 参考户型与空白户型各删一个房间：独立墙与墙上门窗消失、共用墙保留、相邻房间仍在、房内家具被清空、
     顶栏提示数量正确、Ctrl+Z 可撤销；对「四周都是共用墙」的房间给出明确失败提示而不是拆一半；
-  - 选中房间时下拉可见两项，Delete 仍只清空家具、不改动墙体。
+  - 选中房间时下拉可见两项，Delete 仍只清空家具、不改动墙体；
+  - 顶部工具栏顺序为 选择 / 框选 / 绘墙 / 门 / 窗 | 重置方案 / 清空 | 撤销 / 重做，撤销重做的禁用状态与 Ctrl+Z 正常。
 - [ ] 移动端宽度（≤1100）下「框选」按钮可见可点，开关开启时单指拖动为圈选、关闭时为平移，双指缩放始终可用
