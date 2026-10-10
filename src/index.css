@@ -947,6 +947,17 @@
   .tool-wall {
     cursor: crosshair;
   }
+  /* 框选模式：画布十字光标，拖动的选框用主色半透明 + 虚线。 */
+  .plan-canvas.marquee-on {
+    cursor: crosshair;
+  }
+  .plan-canvas.marquee-on .plan-furn {
+    cursor: move;
+  }
+  .plan-marquee {
+    fill: hsl(var(--primary) / 0.12);
+    stroke: hsl(var(--primary));
+  }
   .plan-room-name {
     fill: hsl(var(--foreground));
     stroke: hsl(var(--card));

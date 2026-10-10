@@ -10,6 +10,7 @@ import type { Design,Selection } from '../model/types';
 import type { SizeTransaction } from '../model/sizeTransaction';
 import { placementGaps, wallPlacement } from '../model/wallPlacement';
 import { WallPlacementDiagram } from './WallPlacementDiagram';
+import { openingHeight } from '../model/hardMaterials';
 /** 门窗与贴墙家具的位置改为「到所在墙段两端的净距」（gapA 为左 / 上端，gapB 为右 / 下端）。 */
 function gapFields(d:Design,s:Selection):[string,string,number][] {
   const p=wallPlacement(d,s);if(!p)return [];
@@ -19,7 +20,7 @@ function gapFields(d:Design,s:Selection):[string,string,number][] {
 function sizeFields(d:Design,s:Selection):[string,string,number][] {
   if(s?.kind==='furniture'){const f=d.furniture.find(f=>f.id===s.id);if(!f)return [];const gaps=gapFields(d,s);return [['w','宽度 / m',f.w],['d',f.type==='stairs'?'长度 / m':'深度 / m',f.d],...(gaps.length?gaps:[['cx','中心 X / m',f.cx],['cy','中心 Y / m',f.cy]] as [string,string,number][])];}
   if(s?.kind==='wall'){const w=d.walls.find(w=>w.id===s.id);return w?[['length','长度 / m',length(w)],['thickness','墙厚 / m',w.thickness]]:[];}
-  if(s?.kind==='opening'){const o=d.openings.find(o=>o.id===s.id);return o?[...gapFields(d,s),['width','宽度 / m',o.width],['height','高度 / m',o.height??(o.kind==='door'?2100:1600)],...(o.kind==='window'?[['sill','窗台高 / m',o.sill??800] as [string,string,number]]:[])]:[];}
+  if(s?.kind==='opening'){const o=d.openings.find(o=>o.id===s.id);return o?[...gapFields(d,s),['width','宽度 / m',o.width],['height','高度 / m',openingHeight(o)],...(o.kind==='window'?[['sill','窗台高 / m',o.sill??800] as [string,string,number]]:[])]:[];}
   return [];
 }
 export function SizeFields({design,selection,transaction,close}:{design:Design;selection:Selection;transaction:SizeTransaction;close?:()=>void}){

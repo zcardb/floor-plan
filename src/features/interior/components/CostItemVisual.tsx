@@ -1,9 +1,11 @@
-import { DoorOpen, Grid2X2, Home, Layers, PanelTop, Paintbrush, Wallpaper, PanelsTopLeft } from 'lucide-react';
+import { Grid2X2, Home, Layers, PanelTop, Paintbrush, Wallpaper } from 'lucide-react';
 import type { CostEntry } from '../model/accountCostEntries';
+import { isOpeningKind } from '../model/hardMaterials';
+import { openingIcon } from './openingIcon';
 import { FurnitureShape } from './FurnitureShape';
 import { FloorSwatch } from './FloorSwatch';
 function iconOf(entry: CostEntry) {
-  if (entry.group === 'openingPrices') return (entry.opening?.kind ?? entry.key) === 'door' ? DoorOpen : PanelsTopLeft;
+  if (entry.group === 'openingPrices') { const kind = entry.opening?.kind ?? entry.key; return openingIcon(isOpeningKind(kind) ? kind : 'window'); }
   if (entry.group === 'floorPrices') return entry.key === 'wood' ? Layers : Grid2X2;
   if (entry.group === 'roofPrices') return Home;
   if (entry.group === 'ceilingPrices') return PanelTop;

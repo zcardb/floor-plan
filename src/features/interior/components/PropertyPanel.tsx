@@ -10,7 +10,6 @@ import {
   ArrowDownToLine,
   BrickWall,
   Copy,
-  DoorOpen,
   Trash2,
   ChevronRight,
   LayoutGrid,
@@ -32,7 +31,8 @@ import { DragStepSettings } from './DragStepSettings';
 import type { SizeTransaction } from '../model/sizeTransaction';
 import { BLANK_FRAME_CHANGED, area, bbox, blankFrameIntact, inRoom, length, perim, resizeBlank } from "../model/geometry";
 import type { CustomFloor, CustomOpening, CustomWall, Design, Selection } from "../model/types";
-import { openingName, openingPriceKey } from "../model/hardMaterials";
+import { openingHeight, openingKindLabel, openingName, openingPriceKey } from "../model/hardMaterials";
+import { openingIcon } from "./openingIcon";
 import { OpeningVariantSelect } from "./OpeningVariantSelect";
 import { RoomSurfacePanel } from "./RoomSurfacePanel";
 import { RoomSidesDiagram } from "./RoomSidesDiagram";
@@ -446,7 +446,8 @@ export function PropertyPanel({
   }
   if (o) {
     const name = openingName(design, o);
-    const kindName = o.kind === "door" ? "门" : "窗";
+    const kindName = openingKindLabel(o.kind);
+    const KindIcon = openingIcon(o.kind);
     return (
       <>
         <div className="panel-heading">
@@ -457,12 +458,12 @@ export function PropertyPanel({
           {back}
           <div className="object-title">
             <span className="object-symbol">
-              <DoorOpen size={22} />
+              <KindIcon size={22} />
             </span>
             <div>
               <h3>{name}</h3>
               <small>
-                宽 {formatMeters(o.width)} m · 高 {formatMeters(o.height ?? (o.kind === "door" ? 2100 : 1600))} m
+                宽 {formatMeters(o.width)} m · 高 {formatMeters(openingHeight(o))} m
               </small>
             </div>
           </div>
@@ -476,7 +477,7 @@ export function PropertyPanel({
         </section>
         {priceSection("openingPrices", openingPriceKey(o), name, "m²")}
         <section>
-          <EditorTooltip label={`删除这${o.kind === "door" ? "扇门" : "扇窗"}，可撤销`}>
+          <EditorTooltip label={`删除这${o.kind === "door" ? "扇门" : o.kind === "window" ? "扇窗" : "个垭口"}，可撤销`}>
             <Button variant="outline" size="sm" onClick={remove}>
               <Trash2 />
               删除{kindName}

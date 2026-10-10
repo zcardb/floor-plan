@@ -1,0 +1,2 @@
+ALTER TABLE public.interior_opening_catalog DROP CONSTRAINT interior_opening_catalog_kind_check;
+ALTER TABLE public.interior_opening_catalog ADD CONSTRAINT interior_opening_catalog_kind_check CHECK (kind IN ('door','window','passage'));

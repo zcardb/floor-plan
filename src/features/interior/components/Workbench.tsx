@@ -48,6 +48,7 @@ import {
   RotateCcw,
   RotateCw,
   Ruler,
+  RectangleVertical,
   ScanLine,
   Settings2,
   ShieldCheck,
@@ -76,6 +77,7 @@ import { useDesign } from "../model/useDesign";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { center, norm, pushOut } from "../model/geometry";
 import {
+  isOpeningTool,
   uid,
   type CustomFloor,
   type CustomOpening,
@@ -89,6 +91,7 @@ import {
   type Tool,
 } from "../model/types";
 import { blankDesign, designForTemplate, presetById, isAiDesign } from "../data/templates";
+import { openingKindLabel } from "../model/hardMaterials";
 import { useRoomAi } from "../ai/useRoomAi";
 import { useAiCatalog } from "../ai/useAiCatalog";
 import { AiRoomDialog } from "./AiRoomDialog";
@@ -494,11 +497,47 @@ export function Workbench(p: Props) {
     else if (s.kind === "opening") {
       const opening = d.openings.find(o => o.id === s.id);
       change((d) => ({ ...d, openings: d.openings.filter((o) => o.id !== s.id) }));
-      if (opening) notify.success(`已删除${opening.kind === "door" ? "门" : "窗"}，可撤销恢复`);
+      if (opening) notify.success(`已删除${openingKindLabel(opening.kind)}，可撤销恢复`);
     }
     else if (s.kind === "wall") return removeWall(s.id);
+    else if (s.kind === "group") {
+      const ids = groupIds(d, s), count = ids.length;
+      if (!count) return setSelection(null);
+      change((d) => removeGroup(d, ids));
+      notify.success(`已删除选中的 ${count} 件家具，可撤销恢复`);
+    }
     setSelection(null);
   }, [d, selection, change, commit, designRef, removeWall]);
+  const removeRoom = useCallback(
+    async (roomId: string) => {
+      if (readOnly) return;
+      const before = designRef.current;
+      const room = before.rooms.find(r => r.id === roomId);
+      if (!room) return notify.fail("房间不存在，请重新选择");
+      const ok = await confirm({
+        title: `删除「${room.name}」？`,
+        description: "将删除这个房间、房内家具，以及只属于这个房间的墙（含墙上门窗）；与相邻房间共用的墙和承重墙保留。可撤销恢复。",
+        confirmText: "删除房间",
+        tone: "destructive",
+      });
+      if (!ok) return;
+      let result: RoomRemoval;
+      try {
+        result = removeRoomModel(before, roomId);
+      } catch (cause) {
+        return notify.fail(cause instanceof Error ? cause.message : "无法删除这个房间");
+      }
+      if (model.current.current !== before) return notify.fail("设计已变化，请重新选择房间");
+      commit(result.design, before);
+      setSelection(null);
+      const parts = [`已删除「${room.name}」及 ${result.removedWalls} 面独立墙`];
+      if (result.protectedWalls) parts.push(`${result.protectedWalls} 面承重墙保留`);
+      if (result.furniture) parts.push(`清理 ${result.furniture} 件家具`);
+      if (result.exposed.length) parts.push(`${result.exposed.join("、")} 现在与本区域连成一片`);
+      notify.success(parts.join("，") + "，可撤销恢复");
+    },
+    [readOnly, confirm, commit, designRef, model.current],
+  );
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (readOnly && !['t', 'f', 'escape'].includes(e.key.toLowerCase())) return;
@@ -532,24 +571,15 @@ export function Workbench(p: Props) {
         if (view === "2d") canvas.current?.fit();
         else scene.current?.iso();
       } else if (k === "v") setTool("select");
-      else if (k.startsWith("arrow") && selection?.kind === "furniture") {
+      else if (k === "m" && view === "2d") setMarquee(v => !v);
+      else if (k.startsWith("arrow") && (selection?.kind === "furniture" || selection?.kind === "group")) {
         e.preventDefault();
         const st = e.shiftKey ? 100 : 10;
-        change((d) => ({
-          ...d,
-          furniture: d.furniture.map((f) =>
-            f.id === selection.id
-              ? {
-                  ...f,
-                  cx:
-                    f.cx +
-                    (k === "arrowright" ? st : k === "arrowleft" ? -st : 0),
-                  cy:
-                    f.cy + (k === "arrowdown" ? st : k === "arrowup" ? -st : 0),
-                }
-              : f,
-          ),
-        }));
+        const ids = selection.kind === "furniture" ? [selection.id] : selection.ids;
+        change((d) => moveGroup(d, ids, [
+          k === "arrowright" ? st : k === "arrowleft" ? -st : 0,
+          k === "arrowdown" ? st : k === "arrowup" ? -st : 0,
+        ]));
       }
     };
     window.addEventListener("keydown", key);
@@ -682,8 +712,8 @@ export function Workbench(p: Props) {
   const tip =
     tool === "wall"
       ? "点击起点与转角连续绘墙 · 可拖动起段 · 双击 / 右键 / Enter 完成 · Esc 取消草稿"
-      : tool === "door" || tool === "window"
-        ? "点击墙体放置门窗，选中后可沿墙拖动或使用可视编辑工具条调整"
+      : isOpeningTool(tool)
+        ? "点击墙体放置门窗或垭口，选中后可沿墙拖动或使用可视编辑工具条调整"
         : view === "3d"
           ? "拖动旋转 · 滚轮缩放 · 选中家具可移动 · 点击门开关"
           : "拖入家具，开始规划你的理想空间";
@@ -781,6 +811,9 @@ export function Workbench(p: Props) {
             </ToolButton>
             {structureTools && (
               <>
+                <ToolButton label="垭口" active={tool === "passage"} onClick={() => setTool("passage")}>
+                  <RectangleVertical size={16} />
+                </ToolButton>
                 <ToolButton label="门" active={tool === "door"} onClick={() => setTool("door")}>
                   <DoorOpen size={16} />
                 </ToolButton>

@@ -1,5 +1,5 @@
 import { notify } from '@/lib/notify';
-import { applyOpeningVariant, pickableOpenings } from '../model/hardMaterials';
+import { applyOpeningVariant, pickableOpenings, standardOpeningName } from '../model/hardMaterials';
 import type { CustomOpening, Design, Opening } from '../model/types';
 import { EditorSelect } from './EditorSelect';
 
@@ -12,7 +12,7 @@ export function OpeningVariantSelect({ design, opening, accountOpenings = [], ch
   const choices = pickableOpenings(design, accountOpenings, opening.kind);
   // 只有标准款时无可切换项，不显示款式选择。
   if (!choices.length && !opening.variant) return null;
-  const standard = opening.kind === 'door' ? '标准门' : '标准窗';
+  const standard = standardOpeningName(opening.kind);
   const select = (value: string) => {
     let kept = false;
     try {

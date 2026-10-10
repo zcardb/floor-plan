@@ -15,7 +15,7 @@ import { useFloorCatalog } from '../cloud/useFloorCatalog';
 import { useWallCatalog } from '../cloud/useWallCatalog';
 import { useCeilingCatalog, useRoofCatalog } from '../cloud/useSurfaceCatalogs';
 import { useOpeningCatalog } from '../cloud/useOpeningCatalog';
-import { HARD_CATEGORIES,OPENING_CATEGORY,surfaceCategory,surfaceKindOfCategory,type SurfaceKind } from '../model/hardMaterials';
+import { HARD_CATEGORIES,OPENING_CATEGORY,openingKindLabel,surfaceCategory,surfaceKindOfCategory,type SurfaceKind } from '../model/hardMaterials';
 import { CustomColorMaterialForm } from './CustomColorMaterialForm';
 import { CustomOpeningForm } from './CustomOpeningForm';
 import { AccountMaterialList } from './AccountMaterialList';
@@ -85,7 +85,7 @@ export function CustomFurnitureDialog({open,onOpenChange,loggedIn,login,onCreate
     {onCreateFloor&&floors.items.length>0&&<><p className="muted-note">{floors.items.length} 款 · 账号地面</p><div className="account-floor-list">{floors.items.map(f=><button key={f.key} type="button" onClick={()=>{if(!loggedIn)return;onCreateFloor(f);onOpenChange(false);}}><FloorSwatch material={customFloorMaterial(f)}/><span>{f.name}<small>{floorPatterns.find(p=>p.value===f.pattern)?.label} · {f.price===null?'未定价':`¥${f.price}/m²`}</small></span><Plus size={14}/></button>)}</div></>}
     {floors.error&&<p className="form-error">{floors.error}</p>}
     {(['wall','roof','ceiling'] as const).map(kind=>{const store=surfaceStores[kind],create=store.create;return create&&<AccountMaterialList key={kind} title={'账号'+surfaceCategory(kind)} items={store.catalog.items.map(w=>({key:w.key,name:w.name,color:w.color,meta:w.price===null?'未定价':`¥${w.price}/m²`,pick:()=>pickMaterial(()=>create(w))}))} error={store.catalog.error}/>;})}
-    {onCreateOpening&&<AccountMaterialList title="账号门窗" items={openings.items.map(o=>({key:o.key,name:o.name,kind:o.kind,meta:`${o.kind==='door'?'门':'窗'} · ${o.price===null?'未定价':`¥${o.price}/m²`}`,pick:()=>pickMaterial(()=>onCreateOpening(o))}))} error={openings.error}/>}
+    {onCreateOpening&&<AccountMaterialList title="账号门窗" items={openings.items.map(o=>({key:o.key,name:o.name,kind:o.kind,meta:`${openingKindLabel(o.kind)} · ${o.price===null?'未定价':`¥${o.price}/m²`}`,pick:()=>pickMaterial(()=>onCreateOpening(o))}))} error={openings.error}/>}
     <p className="muted-note">{catalog.count} 款 · 账号目录款式数</p>
     {catalog.error&&<LoadError title="账号家具读取失败" message={catalog.error} retrying={catalog.loading} onRetry={()=>void loadCatalog()}/>}
     <div className="account-furniture-list">{catalog.items.map(i=><button key={i.catalogId} onClick={()=>{if(!loggedIn)return;onImport(i);onOpenChange(false);}}>{i.imageUrl?<img src={i.imageUrl} crossOrigin="anonymous" alt={i.name}/>:<svg viewBox={`${-i.w/2-100} ${-i.d/2-100} ${i.w+200} ${i.d+200}`}><FurnitureShape f={i}/></svg>}<span>{i.name}<small>{i.category} · {i.price===null?'未定价':`¥${i.price}`}</small></span><Plus size={14}/></button>)}</div>

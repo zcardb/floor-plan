@@ -29,7 +29,9 @@ import {
 import { applyRoomFloor, floorMaterialOf, pickableFloors } from "../model/floorMaterials";
 import { WallOptionsMenu } from './WallOptionsMenu';
 import { BEARING_WALL_LOCKED, canDeleteWall, canResizeWall, wallKindName } from '../model/wallPolicy';
-import { length, bbox } from "../model/geometry";
+import { length, bbox, inRoom } from "../model/geometry";
+import { groupIds } from "../model/furnitureGroup";
+import { RoomDeleteMenu } from './RoomDeleteMenu';
 import { SizeFields } from './SizeFields';
 import { RoomSidesEditor } from './RoomSidesEditor';
 
@@ -42,7 +44,7 @@ import { placeEditor, type ScreenRect } from "../model/selectionAnchor";
 import { selectionCost } from "../model/costBreakdown";
 import { yuan } from "../model/money";
 import type { CustomFloor, CustomOpening, CustomWall, Design, Selection } from "../model/types";
-import { applyRoomWall, openingName, openingPriceKey, pickableWalls } from "../model/hardMaterials";
+import { applyRoomWall, openingHeight, openingName, openingPriceKey, pickableWalls } from "../model/hardMaterials";
 import { PriceField } from "./PriceField";
 import { ColorSwatches } from "./ColorSwatches";
 import { useCostDesign } from './CostDefaultsContext';
@@ -85,12 +87,16 @@ interface Props {
   mergeWall?: (wallId: string) => void;
   /** 删除墙体（与属性面板的「删除隔墙」共用同一实现）。 */
   removeWall?: (wallId: string) => void;
+  /** 删除房间（拆本房间独立墙）；不传时下拉里的「删除房间」不可用。 */
+  removeRoom?: (roomId: string) => void;
   /** 房间「AI 布局」入口；未登录或只读时不传，入口不显示。 */
   roomAi?: { tone: AiEntryTone; open: () => void };
 }
 export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
   function SelectionEditor(p, ref) {
     const costDesign = useCostDesign(p.design);
+    const sel = p.selection,
+      sid = sel && sel.kind !== "group" ? sel.id : null;
     const el = useRef<HTMLDivElement>(null),
       [open, setOpen] = useState<string | null>(null),
       latest = useRef(p),
@@ -150,24 +156,26 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
       observer.observe(node);
       observer.observe(stage);
       return () => observer.disconnect();
-    }, [p.stage, p.selection?.id]);
+    }, [p.stage, sid]);
     useEffect(() => positionRef.current(anchor.current), [p.hidden]);
     const f =
-        p.selection?.kind === "furniture"
-          ? p.design.furniture.find((f) => f.id === p.selection!.id)
+        sel?.kind === "furniture"
+          ? p.design.furniture.find((f) => f.id === sid)
           : null,
       w =
-        p.selection?.kind === "wall"
-          ? p.design.walls.find((w) => w.id === p.selection!.id)
+        sel?.kind === "wall"
+          ? p.design.walls.find((w) => w.id === sid)
           : null,
       r =
-        p.selection?.kind === "room"
-          ? p.design.rooms.find((r) => r.id === p.selection!.id)
+        sel?.kind === "room"
+          ? p.design.rooms.find((r) => r.id === sid)
           : null,
       o =
-        p.selection?.kind === "opening"
-          ? p.design.openings.find((o) => o.id === p.selection!.id)
-          : null;
+        sel?.kind === "opening"
+          ? p.design.openings.find((o) => o.id === sid)
+          : null,
+      group = groupIds(p.design, sel);
+    const roomFurniture = r ? p.design.furniture.filter(f => inRoom([f.cx, f.cy], r)).length : 0;
     const deletableWall = w && canDeleteWall(w);
     const resizableWall = w && canResizeWall(p.design, w);
     const fields = f
@@ -190,7 +198,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
               [
                 "height",
                 "高度 / m",
-                o.height ?? (o.kind === "door" ? 2100 : 1600),
+                openingHeight(o),
               ],
               ...(o.kind === "window"
                 ? [["sill", "窗台高 / m", o.sill ?? 800]]
@@ -251,7 +259,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         name: "墙体施工",
         unit: "m²",
       };
-    if (!f && !w && !r && !o) return null;
+    if (!f && !w && !r && !o && group.length < 2) return null;
     // 工具条直接显示选中对象的金额贡献：房间为本间合计，家具为单价，门窗/墙体为施工金额。
     const cost = p.showCosts ? selectionCost(costDesign, p.selection) : null,
       costLabel =
@@ -271,6 +279,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           <Button type="button" variant="ghost" size="icon" className="visual-editor-drag-handle" aria-label="拖动编辑工具条" {...editorDrag.handlers}><GripVertical size={15} /></Button>
         </EditorTooltip>
         <span className="visual-object-name">
+          {group.length > 1 && `已选中 ${group.length} 件家具`}
           {f?.name ||
             r?.name ||
             (w ? wallKindName(w) : o ? openingName(p.design, o) : "")}
@@ -310,7 +319,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
                   {BEARING_WALL_LOCKED}
                 </p>
               ) : (
-                <SizeFields key={p.selection?.id} design={p.design} selection={p.selection} transaction={p.transaction} close={()=>setOpen(null)}/>
+                <SizeFields key={sid ?? undefined} design={p.design} selection={p.selection} transaction={p.transaction} close={()=>setOpen(null)}/>
               )}
             </PopoverContent>
           </Popover>
@@ -448,21 +457,21 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </EditorTooltip>
           </>
         )}
-        {(f || o || r || deletableWall) && (
-          <EditorTooltip
-            label={r ? "清空房间家具" : "删除对象"}
-            shortcut="Delete"
-          >
-            <button type="button" aria-label={r ? "清空房间家具" : "删除对象"} onClick={p.remove}>
+        {(f || o || deletableWall || group.length > 1) && (
+          <EditorTooltip label={group.length > 1 ? "删除选中家具" : "删除对象"} shortcut="Delete">
+            <button type="button" aria-label={group.length > 1 ? "删除选中家具" : "删除对象"} onClick={p.remove}>
               <Trash2 size={15} />
             </button>
           </EditorTooltip>
         )}
-        <EditorTooltip label="详细属性">
-          <button type="button" aria-label="详细属性" onClick={p.details}>
-            <Settings2 size={15} />
-          </button>
-        </EditorTooltip>
+        {r && <RoomDeleteMenu furniture={roomFurniture} clear={p.remove} removeRoom={p.removeRoom ? () => p.removeRoom!(r.id) : undefined} />}
+        {group.length < 2 && (
+          <EditorTooltip label="详细属性">
+            <button type="button" aria-label="详细属性" onClick={p.details}>
+              <Settings2 size={15} />
+            </button>
+          </EditorTooltip>
+        )}
         <EditorTooltip label="取消选择" shortcut="Esc">
           <button type="button" aria-label="取消选择" onClick={p.close}>
             <X size={15} />

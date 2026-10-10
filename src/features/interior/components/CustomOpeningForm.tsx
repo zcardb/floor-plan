@@ -1,12 +1,13 @@
 import { useState, type ReactNode } from 'react';
-import { DoorOpen, PanelsTopLeft, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { uid, type CustomOpening } from '../model/types';
-import { defaultOpeningSize, openingKinds, validCustomOpening } from '../model/hardMaterials';
+import { defaultOpeningSize, openingKindLabel, openingKinds, validCustomOpening } from '../model/hardMaterials';
+import { openingIcon } from './openingIcon';
 import { formatMeters, parseMeterDraft } from '../model/lengthUnits';
 import { notify } from '@/lib/notify';
 import { parsePriceDraft, priceDraft, type MaterialFormEdit } from './materialFormEdit';
@@ -21,7 +22,9 @@ export function CustomOpeningForm({ categoryField, accountOnly, onCancel, onSave
   const [key] = useState(() => initial?.key ?? 'custom-' + uid());
   const locked = saving || priceOnly;
   const switchKind = (next: CustomOpening['kind']) => { const size = defaultOpeningSize(next); setKind(next); setWidth(meters(size.width)); setHeight(meters(size.height)); };
-  const Icon = kind === 'door' ? DoorOpen : PanelsTopLeft;
+  const Icon = openingIcon(kind);
+  const kindName = openingKindLabel(kind);
+  const placeholder = kind === 'door' ? '如：实木平开门' : kind === 'window' ? '如：断桥铝推拉窗' : '如：实木包边垭口';
   const submit = async () => {
     const item: CustomOpening = { key, name: name.trim(), kind, width: parseMeterDraft(width), height: parseMeterDraft(height), price: parsePriceDraft(price) };
     if (!validCustomOpening(item)) { const message = '请填写名称、宽 0.1～10 m、高 0.1～8 m 及非负单价'; setError(message); notify.fail(message); return; }
@@ -34,7 +37,7 @@ export function CustomOpeningForm({ categoryField, accountOnly, onCancel, onSave
   return <form onSubmit={e => { e.preventDefault(); void submit(); }}>
     <div className="custom-furniture-layout">
       <fieldset className="custom-furniture-fields" disabled={saving}>
-        <div className="custom-field"><Label htmlFor="opening-name">名称</Label><Input id="opening-name" aria-label="门窗名称" maxLength={100} required disabled={locked} placeholder={kind === 'door' ? '如：实木平开门' : '如：断桥铝推拉窗'} value={name} onChange={e => setName(e.target.value)} /></div>
+        <div className="custom-field"><Label htmlFor="opening-name">名称</Label><Input id="opening-name" aria-label="门窗名称" maxLength={100} required disabled={locked} placeholder={placeholder} value={name} onChange={e => setName(e.target.value)} /></div>
         {categoryField}
         <div className="custom-field"><Label htmlFor="opening-kind">类型</Label><Select value={kind} disabled={locked} onValueChange={value => switchKind(value as CustomOpening['kind'])}><SelectTrigger id="opening-kind"><SelectValue /></SelectTrigger><SelectContent>{openingKinds.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div>
         <div className="custom-dimensions">
@@ -44,8 +47,8 @@ export function CustomOpeningForm({ categoryField, accountOnly, onCancel, onSave
         <div className="custom-field"><Label htmlFor="opening-price">{priceLabel}</Label><Input id="opening-price" type="number" min={0} placeholder="未定价" value={price} onChange={e => setPrice(e.target.value)} />{priceHint && <small className="custom-field-hint">{priceHint}</small>}</div>
       </fieldset>
       <div className="custom-image-panel">
-        <div className="custom-image-preview custom-material-preview"><span className="custom-material-swatch"><Icon size={38} strokeWidth={1.3} /></span><span>{name.trim() || (kind === 'door' ? '门' : '窗')}{Number.isFinite(w) && Number.isFinite(h) ? ` · ${formatMeters(w)} × ${formatMeters(h)} m` : ''}</span></div>
-        <small>按开口面积（宽 × 高）计价。{initial ? '' : `创建后选中画布中的${kind === 'door' ? '门' : '窗'}，在“款式”中切换使用。`}</small>
+        <div className="custom-image-preview custom-material-preview"><span className="custom-material-swatch"><Icon size={38} strokeWidth={1.3} /></span><span>{name.trim() || kindName}{Number.isFinite(w) && Number.isFinite(h) ? ` · ${formatMeters(w)} × ${formatMeters(h)} m` : ''}</span></div>
+        <small>按开口面积（宽 × 高）计价。{initial ? '' : `创建后选中画布中的${kindName}，在“款式”中切换使用。`}</small>
       </div>
     </div>
     {extra}

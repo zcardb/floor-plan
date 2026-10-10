@@ -11,6 +11,7 @@ import { contactDistances, originalSegment, wallSplitDraft } from '../model/wall
 import { wallContacts, type WallContact } from '../model/wallContacts';
 import { isBearingWall } from '../model/wallPolicy';
 import { wallDisplayName } from '../model/wallLabel';
+import { openingKindLabel } from '../model/hardMaterials';
 import type { Design } from '../model/types';
 import { notify } from '@/lib/notify';
 
@@ -113,7 +114,7 @@ export function WallSplitDialog({ design, wallId, onApply, onClose }: {
                   <i className="wall-split-check" aria-hidden="true">{picked.includes(contact.offset) && <Check size={12} strokeWidth={3} />}</i>
                   <span className="wall-split-contact-title"><b>接触点 {i + 1}</b><em className="wall-split-contact-dist">{`距 A ${formatMeters(contactDistances(L, [contact.offset], reversed)[0]!)} m`}</em></span>
                   <small>{contact.blocked ? '位于门窗洞口内，不能作为分割点' : contact.opening
-                    ? `${contact.opening.kind === 'door' ? '门' : '窗'}洞口${edgeLabel(contact)}边缘`
+                    ? `${openingKindLabel(contact.opening.kind)}洞口${edgeLabel(contact)}边缘`
                     : <><span>{kinds[contact.kind]}</span> · {contact.wallIds.map(id => { const w = design.walls.find(x => x.id === id); return w ? wallDisplayName(design, w) : '相接墙'; }).join('、')}</>}</small>
                 </button>)}
               </div>
