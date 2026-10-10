@@ -82,7 +82,7 @@ describe('净距驱动真实墙体',()=>{
     const candidates=perimeterDimensions(d)!.chains.flatMap(c=>c.overall?[]:c.segments).flatMap(s=>s.binding?[s.binding]:[]);
     const found=candidates.map(b=>({b,policy:dimensionEditPolicy(d,b)})).filter(({policy})=>!policy.reason).flatMap(({b,policy})=>{
       const fixed=policy.fixed??'start';
-      try{return [{b,fixed,next:editDimensionWalls(d,b,b.end-b.start-100,fixed)}];}catch{return [];}
+      try{const next=editDimensionWalls(d,b,b.end-b.start-100,fixed);return next.rooms.length===d.rooms.length?[{b,fixed,next}]:[];}catch{return [];}
     })[0];
     expect(found).toBeDefined();
     const {b,fixed,next}=found!,moving=fixed==='start'?b.endWalls:b.startWalls;
