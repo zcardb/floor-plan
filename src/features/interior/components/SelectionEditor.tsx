@@ -117,8 +117,15 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           ".stage-topline,.canvas-zoom,.scene-light-control,.mobile-library,.mode-hint",
         ),
       ].map(rectOf);
-      // 画在 SVG 里的距离标注（门窗两侧净距）：编辑栏不要压住它们。
-      const keepVisible = [...stage.querySelectorAll("[data-editor-keep-visible]")].map(rectOf);
+      // 画在 SVG 里的距离标注（门窗两侧净距）与墙端点拖动圆点：编辑栏不要压住它们。
+      // 圆点很小，四周再留出一圈手指 / 鼠标可操作的余量。
+      const handlePad = 14;
+      const keepVisible = [...stage.querySelectorAll("[data-editor-keep-visible]")].map(e => {
+        const r = rectOf(e);
+        return e.getAttribute("data-editor-keep-visible") === "handle"
+          ? { left: r.left - handlePad, top: r.top - handlePad, right: r.right + handlePad, bottom: r.bottom + handlePad }
+          : r;
+      });
       const pos = placeEditor(
         r,
         { width: stage.clientWidth, height: stage.clientHeight },

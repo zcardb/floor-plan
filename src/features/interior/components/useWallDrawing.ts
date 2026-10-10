@@ -1,7 +1,7 @@
 import { validateWallSegment } from '../model/wallDrawing';
 import { rebuildRooms } from '../model/geometry';
 import { splitRoomsWithWall } from '../model/roomFollow';
-import { addEnclosedRooms } from '../model/roomEnclosed';
+import { reconcileRoomsWithWalls } from '../model/roomEnclosed';
 import { splitAtJunctions } from '../model/wallAutoSplit';
 import { uid, type Design } from '../model/types';
 import { useSegmentDrawing } from './useSegmentDrawing';
@@ -15,7 +15,7 @@ export function useWallDrawing(enabled: boolean, design: React.RefObject<Design>
     // 房间先按完整的新墙切分，再按交接点分割墙段：分割只改墙段划分、不改墙体足迹，房间仍然成立。
     const rooms = d.template === 'blank' ? added : splitRoomsWithWall(added, wall.id);
     const next = splitAtJunctions(rooms, wall.id);
-    // 非空白户型：新墙围出的、不属于任何房间的区域补成新房间。
-    commit(next.template === 'blank' ? rebuildRooms(next) : addEnclosedRooms(next));
+    // 非空白户型：被墙隔开的房间拆开，新墙围出的、不属于任何房间的区域补成新房间。
+    commit(next.template === 'blank' ? rebuildRooms(next) : reconcileRoomsWithWalls(next));
   }, done);
 }

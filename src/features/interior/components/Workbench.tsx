@@ -13,7 +13,7 @@ import { syncAccountFurniture, syncAccountMaterials } from '../model/furnitureSy
 import { splitWall as splitWallModel } from '../model/wallSplit';
 import { removeWall as removeWallModel } from '../model/wallRemoval';
 import { clearRoomFurniture } from '../model/roomFurniture';
-import { addEnclosedRooms } from '../model/roomEnclosed';
+import { reconcileRoomsWithWalls } from '../model/roomEnclosed';
 import { followWallFurniture } from '../model/furnitureFollow';
 import { splitAtJunctionsOf } from '../model/wallAutoSplit';
 import { mergeWall as mergeWallModel, wallMergeGroup } from '../model/wallMerge';
@@ -269,14 +269,14 @@ export function Workbench(p: Props) {
   const accountFurniture = p.loggedIn
     ? furnitureCatalog.items.filter((item) => !projectCatalog.some((i) => i.catalogId === item.catalogId))
     : [];
-  // 打开项目时补一次：已被墙围起来、却不属于任何房间的区域补成新房间（之后由改墙流程负责）。
+  // 打开项目时补一次：被墙隔开的房间拆开、墙围出的空白区域补成房间（之后由改墙流程负责）。
   const projectId = p.project.id;
   useEffect(() => {
     if (readOnly) return;
-    const current = designRef.current, next = addEnclosedRooms(current);
+    const current = designRef.current, next = reconcileRoomsWithWalls(current);
     if (next !== current) {
       sync(next);
-      notify.info(`墙体围出的 ${next.rooms.length - current.rooms.length} 块区域已自动划为房间`);
+      notify.info(`已按墙体重新划分房间，新增 ${next.rooms.length - current.rooms.length} 个房间，请检查名称与地面材质`);
     }
   }, [projectId, readOnly, sync, designRef]);
   // 账号家具库里改过的家具同步到本项目（项目内单独改过的单价、尺寸等保留）。

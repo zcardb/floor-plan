@@ -2,7 +2,7 @@ import polygonClipping from 'polygon-clipping';
 import { rebuildRooms, ringArea } from './geometry';
 import { connectedWallPoly } from './wallConnections';
 import { dropOpenRooms } from './roomEnclosure';
-import { addEnclosedRooms } from './roomEnclosed';
+import { reconcileRoomsWithWalls } from './roomEnclosed';
 import { dropOrphanFurniture } from './roomFurniture';
 import { stripStrayHoles } from './roomHoles';
 import { uid, type Design, type Point, type Room, type Wall } from './types';
@@ -183,11 +183,11 @@ export function splitRoomsWithWall(d: Design, wallId: string): Design {
 /**
  * 改墙后的房间同步：空白户型按外框重算，其余项目让房间跟随墙面。
  * 这次改动让某个房间不再被墙围住时，该房间和里面的家具随之删除；
- * 墙围出了不属于任何房间的区域时，补成新房间。
+ * 被墙隔开的房间拆成多个，墙围出了不属于任何房间的区域时，补成新房间。
  */
 export function syncRooms(before: Design, after: Design): Design {
   const synced = after.template === 'blank' ? rebuildRooms(after) : followRooms(before, after);
   const dropped = dropOpenRooms(synced, before);
   const kept = dropped === synced ? dropped : dropOrphanFurniture(before, dropped);
-  return addEnclosedRooms(kept);
+  return reconcileRoomsWithWalls(kept);
 }

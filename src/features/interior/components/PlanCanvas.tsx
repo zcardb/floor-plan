@@ -921,6 +921,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
                       <circle
                         key={k}
                         data-handle={k}
+                        data-editor-keep-visible="handle"
                         cx={w[k][0]}
                         cy={w[k][1]}
                         r={10 / view.s}
