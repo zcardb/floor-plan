@@ -141,7 +141,8 @@ export function validateDesign(value: unknown): Design {
         (item.price !== undefined &&
           item.price !== null &&
           !validPrice(item.price)) ||
-        (item.imageUrl !== undefined && !/^https:\/\//.test(item.imageUrl))
+        (item.imageUrl !== undefined && !/^https:\/\//.test(item.imageUrl)) ||
+        (item.image3dUrl !== undefined && !/^https:\/\//.test(item.image3dUrl))
       )
         fail();
       catalogIds.add(item.catalogId);

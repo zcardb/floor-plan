@@ -171,6 +171,8 @@ export interface LibraryItem {
   category: string;
   height?: number;
   imageUrl?: string;
+  /** AI 生成的 3D 透视效果图（家具详情的 3D 视角）。 */
+  image3dUrl?: string;
   price?: number | null;
 }
 export const uid = () => crypto.randomUUID();

@@ -32,7 +32,7 @@ export function useFurnitureCatalog() {
   const save=useCallback(async(item:LibraryItem)=>{
     if(!validFurnitureType(item.type)||!validFurnitureOutline(item.shape))throw new Error('参考类型或外形无效');
     const {data:{session}}=await supabase.auth.getSession(); if(!session)throw new Error('请先登录');
-    const {error}=await supabase.from('interior_furniture_catalog').upsert({owner_id:session.user.id,catalog_id:item.catalogId!,name:item.name,category:item.category,type:item.type,shape:item.shape??null,width:item.w,depth:item.d,height:item.height||700,color:item.color,price:item.price??null,image_url:item.imageUrl||null},{onConflict:'owner_id,catalog_id'});
+    const {error}=await supabase.from('interior_furniture_catalog').upsert({owner_id:session.user.id,catalog_id:item.catalogId!,name:item.name,category:item.category,type:item.type,shape:item.shape??null,width:item.w,depth:item.d,height:item.height||700,color:item.color,price:item.price??null,image_url:item.imageUrl||null,image_3d_url:item.image3dUrl||null},{onConflict:'owner_id,catalog_id'});
     if(error)throw new Error(error.message);return true;
   },[]);
   const remove=useCallback(async(catalogId:string)=>{

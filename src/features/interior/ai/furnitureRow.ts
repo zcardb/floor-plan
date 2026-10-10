@@ -16,4 +16,5 @@ export const furnitureFromRow = (r: FurnitureRow): LibraryItem => ({
   color: r.color,
   price: r.price === null ? null : Number(r.price),
   imageUrl: r.image_url || undefined,
+  image3dUrl: r.image_3d_url || undefined,
 });

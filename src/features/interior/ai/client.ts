@@ -4,6 +4,8 @@ import type { AiCatalogEntry, AiPlanSnapshot, AiRequiredItem, AiRoomContext } fr
 export const AI_FUNCTION = "interior-ai-design";
 export const AI_COUNT_OPTIONS = [1, 2, 3, 4] as const;
 export const AI_IMAGE_LIMIT = 4;
+/** 附件总数（图片 + 素材）。 */
+export const AI_ATTACHMENT_LIMIT = 6;
 export const AI_REFERENCE_BUCKET = "images";
 
 /** 后端客户端按需加载：只在真正发请求时初始化，引用 AI 模块本身没有副作用。 */
@@ -31,6 +33,8 @@ export interface AiRequestBase {
   /** 0–1，用来在同一批里拿到不同的方案。 */
   description: string;
   images: string[];
+  /** 非图片素材，后端交给模型自行判断如何使用。 */
+  files?: { url: string; name: string; ext: string }[];
   catalog: AiCatalogEntry[];
   projectId?: string;
   /** 直接选择的模型，或自己的小助手（二选一，见 models.ts engineFields）。 */
@@ -83,6 +87,9 @@ export async function markCandidateApplied(candidateId: string): Promise<void> {
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const IMAGE_MAX = 10 * 1024 * 1024;
 const EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
+/** 非图片素材的存储桶：原文件直传，不限类型，单个 ≤ 50 MB。 */
+export const AI_MATERIAL_BUCKET = "ai-materials";
+export const MATERIAL_MAX = 50 * 1024 * 1024;
 
 /** 参考图：校验类型与大小后直传 Enter Cloud Storage，返回公开地址。 */
 export async function uploadReferenceImage(file: File): Promise<string> {
@@ -94,5 +101,17 @@ export async function uploadReferenceImage(file: File): Promise<string> {
   if (error) throw new Error(error.message);
   const { data } = supabase.storage.from(AI_REFERENCE_BUCKET).getPublicUrl(path);
   if (!data.publicUrl) throw new Error("参考图上传失败，请重试");
+  return data.publicUrl;
+}
+
+/** 家装素材（图纸、素材包、3D 模型等）：原文件直传，不在前端解析，交给 AI 自行判断。 */
+export async function uploadReferenceMaterial(file: File, ext: string): Promise<string> {
+  if (file.size > MATERIAL_MAX) throw new Error("素材不能超过 50 MB");
+  const path = `ai-all/${crypto.randomUUID()}.${ext}`;
+  const supabase = await backend();
+  const { error } = await supabase.storage.from(AI_MATERIAL_BUCKET).upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false });
+  if (error) throw new Error(error.message);
+  const { data } = supabase.storage.from(AI_MATERIAL_BUCKET).getPublicUrl(path);
+  if (!data.publicUrl) throw new Error("素材上传失败，请重试");
   return data.publicUrl;
 }

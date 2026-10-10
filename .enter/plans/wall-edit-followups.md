@@ -66,27 +66,27 @@
 - `LibraryItem` 增加 `image3dUrl?: string`；`validation.ts` 与 `imageUrl` 同样要求 https；`useFurnitureCatalog.ts` 读写映射。
 
 ## Implementation checklist
-- [ ] `AccountFurnitureDialog.tsx` + `index.css`：宽约 880px、高 `min(680px, 100dvh-2rem)`，左图右字段两栏、右栏独立滚动；页脚固定且右对齐（删除在前、完成在后）；≤700px 单列
-- [ ] 新增 `FurnitureVisual.tsx`：左上 2D / 3D 切换（默认 2D）；3D 无图空状态；自定义家具右上「AI 调整」
-- [ ] `AiComposer.tsx`：新增 `showEngine`（默认 true），false 时不渲染 `AiEnginePicker`
-- [ ] 新增 `FurnitureAiDialog.tsx`：复用 `AiComposer` + `AiResults` + `useAiBatch`；标题带家具名与视角；无名称输入；默认描述
-- [ ] `FurnitureAiDialog.tsx`：当前视角图（3D 无图用 2D 图）预置为已上传附件，可移除
-- [ ] 应用候选：2D 写 `imageUrl` / 3D 写 `image3dUrl`，经 `saveGeometry` 保存并 `onChanged`，左图立即更新
-- [ ] `useFurnitureImage.ts`：抽出 `generateFurnitureImage(item, { view, description, images, files, requestId }, isCancelled)`，原 hook 改为调用、行为不变
-- [ ] 附件通用化：`referenceImages.ts` 草稿类型加 `name/kind/ext`；`uploadReferenceFile` 支持白名单扩展名与大小上限；总数 6 / 图片 4 限制与提示
-- [ ] `AiComposer.tsx`：`accept` 扩展；选择 / 拖入接受文件；文件附件显示格式角标与文件名；提示文案更新
-- [ ] `ai/client.ts` 与三处调用（AI 布局、AI 创建、家具 AI）：请求带 `files`
-- [ ] `interior-ai-design`：`files` 守卫；PDF 文档输入 / 文本类摘录 / 其余列链接；提示词说明由模型自行判断；部署
-- [ ] `interior-furniture-image-submit`：`view` / `description` / `images` / `files`；`img_2_img` 调整；部署
-- [ ] 迁移加 `image_3d_url`；`types.ts` / `validation.ts` / `useFurnitureCatalog.ts` 接入 `image3dUrl`
+- [x] `AccountFurnitureDialog.tsx` + `index.css`：宽约 880px、高 `min(680px, 100dvh-2rem)`，左图右字段两栏、右栏独立滚动；页脚固定且右对齐（删除在前、完成在后）；≤700px 单列
+- [x] 新增 `FurnitureVisual.tsx`：左上 2D / 3D 切换（默认 2D）；3D 无图空状态；自定义家具右上「AI 调整」
+- [x] `AiComposer.tsx`：新增 `showEngine`（默认 true），false 时不渲染 `AiEnginePicker`
+- [x] 新增 `FurnitureAiDialog.tsx`：复用 `AiComposer` + `AiResults` + `useAiBatch`；标题带家具名与视角；无名称输入；默认描述
+- [x] `FurnitureAiDialog.tsx`：当前视角图（3D 无图用 2D 图）预置为已上传附件，可移除
+- [x] 应用候选：2D 写 `imageUrl` / 3D 写 `image3dUrl`，经 `saveGeometry` 保存并 `onChanged`，左图立即更新
+- [x] `useFurnitureImage.ts`：抽出 `generateFurnitureImage(item, { view, description, images, files, requestId }, isCancelled)`，原 hook 改为调用、行为不变
+- [x] 附件通用化：`referenceImages.ts` 草稿类型加 `name/kind/ext`；`uploadReferenceFile` 支持白名单扩展名与大小上限；总数 6 / 图片 4 限制与提示
+- [x] `AiComposer.tsx`：`accept` 扩展；选择 / 拖入接受文件；文件附件显示格式角标与文件名；提示文案更新
+- [x] `ai/client.ts` 与三处调用（AI 布局、AI 创建、家具 AI）：请求带 `files`
+- [x] `interior-ai-design`：`files` 守卫；PDF 文档输入 / 文本类摘录 / 其余列链接；提示词说明由模型自行判断；部署
+- [x] `interior-furniture-image-submit`：`view` / `description` / `images` / `files`；`img_2_img` 调整；部署
+- [x] 迁移加 `image_3d_url`；`types.ts` / `validation.ts` / `useFurnitureCatalog.ts` 接入 `image3dUrl`
 
 ## Verification checklist
-- [ ] 单测：附件校验——`.dxf` / `.pdf` / `.zip` / `.skp` 接受，`.exe` 拒绝；第 5 张图片被拒并提示；第 7 个附件被拒；超大小被拒
-- [ ] 单测：`validateDesign` / 家具库校验拒绝非 https 的 `image3dUrl`，接受 https
-- [ ] 组件测试：`FurnitureVisual` 默认 2D；切 3D 无图显示「尚未生成 3D 视角图」；内置家具不显示「AI 调整」
-- [ ] 组件测试：`FurnitureAiDialog` 无名称输入、无模型选择器、标题含家具名；有 2D 图时默认附件为该图；3D 无图时默认附件为 2D 图；都没有时附件为空
-- [ ] 组件测试：`AiComposer` 默认仍渲染模型选择器；`accept` 含 `.dxf` `.pdf` `.zip` `.obj` `.dwg`；文件附件显示文件名与格式角标；上传中发送禁用
-- [ ] `pnpm exec vitest run src/features/interior` 通过（已知 `dimensionWallEdit` 失败除外，属另一会话）
-- [ ] `pnpm lint` 0 error；`pnpm run build` 通过
+- [x] 单测：附件校验——`.dxf` / `.pdf` / `.zip` / `.skp` 接受，`.exe` 拒绝；第 5 张图片被拒并提示；第 7 个附件被拒；超大小被拒
+- [x] 单测：`validateDesign` / 家具库校验拒绝非 https 的 `image3dUrl`，接受 https
+- [x] 组件测试：`FurnitureVisual` 默认 2D；切 3D 无图显示「尚未生成 3D 视角图」；内置家具不显示「AI 调整」
+- [x] 组件测试：`FurnitureAiDialog` 无名称输入、无模型选择器、标题含家具名；有 2D 图时默认附件为该图；3D 无图时默认附件为 2D 图；都没有时附件为空
+- [x] 组件测试：`AiComposer` 默认仍渲染模型选择器；`accept` 含 `.dxf` `.pdf` `.zip` `.obj` `.dwg`；文件附件显示文件名与格式角标；上传中发送禁用
+- [x] `pnpm exec vitest run src/features/interior` 通过（已知 `dimensionWallEdit` 失败除外，属另一会话）
+- [x] `pnpm lint` 0 error；`pnpm run build` 通过
 - [ ] 后端：家具图片不带 `view` 的旧请求仍生成俯视图；`files` 含非 https 或非白名单扩展名返回 400；AI 布局带一个 PDF 附件能正常出方案
 - [ ] desktop_1280 截图家具详情弹窗：尺寸协调、页脚右对齐、2D / 3D 切换与「AI 调整」可见

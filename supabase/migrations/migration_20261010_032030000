@@ -1,0 +1,1 @@
+ALTER TABLE public.interior_furniture_catalog ADD COLUMN IF NOT EXISTS image_3d_url text;

@@ -6,7 +6,7 @@ import { applyRoomLayout } from "./apply";
 import { generateRoomCandidate, markCandidateApplied } from "./client";
 import { furnitureInRoom, planSnapshot, roomContext, roomZone } from "./context";
 import { initialPicks, pickNames, requiredOf, withPickSizes } from "./picks";
-import { readyImageUrls, type AiImageDraft } from "./referenceImages";
+import { readyFiles, readyImageUrls, type AiImageDraft } from "./referenceImages";
 import { sanitizeRoomItems } from "./sanitize";
 import { useAiBatch } from "./useAiBatch";
 import type { AiCatalog, AiFurniturePick } from "./types";
@@ -94,7 +94,7 @@ export function useRoomAi({ design, catalog, projectId, change }: {
     const room = openId ? source.rooms.find((r) => r.id === openId) : undefined;
     const draft = openId ? drafts[openId] : undefined;
     if (!room || !draft || !draft.description.trim()) return;
-    const description = draft.description.trim(), images = readyImageUrls(draft.images);
+    const description = draft.description.trim(), images = readyImageUrls(draft.images), files = readyFiles(draft.images);
     const aiCatalog = withPickSizes(latest.current.catalog, draft.picks);
     const required = requiredOf(draft.picks, aiCatalog);
     const context = roomContext(source, room), plan = planSnapshot(source, room.id);
@@ -103,7 +103,7 @@ export function useRoomAi({ design, catalog, projectId, change }: {
     const count = draft.count, engine = engineFields(draft.engine);
     const launch = () => ai.start(request, count, async (index, generationId) => {
       const { candidate } = await generateRoomCandidate({
-        generationId, index, description, images, catalog: aiCatalog.entries, projectId, room: context, plan, existing, required, ...engine,
+        generationId, index, description, images, files, catalog: aiCatalog.entries, projectId, room: context, plan, existing, required, ...engine,
       });
       const items = sanitizeRoomItems(candidate!.result, { zone: roomZone(room), catalog: aiCatalog, required });
       return { id: candidate!.candidateId, index, summary: candidate!.summary, warnings: candidate!.warnings, result: { items, preview: applyRoomLayout(source, room.id, items, aiCatalog) } };

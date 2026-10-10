@@ -5,13 +5,27 @@ import { Button } from '@/components/ui/button';
 import { AlertDialog,AlertDialogContent,AlertDialogHeader,AlertDialogTitle,AlertDialogDescription,AlertDialogFooter,AlertDialogCancel,AlertDialogAction } from '@/components/ui/alert-dialog';
 import type { LibraryItem } from '../model/types';
 import { PriceInput, type PriceInputHandle } from './PriceInput';
-import { FurnitureShape } from './FurnitureShape';
+import { FurnitureVisual, hasViews } from './FurnitureVisual';
+import { FurnitureAiDialog } from './FurnitureAiDialog';
+import type { FurnitureView } from '../cloud/useFurnitureImage';
 import { FurnitureGeometryEditor, type FurnitureGeometryHandle } from './FurnitureGeometryEditor';
 import { formatMeters } from '../model/lengthUnits';
 import { notify } from '@/lib/notify';
 export function AccountFurnitureDialog({item,isCustom,referencePrice,onOpenChange,onChanged,applyDefaultPrice,remove,saveGeometry,commitBusy=false,commitError='',retryPrice,saved=false}:{commitBusy?:boolean;commitError?:string;retryPrice?:()=>Promise<boolean>;saved?:boolean;saveGeometry?:(item:LibraryItem)=>Promise<boolean>;applyDefaultPrice:(price:number|null)=>Promise<boolean>;item:LibraryItem;isCustom:boolean;referencePrice:number|null;onOpenChange:(v:boolean)=>void;onChanged:(next:LibraryItem|null)=>void;remove:(catalogId:string)=>Promise<boolean>}){
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[confirming,setConfirming]=useState(false);
   const [editorPhase,setEditorPhase]=useState<'idle'|'generating'|'saving'>('idle');
+  const [view,setView]=useState<FurnitureView>('top'),[adjusting,setAdjusting]=useState(false);
+  /** 硬装只有 2D，一律按俯视图处理。 */
+  const activeView:FurnitureView=hasViews(item)?view:'top';
+  const canAdjust=isCustom&&!!saveGeometry&&!retryPrice;
+  /** 应用 AI 图片：2D 写 imageUrl、3D 写 image3dUrl，经参考几何同一条保存链路写回账号库。 */
+  const applyImage=async(url:string)=>{
+    if(!saveGeometry)return false;
+    const next={...item,...(activeView==='top'?{imageUrl:url}:{image3dUrl:url})};
+    if(!(await saveGeometry(next)))return false;
+    onChanged(next);
+    return true;
+  };
   const working=busy||commitBusy||editorPhase!=='idle';
   const closeLocked=busy||commitBusy||editorPhase==='saving';
   const failure=commitError||error;
@@ -44,39 +58,38 @@ export function AccountFurnitureDialog({item,isCustom,referencePrice,onOpenChang
   };
   return <>
     <Dialog open onOpenChange={v=>{if(!closeLocked)onOpenChange(v);}}>
-      <DialogContent className="cms-detail-dialog flex max-h-[calc(100dvh-2rem)] max-w-[640px] flex-col overflow-hidden" onEscapeKeyDown={event=>{if(closeLocked)event.preventDefault();}} onInteractOutside={event=>{if(closeLocked)event.preventDefault();}}>
+      <DialogContent className="cms-detail-dialog furniture-detail-dialog" onEscapeKeyDown={event=>{if(closeLocked)event.preventDefault();}} onInteractOutside={event=>{if(closeLocked)event.preventDefault();}}>
         <DialogHeader>
           <DialogTitle>{item.name}</DialogTitle>
-          <DialogDescription>{item.category} · {isCustom?'自定义家具':'内置家具'} · 画布按参考几何绘制，不是 3D 建模。</DialogDescription>
+          <DialogDescription>{item.category} · {isCustom?'自定义家具':'内置家具'} · 画布按参考几何绘制，{hasViews(item)?'2D / 3D 图':'图片'}为 AI 生成的外观参考。</DialogDescription>
         </DialogHeader>
-        <div className="cms-detail-scroll">
-        <div className="cms-detail-body">
-          <div className="cms-detail-visual">
-            {item.imageUrl?<img src={item.imageUrl} crossOrigin="anonymous" alt={item.name}/>:<svg viewBox={`${-item.w/2-100} ${-item.d/2-100} ${item.w+200} ${item.d+200}`}><FurnitureShape f={item}/></svg>}
-          </div>
-          <div className="cms-detail-fields">
-            <dl>
-              <div><dt>分类</dt><dd>{item.category}</dd></div>
-              <div><dt>参考尺寸</dt><dd>{formatMeters(item.w)} × {formatMeters(item.d)}{item.height?` × ${formatMeters(item.height)}`:''} m</dd></div>
-              <div><dt>来源</dt><dd>{isCustom?'自定义':'内置'}</dd></div>
-            </dl>
-            <div className="cms-detail-price">
-              <span className="cms-detail-label">账号默认单价 · 元 / 件</span>
-              <PriceInput ref={priceRef} key={String(item.price)} value={item.price??referencePrice??null} disabled={working||!!retryPrice} label={item.name+'账号默认单价'} onApply={applyPrice}/>
-              <small>仅影响未单独调价的项目；项目内改价仍以项目为准。</small>
+        <div className="furniture-detail-body">
+          <FurnitureVisual item={item} view={view} onView={setView} onAdjust={canAdjust?()=>setAdjusting(true):undefined}/>
+          <div className="furniture-detail-side">
+            <div className="cms-detail-fields">
+              <dl>
+                <div><dt>分类</dt><dd>{item.category}</dd></div>
+                <div><dt>参考尺寸</dt><dd>{formatMeters(item.w)} × {formatMeters(item.d)}{item.height?` × ${formatMeters(item.height)}`:''} m</dd></div>
+                <div><dt>来源</dt><dd>{isCustom?'自定义':'内置'}</dd></div>
+              </dl>
+              <div className="cms-detail-price">
+                <span className="cms-detail-label">账号默认单价 · 元 / 件</span>
+                <PriceInput ref={priceRef} key={String(item.price)} value={item.price??referencePrice??null} disabled={working||!!retryPrice} label={item.name+'账号默认单价'} onApply={applyPrice}/>
+                <small>仅影响未单独调价的项目；项目内改价仍以项目为准。</small>
+              </div>
             </div>
+            {isCustom&&saveGeometry&&<fieldset disabled={busy||commitBusy||!!retryPrice} className="cost-edit-fields"><FurnitureGeometryEditor ref={geometryRef} key={item.type+item.shape+item.w+item.d} item={item} save={saveGeometry} onSaved={onChanged} onWorkChange={setEditorPhase}/></fieldset>}
+            {failure&&<div className="cost-save-error" role="alert"><span>{failure}</span>{retryPrice&&<Button variant="outline" disabled={working} onClick={()=>void retry()}>重试保存</Button>}</div>}
           </div>
         </div>
-        {isCustom&&saveGeometry&&<fieldset disabled={busy||commitBusy||!!retryPrice} className="cost-edit-fields"><FurnitureGeometryEditor ref={geometryRef} key={item.type+item.shape+item.w+item.d} item={item} save={saveGeometry} onSaved={onChanged} onWorkChange={setEditorPhase}/></fieldset>}
-        </div>
-        {failure&&<div className="cost-save-error" role="alert"><span>{failure}</span>{retryPrice&&<Button variant="outline" disabled={working} onClick={()=>void retry()}>重试保存</Button>}</div>}
-        <p className="cost-sync" role="status">{editorPhase==='generating'?'正在生成，原图尚未替换':working?'正在保存…':saved&&!failure?'已保存并生效':'点击完成即保存所有修改'}</p>
-        <div className="cms-detail-actions">
+        <div className="cms-detail-actions furniture-detail-actions">
+          <p className="cost-sync" role="status">{editorPhase==='generating'?'正在生成，原图尚未替换':working?'正在保存…':saved&&!failure?'已保存并生效':'点击完成即保存所有修改'}</p>
           {isCustom&&<Button type="button" variant="ghost" className="cms-detail-action text-destructive hover:bg-destructive/10 hover:text-destructive" disabled={working||!!retryPrice} onClick={()=>setConfirming(true)}><Trash2 size={14}/>删除家具</Button>}
           <Button type="button" className="cms-detail-action" disabled={closeLocked} onClick={()=>void finish()}>{closeLocked?<><Loader2 size={14}/>处理中…</>:editorPhase==='generating'?'取消生成并关闭':'完成'}</Button>
         </div>
       </DialogContent>
     </Dialog>
+    {adjusting&&saveGeometry&&<FurnitureAiDialog item={item} view={activeView} onClose={()=>setAdjusting(false)} onApply={applyImage}/>}
     <AlertDialog open={confirming} onOpenChange={setConfirming}>
       <AlertDialogContent>
         <AlertDialogHeader>

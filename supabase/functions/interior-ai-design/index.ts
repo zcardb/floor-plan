@@ -36,12 +36,51 @@ const str = (v: unknown, max: number): v is string => typeof v === 'string' && v
 
 interface Entry { code: string; catalogId: string; name: string; category: string; type: string; w: number; d: number }
 interface Placed { code: string; back: Side; along?: number; gap?: number }
+
+/** 用户上传的家装素材：只接受本项目素材桶里的公开文件。 */
+interface Material { url: string; name: string; ext: string }
+const MATERIAL_EXTS = ['dxf', 'dwg', 'pdf', 'zip', 'rar', '7z', 'obj', 'stl', 'fbx', 'glb', 'gltf', '3ds', 'skp', 'max', 'rvt', 'ifc', 'txt', 'csv', 'json', 'xlsx', 'docx'];
+/** 文本格式的素材读取开头一段原文附给模型。 */
+const TEXT_EXTS = ['dxf', 'obj', 'gltf', 'ifc', 'txt', 'csv', 'json'];
+const TEXT_EXCERPT = 60_000;
+const materialPrefix = () => `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/ai-materials/ai-all/`;
+const validMaterial = (m: Material) => !!m && typeof m.url === 'string' && m.url.length <= 1000 && m.url.startsWith(materialPrefix())
+  && typeof m.name === 'string' && !!m.name.trim() && m.name.length <= 200 && MATERIAL_EXTS.includes(m.ext);
+
+/** 读取文本素材的开头一段；失败不阻断生成，只说明未能读取。 */
+async function excerpt(m: Material): Promise<string> {
+  try {
+    const response = await fetch(m.url, { headers: { Range: `bytes=0-${TEXT_EXCERPT - 1}` } });
+    if (!response.ok) return '（读取失败）';
+    const text = (await response.text()).slice(0, TEXT_EXCERPT);
+    return text + (text.length >= TEXT_EXCERPT ? NL + '…（后文省略）' : '');
+  } catch {
+    return '（读取失败）';
+  }
+}
+
+/**
+ * 素材说明：PDF 作为文档交给支持的模型；文本格式附上开头一段原文；其余（压缩包、专有 CAD / 3D 格式）只列名称与链接。
+ * 由模型自行判断哪些与需求相关，读不了的不要臆测内容。
+ */
+async function materialsText(files: Material[] = []): Promise<string> {
+  if (!files.length) return '';
+  const blocks = await Promise.all(files.map(async (m) => {
+    const head = `- ${m.name}（${m.ext.toUpperCase()}）：${m.url}`;
+    if (TEXT_EXTS.includes(m.ext)) return `${head}${NL}\`\`\`${NL}${await excerpt(m)}${NL}\`\`\``;
+    if (m.ext === 'pdf') return `${head}（已作为文档附上，若当前模型无法读取文档请忽略）`;
+    return `${head}（此格式无法直接读取内容）`;
+  }));
+  return ['用户附带了以下家装素材，请自行判断哪些与需求相关并加以参考；无法读取的格式不要臆测其内容：', ...blocks].join(NL);
+}
 interface Body {
   mode: 'plan' | 'room';
   generationId: string;
   index: number;
   description: string;
   images: string[];
+  /** 非图片素材（图纸、素材包、3D 模型等），由模型自行判断如何使用。 */
+  files?: Material[];
   catalog: Entry[];
   projectId?: string;
   room?: { roomId: string; name: string; area: number; zone: [number, number, number, number]; openings: unknown[] };
@@ -62,6 +101,7 @@ function guard(raw: unknown): Body | string {
   if (!Number.isInteger(b.index) || b.index < 0 || b.index > 3) return '候选序号无效';
   if (!str(b.description, 2000)) return '请填写需求描述（2000 字以内）';
   if (!Array.isArray(b.images) || b.images.length > 4 || !b.images.every((u) => typeof u === 'string' && /^https:\/\//.test(u) && u.length <= 1000)) return '参考图最多 4 张';
+  if (b.files !== undefined && (!Array.isArray(b.files) || b.files.length > 6 || !b.files.every(validMaterial))) return '素材附件无效（最多 6 个）';
   if (!Array.isArray(b.catalog) || !b.catalog.length || b.catalog.length > 800) return '家具目录无效';
   for (const e of b.catalog)
     if (!e || !/^F\d{1,4}$/.test(e.code) || !str(e.catalogId, 250) || !str(e.name, 100) || typeof e.category !== 'string' || e.category.length > 30 || !str(e.type, 40) || !finite(e.w, 10, 30000) || !finite(e.d, 10, 30000)) return '家具目录条目无效';
@@ -173,16 +213,21 @@ const PLAN_CONTRACT = `你是住宅空间规划与户型设计助手。根据用
 - 门窗：kind 取 door 或 window；wall 引用内墙 key 或外墙名；at 是洞口中心沿墙的位置，width 是洞口宽。门的 into 是开向（横墙填 up/down，竖墙填 left/right）。同一面墙上的洞口互不重叠，离墙端至少 100。
 - 家具：按房间分组，room 引用房间 id。每件家具用 back（背靠哪条边：up/down/left/right）、along（中心沿这条边的位置）、gap（背面到这条边的距离，贴墙为 0）描述，坐标相对该房间**净空矩形**（房间轮廓向内收半个墙厚后的可用范围）的左上角；贴墙摆放时 gap 必须为 0，不要为墙厚留空隙，也不要把家具压到墙上。只能用目录里的代号。`;
 
-/** 与协议无关的对话消息；发送前再转成各协议的格式。 */
-interface Msg { role: 'user' | 'assistant'; text: string; images?: string[] }
+/** 与协议无关的对话消息；发送前再转成各协议的格式。documents 为 PDF 地址。 */
+interface Msg { role: 'user' | 'assistant'; text: string; images?: string[]; documents?: string[] }
 
-/** 把通用消息转成对应协议的请求体；不支持看图的模型不带图片。 */
+/** 把通用消息转成对应协议的请求体；不支持看图的模型不带图片；chat 协议不带文档（素材说明里已有链接）。 */
 function requestBody(model: string, system: string, messages: Msg[]) {
   const { protocol, vision } = MODELS[model];
   const imagesOf = (m: Msg) => (vision && m.role === 'user' ? m.images ?? [] : []);
+  const docsOf = (m: Msg) => (m.role === 'user' ? m.documents ?? [] : []);
   if (protocol === 'anthropic') return {
     model, system, stream: false, max_tokens: MAX_TOKENS,
-    messages: messages.map((m) => ({ role: m.role, content: imagesOf(m).length ? [{ type: 'text', text: m.text }, ...imagesOf(m).map((url) => ({ type: 'image', source: { type: 'url', url } }))] : m.text })),
+    messages: messages.map((m) => ({ role: m.role, content: imagesOf(m).length || docsOf(m).length ? [
+      { type: 'text', text: m.text },
+      ...imagesOf(m).map((url) => ({ type: 'image', source: { type: 'url', url } })),
+      ...docsOf(m).map((url) => ({ type: 'document', source: { type: 'url', url } })),
+    ] : m.text })),
   };
   if (protocol === 'chat') return {
     model, stream: false, max_tokens: MAX_TOKENS,
@@ -192,7 +237,11 @@ function requestBody(model: string, system: string, messages: Msg[]) {
     model, stream: false, max_output_tokens: MAX_TOKENS,
     input: [{ role: 'system', content: system }, ...messages.map((m) => ({
       role: m.role,
-      content: m.role === 'assistant' ? m.text : [{ type: 'input_text', text: m.text }, ...imagesOf(m).map((url) => ({ type: 'input_image', image_url: url }))],
+      content: m.role === 'assistant' ? m.text : [
+        { type: 'input_text', text: m.text },
+        ...imagesOf(m).map((url) => ({ type: 'input_image', image_url: url })),
+        ...docsOf(m).map((url) => ({ type: 'input_file', file_url: url })),
+      ],
     }))],
   };
 }
@@ -509,7 +558,14 @@ Deno.serve(async (req) => {
       agent?.instructions ? `补充要求：${agent.instructions}` : '',
       assistant?.prompt.trim() ? `小助手要求（在不违反上述输出格式与规则的前提下遵循）：${NL}${assistant.prompt.trim()}` : '',
     ].filter(Boolean).join(NL + NL);
-    const messages: Msg[] = [{ role: 'user', text: body.mode === 'room' ? roomPrompt(body) : planPrompt(body), images: body.images }];
+    const materials = await materialsText(body.files);
+    const prompt = body.mode === 'room' ? roomPrompt(body) : planPrompt(body);
+    const messages: Msg[] = [{
+      role: 'user',
+      text: materials ? prompt + NL + NL + materials : prompt,
+      images: body.images,
+      documents: (body.files ?? []).filter((m) => m.ext === 'pdf').map((m) => m.url),
+    }];
     const session = req.headers.get('x-session-id')?.trim() || body.generationId;
     // 每轮保留「hard 最少、其次 soft 最少」的那一版：修复轮偶尔会改坏，不能被最后一轮覆盖。
     let best: { result: unknown; found: Issues } | null = null;

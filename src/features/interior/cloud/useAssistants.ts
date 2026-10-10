@@ -22,9 +22,9 @@ const fromRow = (r: Row): Assistant => ({ id: r.id, name: r.name, avatar: r.avat
 const table = async () => ((await backend()) as unknown as SupabaseClient).from(TABLE);
 const toRow = (input: AssistantInput) => ({ name: input.name.trim(), avatar: input.avatar, model: input.model, prompt: input.prompt });
 
-/** 我的小助手：仅本人可读写（RLS 按 owner_id 限定），挂载即读取。 */
-export function useAssistants() {
-  const [items, setItems] = useState<Assistant[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState("");
+/** 我的小助手：仅本人可读写（RLS 按 owner_id 限定），挂载即读取；enabled 为 false 时不请求（如不需要选模型的入口）。 */
+export function useAssistants(enabled = true) {
+  const [items, setItems] = useState<Assistant[]>([]), [loading, setLoading] = useState(enabled), [error, setError] = useState("");
   const epoch = useRef(0);
   const load = useCallback(async () => {
     const run = ++epoch.current;
@@ -43,7 +43,7 @@ export function useAssistants() {
       if (run === epoch.current) setLoading(false);
     }
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { if (enabled) void load(); }, [load, enabled]);
 
   const create = useCallback(async (input: AssistantInput) => {
     const { data, error: writeError } = await (await table()).insert(toRow(input)).select("id,name,avatar,model,prompt,updated_at").single();

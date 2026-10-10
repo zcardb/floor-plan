@@ -3423,6 +3423,39 @@ export type Database = {
         }
         Relationships: []
       }
+      interior_ai_assistants: {
+        Row: {
+          avatar: string
+          created_at: string
+          id: string
+          model: string
+          name: string
+          owner_id: string
+          prompt: string
+          updated_at: string
+        }
+        Insert: {
+          avatar: string
+          created_at?: string
+          id?: string
+          model: string
+          name: string
+          owner_id?: string
+          prompt?: string
+          updated_at?: string
+        }
+        Update: {
+          avatar?: string
+          created_at?: string
+          id?: string
+          model?: string
+          name?: string
+          owner_id?: string
+          prompt?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       interior_ai_candidates: {
         Row: {
           applied_at: string | null
@@ -3625,6 +3658,7 @@ export type Database = {
           depth: number
           height: number
           id: string
+          image_3d_url: string | null
           image_url: string | null
           name: string
           owner_id: string
@@ -3641,6 +3675,7 @@ export type Database = {
           depth: number
           height: number
           id?: string
+          image_3d_url?: string | null
           image_url?: string | null
           name: string
           owner_id?: string
@@ -3657,6 +3692,7 @@ export type Database = {
           depth?: number
           height?: number
           id?: string
+          image_3d_url?: string | null
           image_url?: string | null
           name?: string
           owner_id?: string
