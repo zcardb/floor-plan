@@ -1,5 +1,6 @@
 import { wallPoly } from '../geometry';
 import { validateDesign } from '../validation';
+import { deriveRooms } from '../roomDerive';
 import { uid, type Design, type Point, type Wall } from '../types';
 import { unitMm, type DxfSegment, type DxfUnit } from './dxfSource';
 import { attachLoose, clusterSymbols, fillCollinearGaps, fillEndGaps, placeOpenings, windowBands, type SymbolSegment } from './openings';
@@ -8,12 +9,13 @@ import { boundsOf } from './vector';
 import { axisWalls, closeJoints, regroupAxes, wallAxes, SINGLE_WALL_THICKNESS } from './walls';
 
 /** 图层在识别中的角色；opening 表示门窗混在一个图层里，按有没有开启弧线自动区分。 */
-export type LayerRole = 'wall' | 'door' | 'window' | 'opening' | 'ignore';
+export type LayerRole = 'wall' | 'door' | 'window' | 'opening' | 'separator' | 'ignore';
 export const LAYER_ROLES: { id: LayerRole; label: string }[] = [
   { id: 'wall', label: '墙体' },
   { id: 'door', label: '门' },
   { id: 'window', label: '窗' },
   { id: 'opening', label: '门窗（自动区分）' },
+  { id: 'separator', label: '房间分隔线' },
   { id: 'ignore', label: '忽略' },
 ];
 export interface RecognizeOptions { roles: Record<string, LayerRole>; unit: DxfUnit }
@@ -33,16 +35,21 @@ export const toPlan = (p: Point, mm: number): Point => [p[0] * mm, -p[1] * mm];
 const round = (v: number) => Math.round(v * 100) / 100;
 const median = (values: number[]) => values.slice().sort((x, y) => x - y)[Math.floor(values.length / 2)];
 
-/** 按图层名猜角色；一个墙图层都没猜到时，除门窗以外的图层都当墙。 */
+/**
+ * 按图层名猜角色；一个墙图层都没猜到时，除门窗以外的图层都当墙。
+ * 兼容 AIA / NCS 标准名（A-WALL、A-DOOR、A-GLAZ、A-AREA-BNDY）与常见中文图层名；拆除、填充图层不参与识别。
+ */
 export function guessRoles(layers: string[]): Record<string, LayerRole> {
   const guess = (name: string): LayerRole =>
-    /open|门窗|洞/i.test(name) ? 'opening'
+    /demo|拆|patt|hatch|填充/i.test(name) ? 'ignore'
+    : /separat|bndy|分隔|分割/i.test(name) ? 'separator'
+    : /open|门窗|洞/i.test(name) ? 'opening'
       : /door|门/i.test(name) ? 'door'
         : /win|glaz|窗/i.test(name) ? 'window'
           : /wall|墙|^qt|[-_]qt/i.test(name) ? 'wall' : 'ignore';
   const roles = Object.fromEntries(layers.map(name => [name, guess(name)]));
   if (!layers.some(name => roles[name] === 'wall'))
-    for (const name of layers) if (roles[name] === 'ignore') roles[name] = 'wall';
+    for (const name of layers) if (roles[name] === 'ignore' && !/demo|拆|patt|hatch|填充/i.test(name)) roles[name] = 'wall';
   return roles;
 }
 
@@ -54,7 +61,7 @@ export function recognizeDxf(segments: DxfSegment[], { roles, unit }: RecognizeO
   if (!wallLines.length) throw new Error('未识别到墙体：请把墙线所在的图层设为「墙体」');
   const symbols: SymbolSegment[] = segments.flatMap(s => {
     const r = role(s);
-    if (r === 'wall' || r === 'ignore') return [];
+    if (r === 'wall' || r === 'ignore' || r === 'separator') return [];
     return [{ a: toPlan(s.a, mm), b: toPlan(s.b, mm), group: s.group, arc: s.arc, kind: r === 'opening' ? 'auto' : r }];
   });
 
@@ -91,7 +98,13 @@ export function recognizeDxf(segments: DxfSegment[], { roles, unit }: RecognizeO
   if (singles) warnings.push(`${singles} 段单线没有配成双线墙，已按 ${SINGLE_WALL_THICKNESS} mm 厚的墙处理`);
   if (loose) warnings.push(`${loose} 处门窗没有找到对应的墙，已跳过，导入后可手动添加`);
 
-  const design = validateDesign({
+  const separators = segments
+    .filter(s => role(s) === 'separator' && !s.arc)
+    .map(s => ({ id: uid(), a: move(toPlan(s.a, mm)), b: move(toPlan(s.b, mm)) }))
+    .filter(s => Math.hypot(s.b[0] - s.a[0], s.b[1] - s.a[1]) >= 20);
+
+  // 房间由「墙 + 分隔线」重算，名称沿用墙体识别出的房间。
+  const design = deriveRooms(validateDesign({
     version: 2,
     template: 'reference',
     templateId: DXF_TEMPLATE_ID,
@@ -102,9 +115,10 @@ export function recognizeDxf(segments: DxfSegment[], { roles, unit }: RecognizeO
     walls,
     openings: placed.openings,
     rooms,
+    separators,
     furniture: [],
     demolished: [],
-  } satisfies Design);
+  } satisfies Design));
   return {
     design,
     offset,
@@ -112,7 +126,7 @@ export function recognizeDxf(segments: DxfSegment[], { roles, unit }: RecognizeO
       walls: walls.length,
       doors: placed.openings.filter(o => o.kind === 'door').length,
       windows: placed.openings.filter(o => o.kind === 'window').length,
-      rooms: rooms.length,
+      rooms: design.rooms.length,
     },
     warnings,
   };

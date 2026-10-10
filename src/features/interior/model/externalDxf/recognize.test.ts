@@ -5,6 +5,7 @@ import { serializeDxf } from '../dxfExport';
 import { area, length } from '../geometry';
 import { readDxfSource, type DxfSegment } from './dxfSource';
 import { guessRoles, recognizeDxf } from './recognize';
+import type { Point } from '../types';
 
 type XY = [number, number];
 const line = (a: XY, b: XY, layer: string) => ['0', 'LINE', '8', layer, '10', a[0], '20', a[1], '11', b[0], '21', b[1]].join('\n');
@@ -103,10 +104,20 @@ describe('外部 DXF 识别', () => {
     d.openings.push({ id: 'door', wallId: 'p', kind: 'door', offset: 2000, width: 900 }, { id: 'win', wallId: 'outer-0', kind: 'window', offset: 1500, width: 1200 });
     const source = readDxfSource(serializeDxf(createExportDocument(d)));
     const roles = guessRoles(source.layers.map(l => l.name));
-    expect(roles).toMatchObject({ WALLS: 'wall', OPENINGS: 'opening' });
+    expect(roles).toMatchObject({ 'A-WALL': 'wall', 'A-DOOR': 'door', 'A-GLAZ': 'window', 'A-AREA': 'ignore' });
+    expect(guessRoles(['A-WALL', 'A-WALL-PATT', 'A-WALL-DEMO', 'A-AREA-BNDY'])).toEqual({ 'A-WALL': 'wall', 'A-WALL-PATT': 'ignore', 'A-WALL-DEMO': 'ignore', 'A-AREA-BNDY': 'separator' });
     const { design, stats } = recognizeDxf(source.segments as DxfSegment[], { unit: source.unit, roles });
     expect(stats).toEqual({ walls: 5, doors: 1, windows: 1, rooms: 2 });
     expect(design.openings.map(o => o.width).sort((a, b) => a - b)).toEqual([900, 1200]);
+  });
+  it('A-AREA-BNDY 图层的线识别为房间分隔线，开敞空间按分隔线分成独立房间', () => {
+    const d = { ...blankDesign(), separators: [{ id: 's', a: [3000, 0] as Point, b: [3000, 6000] as Point }] };
+    const source = readDxfSource(serializeDxf(createExportDocument(d)));
+    const roles = guessRoles(source.layers.map(l => l.name));
+    expect(roles['A-AREA-BNDY']).toBe('separator');
+    const { design, stats } = recognizeDxf(source.segments as DxfSegment[], { unit: source.unit, roles });
+    expect(design.separators).toHaveLength(1);
+    expect(stats.rooms).toBe(2);
   });
   it('复杂户型：整面窗的阳台墙、凸窗、墙角门洞都能识别，被墙围合的房间全部找到', () => {
     const source = readDxfSource(serializeDxf(createExportDocument(referenceDesign())));

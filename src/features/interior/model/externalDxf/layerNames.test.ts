@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { layerLabel } from './layerNames';
 import { DRAWING_LAYERS, DRAWING_LAYER_NAMES } from '../drawingDocument';
+import { CAD_LAYER_NAMES } from '../drawingStyle';
 
 describe('图层中文名', () => {
-  it('本应用导出的图层全部有中文名', () => {
-    expect(DRAWING_LAYERS.map(layerLabel)).toEqual(DRAWING_LAYERS.map(layer => DRAWING_LAYER_NAMES[layer]));
+  it('本应用导出的标准图层（AIA / NCS）全部有中文名', () => {
+    expect(DRAWING_LAYERS.map(layer => layerLabel(CAD_LAYER_NAMES[layer]))).toEqual(DRAWING_LAYERS.map(layer => DRAWING_LAYER_NAMES[layer]));
+    expect(layerLabel(CAD_LAYER_NAMES.WALL_HATCH)).toBe('填充');
+  });
+  it('旧版导出的英文图层名仍有中文名', () => {
+    expect(['WALLS', 'DEMOLISHED', 'OPENINGS', 'FURNITURE', 'STAIRS', 'ROOM_LABELS', 'DIMENSIONS'].map(layerLabel))
+      .toEqual(['墙体', '拆除墙体', '门窗', '家具', '楼梯', '房间名称', '尺寸标注']);
   });
   it('常见 CAD 图层名与中文图层名', () => {
     expect(['0', 'A-WALL', 'DOOR', 'WINDOW', 'COLUMN', 'AXIS', 'TEXT', '墙', 'QT'].map(layerLabel))

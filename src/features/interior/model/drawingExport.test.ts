@@ -9,7 +9,8 @@ import { library } from '../data/catalog';
 import { createDrawingDocument, createExportDocument } from './drawingDocument';
 import { serializeDrawing, drawingFile, projectJsonFile, serializeProjectJson } from './drawingExport';
 import { DXF_SAVED_BY, DXF_TEXT_STYLE, serializeDxf } from './dxfExport';
-import { DXF_LAYER_STYLES } from './drawingStyle';
+import { CAD_LAYER_NAMES, DXF_LAYER_STYLES } from './drawingStyle';
+const isOpeningLayer=(layer:string)=>layer==='DOORS'||layer==='WINDOWS';
 import { serializePdf } from './pdfExport';
 import { drawingScale, drawingSheet } from './drawingScale';
 import { DWG_ERROR, FOREIGN_SVG_ERROR, parseDesignFile } from './designImport';
@@ -66,11 +67,11 @@ describe('工程交换图',()=>{
     const d=fixture(), next=splitWall(d,'partition',[50,300]).design;
     const before=createDrawingDocument(d,layers),after=createDrawingDocument(next,layers);
     expect(after.dimensions.map(dim=>dim.measurement)).toEqual(before.dimensions.map(dim=>dim.measurement));
-    expect(after.entities.filter(e=>e.layer==='OPENINGS')).toEqual(before.entities.filter(e=>e.layer==='OPENINGS'));
+    expect(after.entities.filter(e=>isOpeningLayer(e.layer))).toEqual(before.entities.filter(e=>isOpeningLayer(e.layer)));
     expect(XMLValidator.validate(serializeDrawing(next,'svg'))).toBe(true);
     const parsed=new DxfParser().parseSync(serializeDrawing(next,'dxf'))!;
     expect(parsed.entities.filter(e=>e.type==='DIMENSION')).toHaveLength(after.dimensions.length);
-    expect(parsed.entities.filter(e=>e.layer==='WALLS')).toHaveLength(after.entities.filter(e=>e.layer==='WALLS').length);
+    expect(parsed.entities.filter(e=>e.layer==='A-WALL')).toHaveLength(after.entities.filter(e=>e.layer==='WALLS').length);
   });
   it('尺寸驱动后DXF/SVG和JSON保留真实新净距，而非文字覆盖', () => {
     const d = fixture();
@@ -104,7 +105,7 @@ describe('工程交换图',()=>{
     expect(Object.values(parsed.blocks).some(b=>b.entities?.some(e=>e.type==='ARC'))).toBe(true);
     expect(parsed.entities.some(e=>e.type==='TEXT' && 'text' in e && e.text==='客厅 & <书房>')).toBe(true);
     expect(text).toContain('STUDIO_METERS');expect(text).not.toContain('NaN');
-    const manual=dimensions.find(e=>e.layer==='DIMENSIONS');expect(manual).toBeDefined();
+    const manual=dimensions.find(e=>e.layer==='A-ANNO-DIMS');expect(manual).toBeDefined();
     expect(Object.values(parsed.blocks).some(b=>b.entities?.some(e=>e.type==='TEXT'&&'text'in e&&/^\d+\.\d\d m$/.test(String(e.text))))).toBe(true);
   });
   it('DXF开头写入分段999方案数据，几何输出与不嵌入时一致',()=>{
@@ -139,8 +140,8 @@ describe('工程交换图',()=>{
     const svg=serializeDrawing(d,'svg');
     for(const name of ['家具','尺寸标注','房间名称'])expect(svg).toContain(`inkscape:label="${name}"`);
     const dxf=new DxfParser().parseSync(serializeDrawing(d,'dxf'))!;
-    expect(dxf.entities.some(e=>e.layer==='FURNITURE')).toBe(true);
-    expect(dxf.entities.some(e=>e.type==='DIMENSION'&&e.layer==='DIMENSIONS')).toBe(true);
+    expect(dxf.entities.some(e=>e.layer==='A-FURN')).toBe(true);
+    expect(dxf.entities.some(e=>e.type==='DIMENSION'&&e.layer==='A-ANNO-DIMS')).toBe(true);
     const {names}=await ocgNames(await serializePdf(createExportDocument(d),{fontBytes}));
     expect(names).toEqual(expect.arrayContaining(['家具','尺寸标注']));
   });
@@ -166,7 +167,7 @@ describe('工程交换图',()=>{
     const result=await parseDesignFile(file('户型.dxf',serializeDxf(createExportDocument(fixture()))));
     expect(result.kind).toBe('dxf');expect(result.name).toBe('户型');
     if(result.kind!=='dxf')return;
-    expect(result.source.unit).toBe('mm');expect(result.source.layers.map(l=>l.name)).toEqual(expect.arrayContaining(['WALLS','OPENINGS']));
+    expect(result.source.unit).toBe('mm');expect(result.source.layers.map(l=>l.name)).toEqual(expect.arrayContaining(['A-WALL','A-DOOR']));
   });
   it('负向：外部SVG、DWG、无线条DXF、损坏JSON、超过5MB、未知格式都报错',async()=>{
     await expect(parseDesignFile(file('a.svg','<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>'))).rejects.toThrow(FOREIGN_SVG_ERROR);
@@ -183,8 +184,8 @@ describe('工程交换图',()=>{
       {id:'sofa2',type:'sofa',name:'沙发',cx:4500,cy:3000,w:1800,d:800,rot:90,color:'#a08060'});
     const document=createExportDocument(d),text=serializeDxf(document);
     const parsed=new DxfParser().parseSync(text)!;
-    for(const [name,style] of Object.entries(DXF_LAYER_STYLES)){
-      const layer=dxfRecord(text,'LAYER',name);
+    for(const [key,style] of Object.entries(DXF_LAYER_STYLES)){
+      const name=CAD_LAYER_NAMES[key as keyof typeof CAD_LAYER_NAMES],layer=dxfRecord(text,'LAYER',name);
       expect(layer?.get('62'),name).toBe(String(style.color));
       expect(layer?.get('370'),name).toBe(String(style.lineweight));
       expect(layer?.get('6')?.toUpperCase(),name).toBe(style.lineType);
@@ -194,9 +195,9 @@ describe('工程交换图',()=>{
     expect(dxfTags(text).filter(([c,v])=>c==='0'&&v==='HATCH')).toHaveLength(walls.length);
     const inserts=parsed.entities.filter(e=>e.type==='INSERT');
     expect(inserts).toHaveLength(d.furniture.length+d.openings.length);
-    expect(new Set(inserts.filter(e=>e.layer==='FURNITURE').map(e=>'name' in e?e.name:''))).toEqual(new Set(['FURN_sofa_1800x800','FURN_roundtable_1000x1000']));
+    expect(new Set(inserts.filter(e=>e.layer==='A-FURN').map(e=>'name' in e?e.name:''))).toEqual(new Set(['FURN_sofa_1800x800','FURN_roundtable_1000x1000']));
     expect(parsed.blocks['FURN_roundtable_1000x1000']?.entities?.some(e=>e.type==='CIRCLE')).toBe(true);
-    expect(parsed.entities.some(e=>e.layer==='FURNITURE'&&e.type!=='INSERT')).toBe(false);
+    expect(parsed.entities.some(e=>e.layer==='A-FURN'&&e.type!=='INSERT')).toBe(false);
     expect(serializeDrawing(d,'svg')).toMatch(/<circle cx="1500" cy="1500" r="500"\/>/);
     expect(handseedValid(text)).toBe(true);expect(text).not.toContain('NaN');
   });
@@ -214,15 +215,15 @@ describe('工程交换图',()=>{
     d.furniture=[{...base,id:'s1',cx:2000,cy:2000,rot:180,stair:{form:'l',flightWidth:900,steps:15}},
       {...base,id:'s2',cx:5000,cy:2000,rot:0,stair:{form:'l',flightWidth:900,steps:15,hand:'left',reverse:true}}];
     const text=serializeDxf(createExportDocument(d)),parsed=new DxfParser().parseSync(text)!;
-    const inserts=parsed.entities.filter(e=>e.type==='INSERT'&&e.layer==='STAIRS') as unknown as {name:string;xScale?:number}[];
+    const inserts=parsed.entities.filter(e=>e.type==='INSERT'&&e.layer==='A-FLOR-STRS') as unknown as {name:string;xScale?:number}[];
     expect(inserts).toHaveLength(2);
     expect(new Set(inserts.map(i=>i.name)).size).toBe(2);
     for(const i of inserts){expect(i.name).toMatch(/^STAIR_L_2400x2400/);expect(i.xScale??1).toBeGreaterThan(0);
       expect(parsed.blocks[i.name].entities?.some(e=>e.type==='TEXT')).toBe(false);}
-    const labels=parsed.entities.filter(e=>e.type==='TEXT'&&e.layer==='STAIRS') as unknown as {text:string;rotation?:number}[];
+    const labels=parsed.entities.filter(e=>e.type==='TEXT'&&e.layer==='A-FLOR-STRS') as unknown as {text:string;rotation?:number}[];
     expect(labels.map(l=>l.text)).toEqual(['上','上']);
     for(const l of labels)expect(readable(l.rotation??0),String(l.rotation)).toBe(true);
-    const layer=dxfRecord(text,'LAYER','STAIRS');
+    const layer=dxfRecord(text,'LAYER','A-FLOR-STRS');
     expect(layer?.get('62')).toBe(String(DXF_LAYER_STYLES.STAIRS.color));expect(layer?.get('370')).toBe(String(DXF_LAYER_STYLES.STAIRS.lineweight));
     expect(text).not.toContain('NaN');
   });
@@ -233,9 +234,29 @@ describe('工程交换图',()=>{
       const text=serializeDxf(createExportDocument(d)),parsed=new DxfParser().parseSync(text)!;
       expect(text,String(rot)).not.toContain('NaN');
       const all=[...parsed.entities,...Object.values(parsed.blocks).flatMap(b=>b.entities??[])];
-      for(const e of all)if(e.layer)expect(Object.keys(DXF_LAYER_STYLES).concat('0'),`${rot} ${e.type}`).toContain(e.layer);
+      for(const e of all)if(e.layer)expect(Object.values(CAD_LAYER_NAMES).concat('0'),`${rot} ${e.type}`).toContain(e.layer);
       for(const e of all)if(e.type==='TEXT')expect(readable((e as unknown as {rotation?:number}).rotation??0),`${rot}`).toBe(true);
     }
+  });
+  it('行业规范：AIA / NCS 标准图层名，房间是闭合多段线，分隔线在 A-AREA-BNDY 且为虚线，门窗分层，垭口带虚线过梁',()=>{
+    const d=fixture();
+    d.separators=[{id:'sep',a:[0,3000],b:[3000,3000]}];
+    d.openings.push({id:'pass',wallId:'outer-0',kind:'passage',offset:4500,width:900},{id:'win',wallId:'outer-2',kind:'window',offset:1500,width:1200});
+    const text=serializeDxf(createExportDocument(d)),parsed=new DxfParser().parseSync(text)!;
+    const names=Object.keys(parsed.tables.layer.layers);
+    expect(names).toEqual(expect.arrayContaining(['A-WALL','A-WALL-PATT','A-WALL-DEMO','A-DOOR','A-GLAZ','A-AREA','A-AREA-IDEN','A-AREA-BNDY','A-FURN','A-FLOR-STRS','A-ANNO-DIMS']));
+    expect(names.some(n=>/^(WALLS|OPENINGS|ROOMS)$/.test(n))).toBe(false);
+    const rooms=parsed.entities.filter(e=>e.layer==='A-AREA') as unknown as {type:string;shape?:boolean}[];
+    expect(rooms.length).toBeGreaterThan(0);
+    expect(rooms.every(r=>r.type==='LWPOLYLINE'&&r.shape)).toBe(true);
+    expect(parsed.entities.filter(e=>e.layer==='A-AREA-BNDY').map(e=>e.type)).toEqual(['LINE']);
+    expect(dxfRecord(text,'LAYER','A-AREA-BNDY')?.get('6')?.toUpperCase()).toBe('DASHED');
+    const inserts=parsed.entities.filter(e=>e.type==='INSERT') as unknown as {name:string;layer:string}[];
+    expect(inserts.filter(i=>/^(DOOR|PASS)_/.test(i.name)).every(i=>i.layer==='A-DOOR')).toBe(true);
+    expect(inserts.filter(i=>/^WIN_/.test(i.name)).every(i=>i.layer==='A-GLAZ')).toBe(true);
+    const passage=Object.entries(parsed.blocks).find(([name])=>name.startsWith('PASS_'))![1];
+    expect((passage.entities??[]).filter(e=>(e as unknown as {lineType?:string}).lineType==='DASHED')).toHaveLength(2);
+    expect(serializeDrawing(d,'svg')).toContain('inkscape:label="房间分隔线"');
   });
   it('画布关闭显示层只保留实际结构，导出不修改设计',()=>{
     const d=fixture(),before=JSON.stringify(d),document=createDrawingDocument(d,{...layers,dims:false,furn:false,labels:false});

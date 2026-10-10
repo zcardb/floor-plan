@@ -76,7 +76,7 @@ export function openingDrawing(o: Opening, thickness: number): DrawingEntity[] {
   // 垭口：洞口两侧贯穿墙厚的边线 + 上方过梁投影的虚线（剖切面以上的构件按制图惯例画虚线），没有门扇与开启弧线。
   if (o.kind === 'passage') return [
     ...[-half, half].map(x => drawingLine([x, -t], [x, t], layer)),
-    ...[-t, t].map((y): DrawingEntity => ({ ...drawingLine([-half, y], [half, y], layer), dashed: true } as DrawingEntity)),
+    ...[-t, t].map((y): DrawingEntity => ({ kind: 'polyline', points: [[-half, y], [half, y]], closed: false, layer, dashed: true })),
   ];
   if (o.kind === 'window') return [{ kind: 'polyline', closed: true, layer, points: [[-half, -t], [half, -t], [half, t], [-half, t]] },
     drawingLine([-half, 0], [half, 0], layer)];

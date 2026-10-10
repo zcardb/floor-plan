@@ -26,7 +26,7 @@ describe('取消分割合并连续墙', () => {
     d.openings.push({ id: 'door', wallId: 'q', kind: 'door', offset: 1000, width: 900 });
     const next = mergeWall(d, 'p').design;
     expect(next.openings[0]).toMatchObject({ wallId: 'p', offset: 5000, hinge: 'end', swingSide: 1 });
-    const openings = (design: typeof d) => createDrawingDocument(design, layers).entities.filter(e => e.layer === 'OPENINGS');
+    const openings = (design: typeof d) => createDrawingDocument(design, layers).entities.filter(e => e.layer === 'DOORS' || e.layer === 'WINDOWS');
     const before = openings(d), after = openings(next);
     expect(after[0]).toEqual(before[0]);
     expect(splitWall(next, 'p', [300]).design.walls).toHaveLength(d.walls.length);

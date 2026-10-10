@@ -37,7 +37,8 @@ describe('图纸墙段分割', () => {
       const marked = setWallBearing(next, w.id, true); expect(isOnBearingWall(marked, w.id)).toBe(true);
       expect(calculateCosts(next)).toEqual(calculateCosts(d));
       const layers = { dims: true, labels: true, furn: true, bearing: true, grid: false, snap: true };
-      expect(createDrawingDocument(next, layers).entities.filter(e => e.layer === 'OPENINGS')).toEqual(createDrawingDocument(d, layers).entities.filter(e => e.layer === 'OPENINGS'));
+      const openings = (x: typeof d) => createDrawingDocument(x, layers).entities.filter(e => e.layer === 'DOORS' || e.layer === 'WINDOWS');
+      expect(openings(next)).toEqual(openings(d));
       expect(validateDesign(JSON.parse(JSON.stringify(next))).openings).toEqual(next.openings);
     }
   });

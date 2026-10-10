@@ -48,45 +48,45 @@
 
 ## 实施清单
 ### 模型
-- [ ] `model/types.ts`：新增 Separator 类型、`Design.separators`、选中类型 `"separator"`、工具 `"separator"`
-- [ ] `model/roomDerive.ts`：实现 `deriveRooms`
-- [ ] `model/separators.ts`：实现 follow / migrate / add / remove
-- [ ] `model/roomFollow.ts`：`syncRooms` 改走新流程，删除 followRooms 和 splitRoomsWithWall
-- [ ] `model/geometry.ts`：`rebuildRooms` 改为委托给 `deriveRooms`
-- [ ] 删除旧逻辑：`roomEnclosed.ts`、`roomMerge.ts`、`splitRoomsByWalls`、`roomHoles.ts` 中的相关调用
-- [ ] `model/wallRemoval.ts`、`model/roomRemoval.ts`：改为调用 `syncRooms`
-- [ ] `model/validation.ts`：增加分隔线校验，加载时执行迁移
-- [ ] `data/templates.ts`、`data/floorplanBuilder.ts`：生成方案后执行迁移
-- [ ] `model/externalDxf/recognize.ts`：识别结果写入 `separators`
+- [x] `model/types.ts`：新增 Separator 类型、`Design.separators`、选中类型 `"separator"`、工具 `"separator"`
+- [x] `model/roomDerive.ts`：实现 `deriveRooms`
+- [x] `model/separators.ts`：实现 follow / migrate / add / remove
+- [x] `model/roomFollow.ts`：`syncRooms` 改走新流程，删除 followRooms 和 splitRoomsWithWall
+- [x] `model/geometry.ts`：`rebuildRooms` 改为委托给 `deriveRooms`
+- [x] 删除旧逻辑：`roomEnclosed.ts`、`roomMerge.ts`、`splitRoomsByWalls`、`roomHoles.ts` 中的相关调用
+- [x] `model/wallRemoval.ts`、`model/roomRemoval.ts`：改为调用 `syncRooms`
+- [x] `model/validation.ts`：增加分隔线校验，加载时执行迁移
+- [x] `data/templates.ts`、`data/floorplanBuilder.ts`：生成方案后执行迁移
+- [x] `model/externalDxf/recognize.ts`：识别结果写入 `separators`
 
 ### 调用点
-- [ ] `useWallDrawing.ts`、`PlanCanvas.tsx`（拖墙）、`Workbench.tsx`（打开项目时）：统一改为调用 `syncRooms`
+- [x] `useWallDrawing.ts`、`PlanCanvas.tsx`（拖墙）、`Workbench.tsx`（打开项目时）：统一改为调用 `syncRooms`
 
 ### 界面
-- [ ] `components/WallToolMenu.tsx`：墙工具下拉
-- [ ] `Workbench.tsx`：工具栏改为 选择 · 框选 · 墙 ▾ · 门 · 窗
-- [ ] `Library.tsx`：「硬装」中增加墙、门窗两组按钮
-- [ ] `useSeparatorDrawing.ts`：分隔线绘制，复用 `useSegmentDrawing`
-- [ ] `PlanCanvas.tsx`：分隔线以虚线渲染，可点击选中
-- [ ] 分隔线支持删除，属性面板显示其长度
+- [x] `components/WallToolMenu.tsx`：墙工具下拉
+- [x] `Workbench.tsx`：工具栏改为 选择 · 框选 · 墙 ▾ · 门 · 窗
+- [x] `Library.tsx`：「硬装」中增加墙、门窗两组按钮
+- [x] `useSeparatorDrawing.ts`：分隔线绘制，复用 `useSegmentDrawing`
+- [x] `PlanCanvas.tsx`：分隔线以虚线渲染，可点击选中
+- [x] 分隔线支持删除，属性面板显示其长度
 
 ### 导出
-- [ ] `drawingStyle.ts`：建立标准图层映射，并定义 `A-AREA-BNDY` 的样式
-- [ ] `drawingDocument.ts`：新增 SEPARATORS 图层；门 / 垭口与窗分别放到各自图层；垭口补画虚线过梁
-- [ ] `dxfExport.ts`、`svgExport.ts`、`pdfExport.ts`：改用标准图层名
-- [ ] `externalDxf`：识别拆除墙图层和分隔线图层
+- [x] `drawingStyle.ts`：建立标准图层映射，并定义 `A-AREA-BNDY` 的样式
+- [x] `drawingDocument.ts`：新增 SEPARATORS 图层；门 / 垭口与窗分别放到各自图层；垭口补画虚线过梁
+- [x] `dxfExport.ts`、`svgExport.ts`、`pdfExport.ts`：改用标准图层名
+- [x] `externalDxf`：识别拆除墙图层和分隔线图层
 
 ### 测试
-- [ ] 删除已废弃的测试：roomMerge、roomHoles，以及 roomFollow 中的旧用例
-- [ ] 新增 `roomDerive.test.ts`、`separators.test.ts`
-- [ ] 更新 drawingExport、recognize、Workbench、Library 的测试，以及其他断言随新行为变化的测试
+- [x] 删除已废弃的测试：roomMerge、roomHoles，以及 roomFollow 中的旧用例
+- [x] 新增 `roomDerive.test.ts`、`separators.test.ts`
+- [x] 更新 drawingExport、recognize、Workbench、Library 的测试，以及其他断言随新行为变化的测试
 
 ## 验证清单
-- [ ] 截图 290：删墙后不再出现白条
-- [ ] 截图 289：0.82 m² 的飘窗区能识别为房间
-- [ ] 截图 294：移动墙体时飘窗保持矩形
-- [ ] 厨房和餐厅之间有分隔线，两者仍是独立的房间
-- [ ] 画一条分隔线可以把房间一分为二，删掉后两部分合并回原房间
-- [ ] 导出的 DXF 使用标准图层名，每个房间是一条闭合多段线
-- [ ] 旧项目打开时自动迁移，房间名称和材质不丢失
-- [ ] `pnpm vitest run src/features/interior`、lint、build 全部通过
+- [x] 截图 290：删墙后不再出现白条（roomDerive.test「删墙后两间房并成一间」）
+- [x] 截图 289：0.82 m² 的飘窗区能识别为房间（roomDerive.test「0.82 m²」）
+- [x] 截图 294：移动墙体时飘窗保持矩形（roomFollow.test「飘窗轮廓不变形」）
+- [x] 厨房和餐厅之间有分隔线，两者仍是独立的房间（separators.test「参考户型迁移」）
+- [x] 画一条分隔线可以把房间一分为二，删掉后两部分合并回原房间（separators.test「增删」）
+- [x] 导出的 DXF 使用标准图层名，每个房间是一条闭合多段线（drawingExport.test「行业规范」）
+- [x] 旧项目打开时自动迁移，房间名称和材质不丢失（validation.test / separators.test「迁移」）
+- [x] `pnpm vitest run src/features/interior`、lint、build 全部通过

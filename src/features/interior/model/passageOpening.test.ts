@@ -30,12 +30,13 @@ describe('垭口', () => {
     const bad = { ...design, openings: [...design.openings.slice(0, -1), { ...design.openings[design.openings.length - 1]!, kind: 'arch' }] };
     expect(() => validateDesign(bad)).toThrow();
   });
-  it('导出只有两条贯穿墙厚的边线，没有门扇弧线', () => {
+  it('导出两条贯穿墙厚的边线 + 两条虚线过梁，没有门扇弧线，归入门图层', () => {
     const { design } = withPassage();
     const doc = createDrawingDocument(design, { grid: false, dims: false, labels: false, furn: false, bearing: false, snap: false });
     const own = doc.entities.filter(e => e.group?.id === 'passage');
-    expect(own).toHaveLength(2);
-    expect(own.every(e => e.kind === 'polyline' && e.layer === 'OPENINGS')).toBe(true);
+    expect(own).toHaveLength(4);
+    expect(own.every(e => e.kind === 'polyline' && e.layer === 'DOORS')).toBe(true);
+    expect(own.filter(e => e.kind === 'polyline' && e.dashed)).toHaveLength(2);
     expect(own[0]!.group!.name).toBe('垭口');
   });
   it('两侧房间保持独立，费用中出现垭口条目', () => {
