@@ -1,4 +1,5 @@
 import type { FurnitureOutline } from './furnitureAppearance';
+import type { FurnitureModel3d } from './furniture3d';
 export type Point = [number, number];
 export type WallKind = "bearing" | "exterior" | "partition" | "low";
 export interface Wall {
@@ -53,6 +54,8 @@ export interface Furniture {
   catalogId?: string;
   height?: number;
   imageUrl?: string;
+  /** AI 生成的简易 3D 模型（画布 3D 与详情预览共用）。 */
+  model3d?: FurnitureModel3d;
 }
 export interface MaterialProcurement {
   length?: number;
@@ -173,6 +176,8 @@ export interface LibraryItem {
   imageUrl?: string;
   /** AI 生成的 3D 透视效果图（家具详情的 3D 视角）。 */
   image3dUrl?: string;
+  /** AI 生成的简易 3D 模型（画布 3D 与详情预览共用）。 */
+  model3d?: FurnitureModel3d;
   price?: number | null;
 }
 export const uid = () => crypto.randomUUID();

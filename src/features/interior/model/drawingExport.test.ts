@@ -8,7 +8,7 @@ import { blankDesign } from '../data/templates';
 import { library } from '../data/catalog';
 import { createDrawingDocument, createExportDocument } from './drawingDocument';
 import { serializeDrawing, drawingFile, projectJsonFile, serializeProjectJson } from './drawingExport';
-import { serializeDxf } from './dxfExport';
+import { DXF_SAVED_BY, DXF_TEXT_STYLE, serializeDxf } from './dxfExport';
 import { serializePdf } from './pdfExport';
 import { drawingScale, drawingSheet } from './drawingScale';
 import { DWG_ERROR, FOREIGN_SVG_ERROR, parseDesignFile } from './designImport';
@@ -30,6 +30,30 @@ function fixture(){
 /** Canvas has dimensions hidden; exports must still contain everything. */
 const hiddenOnCanvas=(d:Design):Design=>({...d,dimensionSettings:{...d.dimensionSettings,visible:false}});
 const file=(name:string,text:string,size=text.length)=>({name,size,text:async()=>text});
+/** DXF tag pairs (group code, value) after the leading 999 payload comments. */
+function dxfTags(text:string){
+  const lines=text.split(/\r?\n/),tags:[string,string][]=[];
+  for(let i=0;i+1<lines.length;i+=2)tags.push([lines[i].trim(),lines[i+1]]);
+  return tags;
+}
+/** Group-code → value map of the record `0 <type>` whose name (code 2) is `name`. */
+function dxfRecord(text:string,type:string,name:string){
+  const tags=dxfTags(text);
+  for(let i=0;i<tags.length;i++){
+    if(tags[i][0]!=='0'||tags[i][1]!==type)continue;
+    const end=tags.findIndex((t,j)=>j>i&&t[0]==='0'),body=tags.slice(i+1,end<0?undefined:end);
+    if(body.some(([c,v])=>c==='2'&&v===name))return new Map(body);
+  }
+  return undefined;
+}
+/** $HANDSEED must exceed every object handle (codes 5 / 105) for strict CAD readers. */
+function handseedValid(text:string){
+  const tags=dxfTags(text),at=tags.findIndex(([c,v])=>c==='9'&&v==='$HANDSEED');
+  const seed=parseInt(tags[at+1][1],16);
+  // tags[at+1] is the $HANDSEED value itself, not an object handle.
+  const max=Math.max(...tags.filter(([c],i)=>(c==='5'||c==='105')&&i!==at+1).map(([,v])=>parseInt(v,16)));
+  return seed>max;
+}
 async function ocgNames(bytes:Uint8Array){
   const pdf=await PDFDocument.load(bytes);
   const props=pdf.catalog.lookup(PDFName.of('OCProperties'),PDFDict);
@@ -61,6 +85,12 @@ describe('工程交换图',()=>{
     const d=fixture(),document=createExportDocument(d),text=serializeDrawing(d,'dxf');
     const parsed=new DxfParser().parseSync(text)!;
     expect(parsed.header.$ACADVER).toBe('AC1021');expect(parsed.header.$INSUNITS).toBe(4);expect(parsed.header.$MEASUREMENT).toBe(1);
+    expect(parsed.header.$DWGCODEPAGE).toBe('ANSI_1252');expect(parsed.header.$LASTSAVEDBY).toBe(DXF_SAVED_BY);
+    const style=dxfRecord(text,'STYLE',DXF_TEXT_STYLE);
+    expect(style?.get('3')).toBe('simplex.shx');expect(style?.get('4')).toBe('gbcbig.shx');
+    const textStyles=dxfTags(text).flatMap(([c,v],i,all)=>c==='0'&&v==='TEXT'?[all.slice(i+1,all.findIndex((t,j)=>j>i&&t[0]==='0')).find(([code])=>code==='7')?.[1]]:[]);
+    expect(textStyles.length).toBeGreaterThan(0);expect(textStyles.every(s=>s===DXF_TEXT_STYLE)).toBe(true);
+    expect(handseedValid(text)).toBe(true);expect(handseedValid(serializeDxf(document))).toBe(true);
     const dimensions=parsed.entities.filter(e=>e.type==='DIMENSION');expect(dimensions).toHaveLength(document.dimensions.length);
     expect(Object.keys(parsed.blocks).filter(name=>name.startsWith('*D'))).toHaveLength(dimensions.length);
     for (const entity of dimensions) {

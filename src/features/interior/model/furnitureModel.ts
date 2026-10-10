@@ -5,6 +5,7 @@ export const toFurnitureModel = (item: LibraryItem): Furniture => ({
   id: item.catalogId ?? item.type + item.name,
   type: item.type,
   shape: item.shape,
+  model3d: item.model3d,
   name: item.name,
   cx: 0,
   cy: 0,

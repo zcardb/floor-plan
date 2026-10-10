@@ -1,0 +1,3 @@
+ALTER TABLE public.interior_furniture_catalog ADD COLUMN IF NOT EXISTS model_3d jsonb;
+ALTER TABLE public.interior_furniture_catalog DROP CONSTRAINT IF EXISTS interior_catalog_model_3d_check;
+ALTER TABLE public.interior_furniture_catalog ADD CONSTRAINT interior_catalog_model_3d_check CHECK (model_3d IS NULL OR (jsonb_typeof(model_3d) = 'object' AND pg_column_size(model_3d) < 32000));

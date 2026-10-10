@@ -3,8 +3,11 @@ import type { DxfBlock } from '@tarikjabiri/dxf';
 import type { DrawingDocument, DrawingEntity } from './drawingDocument';
 import type { Point } from './types';
 import { PAYLOAD_MARKER } from './designPayload';
-/** Max characters per DXF 999 comment line (well under common reader line limits). */
+/** Max characters per DXF 999 comment line (R2000+ string limit is 2049 single-byte chars). */
 export const DXF_COMMENT_CHUNK = 2000;
+/** Text style with an SHX big font so AutoCAD renders Chinese instead of `?`. */
+export const DXF_TEXT_STYLE = 'STUDIO_CN';
+export const DXF_SAVED_BY = 'Zhujian Studio';
 const cad = ([x,y]:Point) => point3d(x,-y,0);
 const degrees = (radians:number) => ((-radians*180/Math.PI)%360+360)%360;
 
@@ -17,7 +20,7 @@ function writeEntity(target:DxfBlock,entity:DrawingEntity){
     degrees(entity.clockwise?entity.end:entity.start),degrees(entity.clockwise?entity.start:entity.end),options);
   else target.addText(cad(entity.point),entity.height,entity.text.replace(/[\r\n]/g,' '),{...options,
     rotation:((-entity.rotation)%360+360)%360,horizontalAlignment:TextHorizontalAlignment.Center,
-    verticalAlignment:TextVerticalAlignment.Middle,secondAlignmentPoint:cad(entity.point)});
+    verticalAlignment:TextVerticalAlignment.Middle,secondAlignmentPoint:cad(entity.point)}).textStyle=DXF_TEXT_STYLE;
 }
 // DXF flag 32 declares an exclusive anonymous display block for this dimension.
 class DisplayBlockDimension extends AlignedDimension {
@@ -33,7 +36,10 @@ function payloadComments(payload:string){
 }
 export function serializeDxf(document:DrawingDocument,payload?:string):string{
   const writer=new DxfWriter();writer.setUnits(Units.Millimeters);
-  writer.setVariable('$MEASUREMENT',{70:1});writer.setVariable('$DWGCODEPAGE',{3:'UTF-8'});
+  writer.setVariable('$MEASUREMENT',{70:1});writer.setVariable('$DWGCODEPAGE',{3:'ANSI_1252'});
+  writer.setVariable('$LASTSAVEDBY',{1:DXF_SAVED_BY});
+  const textStyle=writer.tables.addStyle(DXF_TEXT_STYLE);
+  textStyle.fontFileName='simplex.shx';textStyle.bigFontFileName='gbcbig.shx';
   writer.setVariable('$EXTMIN',{10:document.bounds.x,20:-document.bounds.y2,30:0});
   writer.setVariable('$EXTMAX',{10:document.bounds.x2,20:-document.bounds.y,30:0});
   for(const layer of ['WALLS','DEMOLISHED','ROOMS','OPENINGS','FURNITURE','ROOM_LABELS','DIMENSIONS'])writer.addLayer(layer,7,'CONTINUOUS');

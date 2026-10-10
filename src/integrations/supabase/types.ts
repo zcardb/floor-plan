@@ -3660,6 +3660,7 @@ export type Database = {
           id: string
           image_3d_url: string | null
           image_url: string | null
+          model_3d: Json | null
           name: string
           owner_id: string
           price: number | null
@@ -3677,6 +3678,7 @@ export type Database = {
           id?: string
           image_3d_url?: string | null
           image_url?: string | null
+          model_3d?: Json | null
           name: string
           owner_id?: string
           price?: number | null
@@ -3694,6 +3696,7 @@ export type Database = {
           id?: string
           image_3d_url?: string | null
           image_url?: string | null
+          model_3d?: Json | null
           name?: string
           owner_id?: string
           price?: number | null
