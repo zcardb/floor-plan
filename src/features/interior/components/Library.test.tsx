@@ -34,7 +34,7 @@ describe('硬装分类入口',()=>{
       expect(tree.some(n=>n.props['aria-label']==='添加'+name),name).toBe(true);
     const item=tree.find(n=>n.props['aria-label']==='添加直跑楼梯')!;
     (item.props.onClick as ()=>void)();
-    expect(h.add).toHaveBeenCalledWith(expect.objectContaining({name:'直跑楼梯',w:1000,d:3600,stair:{form:'straight',flightWidth:1000,steps:14}}));
+    expect(h.add).toHaveBeenCalledWith(expect.objectContaining({name:'直跑楼梯',w:1000,d:4480,stair:expect.objectContaining({form:'straight',flightWidth:1000,steps:16})}));
     expect(tree.some(n=>n.props['aria-label']==='添加三人沙发')).toBe(false);
     expect(tree.some(n=>n.type==='button'&&Array.isArray(n.props.children)&&n.props.children.includes('墙体'))).toBe(false);
     expect(tree.filter(n=>n.type==='h4').map(n=>n.props.children)).toEqual(['墙','门窗']);

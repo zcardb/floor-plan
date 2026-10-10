@@ -16,7 +16,9 @@ import { removeWall as removeWallModel } from '../model/wallRemoval';
 import { clearRoomFurniture } from '../model/roomFurniture';
 import { removeRoom as removeRoomModel, type RoomRemoval } from '../model/roomRemoval';
 import { groupIds, moveGroup, removeGroup } from '../model/furnitureGroup';
+import { rotateUnit } from '../model/movableUnit';
 import { deriveRooms } from '../model/roomDerive';
+import { isStairs, resizeStair } from '../model/stairs';
 import { migrateSeparators, removeSeparator } from '../model/separators';
 import { followWallFurniture } from '../model/furnitureFollow';
 import { splitAtJunctionsOf } from '../model/wallAutoSplit';
@@ -89,6 +91,7 @@ import {
   type Design,
   type Layers,
   type LibraryItem,
+  type Furniture,
   type Point,
   type Project,
   type Selection,
@@ -395,17 +398,16 @@ export function Workbench(p: Props) {
           point ||
           (view === "3d" ? scene.current?.ground() : null) ||
           (r ? center(r) : [d.width / 2, d.depth / 2]);
-      const f = pushOut(
-        {
-          ...it,
-          catalogId: it.catalogId || `${it.type}:${it.name}`,
-          id: uid(),
-          cx: Math.round(p[0] / 10) * 10,
-          cy: Math.round(p[1] / 10) * 10,
-          rot: 0,
-        },
-        d,
-      );
+      const placed: LibraryItem & Furniture = {
+        ...it,
+        catalogId: it.catalogId || `${it.type}:${it.name}`,
+        id: uid(),
+        cx: Math.round(p[0] / 10) * 10,
+        cy: Math.round(p[1] / 10) * 10,
+        rot: 0,
+      };
+      // 楼梯按当前层高推算踏步数，外框随梯段长同步。
+      const f = pushOut(isStairs(placed) ? resizeStair(placed, {}, d.height) : placed, d);
       // 账号库家具放进画布时登记进项目目录，报价与导出沿用它的名称与单价。
       const entry = it.catalogId && !library.some((l) => l.catalogId === it.catalogId) ? it : null;
       change((d) => ({
@@ -427,13 +429,9 @@ export function Workbench(p: Props) {
   const rotate = useCallback(
     (angle = 90) => {
       sizeTransaction.flush();
-      if (selection?.kind === "furniture")
-        change((d) => ({
-          ...d,
-          furniture: d.furniture.map((f) =>
-            f.id === selection.id ? { ...f, rot: norm(f.rot + angle) } : f,
-          ),
-        }));
+      // 单件原地转；整组绕整体中心转，组内相对位置不变。
+      const ids = selection?.kind === "furniture" ? [selection.id] : selection?.kind === "group" ? selection.ids : [];
+      if (ids.length) change((d) => rotateUnit(d, ids, angle));
     },
     [selection, change, sizeTransaction],
   );

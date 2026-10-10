@@ -1,31 +1,30 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Minus, Plus } from 'lucide-react';
+import { AlertTriangle, Minus, Plus, RotateCcw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { meterDraft, parseMeterDraft } from '../model/lengthUnits';
 import {
-  STAIR_FLIGHT_MAX, STAIR_FLIGHT_MIN, STAIR_PRESETS, STAIR_STEPS_MAX, STAIR_STEPS_MIN,
-  applyStairForm, stairFlightWidths, stairMetrics, stairSpec,
+  STAIR_FLIGHT_MAX, STAIR_FLIGHT_MIN, STAIR_LENGTH_MAX, STAIR_LENGTH_MIN, STAIR_PRESETS, STAIR_RISER_MAX, STAIR_RISER_MIN,
+  STAIR_STEPS_MAX, STAIR_STEPS_MIN, STAIR_TREAD_MAX, STAIR_TREAD_MIN, applyStairForm, resizeStair,
+  stairFlightCount, stairFlightLengths, stairFlightWidths, stairMetrics, stairRiser, stairSpec, stairSteps, stairTread,
 } from '../model/stairs';
 import type { Design, Furniture, StairForm, StairSpec } from '../model/types';
 import { StairPlan } from './StairPlan';
 import { EditorSelect } from './EditorSelect';
 
+type Change = (fn: (d: Design) => Design) => void;
 const enterBlurs = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } };
-/** 米制梯段宽输入：失焦 / 回车提交，越界报错并回滚。 */
+
+/** 米制数字输入：失焦 / 回车提交，越界报错并回滚。 */
 function MeterField({ label, value, onCommit, onError }: { label: string; value: number; onCommit: (mm: number) => void; onError: (text: string) => void }) {
   const [draft, setDraft] = useState(meterDraft(value));
   useEffect(() => setDraft(meterDraft(value)), [value]);
   const commit = () => {
     const mm = parseMeterDraft(draft);
-    if (!Number.isFinite(mm) || mm < STAIR_FLIGHT_MIN || mm > STAIR_FLIGHT_MAX) {
-      onError(`梯段宽需在 ${meterDraft(STAIR_FLIGHT_MIN)}–${meterDraft(STAIR_FLIGHT_MAX)} m 之间`);
-      setDraft(meterDraft(value));
-      return;
-    }
-    onError('');
-    if (mm !== value) onCommit(mm);
+    if (!Number.isFinite(mm)) { setDraft(meterDraft(value)); return; }
+    if (mm === value) onError('');
+    else onCommit(mm);
   };
   return <Label className="field-label">{label}
     <Input className="editor-control" aria-label={label} type="number" step={0.01} value={draft}
@@ -33,23 +32,33 @@ function MeterField({ label, value, onCommit, onError }: { label: string; value:
   </Label>;
 }
 
-type Change = (fn: (d: Design) => Design) => void;
-const updateFurniture = (change: Change, id: string, fn: (f: Furniture) => Furniture) =>
-  change(d => ({ ...d, furniture: d.furniture.map(f => (f.id === id ? fn(f) : f)) }));
+/** 类别卡片缩略图：按该类别标准梯段长推出外框，用当前踏步数与实际梯段宽绘制。 */
+function previewOf(preset: { form: StairForm; flightWidth: number }, furniture: Furniture, steps: number, floorHeight: number) {
+  const f = resizeStair({ ...furniture, stair: { form: preset.form, flightWidth: preset.flightWidth, steps } }, {}, floorHeight);
+  return { stair: f.stair!, box: { w: f.w, d: f.d } };
+}
 
-/** 楼梯专属编辑：类别、梯段宽、踏步数，以及按 GB 50096 套内楼梯推导的踏步尺寸提示。 */
+/** 楼梯专属编辑：类别、各跑宽 / 长、踏步数与踏面 / 踏步高，以及按 GB 50096 推导的提示。 */
 export function StairEditor({ design, furniture, change }: { design: Design; furniture: Furniture; change: Change }) {
-  const spec = stairSpec(furniture);
-  const [steps, setSteps] = useState(String(spec.steps));
-  const [error, setError] = useState('');
+  const spec = stairSpec(furniture), [error, setError] = useState(''), [steps, setSteps] = useState(String(spec.steps));
   useEffect(() => setSteps(String(spec.steps)), [spec.steps]);
-  const patch = (next: Partial<StairSpec>) => updateFurniture(change, furniture.id, f => ({ ...f, stair: { ...stairSpec(f), ...next } }));
-  const pickForm = (form: StairForm) => { setError(''); if (form !== spec.form) updateFurniture(change, furniture.id, f => applyStairForm(f, form)); };
-  const widths = stairFlightWidths(spec), multi = widths.length > 1;
-  /** 改某一跑宽度：写完整 flightWidths，flightWidth 同步为第 1 跑以兼容旧逻辑。 */
-  const commitWidth = (index: number, mm: number) => {
-    const next = widths.map((v, i) => (i === index ? mm : v));
-    patch(multi ? { flightWidth: next[0], flightWidths: next } : { flightWidth: mm });
+  const update = (patch: Partial<StairSpec>, lengths?: number[]) =>
+    change(d => ({ ...d, furniture: d.furniture.map(f => (f.id === furniture.id ? resizeStair(f, patch, design.height, lengths) : f)) }));
+  const check = (mm: number, min: number, max: number, what: string) => {
+    if (mm >= min && mm <= max) { setError(''); return true; }
+    setError(`${what}需在 ${meterDraft(min)}–${meterDraft(max)} m 之间`);
+    return false;
+  };
+  const pickForm = (form: StairForm) => { setError(''); if (form !== spec.form) change(d => ({ ...d, furniture: d.furniture.map(f => (f.id === furniture.id ? applyStairForm(f, form, design.height) : f)) })); };
+  const setLength = (index: number, mm: number) => {
+    if (!check(mm, STAIR_LENGTH_MIN, STAIR_LENGTH_MAX, '梯段长')) return;
+    const lengths = stairFlightLengths(spec, furniture.w, furniture.d).map((v, i) => (i === index ? mm : v));
+    update({}, lengths);
+  };
+  const setWidth = (index: number, mm: number) => {
+    if (!check(mm, STAIR_FLIGHT_MIN, STAIR_FLIGHT_MAX, '梯段宽')) return;
+    const widths = stairFlightWidths(spec).map((v, i) => (i === index ? mm : v));
+    update({ flightWidth: widths[0], ...(widths.length > 1 ? { flightWidths: widths } : {}) });
   };
   const commitSteps = (text: string) => {
     const value = Number(text);
@@ -59,47 +68,65 @@ export function StairEditor({ design, furniture, change }: { design: Design; fur
       return;
     }
     setError('');
-    if (value !== spec.steps) patch({ steps: value });
+    update({ steps: value, stepsManual: true });
   };
-  const metrics = stairMetrics(spec, furniture.w, furniture.d, design.height);
+  const counts = stairFlightCount(spec.form), widths = stairFlightWidths(spec), lengths = stairFlightLengths(spec, furniture.w, furniture.d);
+  const metrics = stairMetrics(spec, furniture.w, furniture.d, design.height), auto = stairSteps(design.height, stairRiser(spec));
+  const prefix = (i: number) => (counts > 1 ? `第 ${i + 1} 跑` : '梯段');
   return <div className="stair-editor" onKeyDown={e => e.stopPropagation()}>
     <div className="stair-forms" role="radiogroup" aria-label="楼梯类别">
-      {STAIR_PRESETS.map(p => <button key={p.form} type="button" role="radio" aria-checked={p.form === spec.form}
-        className="stair-form-card" onClick={() => pickForm(p.form)}>
-        <svg viewBox={`${-p.w / 2 - 80} ${-p.d / 2 - 80} ${p.w + 160} ${p.d + 160}`} className="furniture-drawing" aria-hidden="true">
-          <StairPlan spec={{ form: p.form, flightWidth: p.flightWidth, steps: p.steps }} w={p.w} d={p.d} color={furniture.color} />
-        </svg>
-        <span>{p.name.replace('楼梯', '').trim()}</span>
-      </button>)}
+      {STAIR_PRESETS.map(p => { const preview = previewOf(p, furniture, spec.steps, design.height);
+        return <button key={p.form} type="button" role="radio" aria-checked={p.form === spec.form}
+          className="stair-form-card" onClick={() => pickForm(p.form)}>
+          <svg viewBox={`${-preview.box.w / 2 - 80} ${-preview.box.d / 2 - 80} ${preview.box.w + 160} ${preview.box.d + 160}`} className="furniture-drawing" aria-hidden="true">
+            <StairPlan spec={preview.stair} w={preview.box.w} d={preview.box.d} color={furniture.color} />
+          </svg>
+          <span>{p.name.replace('楼梯', '').trim()}</span>
+        </button>; })}
     </div>
-    <div className="visual-size-fields">
-      {widths.map((value, i) => <MeterField key={`${spec.form}-${i}`} label={multi ? `第 ${i + 1} 跑宽 / m` : '梯段宽 / m'} value={value}
-        onCommit={mm => commitWidth(i, mm)} onError={setError} />)}
+    <div className="stair-fields">
+      {widths.map((value, i) => [
+        <MeterField key={`w${spec.form}${i}`} label={`${prefix(i)}宽 / m`} value={value} onError={setError} onCommit={mm => setWidth(i, mm)} />,
+        lengths[i] !== undefined && <MeterField key={`l${spec.form}${i}`} label={`${prefix(i)}长 / m`} value={lengths[i]} onError={setError} onCommit={mm => setLength(i, mm)} />,
+      ])}
+    </div>
+    <div className="stair-steps-row">
       <Label className="field-label">踏步数 / 级
         <span className="stair-steps">
           <Button type="button" variant="outline" size="icon" aria-label="减少一级" disabled={spec.steps <= STAIR_STEPS_MIN}
-            onClick={() => commitSteps(String(spec.steps - 1))}><Minus /></Button>
+            onClick={() => update({ steps: spec.steps - 1, stepsManual: true })}><Minus /></Button>
           <Input className="editor-control" aria-label="踏步数" type="number" step={1} value={steps}
             onChange={e => setSteps(e.target.value)} onBlur={() => commitSteps(steps)} onKeyDown={enterBlurs} />
           <Button type="button" variant="outline" size="icon" aria-label="增加一级" disabled={spec.steps >= STAIR_STEPS_MAX}
-            onClick={() => commitSteps(String(spec.steps + 1))}><Plus /></Button>
+            onClick={() => update({ steps: spec.steps + 1, stepsManual: true })}><Plus /></Button>
         </span>
       </Label>
+      <div className="stair-modes">
+        <span className={spec.stepsManual ? 'stair-mode' : 'stair-mode is-active'}>{spec.stepsManual ? '手动' : '自动'}</span>
+        {spec.stepsManual && <Button type="button" variant="ghost" size="sm" className="stair-auto" aria-label="按层高恢复自动踏步数"
+          onClick={() => update({ steps: auto, stepsManual: false })}><RotateCcw size={13} />按层高算 {auto} 级</Button>}
+      </div>
+    </div>
+    <div className="stair-fields">
+      <MeterField label="踏面宽 / m" value={stairTread(spec)} onError={setError} onCommit={mm => check(mm, STAIR_TREAD_MIN, STAIR_TREAD_MAX, '踏面宽') && update({ treadDepth: mm })} />
+      <MeterField label="踏步高 / m" value={stairRiser(spec)} onError={setError} onCommit={mm => check(mm, STAIR_RISER_MIN, STAIR_RISER_MAX, '踏步高') && update({ riserHeight: mm })} />
     </div>
     <div className="stair-direction">
       <EditorSelect label="行走方向" value={spec.reverse ? 'reverse' : 'forward'}
         options={[{ value: 'forward', label: '正向 · 由此端起步' }, { value: 'reverse', label: '反向 · 由另一端起步' }]}
-        onChange={value => patch({ reverse: value === 'reverse' })} />
-      {multi && <EditorSelect label="转向" value={spec.hand ?? 'right'}
+        onChange={value => update({ reverse: value === 'reverse' })} />
+      {counts > 1 && <EditorSelect label="转向" value={spec.hand ?? 'right'}
         options={[{ value: 'right', label: '右转' }, { value: 'left', label: '左转' }]}
-        onChange={value => patch({ hand: value as StairSpec['hand'] })} />}
+        onChange={value => update({ hand: value as StairSpec['hand'] })} />}
     </div>
     {error && <p className="form-error" role="alert">{error}</p>}
     <dl className="stair-metrics">
-      <div><dt>{spec.form === 'spiral' ? '踏步宽（距内侧 0.25 m）' : '踏步宽'}</dt><dd>{Math.round(metrics.treadDepth)} mm</dd></div>
-      <div><dt>踏步高（层高 ÷ 踏步数）</dt><dd>{Math.round(metrics.riserHeight)} mm</dd></div>
+      <div><dt>外框</dt><dd>{Math.round(furniture.w)} × {Math.round(furniture.d)}</dd></div>
+      <div><dt>{spec.form === 'spiral' ? '踏面宽（距内侧 0.25 m）' : '实际踏面宽'}</dt><dd>{Math.round(metrics.treadDepth)} mm</dd></div>
+      <div><dt>实际踏步高</dt><dd>{Math.round(metrics.riserHeight)} mm</dd></div>
+      <div><dt>踏步数</dt><dd>{spec.steps} 级</dd></div>
     </dl>
     {metrics.warnings.map(text => <p key={text} className="stair-warning" role="note"><AlertTriangle size={14} />{text}</p>)}
-    <p className="muted-note">依据 GB 50096 套内楼梯：梯段宽 ≥ 0.75 m，踏步宽 ≥ 0.22 m，踏步高 ≤ 0.20 m；外框长宽在「尺寸与位置」中修改。</p>
+    <p className="muted-note">依据 GB 50096 套内楼梯：梯段宽 ≥ 0.75 m、踏面宽 ≥ 0.22 m、踏步高 ≤ 0.20 m；踏步高与踏面宽默认取住宅常用值。</p>
   </div>;
 }

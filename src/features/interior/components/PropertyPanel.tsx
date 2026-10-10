@@ -38,6 +38,7 @@ import { RoomSurfacePanel } from "./RoomSurfacePanel";
 import { RoomSidesDiagram } from "./RoomSidesDiagram";
 import { roomSides } from "../model/roomSides";
 import { cardPrice } from "../model/priceLabel";
+import { syncStairsToHeight } from "../model/stairs";
 import { ColorSwatches } from "./ColorSwatches";
 import { PanelHint, ShortcutList } from "./PanelHint";
 import { Button } from "@/components/ui/button";
@@ -592,7 +593,7 @@ export function PropertyPanel({
               {input(
                 "层高 / m",
                 d.height,
-                (v) => change((d) => ({ ...d, height: v })),
+                (v) => change((d) => syncStairsToHeight({ ...d, height: v })),
                 1000,
                 8000,
               )}

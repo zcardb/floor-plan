@@ -4,7 +4,10 @@ import { library } from '../data/catalog';
 import { blankDesign } from '../data/templates';
 import { validateDesign } from '../model/validation';
 import { createSizeTransaction } from '../model/sizeTransaction';
-import { STAIR_PRESETS, applyStairForm, stairFlightWidths, stairLayout, stairMetrics, stairSpec } from '../model/stairs';
+import {
+  STAIR_DEFAULTS, STAIR_PRESETS, applyStairForm, resizeStair, stairFlightLengths, stairFlightWidths, stairLayout, stairMetrics,
+  stairRiser, stairSizeOf, stairSpec, stairStandardLengths, stairSteps, stairTread, syncStairsToHeight, updateStair,
+} from '../model/stairs';
 import { furnitureDrawing } from '../model/furnitureDrawing';
 import { FurnitureShape } from './FurnitureShape';
 import { SizeFields } from './SizeFields';
@@ -21,7 +24,8 @@ const count = (markup: string, tag: string) => (markup.match(new RegExp(`<${tag}
 describe('楼梯类别与平面图样', () => {
   it('素材库提供直跑 / L 型 / U 型 / 三跑 / 螺旋五种楼梯，均带参数', () => {
     expect(library.filter(item => item.type === 'stairs').map(item => item.stair?.form)).toEqual(['straight', 'l', 'u', 'triple', 'spiral']);
-    expect(preset('直跑楼梯')).toMatchObject({ w: 1000, d: 3600, stair: { form: 'straight', flightWidth: 1000, steps: 14 } });
+    // 外框由行业标准梯段长推导：16 级 × 280 mm 踏面宽 = 4480 mm。
+    expect(preset('直跑楼梯')).toMatchObject({ w: 1000, d: 4480, stair: { form: 'straight', flightWidth: 1000, steps: 16 } });
   });
   it('旧楼梯没有 stair 字段时按直跑 12 级绘制，仍是 11 条踏步线', () => {
     expect(stairSpec(legacy)).toEqual({ form: 'straight', flightWidth: 1000, steps: 12 });
@@ -39,11 +43,11 @@ describe('楼梯类别与平面图样', () => {
       expect(markup, item.name).not.toContain('NaN');
     }
     const straight = preset('直跑楼梯');
-    expect(count(markupOf(straight), 'line')).toBe(13);
+    expect(count(markupOf(straight), 'line')).toBe(15);
     expect(count(markupOf({ ...straight, stair: { ...straight.stair!, steps: 18 } }), 'line')).toBe(17);
     const spiral = markupOf(preset('螺旋楼梯'));
     expect(count(spiral, 'circle')).toBe(3);
-    expect(count(spiral, 'line')).toBe(15);
+    expect(count(spiral, 'line')).toBe(17);
   });
   it('边界：外框缩小时梯段宽被夹取，几何不出现负尺寸或 NaN', () => {
     for (const p of STAIR_PRESETS) for (const [w, d] of [[1000, 1000], [600, 2400], [2400, 600]]) {
@@ -77,7 +81,7 @@ describe('楼梯类别与平面图样', () => {
   it('左转：L / U / 三跑左右镜像，「上」字不做镜像变换', () => {
     for (const form of ['l', 'u', 'triple'] as const) {
       const p = STAIR_PRESETS.find(s => s.form === form)!, spec = { form, flightWidth: p.flightWidth, steps: p.steps };
-      const right = stairLayout(spec, p.w, p.d), left = stairLayout({ ...spec, hand: 'left' }, p.w, p.d);
+      const box = stairSizeOf(spec), right = stairLayout(spec, box.w, box.d), left = stairLayout({ ...spec, hand: 'left' }, box.w, box.d);
       expect(left.lines.map(([a, b]) => [[-a[0], a[1]], [-b[0], b[1]]])).toEqual(right.lines);
       expect(left.start[0]).toBeCloseTo(-right.start[0]);
       expect(left.start[0], form).toBeGreaterThan(0);
@@ -109,10 +113,70 @@ describe('楼梯类别与平面图样', () => {
 });
 
 describe('楼梯参数编辑', () => {
-  it('切换类别：外框与参数换成预设，位置与旋转保留，预设名与单价键随类别', () => {
-    const next = applyStairForm({ ...legacy, rot: 90 }, 'u');
-    expect(next).toMatchObject({ w: 2100, d: 3000, cx: 2000, cy: 2000, rot: 90, name: 'U 型楼梯', catalogId: 'stairs:U 型楼梯', stair: { form: 'u', flightWidth: 1000, steps: 16 } });
+  it('切换类别：参数换成预设、外框按标准梯段长推导、位置与旋转保留，预设名与单价键随类别', () => {
+    const next = applyStairForm({ ...legacy, rot: 90 }, 'u', 2800);
+    // U 型 16 级：两跑各 8 级 × 280 = 2240；外框 = 1000 + 1000 + 梯井 200，进深 = 平台 1000 + 2240。
+    expect(next).toMatchObject({ w: 2200, d: 3240, cx: 2000, cy: 2000, rot: 90, name: 'U 型楼梯', catalogId: 'stairs:U 型楼梯',
+      stair: { form: 'u', flightWidth: 1000, steps: 16, flightLengths: [2240, 2240] } });
     expect(applyStairForm({ ...legacy, name: '主楼梯' }, 'spiral').name).toBe('主楼梯');
+    expect(applyStairForm(legacy, 'l', 3200).stair!.steps).toBe(18);
+  });
+  it('行业标准默认值：踏步高 175 / 踏面宽 280；踏步数 = 层高 ÷ 踏步高', () => {
+    const spec = { form: 'straight' as const, flightWidth: 1000, steps: 16 };
+    expect([stairRiser(spec), stairTread(spec)]).toEqual([STAIR_DEFAULTS.riserHeight, STAIR_DEFAULTS.treadDepth]);
+    expect(stairSteps(2800)).toBe(16);
+    expect(stairSteps(3200)).toBe(18);
+    expect(stairSteps(3000, 150)).toBe(20);
+    expect(stairSteps(100000)).toBe(40);
+    expect(stairStandardLengths({ form: 'triple', flightWidth: 900, steps: 16 })).toEqual([6 * 280, 5 * 280, 5 * 280]);
+  });
+  it('梯段长：外框跟着梯段长推导；L 型平台为 f1 × f2', () => {
+    const straight = resizeStair({ ...legacy, stair: { form: 'straight', flightWidth: 1000, steps: 16 } }, {}, 2800, [4000]);
+    expect(straight).toMatchObject({ w: 1000, d: 4000 });
+    const shorter = resizeStair(straight, {}, 2800, [2800]);
+    expect(shorter.d).toBe(2800);
+    const lStair = { ...legacy, ...applyStairForm(legacy, 'l', 2800) };
+    const l = resizeStair(lStair, {}, 2800, [2400, 1600]);
+    expect(l).toMatchObject({ w: 900 + 1600, d: 900 + 2400 });
+    expect(stairFlightLengths(l.stair!, l.w, l.d).map(Math.round)).toEqual([2400, 1600]);
+    const layout = stairLayout(l.stair!, l.w, l.d);
+    expect(layout.outline).toMatchObject({ kind: 'polygon' });
+    expect(layout.lines).toContainEqual([[-l.w / 2, -l.d / 2 + 900], [-l.w / 2 + 900, -l.d / 2 + 900]]);
+  });
+  it('U 型两跑可不等长：外框进深取较长一跑，行走线贯通，梯井线存在', () => {
+    const u = resizeStair(applyStairForm(legacy, 'u', 2800), {}, 2800, [2600, 1800]);
+    expect(u.d).toBe(1000 + 2600);
+    expect(stairFlightLengths(u.stair!, u.w, u.d).map(Math.round)).toEqual([2600, 1800]);
+    const layout = stairLayout(u.stair!, u.w, u.d);
+    expect(layout.outline).toMatchObject({ kind: 'polygon' });
+    expect(layout.walk).toHaveLength(4);
+    expect(layout.lines.filter(([a, b]) => a[0] === b[0]).length).toBeGreaterThanOrEqual(2);
+    expect([...layout.lines.flat(), ...layout.walk].flat().every(Number.isFinite)).toBe(true);
+  });
+  it('改踏面宽或踏步数时梯段长回到「踏步数 × 踏面宽」；只改梯段宽时保留梯段长', () => {
+    const l = resizeStair(applyStairForm(legacy, 'l', 2800), {}, 2800, [2400, 1600]);
+    expect(resizeStair(l, { flightWidth: 1000, flightWidths: [1000, 900] }, 2800).stair!.flightLengths).toEqual([2400, 1600]);
+    expect(resizeStair(l, { treadDepth: 300 }, 2800).stair!.flightLengths).toEqual([2400, 2400]);
+    expect(resizeStair(l, { steps: 18, stepsManual: true }, 2800).stair!.flightLengths).toEqual([9 * 280, 9 * 280]);
+  });
+  it('踏步数：自动时随层高变化，手动后不变；踏步高改变时自动重算', () => {
+    const auto = applyStairForm(legacy, 'straight', 2800);
+    expect(auto.stair!.steps).toBe(16);
+    const taller = syncStairsToHeight({ ...blankDesign(), height: 3200, furniture: [auto] });
+    expect(taller.furniture[0].stair).toMatchObject({ steps: 18, flightLengths: [18 * 280] });
+    expect(taller.furniture[0].d).toBe(18 * 280);
+    const manual = resizeStair(auto, { steps: 14, stepsManual: true }, 2800);
+    expect(syncStairsToHeight({ ...blankDesign(), height: 3200, furniture: [manual] }).furniture[0].stair!.steps).toBe(14);
+    expect(resizeStair(auto, { riserHeight: 150 }, 2800).stair!.steps).toBe(19);
+    const unchanged = { ...blankDesign(), height: 2800, furniture: [auto, legacy] };
+    expect(syncStairsToHeight(unchanged)).toBe(unchanged);
+  });
+  it('螺旋楼梯：外框由踏面宽（距内侧 0.25 m 量）与踏步数推导', () => {
+    const spec = updateStair({ form: 'spiral', flightWidth: 800, steps: 16 }, {});
+    const { w, d } = stairSizeOf(spec);
+    expect(w).toBe(d);
+    expect(spec.flightLengths).toBeUndefined();
+    expect(stairMetrics(spec, w, d, 2800).treadDepth).toBeCloseTo(280, 5);
   });
   it('规范提示：踏步过窄、过高、梯段过窄时提示，满足时不提示', () => {
     expect(stairMetrics({ form: 'straight', flightWidth: 1000, steps: 14 }, 1000, 3600, 2800).warnings).toEqual([]);
@@ -121,36 +185,55 @@ describe('楼梯参数编辑', () => {
     expect(Math.round(metrics.riserHeight)).toBe(233);
     expect(metrics.warnings).toHaveLength(3);
   });
-  it('编辑面板列出五种类别并高亮当前类别，显示踏步宽与踏步高', () => {
+  it('编辑面板：五种类别、每跑宽 + 长、踏面宽 / 踏步高、自动踏步数与推导结果', () => {
     const design: Design = { ...blankDesign(), height: 2800 };
     const f = { ...preset('L 型楼梯'), id: 'l', cx: 0, cy: 0, rot: 0 } as Furniture;
     const markup = renderToStaticMarkup(<StairEditor design={design} furniture={f} change={() => {}} />);
     expect((markup.match(/role="radio"/g) || []).length).toBe(5);
     expect(markup).toMatch(/aria-checked="true"[^>]*>.*?<span>L 型<\/span>/);
-    expect(markup).toContain('踏步高（层高 ÷ 踏步数）');
-    expect(markup).toContain('187 mm');
-    expect(markup).toContain('第 1 跑宽 / m');
-    expect(markup).toContain('第 2 跑宽 / m');
-    expect(markup).not.toContain('第 3 跑宽');
-    expect(markup).toContain('行走方向');
-    expect(markup).toContain('转向');
+    for (const label of ['第 1 跑宽 / m', '第 1 跑长 / m', '第 2 跑宽 / m', '第 2 跑长 / m', '踏面宽 / m', '踏步高 / m', '行走方向', '转向', '实际踏步高', '外框'])
+      expect(markup, label).toContain(label);
+    expect(markup).not.toContain('第 3 跑');
+    expect(markup).toContain('>自动<');
+    expect(markup).toContain('value="0.28"');
+    expect(markup).toContain('value="0.17"');
+    const manual = renderToStaticMarkup(<StairEditor design={design} furniture={resizeStair(f, { steps: 14, stepsManual: true }, 2800)} change={() => {}} />);
+    expect(manual).toContain('>手动<');
+    expect(manual).toContain('按层高算 16 级');
     const triple = renderToStaticMarkup(<StairEditor design={design} furniture={{ ...preset('三跑楼梯'), id: 't', cx: 0, cy: 0, rot: 0 } as Furniture} change={() => {}} />);
-    expect(triple).toContain('第 3 跑宽 / m');
+    expect(triple).toContain('第 3 跑长 / m');
     const straight = renderToStaticMarkup(<StairEditor design={design} furniture={{ ...preset('直跑楼梯'), id: 's', cx: 0, cy: 0, rot: 0 } as Furniture} change={() => {}} />);
     expect(straight).toContain('梯段宽 / m');
+    expect(straight).toContain('梯段长 / m');
     expect(straight).not.toContain('跑宽');
     expect(straight).not.toContain('转向');
+    const spiral = renderToStaticMarkup(<StairEditor design={design} furniture={{ ...preset('螺旋楼梯'), id: 'p', cx: 0, cy: 0, rot: 0 } as Furniture} change={() => {}} />);
+    expect(spiral).not.toContain('梯段长');
   });
   it('stair 字段经 JSON 往返保留；非法参数被校验拒绝', () => {
     const f = { ...preset('三跑楼梯'), id: 't', cx: 2000, cy: 2000, rot: 0 } as Furniture;
     const design: Design = { ...blankDesign(), furniture: [f] };
     expect(validateDesign(JSON.parse(JSON.stringify(design))).furniture[0].stair).toEqual(f.stair);
-    const full = { ...f, stair: { ...f.stair!, flightWidths: [900, 1000, 1100], reverse: true, hand: 'left' as const } };
+    const full = { ...f, stair: { ...f.stair!, flightWidths: [900, 1000, 1100], flightLengths: [1500, 1200, 1400], treadDepth: 260, riserHeight: 160,
+      stepsManual: true, reverse: true, hand: 'left' as const } };
     expect(validateDesign(JSON.parse(JSON.stringify({ ...design, furniture: [full] }))).furniture[0].stair).toEqual(full.stair);
     for (const stair of [{ ...f.stair!, steps: 2 }, { ...f.stair!, steps: 41 }, { ...f.stair!, steps: 12.5 }, { ...f.stair!, form: 'x' }, { ...f.stair!, flightWidth: 100 },
-      { ...f.stair!, flightWidths: [900, 900] }, { ...f.stair!, flightWidths: [900, 100, 900] }, { ...f.stair!, hand: 'up' }, { ...f.stair!, reverse: 'yes' }])
-      expect(() => validateDesign({ ...design, furniture: [{ ...f, stair }] })).toThrow();
+      { ...f.stair!, flightWidths: [900, 900] }, { ...f.stair!, flightWidths: [900, 100, 900] }, { ...f.stair!, hand: 'up' }, { ...f.stair!, reverse: 'yes' },
+      { ...f.stair!, flightLengths: [1500, 1500] }, { ...f.stair!, flightLengths: [1500, 100, 1500] }, { ...f.stair!, treadDepth: 50 },
+      { ...f.stair!, riserHeight: 500 }, { ...f.stair!, stepsManual: 'yes' }])
+      expect(() => validateDesign({ ...design, furniture: [{ ...f, stair }] }), JSON.stringify(stair)).toThrow();
     expect(() => validateDesign({ ...design, furniture: [{ ...f, type: 'sofa' }] })).toThrow();
+  });
+  it('边界：极小外框与 20 m 梯段长都不出现 NaN 或负尺寸', () => {
+    for (const form of ['straight', 'l', 'u', 'triple'] as const) {
+      const base = applyStairForm(legacy, form, 2800), count = base.stair!.flightLengths!.length;
+      const long = resizeStair(base, {}, 2800, Array(count).fill(20000));
+      for (const [s, w, d] of [[long.stair!, long.w, long.d], [base.stair!, 1000, 1000]] as const) {
+        const layout = stairLayout(s, w, d);
+        expect([...layout.lines.flat(), ...layout.walk, ...layout.arrow, layout.label].flat().every(Number.isFinite), form).toBe(true);
+        expect(layout.treadDepth, form).toBeGreaterThan(0);
+      }
+    }
   });
   it('外框尺寸仍走家具尺寸事务，楼梯显示长宽', () => {
     let current: Design = { ...blankDesign(), furniture: [legacy] };

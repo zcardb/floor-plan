@@ -208,6 +208,21 @@ describe('工程交换图',()=>{
     }
     expect(furnitureDrawing({id:'stair',type:'stairs',name:'楼梯',w:1000,d:3000,cx:0,cy:0,rot:0,color:'#aaa'}).length).toBeGreaterThan(12);
   });
+  it('楼梯新参数进入图块签名：梯段长 / 踏面宽 / 踏步高不同则不复用图块',()=>{
+    const pair=(patch:Record<string,unknown>)=>({id:`s${Object.keys(patch).join('')}`,type:'stairs',name:'直跑楼梯',w:1000,d:4480,cx:2000,cy:2000,rot:0,color:'#e6dccc',
+      stair:{form:'straight',flightWidth:1000,steps:16,flightLengths:[4480],...patch}});
+    const d=fixture();
+    d.furniture=[pair({}),pair({flightLengths:[4000]}),pair({treadDepth:300}),pair({riserHeight:160}),pair({stepsManual:true})].map((f,i)=>({...f,id:`s${i}`,cx:2000+i*2000}));
+    const text=serializeDxf(createExportDocument(d)),parsed=new DxfParser().parseSync(text)!;
+    const inserts=parsed.entities.filter(e=>e.type==='INSERT'&&e.layer==='STAIRS') as unknown as {name:string}[];
+    expect(inserts).toHaveLength(5);
+    expect(new Set(inserts.map(i=>i.name)).size).toBe(5);
+    for(const name of new Set(inserts.map(i=>i.name))){
+      const types=(parsed.blocks[name].entities??[]).map(e=>e.type);
+      expect(types.every(t=>['LINE','LWPOLYLINE','ARC','CIRCLE','ELLIPSE'].includes(t!)),name).toBe(true);
+    }
+    expect(text).not.toContain('NaN');
+  });
   /** CAD 文字从下方或右侧可读：DXF 角度不落在 (90°, 270°]。 */
   const readable=(deg:number)=>{const a=((deg%360)+360)%360;return !(a>90+1e-6&&a<=270+1e-6);};
   it('楼梯导出：STAIRS 图层、STAIR_ 图块、「上」字在模型空间且旋转 180° 后仍可读、左转不用负比例',()=>{

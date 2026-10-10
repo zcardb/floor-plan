@@ -2690,7 +2690,15 @@
 .wall-placement-span.is-active .wall-placement-marker text { fill: hsl(var(--primary-foreground)); }
 .visual-editor-popover:has(.wall-placement) { width: 440px; }
 /* 楼梯专属编辑：类别卡片 + 梯段宽 / 踏步数 + 规范推导 */
-.stair-popover { width: 344px; }
+/* 楼梯面板：内容多，限宽限高并在面板内滚动，避免盖住正在编辑的楼梯 */
+.stair-popover { width: 360px; max-height: min(72vh, 520px, var(--radix-popover-content-available-height, 72vh)); overflow-y: auto; overscroll-behavior: contain; }
+.stair-fields { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-row) var(--sp-col); }
+.stair-steps-row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-col); margin-top: var(--sp-row); }
+.stair-steps-row > .field-label { flex: 1 1 auto; }
+.stair-modes { display: flex; padding-top: 2px; flex-direction: column; align-items: flex-end; gap: 4px; }
+.stair-mode { padding: 2px 7px; border-radius: 999px; font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); background: hsl(var(--secondary)); }
+.stair-mode.is-active { color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); }
+.stair-auto { height: auto; padding: 0 4px; font-size: var(--fs-meta); color: hsl(var(--primary)); }
 .stair-forms { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-bottom: var(--sp-row); }
 .stair-form-card {
   display: grid;
@@ -2708,6 +2716,7 @@
 .stair-form-card[aria-checked="true"] { border-color: hsl(var(--primary)); background: hsl(var(--primary) / 0.08); color: hsl(var(--foreground)); font-weight: 600; }
 .stair-form-card svg { width: 100%; height: 48px; }
 .stair-direction { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-row) var(--sp-col); margin-top: var(--sp-row); }
+.stair-popover .muted-note { margin-top: 8px; }
 .stair-steps { display: flex; align-items: center; gap: 4px; }
 .stair-steps > button { flex: 0 0 auto; width: var(--ctl-lg); height: var(--ctl-lg); }
 .stair-steps > button svg { width: 14px; height: 14px; }

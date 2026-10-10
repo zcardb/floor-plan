@@ -22,9 +22,9 @@ import {
   nearestOnWall,
   norm,
   roomPath,
-  blockFurnitureMove,
 } from "../model/geometry";
-import { snapFurniture, sameGuides, type AlignmentGuide } from '../model/furnitureAlignment';
+import { sameGuides, type AlignmentGuide } from '../model/furnitureAlignment';
+import { dragUnit } from '../model/movableUnit';
 import { AlignmentGuides } from './AlignmentGuides';
 import {
   isOpeningTool,
@@ -56,7 +56,7 @@ import { doorOrientation } from '../model/doorOrientation';
 import { defaultOpeningSize } from '../model/hardMaterials';
 import { dragOpening } from '../model/openingDrag';
 import { isCompletionClick, supportsPointerCompletion } from '../model/toolCompletion';
-import { furnitureCorners, furnitureInRect, groupBounds, groupIds, moveGroup, normalizeRect, selectionOf, type Rect } from '../model/furnitureGroup';
+import { furnitureCorners, furnitureInRect, groupBounds, groupIds, normalizeRect, selectionOf, type Rect } from '../model/furnitureGroup';
 export interface CanvasHandle {
   zoom: (k: number) => void;
   fit: () => void;
@@ -93,12 +93,11 @@ interface Drag {
   screen: Point;
   before: Design;
   id?: string;
-  /** 整组拖动时参与移动的家具。 */
+  /** 拖动家具（单件或整组）时作为一个可移动单位的家具。 */
   ids?: string[];
   /** 框选的当前角点（图纸坐标）。 */
   end?: Point;
   room?: string;
-  offset?: Point;
   view?: { x: number; y: number; s: number };
   moved: boolean;
 }
@@ -555,11 +554,10 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           base.id = fid;
           base.ids = group;
         } else if (fid) {
-          const f = design.furniture.find((f) => f.id === fid)!;
           select({ kind: "furniture", id: fid });
           base.kind = "move";
           base.id = fid;
-          base.offset = [p[0] - f.cx, p[1] - f.cy];
+          base.ids = [fid];
         } else if (marquee && tool === 'select') {
           // 框选模式：从墙、门窗或空白处起拖都是画框（家具上起拖仍是移动家具）。
           base.kind = 'marquee';
@@ -656,9 +654,11 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           setBox(normalizeRect(dr.start, p));
           return;
         }
-        if (dr.kind === 'groupmove') {
-          const moveBy = stepDelta([p[0] - dr.start[0], p[1] - dr.start[1]], dragStep(dr.before));
-          preview(moveGroup(dr.before, dr.ids!, moveBy));
+        if (dr.kind === 'move' || dr.kind === 'groupmove') {
+          // 单件与整组都是「可移动单位」：同一套步进、吸附、对齐线与挡墙。
+          const moved = dragUnit(dr.before, current.current, dr.ids!, [p[0] - dr.start[0], p[1] - dr.start[1]], layers.snap, 8 / view.s);
+          preview(moved.design);
+          showGuides(moved.guides);
           return;
         }
         if (dr.kind === "pan") {
@@ -678,15 +678,6 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           f = next.furniture.find((f) => f.id === dr.id),
           wall = next.walls.find((w) => w.id === dr.id);
         if (f) {
-          if (dr.kind === "move") {
-            // 先按步进取整位移，再吸附、裁到墙面内侧：家具整步移动，贴墙对齐时以吸附为准。
-            const moveBy = stepDelta([p[0] - dr.start[0], p[1] - dr.start[1]], dragStep(next));
-            const goal: Point = [dr.start[0] + moveBy[0], dr.start[1] + moveBy[1]];
-            const snapped = snapFurniture(f, [goal[0] - dr.offset![0], goal[1] - dr.offset![1]], next, layers.snap, 8 / view.s);
-            const last = current.current.furniture.find((o) => o.id === f.id) ?? f;
-            [f.cx, f.cy] = blockFurnitureMove(f, [last.cx, last.cy], snapped.point, next);
-            showGuides(snapped.guides);
-          }
           if (dr.kind === "rot") {
             const a =
               (Math.atan2(p[1] - f.cy, p[0] - f.cx) * 180) / Math.PI + 90;

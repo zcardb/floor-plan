@@ -429,7 +429,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           <EditorTooltip label="楼梯类别、梯段宽与踏步数">
             <PopoverTrigger asChild><button type="button" aria-label="编辑楼梯参数"><Footprints size={15} />楼梯<ChevronDown size={12} /></button></PopoverTrigger>
           </EditorTooltip>
-          <PopoverContent className="visual-editor-popover stair-popover" side="bottom" align="start" collisionPadding={12}>
+          <PopoverContent className="visual-editor-popover stair-popover" side="right" align="start" sideOffset={8} collisionPadding={12}>
             <h3>楼梯</h3>
             <StairEditor design={p.design} furniture={f} change={p.change} />
           </PopoverContent>
@@ -485,19 +485,19 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </PopoverContent>
           </Popover>
         )}
+        {(f || group.length > 1) && (
+          <EditorTooltip label={group.length > 1 ? "整组旋转 90°" : "旋转 90°"} shortcut="R">
+            <button type="button" aria-label={group.length > 1 ? "整组旋转 90°" : "旋转 90°"} onClick={p.rotate}>
+              <RotateCw size={15} />
+            </button>
+          </EditorTooltip>
+        )}
         {f && (
-          <>
-            <EditorTooltip label="旋转 90°" shortcut="R">
-              <button type="button" aria-label="旋转 90°" onClick={p.rotate}>
-                <RotateCw size={15} />
-              </button>
-            </EditorTooltip>
-            <EditorTooltip label="复制对象" shortcut="Ctrl D">
-              <button type="button" aria-label="复制对象" onClick={p.duplicate}>
-                <Copy size={15} />
-              </button>
-            </EditorTooltip>
-          </>
+          <EditorTooltip label="复制对象" shortcut="Ctrl D">
+            <button type="button" aria-label="复制对象" onClick={p.duplicate}>
+              <Copy size={15} />
+            </button>
+          </EditorTooltip>
         )}
         {(f || o || deletableWall || separator || group.length > 1) && (
           <EditorTooltip label={group.length > 1 ? "删除选中家具" : "删除对象"} shortcut="Delete">
