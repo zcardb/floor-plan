@@ -69,7 +69,8 @@ export function serializeDxf(document:DrawingDocument,payload?:string):string{
   }
   const inserted=new Set(document.inserts.map(insert=>insert.groupId));
   for(const e of document.entities){
-    if(e.group&&inserted.has(e.group.id))continue;
+    // 图块代替了几何；文字不进块，按可读角度写在模型空间。
+    if(e.group&&inserted.has(e.group.id)&&e.kind!=='text')continue;
     if(e.layer==='WALLS'&&e.kind==='polyline'&&e.closed&&e.points.length>2){
       const boundary=new HatchBoundaryPaths();
       boundary.addPolylineBoundary(new HatchPolylineBoundary(e.points.map(([x,y])=>vertex(x,-y))));

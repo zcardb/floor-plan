@@ -207,6 +207,36 @@ describe('工程交换图',()=>{
     }
     expect(furnitureDrawing({id:'stair',type:'stairs',name:'楼梯',w:1000,d:3000,cx:0,cy:0,rot:0,color:'#aaa'}).length).toBeGreaterThan(12);
   });
+  /** CAD 文字从下方或右侧可读：DXF 角度不落在 (90°, 270°]。 */
+  const readable=(deg:number)=>{const a=((deg%360)+360)%360;return !(a>90+1e-6&&a<=270+1e-6);};
+  it('楼梯导出：STAIRS 图层、STAIR_ 图块、「上」字在模型空间且旋转 180° 后仍可读、左转不用负比例',()=>{
+    const d=fixture(),base={type:'stairs',name:'L 型楼梯',w:2400,d:2400,color:'#e6dccc'};
+    d.furniture=[{...base,id:'s1',cx:2000,cy:2000,rot:180,stair:{form:'l',flightWidth:900,steps:15}},
+      {...base,id:'s2',cx:5000,cy:2000,rot:0,stair:{form:'l',flightWidth:900,steps:15,hand:'left',reverse:true}}];
+    const text=serializeDxf(createExportDocument(d)),parsed=new DxfParser().parseSync(text)!;
+    const inserts=parsed.entities.filter(e=>e.type==='INSERT'&&e.layer==='STAIRS') as unknown as {name:string;xScale?:number}[];
+    expect(inserts).toHaveLength(2);
+    expect(new Set(inserts.map(i=>i.name)).size).toBe(2);
+    for(const i of inserts){expect(i.name).toMatch(/^STAIR_L_2400x2400/);expect(i.xScale??1).toBeGreaterThan(0);
+      expect(parsed.blocks[i.name].entities?.some(e=>e.type==='TEXT')).toBe(false);}
+    const labels=parsed.entities.filter(e=>e.type==='TEXT'&&e.layer==='STAIRS') as unknown as {text:string;rotation?:number}[];
+    expect(labels.map(l=>l.text)).toEqual(['上','上']);
+    for(const l of labels)expect(readable(l.rotation??0),String(l.rotation)).toBe(true);
+    const layer=dxfRecord(text,'LAYER','STAIRS');
+    expect(layer?.get('62')).toBe(String(DXF_LAYER_STYLES.STAIRS.color));expect(layer?.get('370')).toBe(String(DXF_LAYER_STYLES.STAIRS.lineweight));
+    expect(text).not.toContain('NaN');
+  });
+  it('守护：素材库全部家具在任意旋转下导出 DXF 可回读、图层已登记、文字可读',()=>{
+    for(const rot of [0,135,180,270]){
+      const d=fixture();
+      d.furniture=library.map((item,i)=>({...item,id:`f${i}`,cx:(i%10)*3000,cy:Math.floor(i/10)*3000,rot}));
+      const text=serializeDxf(createExportDocument(d)),parsed=new DxfParser().parseSync(text)!;
+      expect(text,String(rot)).not.toContain('NaN');
+      const all=[...parsed.entities,...Object.values(parsed.blocks).flatMap(b=>b.entities??[])];
+      for(const e of all)if(e.layer)expect(Object.keys(DXF_LAYER_STYLES).concat('0'),`${rot} ${e.type}`).toContain(e.layer);
+      for(const e of all)if(e.type==='TEXT')expect(readable((e as unknown as {rotation?:number}).rotation??0),`${rot}`).toBe(true);
+    }
+  });
   it('画布关闭显示层只保留实际结构，导出不修改设计',()=>{
     const d=fixture(),before=JSON.stringify(d),document=createDrawingDocument(d,{...layers,dims:false,furn:false,labels:false});
     expect(document.dimensions).toHaveLength(0);

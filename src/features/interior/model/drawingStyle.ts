@@ -8,6 +8,7 @@ export const LAYER_STYLES: Record<DrawingLayer, LayerStyle> = {
   ROOMS: { stroke: '#b7afa3', strokeWidth: 6 },
   OPENINGS: { stroke: '#514a40', strokeWidth: 10 },
   FURNITURE: { stroke: '#6f655a', strokeWidth: 6 },
+  STAIRS: { stroke: '#6f655a', strokeWidth: 6 },
   ROOM_LABELS: { stroke: '#514a40', strokeWidth: 0 },
   DIMENSIONS: { stroke: '#887b69', strokeWidth: 8 },
 };
@@ -23,6 +24,7 @@ export const DXF_LAYER_STYLES: Record<DxfLayerName, DxfLayerStyle> = {
   ROOMS: { color: 8, lineweight: 18, lineType: 'CONTINUOUS' },
   OPENINGS: { color: 4, lineweight: 25, lineType: 'CONTINUOUS' },
   FURNITURE: { color: 30, lineweight: 18, lineType: 'CONTINUOUS' },
+  STAIRS: { color: 6, lineweight: 18, lineType: 'CONTINUOUS' },
   ROOM_LABELS: { color: 2, lineweight: 18, lineType: 'CONTINUOUS' },
   DIMENSIONS: { color: 3, lineweight: 13, lineType: 'CONTINUOUS' },
 };

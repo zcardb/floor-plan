@@ -28,6 +28,12 @@ export interface Opening {
   /** 自定义门窗款式 key（见 Design.customOpenings）；为空时是标准门/窗。 */
   variant?: string;
 }
+/** 房间分隔线（Revit 的 Room Separation Line）：无厚度，只用来划分房间，不出现在 3D 里，也不计价。 */
+export interface Separator {
+  id: string;
+  a: Point;
+  b: Point;
+}
 export interface Room {
   id: string;
   name: string;
@@ -51,6 +57,12 @@ export interface StairSpec {
   flightWidth: number;
   /** 踏步数（级）。 */
   steps: number;
+  /** L / U / 三跑各跑梯段宽（mm），长度 = 跑数；缺省时每跑都用 flightWidth。 */
+  flightWidths?: number[];
+  /** 行走方向反转：起步端与箭头对调。 */
+  reverse?: boolean;
+  /** 转向：right（默认，第一跑上行后向右转）/ left（左右镜像）；仅 L / U / 三跑生效。 */
+  hand?: 'left' | 'right';
 }
 export interface Furniture {
   id: string;
@@ -102,6 +114,8 @@ export interface Design {
   walls: Wall[];
   openings: Opening[];
   rooms: Room[];
+  /** 房间分隔线；旧项目没有该字段，加载时按旧房间轮廓迁移生成。 */
+  separators?: Separator[];
   furniture: Furniture[];
   demolished: string[];
   /** @deprecated 旧版「复制/新建才解锁结构」的标记；墙体可编辑性现只看承重，仅为兼容已保存数据保留。 */
@@ -160,7 +174,7 @@ export interface Project {
   templateId?: string;
 }
 export type Selection = {
-  kind: "furniture" | "room" | "wall" | "opening";
+  kind: "furniture" | "room" | "wall" | "opening" | "separator";
   id: string;
 } | {
   /** 框选得到的一组家具（≥2 件）。 */
@@ -169,7 +183,7 @@ export type Selection = {
 } | null;
 /** 选择的稳定标识（成组选择为组内 id 拼接），用于 key 与依赖比较。 */
 export const selectionKey = (s: Selection) => !s ? '' : s.kind === 'group' ? `group:${s.ids.join(',')}` : `${s.kind}:${s.id}`;
-export type Tool = "select" | "wall" | OpeningKind;
+export type Tool = "select" | "wall" | "separator" | OpeningKind;
 export const isOpeningTool = (tool: Tool): tool is OpeningKind => tool === "door" || tool === "window" || tool === "passage";
 export interface Layers {
   grid: boolean;

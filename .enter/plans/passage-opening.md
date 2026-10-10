@@ -1,60 +1,92 @@
-# 新增「垭口」（无门洞口）构件
+# 房间改为「由墙 + 房间分隔线自动计算」，墙工具收成三类，导出符合 CAD 图层规范
 
 ## 背景
-参考户型里厨房和餐厅之间是一个没有门的垭口：两边是墙垛，中间直接留洞，两个房间依然分开计算。目前编辑器只有「门」和「窗」两种开口（`Opening.kind: "door" | "window"`），没法画出这种效果。如果把中间那段墙删掉，`mergeRoomsAcrossWall` 又会把两边房间合并成一间。
+现在每个房间都单独存一块固定轮廓（`Room.rings`），改墙后要靠七八个修补函数去更新这些轮廓，于是出现三类问题：
+- 白块：点不中，也删不掉
+- 飘窗变形
+- 围出来的空间不算房间
 
-这次新增第三种开口 `passage`（垭口）。它和门一样挂在所在墙段上：墙体轮廓仍然参与房间划分，所以两侧房间保持独立；2D 平面图上只画洞口，没有门扇；3D 场景里墙从地面开到洞口高度，没有门扇，人可以直接走过去；费用按洞口面积（宽 × 高）计价，也支持自定义垭口款式。
+改成业界通行做法（Revit 叫 Room Separation Line，即房间分隔线）：**每次改动后，房间都由「墙 + 房间分隔线」重新算出来**，名称和材质按位置重叠沿用。分隔线没有厚度，只用来划分空间，不出现在 3D 里，也不计价。导出的 DXF 图层采用 AIA / 美国国家 CAD 标准（NCS）的通用图层名，方便在其他软件里直接使用。
 
-## 方案要点
-- **统一管理开口类型元数据**：在 `model/hardMaterials.ts` 里把 `openingKinds` 扩展成 `{ value, label, standard }` 三项，并新增：
-  - `openingKindLabel(kind)`：返回 门 / 窗 / 垭口
-  - `defaultOpeningSize(kind)`：门 900×2100，窗 1200×1600，**垭口 1200×2100**
-  
-  代码里散落的 `kind === "door" ? 2100 : 1600` 和 `kind === "door" ? "门" : "窗"` 三元判断全部改为调用这两个函数。不改的话，垭口会被错当成窗处理（默认高度变成 1600，名称显示为「窗」）。
-- **统一管理开口图标**：新建 `components/openingIcon.ts`，提供 `openingIcon(kind)`：门 `DoorOpen`，窗 `PanelsTopLeft`，垭口 `RectangleVertical`（lucide 图标）。
-- **房间拓扑不改**：垭口所在墙段照常进入 `wallFootprints` 和 `roomEnclosure`，两侧房间不会被合并。这一点会用测试锁住。
+## 入口
+- 顶部工具栏：选择 · 框选 · **墙 ▾** · 门 · 窗。下拉里有三项：
+  - 墙
+  - 垭口（已有功能，只是把原来的独立按钮挪进这里）
+  - 房间分隔线（新增）
+- 左侧「硬装」分类显示两组按钮，搜索也能找到：
+  - **墙**：墙 / 垭口 / 房间分隔线
+  - **门窗**：门 / 窗
+
+## 核心设计
+1. **数据**：`Design.separators?: { id, a, b }[]`
+2. **计算房间** `deriveRooms(d, previous)`：
+   - 用外框减去墙体占地和分隔线细带，再去掉与室外连通的那块，剩下每块区域就是一个房间
+   - 按与旧房间的重叠面积贪心配对，沿用原房间的属性
+   - 一间房被切开时，最大的一块保留原 id，其余新建并在名称后加序号
+   - 合成房间的门槛：面积 ≥ 0.3 m²，且平均宽度 ≥ 200 mm
+3. **改墙后统一调用 `syncRooms`**：依次执行 followSeparators → deriveRooms → dropOrphanFurniture
+4. **分隔线跟随墙**：分隔线端点原本贴着某面墙的，墙移动后端点沿分隔线方向伸缩到新的墙面上；墙被删除时端点保持不动
+5. **旧数据迁移** `migrateSeparators`：
+   - 先只用墙算出区域；某个区域里包含 2 个及以上旧房间时，在相邻房间平行对边的中线处生成分隔线
+   - 再执行一次 deriveRooms，把名称和材质沿用过来
+
+## 导出图层映射
+| 内容 | 标准图层 |
+|---|---|
+| 墙体 | `A-WALL` |
+| 墙体填充 | `A-WALL-PATT` |
+| 拆除墙 | `A-WALL-DEMO` |
+| 门、垭口 | `A-DOOR` |
+| 窗 | `A-GLAZ` |
+| 房间边界（闭合多段线） | `A-AREA` |
+| 房间名称 | `A-AREA-IDEN` |
+| 分隔线（虚线） | `A-AREA-BNDY` |
+| 家具 | `A-FURN` |
+| 尺寸标注 | `A-ANNO-DIMS` |
+
+导入外部 DXF 时：名称含 demo / 拆 的图层忽略；`A-AREA-BNDY` 图层识别为分隔线。
 
 ## 实施清单
-### 模型与类型
-- [x] `model/types.ts`：`Opening.kind`、`CustomOpening.kind` 增加 `"passage"`；`Tool` 增加 `"passage"`
-- [x] `model/hardMaterials.ts`：`openingKinds` 增加垭口；新增 `openingKindLabel`；`defaultOpeningSize` 支持垭口；`openingName` 改用 `openingKindLabel`；`validCustomOpening` 接受 `passage`
-- [x] `model/costs.ts` 的 `openingDimensions`：默认高度改用 `defaultOpeningSize(o.kind).height`（窗台高仍只对窗生效，垭口为 0）
-- [x] `model/selectionEdits.ts`：校验「洞口顶部不超过层高」时，默认高度改用 `defaultOpeningSize`
-- [x] `model/validation.ts`：开口类型白名单加入 `"passage"`，保证含垭口的方案能保存和加载
-- [x] `model/wallContacts.ts`：`opening.kind` 类型改为 `Opening["kind"]`
-- [x] `model/accountCostEntries.ts`：内置价格条目增加 `{ key: 'passage', name: '垭口' }`
-- [x] `ai/types.ts`：两处开口 `kind` 类型改为 `Opening["kind"]`（`ai/context.ts` 会原样传出 `kind`，不改会报类型错误；AI 生成逻辑本身不改）
+### 模型
+- [ ] `model/types.ts`：新增 Separator 类型、`Design.separators`、选中类型 `"separator"`、工具 `"separator"`
+- [ ] `model/roomDerive.ts`：实现 `deriveRooms`
+- [ ] `model/separators.ts`：实现 follow / migrate / add / remove
+- [ ] `model/roomFollow.ts`：`syncRooms` 改走新流程，删除 followRooms 和 splitRoomsWithWall
+- [ ] `model/geometry.ts`：`rebuildRooms` 改为委托给 `deriveRooms`
+- [ ] 删除旧逻辑：`roomEnclosed.ts`、`roomMerge.ts`、`splitRoomsByWalls`、`roomHoles.ts` 中的相关调用
+- [ ] `model/wallRemoval.ts`、`model/roomRemoval.ts`：改为调用 `syncRooms`
+- [ ] `model/validation.ts`：增加分隔线校验，加载时执行迁移
+- [ ] `data/templates.ts`、`data/floorplanBuilder.ts`：生成方案后执行迁移
+- [ ] `model/externalDxf/recognize.ts`：识别结果写入 `separators`
 
-### 绘制与导出
-- [x] `components/PlanCanvas.tsx`（2D）：开口渲染改为三个分支。垭口画两条贯穿墙厚的边线，沿墙两侧各画一条虚线（表示上方过梁），不画门扇和开启弧线
-- [x] `model/drawingDocument.ts`（SVG / PDF / DXF 共用）：垭口只输出两条边线，分组名为「垭口」，不输出门扇和弧线
-- [x] `scene/Scene3D.tsx`：沿用现有洞口切割逻辑（窗台高 0、高度取 `openingDimensions`），垭口不生成门扇和玻璃；漫游时的 `blocked` 判断里垭口可以通行（现有逻辑已满足，确认即可）
-- [x] `model/planThumbnail.ts`：垭口和门一样在缩略图上留洞（现有逻辑已满足，不需要改）
+### 调用点
+- [ ] `useWallDrawing.ts`、`PlanCanvas.tsx`（拖墙）、`Workbench.tsx`（打开项目时）：统一改为调用 `syncRooms`
 
-### 放置工具与界面
-- [x] `components/PlanCanvas.tsx`：放置开口的判断从 `door || window` 扩展到 `passage`，宽度取 `defaultOpeningSize(tool).width`；点到已有开口时结束工具的判断同样扩展
-- [x] `components/Workbench.tsx`：在顶部主工具栏的结构工具组里（截图红框位置）**紧跟「绘墙」后面**加一个「垭口」`ToolButton`，顺序为 选择 · 绘墙 · 垭口 · 门 · 窗。它和门、窗一样受 `structureTools` 控制，激活态为 `tool === "passage"`，图标用 `RectangleVertical`；选中后点击墙体即可在点击位置生成垭口，放好自动切回「选择」。操作提示文案加上垭口；删除后的提示改用 `openingKindLabel`
-- [x] 左侧素材库（`Library.tsx`）不加入口，垭口只从顶部工具栏放置
-- [x] `components/PropertyPanel.tsx`：标题、默认高度、删除按钮文案、图标改用新的 helper；开向设置仍然只对门显示
-- [x] `components/SelectionEditor.tsx` 和 `components/SizeFields.tsx`：默认高度改用 `defaultOpeningSize`（窗台高输入框仍只对窗显示）
-- [x] `components/OpeningVariantSelect.tsx`：标准款名称改用 `openingKinds` 里的 `standard` 字段（显示为「标准垭口」）
-- [x] `components/CustomOpeningForm.tsx`、`components/AccountMaterialList.tsx`、`components/CostItemVisual.tsx`、`components/CustomFurnitureDialog.tsx`、`components/WallSplitDialog.tsx`：名称、占位文案、图标改用 `openingKindLabel` 和 `openingIcon`
+### 界面
+- [ ] `components/WallToolMenu.tsx`：墙工具下拉
+- [ ] `Workbench.tsx`：工具栏改为 选择 · 框选 · 墙 ▾ · 门 · 窗
+- [ ] `Library.tsx`：「硬装」中增加墙、门窗两组按钮
+- [ ] `useSeparatorDrawing.ts`：分隔线绘制，复用 `useSegmentDrawing`
+- [ ] `PlanCanvas.tsx`：分隔线以虚线渲染，可点击选中
+- [ ] 分隔线支持删除，属性面板显示其长度
 
-### 后端
-- [x] 新增数据库迁移：把 `interior_opening_catalog.kind` 的 CHECK 约束放宽为 `('door','window','passage')`。只删除并重建这一条约束，不动表里的已有数据
+### 导出
+- [ ] `drawingStyle.ts`：建立标准图层映射，并定义 `A-AREA-BNDY` 的样式
+- [ ] `drawingDocument.ts`：新增 SEPARATORS 图层；门 / 垭口与窗分别放到各自图层；垭口补画虚线过梁
+- [ ] `dxfExport.ts`、`svgExport.ts`、`pdfExport.ts`：改用标准图层名
+- [ ] `externalDxf`：识别拆除墙图层和分隔线图层
 
 ### 测试
-- [x] `model/validation.test.ts`：含 `passage` 的方案能通过校验；未知类型仍然被拒绝
-- [x] `model/costs.test.ts`：没有设置高度时，垭口的 `openingDimensions` 为窗台高 0、高度 2100，面积 = 宽 × 2.1
-- [x] `model/drawingExport.test.ts`：导出时垭口没有 arc 实体，`OPENINGS` 图层上有 2 条边线
-- [x] `components/PlanCanvas.test.tsx`：用垭口工具点击墙体后，生成 `kind: "passage"`、宽度为 1200 的开口并切回选择工具
-- [x] `model/wallRemoval.test.ts` 或新增测试：在参考户型厨房和餐厅之间的隔墙上加垭口后，两个房间仍然独立存在，费用里出现「垭口」条目
+- [ ] 删除已废弃的测试：roomMerge、roomHoles，以及 roomFollow 中的旧用例
+- [ ] 新增 `roomDerive.test.ts`、`separators.test.ts`
+- [ ] 更新 drawingExport、recognize、Workbench、Library 的测试，以及其他断言随新行为变化的测试
 
 ## 验证清单
-- [x] 正向：顶部工具栏「绘墙」右边出现「垭口」按钮（与门、窗同组）；点击后按钮高亮，再点击隔墙，画布上出现两条边线和虚线过梁，没有门扇；选中后可以沿墙拖动，可以修改宽和高
-- [x] 正向：切换到 3D，洞口从地面开到 2.1 m，上方保留过梁，没有门扇，漫游可以穿过
-- [x] 正向：费用面板「门窗」类目出现「垭口」，按 m² 计价；可以新建自定义垭口款式并切换使用
-- [x] 负向：承重墙上放垭口仍然提示「承重墙不可新增开口」；墙段长度不够或与已有开口重叠时给出相应提示
-- [x] 边界：垭口高度超过层高时被拒绝；旧项目（只有门和窗）照常加载，渲染不变
-- [x] 导出：SVG、PDF、DXF 中垭口只有边线，没有开启弧线
-- [x] 执行 `pnpm vitest run src/features/interior`、`pnpm run lint`、`pnpm run build`，全部通过
+- [ ] 截图 290：删墙后不再出现白条
+- [ ] 截图 289：0.82 m² 的飘窗区能识别为房间
+- [ ] 截图 294：移动墙体时飘窗保持矩形
+- [ ] 厨房和餐厅之间有分隔线，两者仍是独立的房间
+- [ ] 画一条分隔线可以把房间一分为二，删掉后两部分合并回原房间
+- [ ] 导出的 DXF 使用标准图层名，每个房间是一条闭合多段线
+- [ ] 旧项目打开时自动迁移，房间名称和材质不丢失
+- [ ] `pnpm vitest run src/features/interior`、lint、build 全部通过

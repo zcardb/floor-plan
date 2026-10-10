@@ -4,7 +4,8 @@ import { XMLParser } from 'fast-xml-parser';
 import { svgPathProperties } from 'svg-path-properties';
 import { FurnitureShape } from '../components/FurnitureShape';
 import type { Furniture, Point } from './types';
-import type { DrawingEntity } from './drawingDocument';
+import { readableRotation, type DrawingEntity, type DrawingLayer } from './drawingDocument';
+import { isStairs } from './stairs';
 
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '', preserveOrder: true });
 type XmlNode = Record<string, unknown>;
@@ -49,7 +50,10 @@ function samplePath(path: string): Point[][] {
     add(0,total,0);return points;
   });
 }
+/** 楼梯单独成层（天正 STAIR / AIA A-FLOR-STRS），其余家具在 FURNITURE。 */
+export const furnitureLayer = (f: Pick<Furniture, 'type'>): DrawingLayer => (isStairs(f) ? 'STAIRS' : 'FURNITURE');
 export function furnitureDrawing(f: Furniture): DrawingEntity[] {
+  const layer = furnitureLayer(f);
   const xml = renderToStaticMarkup(createElement(FurnitureShape,{f}));
   const entities:DrawingEntity[]=[];
   const angle=f.rot*Math.PI/180;
@@ -61,7 +65,7 @@ export function furnitureDrawing(f: Furniture): DrawingEntity[] {
       const n=(key:string,fallback=0)=>Number(attrs[key]??fallback);
       const matrix=multiply(parent,transform(attrs.transform||''));
       const apply=([x,y]:Point):Point=>[matrix[0]*x+matrix[2]*y+matrix[4],matrix[1]*x+matrix[3]*y+matrix[5]];
-      const push=(points:Point[],closed:boolean)=>{if(points.length>1)entities.push({kind:'polyline',layer:'FURNITURE',points:points.map(apply),closed});};
+      const push=(points:Point[],closed:boolean)=>{if(points.length>1)entities.push({kind:'polyline',layer,points:points.map(apply),closed});};
       if(tag==='g'){visit(node[tag] as XmlNode[],matrix);continue;}
       if(tag==='line')push([[n('x1'),n('y1')],[n('x2'),n('y2')]],false);
       else if(tag==='rect'){
@@ -72,8 +76,8 @@ export function furnitureDrawing(f: Furniture): DrawingEntity[] {
         const rx=n(tag==='circle'?'r':'rx'),ry=n(tag==='circle'?'r':'ry'),scale=similarityScale(matrix);
         if(scale!==null&&rx>0&&ry>0){
           const center=apply([n('cx'),n('cy')]);
-          if(Math.abs(rx-ry)<1e-9)entities.push({kind:'circle',layer:'FURNITURE',center,radius:rx*scale});
-          else{const major:Point=rx>=ry?[rx,0]:[0,ry];entities.push({kind:'ellipse',layer:'FURNITURE',center,ratio:Math.min(rx,ry)/Math.max(rx,ry),
+          if(Math.abs(rx-ry)<1e-9)entities.push({kind:'circle',layer,center,radius:rx*scale});
+          else{const major:Point=rx>=ry?[rx,0]:[0,ry];entities.push({kind:'ellipse',layer,center,ratio:Math.min(rx,ry)/Math.max(rx,ry),
             major:[matrix[0]*major[0]+matrix[2]*major[1],matrix[1]*major[0]+matrix[3]*major[1]]});}
         }else{
           const r=Math.max(rx,ry),count=Math.max(16,Math.ceil(Math.PI/Math.acos(Math.max(-1,1-1/Math.max(r,1)))));
@@ -81,8 +85,8 @@ export function furnitureDrawing(f: Furniture): DrawingEntity[] {
         }
       }else if(tag==='text'){
         const text=((node[tag] as XmlNode[])||[]).map(child=>String(child['#text']??'')).join('').trim(),scale=similarityScale(matrix)??1;
-        if(text)entities.push({kind:'text',layer:'FURNITURE',point:apply([n('x'),n('y')]),height:n('font-size',100)*scale,text,
-          rotation:Math.atan2(matrix[1],matrix[0])*180/Math.PI});
+        if(text)entities.push({kind:'text',layer,point:apply([n('x'),n('y')]),height:n('font-size',100)*scale,text,
+          rotation:readableRotation(Math.atan2(matrix[1],matrix[0])*180/Math.PI)});
       }else if(tag==='path')samplePath(attrs.d||'').forEach((points,i)=>push(points,/[zZ]\s*$/.test((attrs.d.match(/[Mm][^Mm]*/g)||[])[i]||'')));
       else throw new Error(`暂不支持导出家具图元：${tag}`);
     }

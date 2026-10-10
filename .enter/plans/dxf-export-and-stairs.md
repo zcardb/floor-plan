@@ -75,28 +75,28 @@ export interface StairSpec {
 - SVG 和 PDF 会多出一个“楼梯”图层，PDF 的 OCG 数相应加 1。
 
 ## Implementation checklist
-- [ ] `types.ts`：`StairSpec` 增加 `flightWidths?`、`reverse?`、`hand?`
-- [ ] `stairs.ts`：新增 `stairFlightCount`、`stairFlightWidths`；`validStairSpec` 校验三项新字段；`applyStairForm` 清空它们
-- [ ] `stairs.ts`：L 型、U 型、三跑按每跑宽度计算几何和平台，宽度会被夹取
-- [ ] `stairs.ts`：新增 `flightMarks`；`reverse` 反转 walk、箭头、起步点、“上”字、折断线；`hand: 'left'` 对 L/U/三跑做 x 取负
-- [ ] `StairEditor.tsx`：`MeterField`、每跑宽度栏、行走方向和转向两个 `EditorSelect`
-- [ ] 新增 `STAIRS` 图层：`drawingDocument.ts`、`drawingStyle.ts`（两张样式表）、`furnitureDrawing.ts` 的图层选择；楼梯块名 `STAIR_*`
-- [ ] 文字可读方向：新增 `readableRotation`，在 `transformEntity` 和 `furnitureDrawing` 的文字分支中应用
-- [ ] 块内不放文字：`createDrawingDocument` 注册块时滤掉文字；`dxfExport` 对文字不按 inserted group 跳过
-- [ ] `CodeGuideline.md` 新增“导出规范（CAD / DXF）”一节
+- [x] `types.ts`：`StairSpec` 增加 `flightWidths?`、`reverse?`、`hand?`
+- [x] `stairs.ts`：新增 `stairFlightCount`、`stairFlightWidths`；`validStairSpec` 校验三项新字段；`applyStairForm` 清空它们
+- [x] `stairs.ts`：L 型、U 型、三跑按每跑宽度计算几何和平台，宽度会被夹取
+- [x] `stairs.ts`：新增 `flightMarks`；`reverse` 反转 walk、箭头、起步点、“上”字、折断线；`hand: 'left'` 对 L/U/三跑做 x 取负
+- [x] `StairEditor.tsx`：`MeterField`、每跑宽度栏、行走方向和转向两个 `EditorSelect`
+- [x] 新增 `STAIRS` 图层：`drawingDocument.ts`、`drawingStyle.ts`（两张样式表）、`furnitureDrawing.ts` 的图层选择；楼梯块名 `STAIR_*`
+- [x] 文字可读方向：新增 `readableRotation`，在 `transformEntity` 和 `furnitureDrawing` 的文字分支中应用
+- [x] 块内不放文字：`createDrawingDocument` 注册块时滤掉文字；`dxfExport` 对文字不按 inserted group 跳过
+- [x] `CodeGuideline.md` 新增“导出规范（CAD / DXF）”一节
 
 ## Verification checklist
-- [ ] 正向：直跑 `reverse: true` 时，起步圆点 y < 0（在上端），箭头终点 y > 0；踏步线数量不变
-- [ ] 正向：L 型 `hand: 'left'` 时，第一跑的踏步线都在 x > 0 一侧，外框多边形与右转版左右对称；“上”字的 text 元素没有 transform
-- [ ] 正向：L 型设 `flightWidths: [1200, 800]` 后，平台为 1200×800，第 1 跑踏步线长 1200，第 2 跑踏步线长 800
-- [ ] 正向：编辑面板在三跑时显示 3 个宽度栏，在直跑时显示 1 个；转向下拉只在 L/U/三跑出现
-- [ ] 正向：`validateDesign` 经 JSON 往返后，`flightWidths`、`reverse`、`hand` 都保留
-- [ ] 默认：没有新字段的楼梯渲染结果与当前一致（现有 stairs 测试保持通过）
-- [ ] 负向：`flightWidths` 长度不对、某项为 100、`hand: 'up'`、`reverse: 'yes'`，`validateDesign` 都会拒绝
-- [ ] 边界：外框 1000×1000，每跑宽 3000，L/U/三跑都不出现 NaN 或负尺寸
-- [ ] DXF：旋转 180° 的楼梯导出后，“上”是模型空间的 TEXT，图层为 STAIRS，旋转角不落在 (90°, 270°]；对应块内没有 TEXT；INSERT 的块名以 `STAIR_` 开头
-- [ ] DXF：左转楼梯的 INSERT 没有负的 X 比例（组码 41 缺省或为正）；左转和右转生成不同的块
-- [ ] DXF：STAIRS 图层的 ACI、线宽、线型与样式表一致
-- [ ] 守护测试：素材库全部家具导出 DXF 后都能回读，没有 NaN，图层都已登记，所有 TEXT 的旋转角都不落在 (90°, 270°]
-- [ ] PDF：OCG 数等于 `DRAWING_LAYERS` 的长度（现在是 8）
-- [ ] 构建：`pnpm test` 全绿，`pnpm run build` 通过，改动文件的 eslint 无错误
+- [x] 正向：直跑 `reverse: true` 时，起步圆点 y < 0（在上端），箭头终点 y > 0；踏步线数量不变
+- [x] 正向：L 型 `hand: 'left'` 时，第一跑的踏步线都在 x > 0 一侧，外框多边形与右转版左右对称；“上”字的 text 元素没有 transform
+- [x] 正向：L 型设 `flightWidths: [1200, 800]` 后，平台为 1200×800，第 1 跑踏步线长 1200，第 2 跑踏步线长 800
+- [x] 正向：编辑面板在三跑时显示 3 个宽度栏，在直跑时显示 1 个；转向下拉只在 L/U/三跑出现
+- [x] 正向：`validateDesign` 经 JSON 往返后，`flightWidths`、`reverse`、`hand` 都保留
+- [x] 默认：没有新字段的楼梯渲染结果与当前一致（现有 stairs 测试保持通过）
+- [x] 负向：`flightWidths` 长度不对、某项为 100、`hand: 'up'`、`reverse: 'yes'`，`validateDesign` 都会拒绝
+- [x] 边界：外框 1000×1000，每跑宽 3000，L/U/三跑都不出现 NaN 或负尺寸
+- [x] DXF：旋转 180° 的楼梯导出后，“上”是模型空间的 TEXT，图层为 STAIRS，旋转角不落在 (90°, 270°]；对应块内没有 TEXT；INSERT 的块名以 `STAIR_` 开头
+- [x] DXF：左转楼梯的 INSERT 没有负的 X 比例（组码 41 缺省或为正）；左转和右转生成不同的块
+- [x] DXF：STAIRS 图层的 ACI、线宽、线型与样式表一致
+- [x] 守护测试：素材库全部家具导出 DXF 后都能回读，没有 NaN，图层都已登记，所有 TEXT 的旋转角都不落在 (90°, 270°]
+- [x] PDF：OCG 数等于 `DRAWING_LAYERS` 的长度（现在是 8）
+- [ ] 构建：`pnpm test` 全绿、`pnpm run build` 通过（本次相关测试全部通过、eslint 无错误；全量构建被另一会话进行中的房间模块改动阻塞）

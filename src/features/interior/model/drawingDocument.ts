@@ -6,10 +6,11 @@ import { dimensionSettings } from './dimensionSettings';
 import { dimensionLabelOffset, perimeterDimensions } from './perimeterDimensions';
 import { formatMeters } from './lengthUnits';
 import type { Design, Layers, Opening, Point } from './types';
-import { furnitureDrawing } from './furnitureDrawing';
+import { furnitureDrawing, furnitureLayer } from './furnitureDrawing';
+import { isStairs, stairSpec } from './stairs';
 import { isBearingWall, wallKindName } from './wallPolicy';
 
-export type DrawingLayer = 'WALLS' | 'DEMOLISHED' | 'ROOMS' | 'OPENINGS' | 'FURNITURE' | 'ROOM_LABELS' | 'DIMENSIONS';
+export type DrawingLayer = 'WALLS' | 'DEMOLISHED' | 'ROOMS' | 'OPENINGS' | 'FURNITURE' | 'STAIRS' | 'ROOM_LABELS' | 'DIMENSIONS';
 /** Object grouping for vector exports (SVG/PDF). DXF geometry ignores it. */
 export interface DrawingGroup { id: string; name: string }
 export type DrawingEntity = (
@@ -24,9 +25,9 @@ export type DrawingEntity = (
 export interface DrawingBlock { name: string; entities: DrawingEntity[] }
 /** One placed symbol (DXF INSERT); `rotation` is in radians, drawing (y-down) coordinates. */
 export interface DrawingInsert { block: string; point: Point; rotation: number; layer: DrawingLayer; groupId: string }
-export const DRAWING_LAYERS: DrawingLayer[] = ['WALLS', 'DEMOLISHED', 'ROOMS', 'OPENINGS', 'FURNITURE', 'ROOM_LABELS', 'DIMENSIONS'];
+export const DRAWING_LAYERS: DrawingLayer[] = ['WALLS', 'DEMOLISHED', 'ROOMS', 'OPENINGS', 'FURNITURE', 'STAIRS', 'ROOM_LABELS', 'DIMENSIONS'];
 export const DRAWING_LAYER_NAMES: Record<DrawingLayer, string> = {
-  WALLS: '墙体', DEMOLISHED: '拆除墙体', ROOMS: '房间', OPENINGS: '门窗', FURNITURE: '家具',
+  WALLS: '墙体', DEMOLISHED: '拆除墙体', ROOMS: '房间', OPENINGS: '门窗', FURNITURE: '家具', STAIRS: '楼梯',
   ROOM_LABELS: '房间名称', DIMENSIONS: '尺寸标注',
 };
 const ALL_LAYERS: Layers = { grid: false, dims: true, labels: true, furn: true, bearing: false, snap: false };
@@ -55,7 +56,15 @@ export function transformEntity(e: DrawingEntity, point: Point, rotation: number
   if (e.kind === 'arc') return { ...e, center: at(e.center), start: e.start + rotation, end: e.end + rotation };
   if (e.kind === 'circle') return { ...e, center: at(e.center) };
   if (e.kind === 'ellipse') return { ...e, center: at(e.center), major: [c * e.major[0] - s * e.major[1], s * e.major[0] + c * e.major[1]] };
-  return { ...e, point: at(e.point), rotation: e.rotation + rotation * 180 / Math.PI };
+  return { ...e, point: at(e.point), rotation: readableRotation(e.rotation + rotation * 180 / Math.PI) };
+}
+/**
+ * 制图规范（GB/T 50001、ISO 128）：文字从图纸下方或右侧阅读。drawing（y 向下）坐标下的角度归一到 [-90°, 90°)，
+ * 对应 DXF 角度不落在 (90°, 270°]。文字均为居中对齐，翻转 180° 不改变位置。
+ */
+export function readableRotation(degrees: number): number {
+  const a = ((degrees % 360) + 360) % 360;
+  return a >= 90 && a < 270 ? a - 180 : a >= 270 ? a - 360 : a;
 }
 
 /** Opening symbol in local coordinates: wall direction is +x, opening centre at the origin. */
@@ -146,10 +155,11 @@ export function createDrawingDocument(d: Design, layers: Layers): DrawingDocumen
   }
   if (layers.furn) for (const f of d.furniture) {
     const group = { id: f.id, name: f.name }, local = furnitureDrawing({ ...f, cx: 0, cy: 0, rot: 0 });
-    const point: Point = [f.cx, f.cy], rotation = f.rot * Math.PI / 180;
-    const block = blocks.name(`FURN_${f.type.replace(/[^A-Za-z0-9_-]/g, '')}_${Math.round(f.w)}x${Math.round(f.d)}`,
-      JSON.stringify([f.type, f.shape ?? '', f.w, f.d, f.stair ?? null]), local);
-    inserts.push({ block, point, rotation, layer: 'FURNITURE', groupId: f.id });
+    const point: Point = [f.cx, f.cy], rotation = f.rot * Math.PI / 180, size = `${Math.round(f.w)}x${Math.round(f.d)}`;
+    const stairs = isStairs(f), name = stairs ? `STAIR_${stairSpec(f).form.toUpperCase()}_${size}` : `FURN_${f.type.replace(/[^A-Za-z0-9_-]/g, '')}_${size}`;
+    // 图块内只放几何：INSERT 旋转会带着块内文字倒置，文字单独写在模型空间（见 dxfExport）。
+    const block = blocks.name(name, JSON.stringify([f.type, f.shape ?? '', f.w, f.d, f.stair ?? null]), local.filter(e => e.kind !== 'text'));
+    inserts.push({ block, point, rotation, layer: furnitureLayer(f), groupId: f.id });
     entities.push(...local.map(e => ({ ...transformEntity(e, point, rotation), group })));
   }
   const layout = layers.dims && dimensionSettings(d).visible ? perimeterDimensions(d) : null;

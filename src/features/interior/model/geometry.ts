@@ -1,8 +1,6 @@
-import polygonClipping from "polygon-clipping";
 import { isBearingWall } from './wallPolicy';
-import { connectedWallPoly } from './wallConnections';
+import { deriveRooms } from './roomDerive';
 import {
-  uid,
   type Design,
   type Point,
   type Room,
@@ -145,69 +143,12 @@ export function blankFrameIntact(d: Design): boolean {
       wall.a[0] === want.a[0] && wall.a[1] === want.a[1] && wall.b[0] === want.b[0] && wall.b[1] === want.b[1];
   });
 }
-/** rebuildRooms 在墙体包围盒外留出的作图余量（mm）。 */
-const frameMargin = 1000;
 /**
- * 空白户型的房间按实际墙体轮廓重算：以作图余量框减去全部墙体带，室外那一块去掉，其余即房间。
- * 因此外围墙单独移动、门洞开向外侧后，房间跟随真实墙体，而不是跟着 width / depth 的外框矩形。
+ * 房间按「墙 + 房间分隔线」重算（见 roomDerive.deriveRooms）；名称与材质按重叠沿用。
+ * 函数声明会被提升，roomDerive 对本模块的循环引用在调用时已就绪。
  */
 export function rebuildRooms(d: Design): Design {
-  if (d.template !== "blank") return d;
-  const standing = d.walls.filter((w) => !d.demolished.includes(w.id) && w.kind !== "low");
-  const box = standing.length ? bbox(standing.flatMap((w) => [w.a, w.b])) : { x: -100, y: -100, x2: d.width + 100, y2: d.depth + 100 };
-  const frame = rect(box.x - frameMargin, box.y - frameMargin, box.x2 - box.x + frameMargin * 2, box.y2 - box.y + frameMargin * 2);
-  const polygons = standing.length
-    ? polygonClipping.difference([frame], ...standing.map((w) => [connectedWallPoly(w, d.walls, d.demolished)]))
-    : [[frame]];
-  const outside: Point = [frame[0][0] + 1, frame[0][1] + 1];
-  // 含室外探针的那块是墙体外的空间（可能是带洞多边形，洞即户型轮廓）。
-  const regions = polygons.filter((poly) => !inRing(outside, poly[0] as Point[]));
-  const used = new Set<string>();
-  const rooms: Room[] = regions
-    .filter((poly) => ringArea(poly[0] as Point[]) > 10000)
-    .map((poly, i) => {
-      const rings = poly.map(
-        (r) =>
-          r.slice(
-            0,
-            r.length > 1 &&
-              r[0][0] === r[r.length - 1][0] &&
-              r[0][1] === r[r.length - 1][1]
-              ? -1
-              : undefined,
-          ) as Point[],
-      );
-      const next: Room = {
-        id: uid(),
-        name: "房间 " + (i + 1),
-        rings,
-        mat: "wood",
-      };
-      const previous = d.rooms
-        .map((r) => ({
-          r,
-          overlap: polygonClipping
-            .intersection(r.rings, rings)
-            .reduce(
-              (s, p) =>
-                s +
-                ringArea(p[0] as Point[]) -
-                p.slice(1).reduce((n, h) => n + ringArea(h as Point[]), 0),
-              0,
-            ),
-        }))
-        .sort((a, b) => b.overlap - a.overlap)
-        .find((v) => v.overlap > 0 && !used.has(v.r.id));
-      if (previous) {
-        used.add(previous.r.id);
-        next.id = previous.r.id;
-        next.name = previous.r.name;
-        next.mat = previous.r.mat;
-        next.wallMat = previous.r.wallMat;
-      }
-      return next;
-    });
-  return { ...d, rooms };
+  return deriveRooms(d);
 }
 export function resizeBlank(
   d: Design,

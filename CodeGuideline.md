@@ -109,6 +109,13 @@ Every page-level view must be reflected in the URL, in both directions.
 - **Each new route states where a logged-out visitor goes**, and gets a `resolveView` case in `model/routes.test.ts`.
 - In-page UI state (list filters, 2D/3D view, panel tabs) stays out of the URL unless explicitly requested.
 
+## Feature Specs (mandatory)
+
+Per-feature rules live in `docs/features/` (index: `docs/features/README.md`). Read the matching spec before changing a feature, and update it in the same change when a rule changes.
+
+- **Every furniture item, structure or annotation must export in line with CAD / DXF industry conventions** — see `docs/features/drawing-export.md`: one registered layer per object class (ACI colour, lineweight, linetype), symbols as named BLOCK + INSERT without text inside and without negative scale, text readable from the bottom or right, millimetre units, `STUDIO_CN` text style, and DXF read-back tests.
+- Stairs: `docs/features/stairs.md`.
+
 ## Coding Best Practices
 
 - **One module, one responsibility:**  

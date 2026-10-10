@@ -2718,6 +2718,7 @@
 .stair-form-card:hover { border-color: hsl(var(--primary) / 0.5); color: hsl(var(--foreground)); }
 .stair-form-card[aria-checked="true"] { border-color: hsl(var(--primary)); background: hsl(var(--primary) / 0.08); color: hsl(var(--foreground)); font-weight: 600; }
 .stair-form-card svg { width: 100%; height: 48px; }
+.stair-direction { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-row) var(--sp-col); margin-top: var(--sp-row); }
 .stair-steps { display: flex; align-items: center; gap: 4px; }
 .stair-steps > button { flex: 0 0 auto; width: var(--ctl-lg); height: var(--ctl-lg); }
 .stair-steps > button svg { width: 14px; height: 14px; }
