@@ -1,4 +1,4 @@
-# 长按圈选批量选家具 + 房间「删除房间」操作
+# 框选批量选家具 + 房间「删除房间」操作
 
 ## Context
 
@@ -9,8 +9,8 @@
 
 两项需求：
 
-1. **长按拖拽圈选家具**（类似截图框选）：在空白处按住鼠标稍作停顿后拖动，画出选框批量选中家具；
-   选中后拖动其中任意一件，整批家具一起移动，相对位置不变。
+1. **框选家具**（类似截图框选）：2D 工具栏新增「框选」开关；开启后在空白处左键拖动画出选框，批量选中家具；
+   关闭时左键拖动仍是平移画布（不占用现有平移手势）。选中后拖动其中任意一件，整批家具一起移动，相对位置不变。
 2. **房间的两个删除操作**：清空房间家具（Delete / Backspace，保持现状）+ 删除房间（下拉菜单新增），
    删除房间 = 清除房内家具 + 删除该房间独立墙及墙上门窗（承重墙与共用墙保留并提示）。
 
@@ -34,6 +34,7 @@
 
 ## 设计（已与用户确认）
 
+- 圈选与平移用 **工具栏「框选」开关** 区分：开关关闭 = 现状（左键拖空白处平移）；开关开启 = 左键拖空白处圈选。
 - 「清除家具」快捷键保持 **Delete / Backspace**，下拉里新增 **删除房间**。
 - 删除房间时，房间自己的外墙（只围这一间、另一侧是室外）**算独立墙一起删**；与其它房间共用的墙不动。
 - 圈选命中规则：家具**四个角全部落在选框内**才选中。
@@ -60,25 +61,32 @@ export type Selection = { kind: "furniture" | "room" | "wall" | "opening"; id: s
   - `moveGroup(before, ids, delta)`：每件按 `stepDelta` 同一取整位移平移，保持相对位置（不做逐件靠墙吸附，
     否则整批相对关系会被破坏）。
 
-### 2. PlanCanvas 长按圈选与群组拖动
+### 2. 「框选」开关 + PlanCanvas 圈选与群组拖动
 
+- `Workbench` 新增状态 `marquee: boolean`（默认关），在 2D 工具组「选择」按钮右侧加 `ToolButton`
+  「框选」（lucide `SquareDashedMousePointer` 图标，快捷键 `M`，`active={marquee}`），点击切换；
+  点「绘墙 / 门 / 窗」或切到 3D 时自动关闭；只读预览不显示。
+  通过新 prop `marquee` 传给 `PlanCanvas`，仅在 `tool==='select'` 时生效。
 - 新增 `Drag.kind = 'marquee'` 与 `'groupmove'`。
-- `onPointerDown`（`tool==='select'`、非只读、空白处、单指、非右键）：起 `longPress` 计时器（350ms）；
-  - 指针移动超过 5px 或出现第二指 → 取消计时器，照旧 `pan` / 双指缩放；
-  - 计时器触发且指针仍按住 → `kind='marquee'`，记录世界坐标起点，`select(null)`；
+- `onPointerDown`（`tool==='select'`、非只读、单指、左键）：
+  - `marquee` 开启且按在空白 / 房间上（非家具、墙、门窗、手柄）→ `kind='marquee'`，记录世界坐标起点；
+  - `marquee` 关闭 → 维持现状 `pan`（不受任何影响）；
   - 落在家具上（`data-fid`）：维持现有的单选 + `move`；若该家具属于当前 `group`，改为 `kind='groupmove'`
-    （`id` 记起点件，`drag.ids` 记整组，`before` 记 `start` 时快照）。
+    （`id` 记起点件，`drag.ids` 记整组，`before` 记按下时快照）——与开关状态无关，关闭开关后整组仍可拖动；
+  - 双指手势、滚轮缩放在框选模式下照常可用；框选模式下点空白未拖动（<5px）= 现有「选房间 / 取消选择」。
 - `onPointerMove`：`marquee` 只更新选框；`groupmove` 用 `moveGroup(dr.before, ids, stepDelta([dx,dy]))` `preview`。
 - `onPointerUp`：
   - `marquee` → `furnitureInRect`：0 件 → 清空选择；1 件 → 单选；≥2 件 → `{kind:'group', ids}`；
   - `groupmove` 有位移 → `commit(d, dr.before)`（可撤销）+ 顶部提示「已移动 N 件家具」；
   - `pan` 的既有语义（未移动时按 `data-room` 选房间）保持不变。
-- `onPointerCancel` / `finish(true)` 必须清掉 `longPress` 计时器，避免拖动中途留下定时器。
+- `onPointerCancel` / `finish(true)` 清掉进行中的选框。
+- `<svg>` class 在开关开启时追加 `marquee-on`，`src/index.css` 中把光标设为十字（`crosshair`），提示当前是框选模式；
+  状态栏 `tip` 在开关开启时显示「拖动框选家具 · 拖动选中的家具可整组移动 · M 关闭框选」。
 - 覆盖层：
   - `marquee` 进行中画 `var(--plan-selection-soft)` 填充 + `var(--plan-selection)` 虚线的选框；
   - `group`：每件虚线框（复用单件家具的同一个 `<rect>` 样式）+ 整体外框；
   - `selectionPoints` 增加 `group` 分支（用 `groupBounds` 的四角），`SelectionEditor` 自动定位到整组；
-  - `<svg>` class 增加 `tool-marquee`（或复用 `tool-select`），必要时在 `src/index.css` 补样式。
+
 
 ### 3. Workbench / SelectionEditor / 其它 Selection 消费者
 
@@ -126,8 +134,10 @@ export type Selection = { kind: "furniture" | "room" | "wall" | "opening"; id: s
 - [ ] `types.ts` 的 `Selection` 增加 `{ kind: 'group'; ids: string[] }`，仓库内所有 `s.id` 访问点按 TS 报错补齐分支
 - [ ] `rectSelect.ts`：`furnitureInRect` 按「四角全部在框内」返回 id，`normalizeRect` 支持任意方向的拖拽
 - [ ] `furnitureGroup.ts`：`groupIds` 过滤失效 id、`groupBounds` 返回整组外接框、`moveGroup` 用同一步进取整位移平移
-- [ ] `PlanCanvas` 空白处长按（350ms）后进入 `marquee`，移动取消 / 双指取消长按，选框实时渲染
-- [ ] `PlanCanvas` 圈选松开：0 件清空选择、1 件单选、≥2 件 `{kind:'group'}`；`pointercancel`/`cancel` 清掉计时器
+- [ ] `Workbench` 新增 `marquee` 状态与 2D 工具栏「框选」开关（`SquareDashedMousePointer` 图标、快捷键 M），切换绘墙 / 门 / 窗 / 3D 时自动关闭，只读不显示
+- [ ] `PlanCanvas` 新 prop `marquee`：开启时空白处左键拖动进入 `marquee` 并实时渲染选框；关闭时空白处拖动仍是 `pan`
+- [ ] `PlanCanvas` 圈选松开：0 件清空选择、1 件单选、≥2 件 `{kind:'group'}`；`pointercancel` 清掉选框
+- [ ] 开关开启时画布光标为十字、状态栏提示框选操作
 - [ ] `PlanCanvas` 拖动组内任一家具走 `groupmove`，整组按同一位移 `preview`，松手 `commit` 可撤销
 - [ ] 覆盖层渲染 `marquee` 选框与 `group` 的逐件虚线框 + 整组外框；`selectionPoints` 支持 `group`
 - [ ] `Workbench.remove()` 支持 `group` 批量删除；方向键在有 `group` 时整组移动；切 3D 时清空 `group`
@@ -144,10 +154,12 @@ export type Selection = { kind: "furniture" | "room" | "wall" | "opening"; id: s
       （只删独立墙、共用墙保留、外墙一并删除、固定户型删后房间数 -1、承重墙围合时抛错）
 - [ ] `pnpm lint`、`pnpm run build` 通过（`pnpm exec tsc --noEmit` 确认 `Selection` 新变体无遗漏分支）
 - [ ] 手工验证 2D（`pnpm dev`，桌面 1280 宽）：
-  - 空白处按下不动 350ms 再拖出矩形 → 框内家具整组选中，可见选框；松手不动（未拖出）仍只清空选择；
+  - 开关关闭：左键拖空白处平移画布，与改动前一致；
+  - 开关开启（或按 M）：拖出矩形 → 框内（四角全在框内）家具整组选中，可见选框；点空白未拖动仍是选房间 / 取消选择；
+    滚轮缩放可用；切到绘墙后开关自动关闭；
   - 点中组内一件拖动 → 整组同位移，位置关系不变；Delete 删除整组，Ctrl+Z 可撤销；
   - 单选家具的移动 / 吸附 / 靠墙阻挡行为与改动前一致；
   - 参考户型与空白户型各删一个房间：独立墙与墙上门窗消失、共用墙保留、相邻房间仍在、房内家具被清空、
     顶栏提示数量正确、Ctrl+Z 可撤销；对「四周都是共用墙」的房间给出明确失败提示而不是拆一半；
   - 选中房间时下拉可见两项，Delete 仍只清空家具、不改动墙体。
-- [ ] 移动端宽度（≤1100）下选框与工具条不与抽屉冲突（长按拖动的既有 pan 手势仍可用）
+- [ ] 移动端宽度（≤1100）下「框选」按钮可见可点，开关开启时单指拖动为圈选、关闭时为平移，双指缩放始终可用
