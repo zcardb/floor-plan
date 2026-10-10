@@ -21,7 +21,6 @@ import {
   length,
   nearestOnWall,
   norm,
-  rebuildRooms,
   roomPath,
   blockFurnitureMove,
 } from "../model/geometry";
@@ -363,10 +362,8 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         let next = d;
         if (wallEdit) {
           try {
-            // 先同步房间（空白户型按外框重算），再按交接点分割墙段：分割只改墙段划分，房间仍然成立。
-            const synced = syncRooms(dr.before, d);
-            next = splitAtJunctions(synced, dr.id!);
-            if (next.template === 'blank') next = rebuildRooms(next);
+            // 按交接点分割墙段只改墙段划分；房间随后由「墙 + 分隔线」重算。
+            next = syncRooms(dr.before, splitAtJunctions(d, dr.id!));
           } catch (cause) {
             preview(dr.before);
             notify.fail(errorMessage(cause, "该调整会破坏房间划分"));
