@@ -1,95 +1,92 @@
-# 家具详情弹窗：放大布局 + 2D / 3D 视角切换 + AI 重新生成 + 素材附件
+# 家具详情弹窗：放大布局 + 2D / 3D 视角 + AI 调整 + 家装素材附件
 
 > 上一份计划（墙体编辑后续 5 项）已全部完成并提交，本文件改写为本轮计划。
 
 ## Context
-用户反馈（截图 256 / 257）：
-1. 家具详情弹窗（家具库里点开一件家具：左侧图片、底部「删除家具 / 完成」）太小，底部按钮要右对齐。
-2. 增加家具的 3D 视角预览：左侧 2D 图的左上角放一个 2D / 3D 切换按钮。
-3. 2D、3D 两张图都能用 AI 调整 / 重新生成，生成弹窗复用「AI 布局 / AI 创建」那套弹窗（输入框 + 参考附件 + 数量 + 候选结果网格）；不要名称输入框，标题直接用家具名称。
-   - 补充：调整 = 默认把当前家具图片带进附件区；重新生成 = 不带原图。界面不区分两种，只有一个入口，默认调整模式（移除附件即重新生成）。
-4. 所有 AI 弹窗的附件除图片外，还要能导入常用素材：DXF、PDF、ZIP 素材包，以及家装常用的其它素材类型。
-   - 补充：能转成图片的一律转成参考图（DXF、DW… 等线稿类，PDF，ZIP，3D 模型）；转不了的素材（原始 3D 工程文件等）照常上传保存，但标注「AI 暂不读取内容」。
+用户反馈（截图 256 / 257）与后续补充：
+1. 家具详情弹窗（家具库里点开一件家具：左侧图片、底部「删除家具 / 完成」）太小；宽高都要调整，整体协调；底部按钮右对齐。
+2. 增加家具的 3D 视角预览：左侧图片区左上角放 2D / 3D 切换。
+3. 2D、3D 都能用 AI 调整 / 重新生成，复用「AI 布局 / AI 创建」的弹窗（输入框 + 附件 + 数量 + 候选网格）；不要名称输入框，名称默认就是家具名。
+   - 调整 = 默认把当前家具图片带进附件区；重新生成 = 不带原图。界面不区分两种，只有一个入口，默认调整（移除附件即重新生成）。
+4. 所有 AI 弹窗的附件，除图片外支持家装常用素材：DXF、PDF、ZIP 素材包及其它常见格式。不强制在前端转换，原文件交给 AI，由 AI 自己判断怎么用。
+5. UI 按 Growth.Design 心理学法则设计（用户给的参考），具体落点见「设计原则」。
 
-用户没有回答追问，按推荐方案执行：
-- 「3D 视角」= AI 生成的 3D 透视效果图，与现有 2D 俯视符号图一样由 AI 生成、可重新生成（沿用项目已在用的 Seedream 5 图片模型）。
-- DXF / PDF / ZIP 在前端转换成参考图再上传，所有 AI 模型都能读取：DXF 画成线稿 PNG，PDF 渲染前几页，ZIP 解出其中的图片 / DXF / PDF 再按前两条处理。
+已定方案（用户未回答追问，按推荐执行）：「3D 视角」是 AI 生成的 3D 透视效果图，与现有 2D 俯视符号图一样由 AI 生成；图片模型沿用项目已在用的 Seedream 5。
+
+## 设计原则（Growth.Design 法则 → 落点）
+- **Visual Hierarchy / Fitts's Law**：图片区是视觉主角，占左侧大块；主操作「完成」放右下、尺寸最大；「删除家具」降为次级（文字按钮、与完成同在右侧但在前）。
+- **Law of Proximity / Juxtaposition**：2D / 3D 切换与「AI 调整」都贴在图片区角上，表明它们只作用于这张图；右侧字段按「基本信息 / 单价 / 参考几何」分组。
+- **Progressive Disclosure / Hick's Law**：「调整参考类型与外形」保持折叠；AI 弹窗只露出描述、附件、数量和发送，不放模型选择。
+- **Nudge（不强迫）**：默认调整模式，预置当前图片为附件；随时可 ✕ 移除改为重新生成，不额外做模式切换。
+- **Cognitive Load**：弹窗固定高度，左右两栏各自滚动，避免整窗跳动；空 3D 状态只给一句说明 + 一个按钮。
+- **Feedback Loop**：附件上传中显示加载、非图片附件显示文件类型图标与名称；应用新图后左侧立即换图并 toast 提示，可再次调整。
+- **Signifiers**：非图片附件卡片显示格式角标（DXF / PDF / ZIP…），hover 显示「AI 会按需读取」。
 
 ## 方案
 
 ### 1. 弹窗布局（`components/AccountFurnitureDialog.tsx` + `index.css`）
-- `DialogContent` 宽度从 `max-w-[640px]` 放大到约 880px，左侧图片区加大（约 360px 正方形），小屏仍单列。
-- 底部 `.cms-detail-actions` 改为整体右对齐：`[删除家具] [完成]` 都在右侧，删除在前。
+- 宽度 `max-w-[640px]` → 约 `880px`；高度固定 `min(680px, 100dvh - 2rem)`，内容区为左右两栏：左栏图片区（宽约 400px，图片区正方形，等高铺满），右栏字段区独立滚动。
+- 页脚 `.cms-detail-actions` 固定在底部、整体右对齐：`[删除家具]（ghost）[完成]（主按钮）`。
+- 小屏（≤ 700px）回到单列：图片在上（固定高度），字段在下，页脚不变。
 
-### 2. 左侧 2D / 3D 视觉区（新组件 `components/FurnitureVisual.tsx`）
-- 左上角分段切换按钮「2D | 3D」（`role="radiogroup"`，lucide 图标 `Square` / `Box`）。
-- 2D：沿用现有逻辑，`item.imageUrl` 或 `FurnitureShape` 参考符号。
-- 3D：`item.image3dUrl`；没有时显示空状态「尚未生成 3D 视角图」。
-- 右上角一个「AI 调整」按钮（`Sparkles`），只在自定义家具（`isCustom && saveGeometry`）时显示。点击打开第 3 节的 AI 弹窗，视角 = 当前选中的视角。不区分「调整 / 重新生成」两个入口，也不在界面上显示模式切换。
+### 2. 左侧视觉区（新组件 `components/FurnitureVisual.tsx`）
+- 左上角分段切换「2D | 3D」（`role="radiogroup"`，lucide `Square` / `Box`），默认 2D。
+- 2D：`item.imageUrl` 或 `FurnitureShape` 参考符号；3D：`item.image3dUrl`，没有时空状态「尚未生成 3D 视角图」+「AI 生成」按钮。
+- 右上角一个「AI 调整」按钮（`Sparkles`），只在自定义家具（`isCustom && saveGeometry`）时显示；打开第 3 节弹窗，视角 = 当前视角。
 
-### 3. 家具 AI 生成弹窗（新组件 `components/FurnitureAiDialog.tsx`）
-- 默认就是「调整」：打开时把当前家具图片作为第一张参考附件，直接显示在输入框的附件区（可点开放大，也可点 ✕ 移除）。
-  - 当前视角有图就带当前视角的图；3D 还没生成时带 2D 图作为参考；两张都没有时附件区为空。
-  - 用户移除这张附件后，就是不参考原图的重新生成；界面不额外区分。
-- 复用 `.ai-dialog` 外壳、`AiComposer`、`AiResults`、`useAiBatch`，结构与 `AiCreateProjectForm` 一致：输入态 → 候选结果 → 选中一个「应用」；可「返回修改」，关闭即停止。
-- 标题：`AI 调整 · {家具名} · 2D 俯视图 / 3D 视角图`；没有名称输入框。
-- 描述默认填：`{名称}，宽 × 深 × 高 m，主色 {color}`，用户可改。
-- `AiComposer` 新增可选 prop `showEngine?: boolean`（默认 true），这里传 false：图片生成不用对话模型 / 小助手选择器；保留数量 1–4。
-- 每个格子 = 一次「提交 + 轮询」任务（各自独立 `request_id`），预览直接显示生成图。
-- 应用：2D 写 `imageUrl`、3D 写 `image3dUrl`，经现有 `saveGeometry`（`catalog.save(furnitureGeometryPayload(...))`）保存后 `onChanged(next)`，详情弹窗左侧立即换图。
+### 3. 家具 AI 弹窗（新组件 `components/FurnitureAiDialog.tsx`）
+- 复用 `.ai-dialog` 外壳、`AiComposer`、`AiResults`、`useAiBatch`，结构同 `AiCreateProjectForm`：输入态 → 候选结果 → 选中「应用」；可「返回修改」；关闭即停止。
+- 标题 `AI 调整 · {家具名} · 2D 俯视图 / 3D 视角图`；无名称输入框。
+- 默认描述：`{名称}，宽 × 深 × 高 m，主色 {color}`，可改。
+- 默认附件：当前视角的图；3D 无图时用 2D 图；都没有则为空。以「已上传」状态预置（无需再次上传），可放大、可移除。
+- `AiComposer` 新增 `showEngine?: boolean`（默认 true），此处传 false；保留数量 1–4。
+- 每个候选格子 = 一次「提交 + 轮询」任务（独立 `request_id`），预览直接显示生成图。
+- 应用：2D 写 `imageUrl`、3D 写 `image3dUrl`，经现有 `saveGeometry`（`catalog.save(furnitureGeometryPayload(...))`）保存后 `onChanged(next)`。
 
-### 4. 图片生成调用（`cloud/useFurnitureImage.ts` + 后端函数 `interior-furniture-image-submit`）
-- 把单次「提交 + 轮询」提成纯函数 `generateFurnitureImage(item, { view, description, images, requestId }, isCancelled)`；现有 `useFurnitureImage` hook 改为调用它，行为不变。
-- 后端函数（重新生成分支，即带 `request_id` 时）新增可选参数：
-  - `view: 'top' | 'perspective'`（默认 `top`，旧调用不受影响）；
-  - `description`（≤ 2000 字，作为用户需求拼进提示词，仍保留固定画风约束）；
-  - `images`（≤ 4 个 https 地址）。
-- 提示词：`top` 维持现有俯视符号画风；`perspective` 为「单件家具 3/4 俯角透视产品渲染图、中性浅色背景、无文字水印」。
-- 有参考图时用 `img_2_img`（第一张为 `resource_url`，即默认带上的当前家具图；其余为 `refer_image_urls`），提示词说明「在原图基础上按需求调整，保持家具主体与视角」；没有参考图时 `txt_2_img`。`perspective` 比例 4:3，`top` 仍 1:1。模型不变（Seedream 5）。
-- 改完重新部署这个后端函数；状态查询函数不动。
+### 4. 附件：图片 + 家装素材，原文件交给 AI（`ai/referenceImages.ts` → 通用附件、`ai/client.ts`、`AiComposer.tsx`）
+- 附件草稿从「只有图片」扩为通用附件：`{ id, name, kind: 'image' | 'file', ext, preview?, url?, uploading }`。
+- 支持类型（`accept`）：图片 jpg / png / webp / gif；图纸 `.dxf` `.dwg` `.pdf`；素材包 `.zip`；3D 模型 `.obj` `.stl` `.fbx` `.glb` `.gltf` `.3ds` `.skp` `.max` `.rvt` `.ifc`；其它 `.txt` `.csv` `.json`。
+- 上传：原文件直传现有参考素材存储桶（`ai-all/` 路径），图片 ≤ 10 MB、其它 ≤ 50 MB；不在前端解析或转换。
+- 数量：附件总数最多 6 个，其中图片最多 4 张（与后端模型输入上限一致）；超出、类型不支持、上传失败都 `notify` 说明原因。
+- 显示：图片仍是缩略图；文件显示格式角标 + 文件名（`FileText` / `FileArchive` / `Box` 图标），上传中显示加载；提示文案「添加图片或素材（DXF / PDF / ZIP / 3D 模型等，也可粘贴或拖入）」。
+- 请求：现有 `images: string[]` 不变，新增 `files: { url, name, ext }[]`（`readyImageUrls` 旁新增 `readyFiles`）。AI 布局、AI 创建户型、家具 AI 三处共用。
 
-### 5. 数据：3D 图地址
-- 迁移：`interior_furniture_catalog` 增加可空列 `image_3d_url text`（同一家具库业务的兼容扩展，不改已有数据；现有 RLS 已按 owner 限定）。
-- `model/types.ts`：`LibraryItem` 增加 `image3dUrl?: string`；`model/validation.ts` 与 `imageUrl` 同样校验必须是 https。
-- `cloud/useFurnitureCatalog.ts`：读写映射 `image_3d_url ↔ image3dUrl`。
+### 5. 后端：把素材交给模型，由模型判断（`interior-ai-design`、`interior-furniture-image-submit`）
+- `interior-ai-design`（AI 布局 / AI 创建）：
+  - 守卫新增 `files`（≤ 6 个、https、名称 ≤ 200、扩展名白名单）。
+  - 图片照旧作为图像输入；PDF 按协议作为文档输入（anthropic `document` URL、responses `input_file`），不支持的协议列为链接；文本类（`.dxf` `.obj` `.gltf` `.ifc` `.txt` `.csv` `.json`）读取前 60 KB 文本附在消息里；其余（zip、dwg、skp 等）只列出文件名与链接。
+  - 提示词说明：附件是用户的家装素材，请自行判断哪些与需求相关，无法读取的格式不要臆测内容。
+- `interior-furniture-image-submit`（家具图片，重新生成分支）：
+  - 新增可选 `view: 'top' | 'perspective'`（默认 top，旧调用不变）、`description`（≤ 2000）、`images`（≤ 4 个 https）、`files`（同上，仅作为文字说明列入提示词——图片模型只能读图）。
+  - 有图片附件 → `img_2_img`（第一张为 `resource_url`，即默认带上的当前家具图），提示词「在原图基础上按需求调整，保持家具主体与视角」；无图 → `txt_2_img`。`perspective` 比例 4:3，`top` 1:1。
+- 两个后端函数改完重新部署；状态查询函数不动。
 
-### 6. 附件支持家装常用素材（`components/AiComposer.tsx` + 新模块 `ai/referenceFiles.ts`）
-- 文件选择 `accept` 扩为：图片（jpg / png / webp / gif）、`.dxf`、`.pdf`、`.zip`、`.obj`、`.stl`、`.glb`、`.gltf`、`.3ds`、`.dwg`、`.skp`、`.rvt`、`.max`、`.ifc`、`.fbx`；拖入 / 选择时先经 `expandReferenceFiles(files, room)` 处理，再交给现有 `images.add` 上传（粘贴仍只取图片）。
-- 能转成参考图的：
-  - 图片：原样。
-  - DXF：复用 `model/externalDxf/dxfSource.ts` 的 `readDxfSource` 取线段，绘到画布（浅底深线、等比居中，长边 2048px）导出 PNG。
-  - PDF：动态加载 `pdfjs-dist`，按剩余名额渲染前几页为 PNG。
-  - ZIP：动态加载 `fflate` 解包，跳过 `__MACOSX` 与隐藏文件，按扩展名递归处理其中的图片 / DXF / PDF / 3D 模型。
-  - 3D 模型（`.obj` 为主，`.stl` / `.glb` / `.gltf` / `.3ds` / `.fbx` / `.ifc` 尽力解析）：解析顶点后取轴测投影画成线稿 PNG（与 DXF 同一套画布工具）。
-- 转不了的工程文件（`.dwg`、`.skp`、`.rvt`、`.max` 等专有格式）：原文件直传进素材库，附件上标注「AI 暂不读取内容」，不假装能解析。
-- 总数仍受 `AI_IMAGE_LIMIT`（4 张）限制；超出名额、无法识别、解析失败都用 `notify` 说明原因，不静默丢弃。
-- 转换期间在缩略图区显示「正在解析素材…」，并把它算进「上传中」，发送按钮禁用。
-- 提示文案：「添加参考图或素材（图片 / DXF / PDF / ZIP / 3D 模型，也可粘贴或拖入）」；拖入提示「松开以添加参考素材」；附件区下方一行小字列出支持的类型与「专有工程文件仅保存、AI 不读取」。
-- 因为 `AiComposer` 是共用组件，AI 布局、AI 创建户型、家具 AI 生成三处同时生效。
-- 新增依赖：`pdfjs-dist`、`fflate`（都按需动态加载，不进首屏包）；3D 模型解析用轻量自写解析器，不引入 three 之外的加载器。
+### 6. 数据：3D 图地址
+- 迁移：`interior_furniture_catalog` 增加可空列 `image_3d_url text`（同一家具库业务的兼容扩展，不动已有数据；现有 RLS 已按 owner 限定）。
+- `LibraryItem` 增加 `image3dUrl?: string`；`validation.ts` 与 `imageUrl` 同样要求 https；`useFurnitureCatalog.ts` 读写映射。
 
 ## Implementation checklist
-- [ ] `AccountFurnitureDialog.tsx`：弹窗放大到约 880px，左图区加大；底部按钮整体右对齐（删除在前、完成在后）
-- [ ] 新增 `FurnitureVisual.tsx`：左上角 2D / 3D 切换；3D 无图时显示空状态；自定义家具显示一个「AI 调整」按钮（不区分调整 / 重新生成）
-- [ ] `AiComposer.tsx`：新增 `showEngine` prop（默认 true）；false 时不渲染 `AiEnginePicker`
-- [ ] 新增 `FurnitureAiDialog.tsx`：复用 `AiComposer` + `AiResults` + `useAiBatch`；标题带家具名与视角、无名称输入；默认描述含名称尺寸颜色
-- [ ] `FurnitureAiDialog.tsx`：打开时把当前视角图片（3D 无图时用 2D 图）预置为已上传的参考附件并显示在附件区；可移除
-- [ ] `useFurnitureImage.ts`：抽出 `generateFurnitureImage(item, options, isCancelled)`，hook 改为调用它且行为不变
-- [ ] 后端函数 `interior-furniture-image-submit`：支持 `view` / `description` / `images`，有参考图走 `img_2_img`；参数校验；重新部署
-- [ ] 迁移：`interior_furniture_catalog` 加可空列 `image_3d_url`
-- [ ] `types.ts` / `validation.ts` / `useFurnitureCatalog.ts`：`image3dUrl` 字段、https 校验、读写映射
-- [ ] 应用候选：2D 写 `imageUrl`、3D 写 `image3dUrl`，经 `saveGeometry` 保存并 `onChanged` 刷新详情左图
-- [ ] 新增 `ai/referenceFiles.ts`：图片原样、DXF → PNG（复用 `readDxfSource`）、PDF → 前几页 PNG（`pdfjs-dist`）、ZIP 解包递归（`fflate`）、3D 模型 → 轴测线稿 PNG（`.obj` 必做，其余尽力）；转不了的专有格式原样上传并标记「AI 暂不读取」；总数受 4 张限制，失败 / 超额有提示
-- [ ] `AiComposer.tsx`：`accept` 扩到图片 + `.dxf,.pdf,.zip,.obj,.stl,.glb,.gltf,.3ds,.dwg,.skp,.rvt,.max,.ifc,.fbx`；选择 / 拖入走 `expandReferenceFiles`；解析中禁用发送并显示状态；提示文案与支持类型小字更新；「AI 暂不读取」的附件在缩略图上标注
-- [ ] `index.css`：`FurnitureVisual` 切换按钮、空状态、放大后的弹窗布局样式（使用设计令牌）
+- [ ] `AccountFurnitureDialog.tsx` + `index.css`：宽约 880px、高 `min(680px, 100dvh-2rem)`，左图右字段两栏、右栏独立滚动；页脚固定且右对齐（删除在前、完成在后）；≤700px 单列
+- [ ] 新增 `FurnitureVisual.tsx`：左上 2D / 3D 切换（默认 2D）；3D 无图空状态；自定义家具右上「AI 调整」
+- [ ] `AiComposer.tsx`：新增 `showEngine`（默认 true），false 时不渲染 `AiEnginePicker`
+- [ ] 新增 `FurnitureAiDialog.tsx`：复用 `AiComposer` + `AiResults` + `useAiBatch`；标题带家具名与视角；无名称输入；默认描述
+- [ ] `FurnitureAiDialog.tsx`：当前视角图（3D 无图用 2D 图）预置为已上传附件，可移除
+- [ ] 应用候选：2D 写 `imageUrl` / 3D 写 `image3dUrl`，经 `saveGeometry` 保存并 `onChanged`，左图立即更新
+- [ ] `useFurnitureImage.ts`：抽出 `generateFurnitureImage(item, { view, description, images, files, requestId }, isCancelled)`，原 hook 改为调用、行为不变
+- [ ] 附件通用化：`referenceImages.ts` 草稿类型加 `name/kind/ext`；`uploadReferenceFile` 支持白名单扩展名与大小上限；总数 6 / 图片 4 限制与提示
+- [ ] `AiComposer.tsx`：`accept` 扩展；选择 / 拖入接受文件；文件附件显示格式角标与文件名；提示文案更新
+- [ ] `ai/client.ts` 与三处调用（AI 布局、AI 创建、家具 AI）：请求带 `files`
+- [ ] `interior-ai-design`：`files` 守卫；PDF 文档输入 / 文本类摘录 / 其余列链接；提示词说明由模型自行判断；部署
+- [ ] `interior-furniture-image-submit`：`view` / `description` / `images` / `files`；`img_2_img` 调整；部署
+- [ ] 迁移加 `image_3d_url`；`types.ts` / `validation.ts` / `useFurnitureCatalog.ts` 接入 `image3dUrl`
 
 ## Verification checklist
-- [ ] 单测 `ai/referenceFiles.test.ts`：图片原样返回；简单 DXF（两条线）转出 1 张 PNG；简单 `.obj`（一个三角形）转出 1 张 PNG；ZIP 内含 1 图 + 1 DXF + 1 个 `.txt` → 得到 2 张、忽略 txt；`.skp` 原文件上传且标记为不读取；超过剩余名额时只返回前 N 张
+- [ ] 单测：附件校验——`.dxf` / `.pdf` / `.zip` / `.skp` 接受，`.exe` 拒绝；第 5 张图片被拒并提示；第 7 个附件被拒；超大小被拒
 - [ ] 单测：`validateDesign` / 家具库校验拒绝非 https 的 `image3dUrl`，接受 https
-- [ ] 组件测试：`FurnitureVisual` 默认 2D、切到 3D 无图时显示「尚未生成 3D 视角图」；内置家具不显示 AI 调整按钮
-- [ ] 组件测试：`FurnitureAiDialog` 不渲染名称输入框与模型选择器，标题包含家具名；有 2D 图时附件区默认显示这张图；3D 无图时默认附件为 2D 图；两张都没有时附件区为空
-- [ ] 组件测试：`AiComposer` 默认仍渲染模型选择器（`showEngine` 默认值不破坏 AI 布局 / AI 创建）；文件选择 `accept` 包含 `.dxf`、`.pdf`、`.zip`、`.obj`、`.dwg`；解析素材时发送按钮禁用
-- [ ] `pnpm exec vitest run src/features/interior` 全部通过（已知的 `dimensionWallEdit` 失败除外，属另一会话）
-- [ ] `pnpm lint` 0 error；`pnpm run build` 通过，且 `pdfjs-dist` / `fflate` 为独立分包
-- [ ] 后端函数部署后：不带 `view` 的旧请求仍生成俯视图；`images` 含非 https 地址返回 400
-- [ ] desktop_1280 截图打开家具详情弹窗，确认尺寸放大、底部按钮右对齐、左上角 2D / 3D 切换可见
+- [ ] 组件测试：`FurnitureVisual` 默认 2D；切 3D 无图显示「尚未生成 3D 视角图」；内置家具不显示「AI 调整」
+- [ ] 组件测试：`FurnitureAiDialog` 无名称输入、无模型选择器、标题含家具名；有 2D 图时默认附件为该图；3D 无图时默认附件为 2D 图；都没有时附件为空
+- [ ] 组件测试：`AiComposer` 默认仍渲染模型选择器；`accept` 含 `.dxf` `.pdf` `.zip` `.obj` `.dwg`；文件附件显示文件名与格式角标；上传中发送禁用
+- [ ] `pnpm exec vitest run src/features/interior` 通过（已知 `dimensionWallEdit` 失败除外，属另一会话）
+- [ ] `pnpm lint` 0 error；`pnpm run build` 通过
+- [ ] 后端：家具图片不带 `view` 的旧请求仍生成俯视图；`files` 含非 https 或非白名单扩展名返回 400；AI 布局带一个 PDF 附件能正常出方案
+- [ ] desktop_1280 截图家具详情弹窗：尺寸协调、页脚右对齐、2D / 3D 切换与「AI 调整」可见
