@@ -8,6 +8,7 @@ import { splitAtJunctionsOf } from './wallAutoSplit';
 import { placeEditor } from './selectionAnchor';
 import { editSelection } from './selectionEdits';
 import { placementGaps, wallPlacement } from './wallPlacement';
+import { keepOpeningsInPlace, openingsFitWalls } from './openingAnchor';
 import type { Design, Furniture, Wall } from './types';
 
 const furn = (id: string, cx: number, cy: number, w = 1000, d = 600, rot = 0): Furniture =>
@@ -133,6 +134,42 @@ describe('门窗与贴墙家具按到墙两端的净距定位', () => {
     const next = editSelection(d, s, { gapA: 200 });
     expect(next.furniture.find(f => f.id === 'cab')).toMatchObject({ cx: 2900, cy: 700 });
     expect(wallPlacement(d, { kind: 'furniture', id: 'free' })).toBeNull();
+  });
+});
+
+describe('墙延长 / 缩短时门窗留在原位', () => {
+  const withWindow = () => {
+    const d = design();
+    d.openings = [{ id: 'win', wallId: 'inner', kind: 'window', offset: 3000, width: 900 }];
+    return d;
+  };
+  const center = (d: Design) => {
+    const o = d.openings[0]!, w = d.walls.find(w => w.id === o.wallId)!, L = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
+    return [w.a[0] + (w.b[0] - w.a[0]) * o.offset / L, w.a[1] + (w.b[1] - w.a[1]) * o.offset / L];
+  };
+  it('拖 A 端把墙延长：窗户的世界坐标不变', () => {
+    const before = withWindow();
+    const after = { ...before, walls: before.walls.map(w => w.id === 'inner' ? { ...w, a: [2500, -1500] as [number, number] } : w) };
+    const next = keepOpeningsInPlace(before, after);
+    expect(next.openings[0]!.offset).toBe(4500);
+    expect(center(next)).toEqual(center(before));
+  });
+  it('拖 B 端延长：offset 不变；A 端缩短到切进窗户时判为放不下', () => {
+    const before = withWindow();
+    const longer = { ...before, walls: before.walls.map(w => w.id === 'inner' ? { ...w, b: [2500, 8000] as [number, number] } : w) };
+    expect(keepOpeningsInPlace(before, longer)).toBe(longer);
+    const cut = keepOpeningsInPlace(before, { ...before, walls: before.walls.map(w => w.id === 'inner' ? { ...w, a: [2500, 2800] as [number, number] } : w) });
+    expect(openingsFitWalls(cut, ['inner'])).toBe(false);
+  });
+  it('连接墙被移动的墙带着从 A 端伸长时，墙上门窗留在原位', () => {
+    const d = design();
+    const arm: Wall = { id: 'arm', kind: 'partition', a: [2500, 3000], b: [6000, 3000], thickness: 200 };
+    d.walls = [...d.walls, arm];
+    d.openings = [{ id: 'door', wallId: 'arm', kind: 'door', offset: 2000, width: 900 }];
+    const before = center(d);
+    const next = moveWallWithJoints(d, 'inner', [-500, 0])!;
+    expect(next.walls.find(w => w.id === 'arm')!.a).toEqual([2000, 3000]);
+    expect(center(next)).toEqual(before);
   });
 });
 

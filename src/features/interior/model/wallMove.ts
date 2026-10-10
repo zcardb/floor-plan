@@ -1,5 +1,6 @@
 import { length, nearestOnWall } from './geometry';
 import { canResizeWall } from './wallPolicy';
+import { keepOpeningsInPlace, openingsFitWalls } from './openingAnchor';
 import type { Design, Point, Wall } from './types';
 
 /** 移墙后墙段（含被带动的连接墙）的最短长度（mm）。 */
@@ -109,14 +110,11 @@ export function moveWallWithJoints(d: Design, wallId: string, delta: Point): Des
 
   const walls = new Map(d.walls.map(w => [w.id, w]));
   walls.set(wall.id, moved);
-  // 墙的 A 端移动量：门窗偏移以 A 端为基准。
-  const offsetShift = new Map<string, number>([[wall.id, dot(shiftA, u)]]);
   const changed = new Set([wall.id]);
   const shiftEnd = ({ wall: c, end }: EndJoint, shift: Point) => {
     const current = walls.get(c.id)!;
     walls.set(c.id, { ...current, [end]: [current[end][0] + shift[0], current[end][1] + shift[1]] });
     changed.add(c.id);
-    if (end === 'a') offsetShift.set(c.id, (offsetShift.get(c.id) ?? 0) + dot(shift, unit(c)));
   };
   ja.ends.forEach(j => shiftEnd(j, shiftA));
   jb.ends.forEach(j => shiftEnd(j, shiftB));
@@ -129,15 +127,7 @@ export function moveWallWithJoints(d: Design, wallId: string, delta: Point): Des
   const nextWalls = d.walls.map(w => walls.get(w.id)!);
   if (nextWalls.some(w => changed.has(w.id) && length(w) < MIN_LENGTH)) return null;
 
-  const openings = d.openings.map(o => {
-    const shift = offsetShift.get(o.wallId);
-    return shift ? { ...o, offset: o.offset - shift } : o;
-  });
-  const fits = openings.every(o => {
-    if (!changed.has(o.wallId)) return true;
-    const host = walls.get(o.wallId)!;
-    return o.offset - o.width / 2 >= -0.01 && o.offset + o.width / 2 <= length(host) + 0.01;
-  });
-  if (!fits) return null;
-  return { ...d, walls: nextWalls, openings };
+  // 被带动伸缩的连接墙：门窗留在原位，不随移动的端点滑动。
+  const next = keepOpeningsInPlace(d, { ...d, walls: nextWalls });
+  return openingsFitWalls(next, changed) ? next : null;
 }

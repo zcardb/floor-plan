@@ -13,6 +13,7 @@ import { syncRooms } from '../model/roomFollow';
 import { splitAtJunctions } from '../model/wallAutoSplit';
 import { followWallFurniture } from '../model/furnitureFollow';
 import { moveWallWithJoints } from '../model/wallMove';
+import { keepOpeningsInPlace, openingsFitWalls } from '../model/openingAnchor';
 import {
   area,
   center,
@@ -631,13 +632,11 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
             wall[key] = q;
             try { validateWallSegment(next,wall.a,wall.b,wall.id); } catch { return; }
             if (length(wall) < 100) return;
-            if (
-              next.openings.some(
-                (o) =>
-                  o.wallId === wall.id && o.offset + o.width / 2 > length(wall),
-              )
-            )
-              return;
+            // 拖动端点延长 / 缩短墙时，门窗留在原位（以未动的那一端为基准）。
+            const anchored = keepOpeningsInPlace(dr.before, next);
+            if (!openingsFitWalls(anchored, [wall.id])) return;
+            preview(anchored);
+            return;
           }
         }
         preview(next);
