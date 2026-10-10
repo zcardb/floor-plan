@@ -6,13 +6,14 @@ import { validateDesign } from '../model/validation';
 import { createSizeTransaction } from '../model/sizeTransaction';
 import {
   STAIR_DEFAULTS, STAIR_PRESETS, applyStairForm, resizeStair, stairFlightLengths, stairFlightWidths, stairLayout, stairMetrics,
-  stairRiser, stairSizeOf, stairSpec, stairStandardLengths, stairSteps, stairTread, syncStairsToHeight, updateStair,
+  stairRiser, stairSizeOf, stairSpec, stairStandardLengths, stairSteps, stairTread, stairWell, syncStairsToHeight, updateStair,
 } from '../model/stairs';
 import { furnitureDrawing } from '../model/furnitureDrawing';
 import { FurnitureShape } from './FurnitureShape';
 import { SizeFields } from './SizeFields';
 import { StairEditor } from './StairEditor';
 import { sizeDraftToModel } from '../model/lengthUnits';
+import { editSelection } from '../model/selectionEdits';
 import type { Design, Furniture } from '../model/types';
 
 /** 旧数据里的楼梯：没有 stair 字段。 */
@@ -209,6 +210,12 @@ describe('楼梯参数编辑', () => {
     expect(straight).not.toContain('转向');
     const spiral = renderToStaticMarkup(<StairEditor design={design} furniture={{ ...preset('螺旋楼梯'), id: 'p', cx: 0, cy: 0, rot: 0 } as Furniture} change={() => {}} />);
     expect(spiral).not.toContain('梯段长');
+    const u = renderToStaticMarkup(<StairEditor design={design} furniture={{ ...preset('U 型楼梯'), id: 'u', cx: 0, cy: 0, rot: 0 } as Furniture} change={() => {}} />);
+    expect(u).toContain('梯井宽 / m');
+    expect(u).toContain('value="0.20"');
+    expect(u).toContain('第 1 跑宽 1.00 + 梯井 0.20 + 第 2 跑宽 1.00 = 2.20 m');
+    expect(u).toContain('梯井是 U 型两跑梯段之间的竖向空档');
+    expect(straight).not.toContain('梯井');
   });
   it('stair 字段经 JSON 往返保留；非法参数被校验拒绝', () => {
     const f = { ...preset('三跑楼梯'), id: 't', cx: 2000, cy: 2000, rot: 0 } as Furniture;
@@ -234,6 +241,41 @@ describe('楼梯参数编辑', () => {
         expect(layout.treadDepth, form).toBeGreaterThan(0);
       }
     }
+  });
+  it('在尺寸里直接改外框：反推各跑宽与梯井，之后调细节外框不再回退', () => {
+    const u = { ...preset('U 型楼梯'), id: 'u', cx: 0, cy: 0, rot: 0 } as Furniture;
+    expect([u.w, u.d]).toEqual([2200, 3240]);
+    // 用户把外框宽改成 1.80 m：两跑等比缩到 0.80，梯井保持 0.20。
+    const narrow = editSelection({ ...blankDesign(), furniture: [u] }, { kind: 'furniture', id: 'u' }, { w: 1800 }).furniture[0];
+    expect(narrow.stair).toMatchObject({ flightWidths: [800, 800], wellGap: 200 });
+    expect(narrow.w).toBe(1800);
+    // 接着改踏面宽：外框宽度保持 1.80，不再跳回 1.94。
+    const deeper = editSelection({ ...blankDesign(), furniture: [narrow] }, { kind: 'furniture', id: 'u' }, { d: 3000 }).furniture[0];
+    expect(deeper.w).toBe(1800);
+    const after = resizeStair(deeper, { treadDepth: 300 }, 2800);
+    expect(after.w).toBe(1800);
+    expect(after.stair!.wellGap).toBe(200);
+    expect(validateDesign({ ...blankDesign(), furniture: [after] }).furniture[0].w).toBe(1800);
+    // 直跑：改外框即改梯段宽与梯段长。
+    const straight = editSelection({ ...blankDesign(), furniture: [{ ...preset('直跑楼梯'), id: 's', cx: 0, cy: 0, rot: 0 }] }, { kind: 'furniture', id: 's' }, { w: 1200, d: 5000 }).furniture[0];
+    expect(straight.stair).toMatchObject({ flightWidth: 1200, flightLengths: [5000] });
+    // 没有 stair 字段的老楼梯不受影响。
+    const legacyRow = editSelection({ ...blankDesign(), furniture: [legacy] }, { kind: 'furniture', id: 'stairs' }, { w: 1200 }).furniture[0];
+    expect(legacyRow).toMatchObject({ w: 1200 });
+    expect(legacyRow.stair).toBeUndefined();
+  });
+  it('梯井可单独调：改大梯井则外框变宽；非法值被拒绝', () => {
+    const u = { ...preset('U 型楼梯'), id: 'u', cx: 0, cy: 0, rot: 0 } as Furniture;
+    const wider = resizeStair(u, { wellGap: 400 }, 2800);
+    expect(wider.stair!.wellGap).toBe(400);
+    expect(wider.w).toBe(2400);
+    expect(stairWell({ ...u.stair!, wellGap: 0 })).toBe(0);
+    expect(stairWell(u.stair!)).toBe(200);
+    expect(stairWell({ form: 'straight', flightWidth: 1000, steps: 16 })).toBe(0);
+    for (const wellGap of [{ wellGap: -1 }, { wellGap: 2000 }, { wellGap: 1000.5 }])
+      expect(() => validateDesign({ ...blankDesign(), furniture: [{ ...u, stair: { ...u.stair!, ...wellGap } }] }), JSON.stringify(wellGap)).toThrow();
+    for (const wellGap of [0, 100, 200, 1000])
+      expect(validateDesign({ ...blankDesign(), furniture: [{ ...u, stair: { ...u.stair!, wellGap } }] }).furniture[0].stair!.wellGap, String(wellGap)).toBe(wellGap);
   });
   it('外框尺寸仍走家具尺寸事务，楼梯显示长宽', () => {
     let current: Design = { ...blankDesign(), furniture: [legacy] };

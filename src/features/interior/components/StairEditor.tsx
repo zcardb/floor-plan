@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { meterDraft, parseMeterDraft } from '../model/lengthUnits';
 import {
   STAIR_FLIGHT_MAX, STAIR_FLIGHT_MIN, STAIR_LENGTH_MAX, STAIR_LENGTH_MIN, STAIR_PRESETS, STAIR_RISER_MAX, STAIR_RISER_MIN,
-  STAIR_STEPS_MAX, STAIR_STEPS_MIN, STAIR_TREAD_MAX, STAIR_TREAD_MIN, applyStairForm, resizeStair,
-  stairFlightCount, stairFlightLengths, stairFlightWidths, stairMetrics, stairRiser, stairSpec, stairSteps, stairTread,
+  STAIR_STEPS_MAX, STAIR_STEPS_MIN, STAIR_TREAD_MAX, STAIR_TREAD_MIN, STAIR_WELL_MAX, STAIR_WELL_MIN, applyStairForm, resizeStair,
+  stairBoxTerms, stairFlightCount, stairFlightLengths, stairFlightWidths, stairMetrics, stairRiser, stairSpec, stairSteps, stairTread, stairWell,
 } from '../model/stairs';
 import type { Design, Furniture, StairForm, StairSpec } from '../model/types';
 import { StairPlan } from './StairPlan';
@@ -72,6 +72,12 @@ export function StairEditor({ design, furniture, change }: { design: Design; fur
   };
   const counts = stairFlightCount(spec.form), widths = stairFlightWidths(spec), lengths = stairFlightLengths(spec, furniture.w, furniture.d);
   const metrics = stairMetrics(spec, furniture.w, furniture.d, design.height), auto = stairSteps(design.height, stairRiser(spec));
+  const m = (mm: number) => meterDraft(Math.round(mm));
+  // 外框是怎么来的：把相加的尺寸列出来，避免改外框和改细节时对不上。
+  const box = stairBoxTerms(spec), chain = (label: string, parts: { label: string; value: number }[]) => ({
+    label, text: `${parts.map(p => `${p.label} ${m(p.value)}`).join(' + ')}${parts.length > 1 ? ` = ${m(parts.reduce((a, b) => a + b.value, 0))}` : ''} m`,
+  });
+  const terms = [chain(spec.form === 'spiral' ? '外框' : '外框宽', box.w), ...(box.d.length ? [chain('外框深', box.d)] : [])];
   const prefix = (i: number) => (counts > 1 ? `第 ${i + 1} 跑` : '梯段');
   return <div className="stair-editor" onKeyDown={e => e.stopPropagation()}>
     <div className="stair-forms" role="radiogroup" aria-label="楼梯类别">
@@ -111,6 +117,10 @@ export function StairEditor({ design, furniture, change }: { design: Design; fur
       <MeterField label="踏面宽 / m" value={stairTread(spec)} onError={setError} onCommit={mm => check(mm, STAIR_TREAD_MIN, STAIR_TREAD_MAX, '踏面宽') && update({ treadDepth: mm })} />
       <MeterField label="踏步高 / m" value={stairRiser(spec)} onError={setError} onCommit={mm => check(mm, STAIR_RISER_MIN, STAIR_RISER_MAX, '踏步高') && update({ riserHeight: mm })} />
     </div>
+    {counts > 1 && spec.form === 'u' && <div className="stair-fields">
+      <MeterField label="梯井宽 / m" value={stairWell(spec)} onError={setError}
+        onCommit={mm => check(mm, STAIR_WELL_MIN, STAIR_WELL_MAX, '梯井宽') && update({ wellGap: mm })} />
+    </div>}
     <div className="stair-direction">
       <EditorSelect label="行走方向" value={spec.reverse ? 'reverse' : 'forward'}
         options={[{ value: 'forward', label: '正向 · 由此端起步' }, { value: 'reverse', label: '反向 · 由另一端起步' }]}
@@ -121,12 +131,16 @@ export function StairEditor({ design, furniture, change }: { design: Design; fur
     </div>
     {error && <p className="form-error" role="alert">{error}</p>}
     <dl className="stair-metrics">
-      <div><dt>外框</dt><dd>{Math.round(furniture.w)} × {Math.round(furniture.d)}</dd></div>
+      {terms.map(t => <div key={t.label} className="stair-box-term"><dt>{t.label}</dt><dd>{t.text}</dd></div>)}
       <div><dt>{spec.form === 'spiral' ? '踏面宽（距内侧 0.25 m）' : '实际踏面宽'}</dt><dd>{Math.round(metrics.treadDepth)} mm</dd></div>
       <div><dt>实际踏步高</dt><dd>{Math.round(metrics.riserHeight)} mm</dd></div>
       <div><dt>踏步数</dt><dd>{spec.steps} 级</dd></div>
     </dl>
     {metrics.warnings.map(text => <p key={text} className="stair-warning" role="note"><AlertTriangle size={14} />{text}</p>)}
-    <p className="muted-note">依据 GB 50096 套内楼梯：梯段宽 ≥ 0.75 m、踏面宽 ≥ 0.22 m、踏步高 ≤ 0.20 m；踏步高与踏面宽默认取住宅常用值。</p>
+    <p className="muted-note">
+      上方「外框」由这些尺寸相加得出；在「尺寸与位置」里直接改外框，也会按外框反推这些尺寸，两边始终一致。
+      {spec.form === 'u' && '梯井是 U 型两跑梯段之间的竖向空档，住宅常取 0.10–0.20 m；净宽大于 0.11 m 时须做防止儿童攀滑的措施。'}
+      依据 GB 50096 套内楼梯：梯段宽 ≥ 0.75 m、踏面宽 ≥ 0.22 m、踏步高 ≤ 0.20 m。
+    </p>
   </div>;
 }

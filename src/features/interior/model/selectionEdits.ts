@@ -3,6 +3,7 @@ import { BEARING_WALL_LOCKED, canResizeWall } from './wallPolicy';
 import { syncRooms } from './roomFollow';
 import { placementShift, wallPlacement } from './wallPlacement';
 import { openingHeight, openingSill } from './hardMaterials';
+import { fitStairToBox, isStairs } from './stairs';
 import type { Design, Selection } from "./types";
 
 /**
@@ -65,15 +66,13 @@ export function editSelection(
   if (s.kind === "furniture")
     return {
       ...d,
-      furniture: d.furniture.map((f) =>
-        f.id === s.id
-          ? {
-              ...f,
-              ...values,
-              rot: values.rot === undefined ? f.rot : norm(values.rot),
-            }
-          : f,
-      ),
+      furniture: d.furniture.map((f) => {
+        if (f.id !== s.id) return f;
+        const next = { ...f, ...values, rot: values.rot === undefined ? f.rot : norm(values.rot) };
+        // 楼梯外框由梯段推导：直接改外框时反推梯段参数，避免之后调细节时外框回退。
+        const sized = values.w !== undefined || values.d !== undefined;
+        return sized && isStairs(next) ? fitStairToBox(next, values.w !== undefined ? "w" : "d") : next;
+      }),
     };
   if (s.kind === "wall") {
     const w = d.walls.find((w) => w.id === s.id);

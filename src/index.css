@@ -2724,6 +2724,8 @@
 .stair-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-col); margin: var(--sp-row) 0 0; padding: 8px 10px; border-radius: var(--ctl-radius); background: hsl(var(--secondary) / 0.6); }
 .stair-metrics dt { font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); }
 .stair-metrics dd { margin: 2px 0 0; font-size: var(--fs-control); font-weight: 600; color: hsl(var(--foreground)); font-variant-numeric: tabular-nums; }
+.stair-metrics .stair-box-term { grid-column: 1 / -1; }
+.stair-metrics .stair-box-term dd { font-weight: 500; font-size: var(--fs-meta); }
 .visual-editor-popover .stair-warning { display: flex; align-items: flex-start; gap: 6px; margin: 6px 0 0; color: hsl(var(--destructive)); }
 .stair-warning svg { flex: 0 0 auto; margin-top: 3px; }
 /* 房间逐边尺寸：工具条弹层为「左预览 + 右输入」，属性面板只读标注边长 */

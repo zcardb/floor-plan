@@ -19,8 +19,12 @@ export const STAIR_TREAD_MIN = 150, STAIR_TREAD_MAX = 400;
 export const STAIR_RISER_MIN = 100, STAIR_RISER_MAX = 250;
 /** 住宅套内常用值：踏步高 175 mm（150–175 舒适区）、踏面宽 280 mm（260–300 常用区）。 */
 export const STAIR_DEFAULTS = { riserHeight: 175, treadDepth: 280 };
-/** U 型两跑之间默认梯井净宽（mm）。 */
+/**
+ * 梯井：U 型（双跑）楼梯两跑梯段之间的竖向空档，平面上夹在左右两跑中间。
+ * GB 50096：梯井净宽大于 0.11 m 时须采取防止儿童攀滑的措施；住宅常取 0.10–0.20 m，默认 0.20 m。
+ */
 export const STAIR_WELL_GAP = 200;
+export const STAIR_WELL_MIN = 0, STAIR_WELL_MAX = 1000;
 /** GB 50096 套内楼梯：梯段净宽 ≥ 0.75 m、踏步宽 ≥ 0.22 m、踏步高 ≤ 0.20 m；扇形踏步在距内侧扶手 0.25 m 处量踏步宽。 */
 export const STAIR_RULES = { flightWidth: 750, treadDepth: 220, riserHeight: 200, spiralMeasureOffset: 250 };
 const SPIRAL_SWEEP = (300 * Math.PI) / 180;
@@ -35,6 +39,7 @@ export function stairFlightCount(form: StairForm) { return form === 'triple' ? 3
 const multiFlight = (form: StairForm) => stairFlightCount(form) > 1;
 export function stairRiser(spec: StairSpec) { return spec.riserHeight ?? STAIR_DEFAULTS.riserHeight; }
 export function stairTread(spec: StairSpec) { return spec.treadDepth ?? STAIR_DEFAULTS.treadDepth; }
+export function stairWell(spec: StairSpec) { return spec.form === 'u' ? spec.wellGap ?? STAIR_WELL_GAP : 0; }
 /** 踏步数 = 层高 ÷ 踏步高，取整并夹到 3–40 级。 */
 export function stairSteps(floorHeight: number, riser: number = STAIR_DEFAULTS.riserHeight) {
   return clamp(Math.round(floorHeight / Math.max(riser, STAIR_RISER_MIN)), STAIR_STEPS_MIN, STAIR_STEPS_MAX);
@@ -68,6 +73,7 @@ export function validStairSpec(spec: unknown): boolean {
     (s.treadDepth === undefined || range(s.treadDepth, STAIR_TREAD_MIN, STAIR_TREAD_MAX)) &&
     (s.riserHeight === undefined || range(s.riserHeight, STAIR_RISER_MIN, STAIR_RISER_MAX)) &&
     (s.stepsManual === undefined || typeof s.stepsManual === 'boolean') &&
+    (s.wellGap === undefined || (s.form === 'u' && range(s.wellGap, STAIR_WELL_MIN, STAIR_WELL_MAX))) &&
     (s.reverse === undefined || typeof s.reverse === 'boolean') && (s.hand === undefined || s.hand === 'left' || s.hand === 'right');
 }
 /** 旧楼梯没有 stair 字段：按直跑、梯段宽等于外框宽、12 级处理（与旧图样一致）。 */
@@ -196,8 +202,9 @@ export function stairWellGap(spec: StairSpec, w: number, d: number): number {
   return Math.max(0, w - a.width - b.width);
 }
 
-/** 由梯段宽、梯段长（或螺旋的踏面宽）推导外框 w × d（mm）。 */
-export function stairSizeOf(spec: StairSpec, gap: number = STAIR_WELL_GAP): { w: number; d: number } {
+/** 由梯段宽、梯段长、梯井（或螺旋的踏面宽）推导外框 w × d（mm）。 */
+export function stairSizeOf(spec: StairSpec): { w: number; d: number } {
+  const gap = stairWell(spec);
   const widths = stairFlightWidths(spec);
   if (spec.form === 'spiral') {
     const step = SPIRAL_SWEEP / clamp(Math.round(spec.steps), STAIR_STEPS_MIN, STAIR_STEPS_MAX);
@@ -229,11 +236,58 @@ export function updateStair(spec: StairSpec, patch: Partial<StairSpec>,
   next.flightLengths = (opts.lengths ?? (standard ? stairStandardLengths(next) : current!)).map(v => Math.round(clamp(v, STAIR_LENGTH_MIN, STAIR_LENGTH_MAX)));
   return next;
 }
-/** 更新楼梯并按梯段长同步外框；U 型保留当前梯井宽。 */
+/** 更新楼梯并按梯段长同步外框。旧 U 型数据没有 wellGap 时，先从当前外框量出梯井，避免外框跳变。 */
 export function resizeStair(f: Furniture, patch: Partial<StairSpec>, floorHeight?: number, lengths?: number[]): Furniture {
   const spec = stairSpec(f), stair = updateStair(spec, patch, { floorHeight, lengths, size: f });
-  const gap = spec.form === 'u' && stair.form === 'u' ? stairWellGap(spec, f.w, f.d) : STAIR_WELL_GAP, size = stairSizeOf(stair, gap);
+  if (stair.form === 'u' && stair.wellGap === undefined)
+    stair.wellGap = spec.form === 'u' ? Math.round(clamp(stairWellGap(spec, f.w, f.d), STAIR_WELL_MIN, STAIR_WELL_MAX)) : STAIR_WELL_GAP;
+  if (stair.form !== 'u') delete stair.wellGap;
+  const size = stairSizeOf(stair);
   return { ...f, w: Math.round(size.w), d: Math.round(size.d), stair };
+}
+
+/**
+ * 在「尺寸与位置」里直接改外框后，按新外框反推各跑宽 / 长（U 型保留梯井、两跑等比缩放），
+ * 使楼梯参数与外框一致；之后再调楼梯细节时外框不会回退。`prefer` 是用户改的那一边（螺旋楼梯据此取正方形）。
+ */
+export function fitStairToBox(f: Furniture, prefer: 'w' | 'd' = 'w'): Furniture {
+  if (!f.stair) return f;
+  const spec = f.stair, width = (v: number) => Math.round(clamp(v, STAIR_FLIGHT_MIN, STAIR_FLIGHT_MAX));
+  const run = (v: number) => Math.round(clamp(v, STAIR_LENGTH_MIN, STAIR_LENGTH_MAX));
+  let stair: StairSpec;
+  if (spec.form === 'spiral') {
+    const size = prefer === 'w' ? f.w : f.d, outer = size / 2, fw = width(Math.min(spec.flightWidth, outer * 0.85));
+    const step = SPIRAL_SWEEP / clamp(Math.round(spec.steps), STAIR_STEPS_MIN, STAIR_STEPS_MAX);
+    stair = { ...spec, flightWidth: fw, treadDepth: Math.round(clamp((outer - fw + STAIR_RULES.spiralMeasureOffset) * step, STAIR_TREAD_MIN, STAIR_TREAD_MAX)) };
+  } else if (spec.form === 'u') {
+    const widths = stairFlightWidths(spec), gap = Math.min(stairWell(spec), Math.max(0, f.w - 2 * STAIR_FLIGHT_MIN));
+    const k = (f.w - gap) / (widths[0] + widths[1]), f1 = width(widths[0] * k), f2 = width(widths[1] * k);
+    const runs = spec.flightLengths?.length === 2 ? spec.flightLengths : stairFlightLengths(spec, f.w, f.d);
+    const r = (f.d - Math.max(f1, f2)) / Math.max(runs[0], runs[1]);
+    stair = { ...spec, flightWidth: f1, flightWidths: [f1, f2], flightLengths: runs.map(v => run(v * r)), wellGap: Math.round(Math.max(0, f.w - f1 - f2)) };
+  } else if (spec.form === 'straight') {
+    stair = { ...spec, flightWidth: width(f.w), flightLengths: [run(f.d)] };
+  } else {
+    const flights = flightLayout(spec, f.w, f.d).flights, widths = flights.map(fl => width(fl.width));
+    stair = { ...spec, flightWidth: widths[0], flightWidths: widths, flightLengths: flights.map(fl => run(dist(fl.start, fl.end))) };
+  }
+  const size = stairSizeOf(stair);
+  return { ...f, w: Math.round(size.w), d: Math.round(size.d), stair };
+}
+
+export interface StairBoxTerm { label: string; value: number }
+/** 外框宽 / 深由哪些尺寸相加而来，用于在编辑面板里说明外框为什么是这个值。螺旋楼梯返回外径。 */
+export function stairBoxTerms(spec: StairSpec): { w: StairBoxTerm[]; d: StairBoxTerm[] } {
+  const widths = stairFlightWidths(spec);
+  if (spec.form === 'spiral') { const { w } = stairSizeOf(spec); return { w: [{ label: '外径', value: w }], d: [] }; }
+  const runs = spec.flightLengths?.length === widths.length ? spec.flightLengths : stairStandardLengths(spec);
+  if (spec.form === 'l') return { w: [{ label: '第 1 跑宽', value: widths[0] }, { label: '第 2 跑长', value: runs[1] }],
+    d: [{ label: '第 2 跑宽', value: widths[1] }, { label: '第 1 跑长', value: runs[0] }] };
+  if (spec.form === 'u') return { w: [{ label: '第 1 跑宽', value: widths[0] }, { label: '梯井', value: stairWell(spec) }, { label: '第 2 跑宽', value: widths[1] }],
+    d: [{ label: '平台', value: Math.max(widths[0], widths[1]) }, { label: '较长一跑', value: Math.max(runs[0], runs[1]) }] };
+  if (spec.form === 'triple') return { w: [{ label: '第 1 跑宽', value: widths[0] }, { label: '第 2 跑长', value: runs[1] }, { label: '第 3 跑宽', value: widths[2] }],
+    d: [{ label: '第 2 跑宽', value: widths[1] }, { label: '较长边跑', value: Math.max(runs[0], runs[2]) }] };
+  return { w: [{ label: '梯段宽', value: widths[0] }], d: [{ label: '梯段长', value: runs[0] }] };
 }
 /** 层高变化后，所有自动踏步数的楼梯按新层高重算（手动指定的不变）。 */
 export function syncStairsToHeight(design: Design): Design {

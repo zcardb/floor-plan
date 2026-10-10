@@ -61,6 +61,8 @@ export interface StairSpec {
   flightWidths?: number[];
   /** 各跑水平长度（mm），长度 = 跑数；缺省时在外框内均分（旧数据行为）。螺旋楼梯不使用。 */
   flightLengths?: number[];
+  /** 梯井净宽（mm），仅 U 型：两跑梯段之间的竖向空档；缺省 200。 */
+  wellGap?: number;
   /** 踏面宽（mm），缺省 280（住宅套内常用值）。 */
   treadDepth?: number;
   /** 踏步高（mm），缺省 175（住宅套内常用值）；踏步数由层高 ÷ 踏步高推算。 */
