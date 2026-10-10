@@ -21,7 +21,7 @@ function harness(structureTools=true){
 }
 beforeEach(()=>{state.values=[];state.cursor=0;});
 describe('硬装分类入口',()=>{
-  it('硬装有独立图标，切换后集中显示工具与楼梯且移除软装列表',()=>{
+  it('硬装有独立图标，切换后集中显示五种楼梯与工具，并移除软装列表',()=>{
     const h=harness();
     let tree=h.render();
     const category=tree.find(n=>n.type==='button'&&Array.isArray(n.props.children)&&n.props.children.includes('硬装'))!;
@@ -29,9 +29,11 @@ describe('硬装分类入口',()=>{
     expect(tree.some(n=>n.props.className==='structural-items')).toBe(false);
     (category.props.onClick as ()=>void)();tree=h.render();
     expect(tree.some(n=>n.props.className==='structural-items')).toBe(true);
-    const item=tree.find(n=>n.props['aria-label']==='添加楼梯')!;
+    for(const name of ['直跑楼梯','L 型楼梯','U 型楼梯','三跑楼梯','螺旋楼梯'])
+      expect(tree.some(n=>n.props['aria-label']==='添加'+name),name).toBe(true);
+    const item=tree.find(n=>n.props['aria-label']==='添加直跑楼梯')!;
     (item.props.onClick as ()=>void)();
-    expect(h.add).toHaveBeenCalledWith(expect.objectContaining({name:'楼梯',w:1000,d:3000}));
+    expect(h.add).toHaveBeenCalledWith(expect.objectContaining({name:'直跑楼梯',w:1000,d:3600,stair:{form:'straight',flightWidth:1000,steps:14}}));
     expect(tree.some(n=>n.props['aria-label']==='添加三人沙发')).toBe(false);
     expect(tree.some(n=>n.type==='button'&&Array.isArray(n.props.children)&&n.props.children.includes('墙体'))).toBe(false);
     for(const [label,tool] of [['门','door'],['窗','window']]){
@@ -45,7 +47,7 @@ describe('硬装分类入口',()=>{
     const search=tree.find(n=>n.type==='input'&&n.props['aria-label']==='搜索家具')!;
     (search.props.onChange as (event:{target:{value:string}})=>void)({target:{value:'楼梯'}});
     tree=h.render();
-    expect(tree.some(n=>n.props['aria-label']==='添加楼梯')).toBe(true);
+    expect(tree.some(n=>n.props['aria-label']==='添加U 型楼梯')).toBe(true);
     expect(tree.some(n=>n.props.className==='structural-items')).toBe(false);
   });
 });

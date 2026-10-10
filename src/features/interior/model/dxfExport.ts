@@ -1,8 +1,12 @@
-import { AlignedDimension, BlockFlags, DxfWriter, LWPolylineFlags, TextHorizontalAlignment, TextVerticalAlignment, Units, point3d } from '@tarikjabiri/dxf';
-import type { DxfBlock } from '@tarikjabiri/dxf';
+import {
+  AlignedDimension, BlockFlags, DxfWriter, HatchBoundaryPaths, HatchPolylineBoundary, HatchPredefinedPatterns, LWPolylineFlags,
+  TextHorizontalAlignment, TextVerticalAlignment, Units, pattern, point3d, vertex,
+} from '@tarikjabiri/dxf';
+import type { DxfBlock, DxfLayer } from '@tarikjabiri/dxf';
 import type { DrawingDocument, DrawingEntity } from './drawingDocument';
 import type { Point } from './types';
 import { PAYLOAD_MARKER } from './designPayload';
+import { DXF_DASHED_PATTERN, DXF_LAYER_STYLES, DXF_WALL_HATCH_LAYER, type DxfLayerName } from './drawingStyle';
 /** Max characters per DXF 999 comment line (R2000+ string limit is 2049 single-byte chars). */
 export const DXF_COMMENT_CHUNK = 2000;
 /** Text style with an SHX big font so AutoCAD renders Chinese instead of `?`. */
@@ -18,6 +22,9 @@ function writeEntity(target:DxfBlock,entity:DrawingEntity){
     else target.addLWPolyline(entity.points.map(([x,y])=>({point:{x,y:-y}})),{...options,flags:entity.closed?LWPolylineFlags.Closed:LWPolylineFlags.None});
   }else if(entity.kind==='arc')target.addArc(cad(entity.center),entity.radius,
     degrees(entity.clockwise?entity.end:entity.start),degrees(entity.clockwise?entity.start:entity.end),options);
+  else if(entity.kind==='circle')target.addCircle(cad(entity.center),entity.radius,options);
+  // ELLIPSE group code 11 is the major-axis endpoint relative to the centre.
+  else if(entity.kind==='ellipse')target.addEllipse(cad(entity.center),point3d(entity.major[0],-entity.major[1],0),entity.ratio,0,2*Math.PI,options);
   else target.addText(cad(entity.point),entity.height,entity.text.replace(/[\r\n]/g,' '),{...options,
     rotation:((-entity.rotation)%360+360)%360,horizontalAlignment:TextHorizontalAlignment.Center,
     verticalAlignment:TextVerticalAlignment.Middle,secondAlignmentPoint:cad(entity.point)}).textStyle=DXF_TEXT_STYLE;
@@ -29,6 +36,15 @@ class DisplayBlockDimension extends AlignedDimension {
     this.dimensionType |= 32;
   }
 }
+/** The library hard-codes layer lineweight (group 370) to 0; rewrite that one tag with the layer's lineweight. */
+function setLayerLineweight(layer:DxfLayer,lineweight:number){
+  const write=layer.dxfy.bind(layer);
+  layer.dxfy=dx=>write(new Proxy(dx,{get(target,key){
+    if(key==='push')return (code:number,value:unknown)=>target.push(code,code===370?lineweight:value as never);
+    const member=Reflect.get(target,key,target);
+    return typeof member==='function'?member.bind(target):member;
+  }}));
+}
 /** Leading 999 comment lines: marker, chunk count, then the base64 payload in chunks. */
 function payloadComments(payload:string){
   const chunks=payload.match(new RegExp(`.{1,${DXF_COMMENT_CHUNK}}`,'g'))||[];
@@ -37,15 +53,32 @@ function payloadComments(payload:string){
 export function serializeDxf(document:DrawingDocument,payload?:string):string{
   const writer=new DxfWriter();writer.setUnits(Units.Millimeters);
   writer.setVariable('$MEASUREMENT',{70:1});writer.setVariable('$DWGCODEPAGE',{3:'ANSI_1252'});
-  writer.setVariable('$LASTSAVEDBY',{1:DXF_SAVED_BY});
+  writer.setVariable('$LASTSAVEDBY',{1:DXF_SAVED_BY});writer.setVariable('$LWDISPLAY',{290:1});
   const textStyle=writer.tables.addStyle(DXF_TEXT_STYLE);
   textStyle.fontFileName='simplex.shx';textStyle.bigFontFileName='gbcbig.shx';
   writer.setVariable('$EXTMIN',{10:document.bounds.x,20:-document.bounds.y2,30:0});
   writer.setVariable('$EXTMAX',{10:document.bounds.x2,20:-document.bounds.y,30:0});
-  for(const layer of ['WALLS','DEMOLISHED','ROOMS','OPENINGS','FURNITURE','ROOM_LABELS','DIMENSIONS'])writer.addLayer(layer,7,'CONTINUOUS');
+  writer.addLType('DASHED','__ __ __',DXF_DASHED_PATTERN);
+  for(const [name,style] of Object.entries(DXF_LAYER_STYLES) as [DxfLayerName,typeof DXF_LAYER_STYLES[DxfLayerName]][])
+    setLayerLineweight(writer.addLayer(name,style.color,style.lineType==='DASHED'?'DASHED':'Continuous'),style.lineweight);
   const style=writer.addDimStyle('STUDIO_METERS');
   Object.assign(style,{DIMTXT:180,DIMASZ:120,DIMTSZ:60,DIMEXO:35,DIMEXE:120,DIMLFAC:0.001,DIMDEC:2,DIMLUNIT:2,DIMPOST:'<> m',DIMGAP:90,DIMTAD:1,DIMTMOVE:1,DIMZIN:0});
-  for(const e of document.entities)writeEntity(writer.modelSpace,e);
+  for(const block of document.blocks){
+    const target=writer.blocks.addBlock(block.name,writer.document.objects,false);
+    for(const entity of block.entities)writeEntity(target,entity);
+  }
+  const inserted=new Set(document.inserts.map(insert=>insert.groupId));
+  for(const e of document.entities){
+    if(e.group&&inserted.has(e.group.id))continue;
+    if(e.layer==='WALLS'&&e.kind==='polyline'&&e.closed&&e.points.length>2){
+      const boundary=new HatchBoundaryPaths();
+      boundary.addPolylineBoundary(new HatchPolylineBoundary(e.points.map(([x,y])=>vertex(x,-y))));
+      writer.modelSpace.addHatch(boundary,pattern({name:HatchPredefinedPatterns.SOLID}),{layerName:DXF_WALL_HATCH_LAYER});
+    }
+    writeEntity(writer.modelSpace,e);
+  }
+  for(const insert of document.inserts)
+    writer.modelSpace.addInsert(insert.block,cad(insert.point),{layerName:insert.layer,rotationAngle:degrees(insert.rotation)});
   document.dimensions.forEach((dim,index)=>{
     const block=writer.blocks.addBlock(`*D${index+1}`,writer.document.objects,false);block.flags=BlockFlags.AnonymousBlock;
     for(const entity of dim.display)writeEntity(block,entity);
