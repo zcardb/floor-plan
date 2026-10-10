@@ -1,128 +1,73 @@
-# DXF 导出补齐 CAD 规范 + 楼梯按规范扩展
+# 楼梯：行走方向反转、左转/右转、每跑单独梯段宽
 
 ## Context
-上一轮对照 DXF、CAD 和建筑制图规范做了类型缺口盘点（见 `cad-type-gap-analysis.md`）。你确定本次只做两件事：
-1. **不改设计数据模型，只改导出**：DXF 补上图层颜色、线宽、虚线线型，圆形写成 CIRCLE/ELLIPSE，墙体加 HATCH 填充，家具和门窗写成 BLOCK + INSERT。
-2. **楼梯按规范扩展**：分 5 类（直跑、L 型、U 型、三跑、螺旋），每类可设梯段宽和踏步数，有自己独立的平面图样和专属编辑面板。外框长宽照常可改，踏面在外框内均分。**3D 保持现状。**
+楼梯旋转后，“上”字、起步点和箭头只会跟着整体转，没办法单独指定哪一头是上行起点。另外，L 型、U 型、三跑楼梯的几跑现在只能共用一个梯段宽。你确定要做三件事：
+1. **行走方向反转**：起步端和箭头对调，“上”字和折断线跟着移到新的第一跑。
+2. **转向**：L 型、U 型、三跑可以选左转或右转，右转和左转互为镜像。
+3. **每跑单独设梯段宽**：L 型、U 型有 2 跑，三跑有 3 跑。平台大小跟着各跑宽度变化。
 
-其他缺口本次不做。
+不做：标注文字切换“上/下”、文字保持正向、每跑单独设踏步数、3D 视图改动。
 
----
-
-## 一、DXF 导出（不改 `Design`）
-
-### 1. 图层样式（`model/drawingStyle.ts` 新增 `DXF_LAYER_STYLES`）
-| 图层 | ACI 颜色 | 线宽 | 线型 |
-| --- | --- | --- | --- |
-| WALLS | 7 | 0.50 | CONTINUOUS |
-| WALL_HATCH（只在 DXF 里有） | 8 | 0.00 | CONTINUOUS |
-| DEMOLISHED | 1 | 0.35 | **DASHED** |
-| ROOMS | 8 | 0.18 | CONTINUOUS |
-| OPENINGS | 4 | 0.25 | CONTINUOUS |
-| FURNITURE | 30 | 0.18 | CONTINUOUS |
-| ROOM_LABELS | 2 | 0.18 | CONTINUOUS |
-| DIMENSIONS | 3 | 0.13 | CONTINUOUS |
-
-- 用 `writer.addLType('DASHED', '__ __ __', [80, -50])` 定义虚线，与 SVG/PDF 里拆除墙的 `dash: [80, 50]` 保持一致。
-- `@tarikjabiri/dxf` 2.9.0 的 `DxfLayer.dxfy` 把组码 370 写死为 0。在 `dxfExport.ts` 里覆盖已创建图层的 `dxfy`，把 370 改为表中的线宽（单位 1/100 mm，都取标准档位）；同时设置 `$LWDISPLAY = 1`。
-
-### 2. 新增导出图元 CIRCLE / ELLIPSE（`model/drawingDocument.ts`）
-- `DrawingEntity` 增加两种：`{kind:'circle'; center; radius}`、`{kind:'ellipse'; center; major: Point /*长轴向量*/; ratio}`。这只是导出用的中间类型，不是设计数据。
-- `furnitureDrawing.ts`：`<circle>/<ellipse>` 在相似变换下（等比缩放 + 旋转 + 平移，当前所有家具都满足）输出 circle/ellipse；遇到非等比变换仍退回原来的折线采样。另外新增对 `<text>` 的支持（楼梯的"上"字要用），输出 `text` 实体，字高和旋转都从变换矩阵推出。
-- 下游各处同步：`dxfExport.writeEntity` 调用 `addCircle` 或 `addEllipse(center, 长轴端点, ratio, 0, 2π)`（y 轴翻转）；`svgExport.element` 输出 `<circle>` 或 `<ellipse transform=rotate>`；`pdfExport` 新增 `ellipsePoints` 采样（与 `arcPoints` 同样按约 20 mm 弦长）；`createDrawingDocument` 的 bounds 计算覆盖这两种新图元。
-
-### 3. 墙体 HATCH
-`serializeDxf` 遍历 WALLS 图层里的闭合多段线（DEMOLISHED 不处理），对每个调用 `addHatch(HatchPolylineBoundary, pattern({name: SOLID}), {layerName: 'WALL_HATCH'})`。墙线本身保持不变。
-
-### 4. 家具和门窗写成 BLOCK + INSERT
-- `DrawingDocument` 新增两个字段：`blocks: {name; entities /*局部坐标*/}[]` 和 `inserts: {block; point; rotation /*弧度*/; layer; groupId}[]`。
-- 新增 `transformEntity(e, point, rotation)`，覆盖 polyline、arc、text、circle、ellipse 五种图元。
-- **家具**：先用 `furnitureDrawing({...f, cx:0, cy:0, rot:0})` 得到局部几何，再用 `transformEntity` 得到世界坐标，放进 `entities`（SVG/PDF 照旧使用）。块按 `type | shape | w | d | stair` 签名去重，块名形如 `FURN_sofa_2400x900`，同名但签名不同时追加 `_2`。
-- **门窗**：把 `createDrawingDocument` 里的门、窗、垭口绘制逻辑抽成 `openingDrawing(o, thickness)`，输出局部坐标（墙方向为 +x，洞口中心为原点）。块按 `kind | width | thickness | mirrorX | mirrorY` 去重，块名形如 `DOOR_900x240`、`WIN_1500x240`、`PASS_900x240`。
-- **DXF 写出**：先写块定义（沿用尺寸块的 `writer.blocks.addBlock` 写法）；模型空间跳过已经被 INSERT 代替的 group，改为调用 `addInsert(name, cad(point), {layerName, rotationAngle: degrees(rotation)})`。这里的 y 翻转与 `degrees()` 取反配合是正确的。
-- SVG/PDF 不读 `blocks` / `inserts`，输出内容不变。无载荷的外部 DXF 识别本来就会展开 INSERT，不受影响。
-
----
-
-## 二、楼梯（`Furniture` 只新增一个可选字段）
-
-### 1. 数据（`model/types.ts`，新增 `model/stairs.ts`）
+## 一、数据（`model/types.ts`，`StairSpec` 只新增可选字段，旧数据不受影响）
 ```ts
-export type StairForm = 'straight' | 'l' | 'u' | 'triple' | 'spiral';
-export interface StairSpec { form: StairForm; flightWidth: number /*mm*/; steps: number }
-// Furniture.stair?: StairSpec;  LibraryItem.stair?: StairSpec
+export interface StairSpec {
+  form: StairForm; flightWidth: number; steps: number;
+  /** L / U / 三跑各跑梯段宽（mm），长度 = 跑数；缺省时每跑都用 flightWidth。 */
+  flightWidths?: number[];
+  /** 行走方向反转：起步端与箭头对调。 */
+  reverse?: boolean;
+  /** 转向：默认 right（第一跑上行后向右转，即当前图样）；left 为左右镜像。仅 L / U / 三跑生效。 */
+  hand?: 'left' | 'right';
+}
 ```
-- `stairSpec(f)`：没有 `stair` 字段的老楼梯视为 `{straight, flightWidth: f.w, steps: 12}`，画出来与现在一样是 11 条踏步线。
-- `STAIR_PRESETS`（同时作为素材库的 5 个条目）：
+- `model/stairs.ts` 新增：
+  - `stairFlightCount(form)`：直跑 1、L 型 2、U 型 2、三跑 3、螺旋 1
+  - `stairFlightWidths(spec)`：有 `flightWidths` 就用它，否则用 `flightWidth` 补满跑数
+- `validStairSpec` 增加三项校验：`flightWidths` 的长度必须等于跑数，每项在 300–5000 mm 之间；`reverse` 必须是布尔值；`hand` 只能是 `left` 或 `right`。
+- `applyStairForm` 切换类别时清掉这三个字段，回到该类别的预设值。
+- 修改某一跑宽度时，写入完整的 `flightWidths`，同时让 `flightWidth` 等于第 1 跑的宽度，保持兼容。
 
-| 类别 | 外框 w×d | 梯段宽 | 踏步数 |
-| --- | --- | --- | --- |
-| 直跑楼梯 | 1000×3600 | 1000 | 14 |
-| L 型楼梯 | 2400×2400 | 900 | 15 |
-| U 型楼梯 | 2100×3000 | 1000 | 16 |
-| 三跑楼梯 | 2700×2700 | 900 | 17 |
-| 螺旋楼梯 | 1800×1800 | 800 | 14 |
+## 二、几何（`stairLayout` 重构，统一“梯段描述 → 标记”）
+- 各类别先按**正向、右转**算出 `lines`、`outline`、`walk`，以及 `flights: {start, end, width, tread}[]`，即每一跑的中线起止点、宽度和踏步宽。
+- **每跑宽度**：
+  - L 型：第 1 跑 f1 在左列，第 2 跑 f2 在顶行，平台为 f1×f2。run1 = d − f2，run2 = w − f1。
+  - U 型：f1 在左列，f2 在右列，中间留梯井；顶部平台进深取 max(f1, f2)。f1 + f2 不超过 w。
+  - 三跑：f1 在左列，f2 在顶行，f3 在右列；两个平台分别是 f1×f2 和 f3×f2。run2 = w − f1 − f3。
+  - 每跑宽度都会被夹到外框能容纳的范围内，避免出现负尺寸。
+- **标记统一函数** `flightMarks(flight, n)`：在第一跑上放起步点（沿行走方向 t/2 处）、“上”字（第一跑右手侧）、折断线（第一跑中点，45° 斜向）。直跑和多跑共用这个函数，螺旋楼梯保留现有的标记位置。
+- **反转**：`walk` 倒序，箭头画在新终点，用最后一跑的反向作为第一跑来生成标记；踏步线和外框不变。螺旋楼梯同样适用。
+- **左转**：对 L 型、U 型、三跑的全部点做 x 取负。因为是直接改坐标、不用 transform，“上”字不会被镜像成反字。
+- `StairLayout.flightWidth` 改为各跑中的最小值，供规范提示使用；`treadDepth` 继续取各跑踏步宽的最小值。
 
-- 校验（`validation.ts`）：`form` 必须是上面 5 种之一；`steps` 为 3–40 的整数；`flightWidth` 在 300–5000 mm 之间。
+## 三、编辑面板（`components/StairEditor.tsx`）
+- 抽出一个 `MeterField` 小组件：米制输入，失焦或回车时提交，超出范围就报错并回滚。原来的梯段宽字段和新的每跑宽度字段都用它。
+- **梯段宽**：
+  - 直跑和螺旋楼梯：仍是一个“梯段宽 / m”。
+  - L 型、U 型：显示“第 1 跑 / m”“第 2 跑 / m”两栏。
+  - 三跑：显示三栏，共用现有的 `.visual-size-fields` 栅格。
+- **方向**：复用 `EditorSelect`，参考 `DoorOrientationControls` 的写法：
+  - “行走方向”：正向 · 由此端起步 / 反向 · 由另一端起步
+  - “转向”（只在 L 型、U 型、三跑时显示）：右转 / 左转
+- 所有修改都走 `p.change`，所以撤销和保存沿用现有机制。
 
-### 2. 平面图样（GB/T 50104：踏步线、平台、梯井、行走线加箭头、起步点、"上"字、折断线）
-`stairLayout(spec, w, d)` 只做纯几何计算。梯段宽会被夹到外框能容纳的最大值，所以改外框尺寸永远不会出错。
-- **直跑**：梯段居中，n 级等分 d。
-- **L 型**：左侧梯段向上，左上角是 fw×fw 平台，再接顶部梯段向右；踏步按 ⌈n/2⌉ 和 ⌊n/2⌋ 分配。
-- **U 型**：左右两个平行梯段，中间是梯井，顶部是贯通平台；第一跑上行、第二跑下行。
-- **三跑**：左梯段向上、左上平台、顶部梯段向右、右上平台、右梯段向下；踏步大致三等分。
-- **螺旋**：外圆 R = min(w,d)/2，中柱 r = max(R − fw, 0.15R)，n 条径向踏步线均分 300° 扫角，行走线是半径 (r+R)/2 的圆弧。
-- 每类都画：行走线（终点带箭头）、起步圆点、"上"字、第一跑上的 45° 折断线。
-
-新增 `components/StairPlan.tsx`，把布局渲染成 SVG。踏步线用 `<line>`，行走线和折断线用 `<path>`，螺旋外圆和中柱用 `<circle>`，文字用 `<text text-anchor=middle dominant-baseline=central>`。`FurnitureShape` 里的 `t === 'stairs'` 分支改为调用 `<StairPlan>`。画布、素材库缩略图和导出（经由 furnitureDrawing）都自动使用新图样。文字颜色新增 `.stair-label` 设计令牌样式（`index.css`）。
-
-### 3. 素材库（`data/catalog.ts`、`Library.tsx`）
-原来的单个"楼梯"条目替换为 `STAIR_PRESETS` 生成的 5 个条目，每条带 `stair` 字段，`category` 仍是"客厅"。素材库已有的 `type === 'stairs' → 硬装` 规则不变，所以"硬装"分类下会显示 5 种楼梯，各带自己的缩略图。搜"楼梯"能搜到全部 5 种。
-
-### 4. 专属编辑面板（新增 `components/StairEditor.tsx`，接入 `SelectionEditor.tsx`）
-选中楼梯后，工具条多出一个"楼梯"按钮（lucide `Footprints` 图标），点开是 Popover：
-- **类别**：5 张卡片，每张显示 `StairPlan` 缩略图和名称，当前类别高亮。切换类别时，外框、梯段宽、踏步数都换成该类别的预设值；位置和旋转保留；`catalogId` 换成新类别的值（单价随类别走）；如果名称还是预设名，也一并换成新预设名。
-- **梯段宽 / m**：两位小数的米制输入，失焦或回车时提交，范围 0.30–5.00。
-- **踏步数**：−/+ 按钮加整数输入，范围 3–40。
-- **推导信息**：踏步宽（mm；螺旋楼梯按距内侧 250 mm 处计算）、踏步高 = `Design.height` / 踏步数。
-- **规范提示**（只提示、不拦截，依据 GB 50096 套内楼梯）：梯段宽 < 750 mm、踏步宽 < 220 mm、踏步高 > 200 mm 时，显示 `AlertTriangle` 加说明文字。
-- 所有修改都走 `p.change`，所以撤销、保存和云同步沿用现有机制。
-
-不改动：3D 场景、数据库、家具通用的尺寸、旋转、复制、删除事务。
-
----
+## 四、联动（不需要额外改动，只需验证）
+- 画布、缩略图、SVG/PDF/DXF 导出都通过 `StairPlan` 或 `furnitureDrawing` 取图样，会自动带上方向和宽度。
+- DXF 图块签名里已经包含整个 `f.stair` 对象，所以方向不同的楼梯会生成不同的块。
 
 ## Implementation checklist
-- [x] `drawingStyle.ts`：新增 `DXF_LAYER_STYLES`，覆盖 7 个图层加 WALL_HATCH（ACI 颜色、线宽、线型）
-- [x] `dxfExport.ts`：定义 DASHED 线型，图层按表设置颜色和线型，组码 370 写入线宽，设置 `$LWDISPLAY=1`
-- [x] `drawingDocument.ts`：新增 `circle`/`ellipse` 图元、`transformEntity`、`openingDrawing`，以及 `blocks`/`inserts` 字段；bounds 覆盖新图元
-- [x] `furnitureDrawing.ts`：相似变换下圆/椭圆输出 circle/ellipse，非等比变换回退折线；支持 `<text>`
-- [x] `svgExport.ts` / `pdfExport.ts`：渲染 circle/ellipse
-- [x] `dxfExport.ts`：写出 CIRCLE、ELLIPSE；WALLS 闭合多段线写出 SOLID HATCH 到 WALL_HATCH 层
-- [x] `dxfExport.ts`：块定义加 INSERT，被代替的 group 不再写散线；尺寸匿名块逻辑不变
-- [x] `types.ts`：新增 `StairForm`、`StairSpec`，`Furniture.stair?`、`LibraryItem.stair?`
-- [x] `model/stairs.ts`：`STAIR_PRESETS`、`stairSpec`（老数据回退）、`stairLayout`（5 类、梯段宽夹取）、`stairMetrics`（踏步宽、踏步高、规范提示）、`applyStairForm`
-- [x] `validation.ts`：校验 `stair` 字段
-- [x] `components/StairPlan.tsx` 和 `FurnitureShape.tsx` 的 stairs 分支；`index.css` 新增 `.stair-label`
-- [x] `catalog.ts`：单个楼梯条目替换为 5 个预设条目
-- [x] `components/StairEditor.tsx`：类别卡片、梯段宽、踏步数、推导信息、规范提示；在 `SelectionEditor.tsx` 中只对 `type==='stairs'` 显示
+- [ ] `types.ts`：`StairSpec` 增加 `flightWidths?`、`reverse?`、`hand?`
+- [ ] `stairs.ts`：新增 `stairFlightCount`、`stairFlightWidths`；`validStairSpec` 校验三项新字段；`applyStairForm` 清空它们
+- [ ] `stairs.ts`：L 型、U 型、三跑按每跑宽度计算几何和平台，宽度会被夹取
+- [ ] `stairs.ts`：新增 `flightMarks`；`reverse` 反转 walk、箭头、起步点、“上”字、折断线；`hand: 'left'` 对 L/U/三跑做 x 取负
+- [ ] `StairEditor.tsx`：`MeterField`、每跑宽度栏、行走方向和转向两个 `EditorSelect`
 
 ## Verification checklist
-- [x] 正向（`drawingExport.test.ts`）：用 `dxf-parser` 回读，各图层颜色、线型与表一致，DEMOLISHED 为 DASHED，图层记录 370 等于表中线宽
-- [x] 正向：含圆桌的方案导出后有 CIRCLE；WALLS 闭合多段线数 = HATCH 数；INSERT 数 = 家具数 + 未拆除墙上的门窗数；同尺寸的两件沙发共用一个块
-- [x] 正向：SVG 中圆桌是 `<circle>`；PDF 仍能回读，OCG 数不变
-- [x] 正向（`stairs.test.tsx`）：5 类楼梯都能渲染；直跑 n=14 时有 13 条 `<line>`；改 steps 后踏步线数随之变化；螺旋楼梯有 2 个 `<circle>`；每类都有"上"字和箭头路径
-- [x] 正向：`StairEditor` 切换为 U 型后 w/d/flightWidth/steps 等于预设，cx/cy/rot 不变；踏步数修改提交后 `validateDesign` 往返仍保留 `stair`
-- [x] 正向：楼梯导出 DXF 后，块内含 TEXT"上"；SVG/DXF/JSON 往返用例仍满足深度相等
-- [x] 默认值：没有 `stair` 字段的老楼梯，渲染为 11 条踏步线的直跑，`validateDesign` 能通过
-- [x] 负向：`steps` 为 2、41 或 12.5，`form: 'x'`，`flightWidth: 100`，`validateDesign` 都报错
-- [x] 负向：`walls: []` 时三种导出仍抛"没有可导出的有效墙体"；无载荷的外部 DXF 仍走识别流程
-- [x] 边界：外框缩到 1000×1000 时，L 型、U 型、三跑都不会画出负尺寸或 NaN（梯段宽被夹取）；踏步宽 < 220 mm 时规范提示出现，满足时不出现
-- [x] 更新 `Library.test.tsx`：硬装分类下出现 5 种楼梯，点击"添加直跑楼梯"后带 `stair` 字段
-- [x] 构建：`pnpm test` 全绿，`pnpm lint` 无新增错误，`pnpm exec tsc --noEmit` 和 `pnpm run build` 通过
-- [ ] 截图：`desktop_1280` 下选中楼梯，查看编辑面板和画布图样
-- [ ] 人工确认（沙箱里没有 AutoCAD）：在 AutoCAD 中打开导出文件，检查图层颜色、线宽、拆除墙虚线、墙体实心填充，以及家具能否整块选中
-
-## 追加：楼梯归入硬装
-- [x] 账号家具库「硬装」新增「楼梯」分类（含旧账号副本，按 type 判断）
-- [x] 全屋成本新增「楼梯」类，计入硬装总额，仍按件计价；房内楼梯计入本间硬装
+- [ ] 正向：直跑 `reverse: true` 时，起步圆点 y < 0（在上端），箭头终点 y > 0；踏步线数量不变
+- [ ] 正向：L 型 `hand: 'left'` 时，第一跑的踏步线都在 x > 0 一侧，外框多边形与右转版左右对称；“上”字的 text 元素没有 transform
+- [ ] 正向：L 型设 `flightWidths: [1200, 800]` 后，平台为 1200×800，第 1 跑踏步线长 1200，第 2 跑踏步线长 800
+- [ ] 正向：编辑面板在三跑时显示 3 个宽度栏，在直跑时显示 1 个；转向下拉只在 L/U/三跑出现
+- [ ] 正向：`validateDesign` 经 JSON 往返后，`flightWidths`、`reverse`、`hand` 都保留
+- [ ] 默认：没有新字段的楼梯渲染结果与当前一致（现有 stairs 测试保持通过）
+- [ ] 负向：`flightWidths` 长度不对、某项为 100、`hand: 'up'`、`reverse: 'yes'`，`validateDesign` 都会拒绝
+- [ ] 边界：外框 1000×1000，每跑宽 3000，L/U/三跑都不出现 NaN 或负尺寸
+- [ ] 构建：`pnpm test` 全绿，`pnpm run build` 通过，改动文件的 eslint 无错误
