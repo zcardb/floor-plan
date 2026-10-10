@@ -42,10 +42,22 @@ export interface Room {
   /** 吊顶材料 key；为空表示原顶，不计费。 */
   ceilingMat?: string;
 }
+/** 楼梯类别（GB/T 50104 平面图常见形式）。 */
+export type StairForm = 'straight' | 'l' | 'u' | 'triple' | 'spiral';
+/** 楼梯参数：外框仍用家具的 w × d，踏面在外框内按踏步数均分。 */
+export interface StairSpec {
+  form: StairForm;
+  /** 梯段宽（mm）；螺旋楼梯为径向宽度。 */
+  flightWidth: number;
+  /** 踏步数（级）。 */
+  steps: number;
+}
 export interface Furniture {
   id: string;
   type: string;
   shape?: FurnitureOutline;
+  /** 仅楼梯（type === 'stairs'）使用；旧数据没有该字段时按直跑处理。 */
+  stair?: StairSpec;
   name: string;
   cx: number;
   cy: number;
@@ -176,6 +188,7 @@ export interface LibraryItem {
   catalogId?: string;
   type: string;
   shape?: FurnitureOutline;
+  stair?: StairSpec;
   name: string;
   w: number;
   d: number;

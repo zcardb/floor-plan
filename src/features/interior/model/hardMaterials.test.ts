@@ -53,7 +53,7 @@ describe('自定义墙面与门窗', () => {
   it('账号条目包含自定义墙面与门窗及来源', () => {
     const entries = accountCostEntries([], {}, [], [wall], [door]);
     expect(entries.filter(e => e.category === '墙面').map(e => e.name)).toEqual(['艺术涂料', '乳胶漆', '墙纸', '墙砖']);
-    expect(entries.filter(e => e.category === '门窗').map(e => e.name)).toEqual(['实木门', '门', '窗']);
+    expect(entries.filter(e => e.category === '门窗').map(e => e.name)).toEqual(['实木门', '门', '窗', '垭口']);
     const design = { ...blankDesign(), customWalls: [wall], customOpenings: [door] };
     expect(accountCostSource(design, { group: 'wallPrices', key: wall.key })).toBe('账号墙面库');
     expect(accountCostSource(design, { group: 'openingPrices', key: door.key })).toBe('账号门窗库');

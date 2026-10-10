@@ -3740,7 +3740,8 @@ button.room-cost-row:hover {
 }
 /* 破坏性操作：宽屏常驻顶部工具栏，窄屏收进「文件」菜单，避免工具栏溢出且不产生双入口 */
 @media (max-width: 600px) {
-  .danger-actions {
+  .danger-actions,
+  .danger-divider {
     display: none;
   }
 }

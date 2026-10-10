@@ -157,9 +157,9 @@ describe('尺寸驱动墙体提交链', () => {
   });
 });
 describe('2D 常用工具与顶部工具栏', () => {
-  it('直接展示选择、门、窗（绘墙改为单击墙身进入），并切换对应画布工具及选中态', () => {
-    expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['选择', '门', '窗']);
-    for (const [label, tool] of [['选择', 'select'], ['门', 'door'], ['窗', 'window']]) {
+  it('直接展示选择、框选、垭口、门、窗（绘墙改为单击墙身进入），并切换对应画布工具及选中态', () => {
+    expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['选择', '框选', '垭口', '门', '窗']);
+    for (const [label, tool] of [['选择', 'select'], ['垭口', 'passage'], ['门', 'door'], ['窗', 'window']]) {
       const button = tools(render()).find(node => node.props.label === label)!;
       (button.props.onClick as () => void)();
       expect(state.values[1]).toBe(tool);
@@ -212,7 +212,7 @@ describe('2D 常用工具与顶部工具栏', () => {
   });
   it('可编辑的参考户型（游客/复制项目）开放绘墙和门窗，3D 保持原有工具', () => {
     state.design = referenceDesign();
-    expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['选择', '门', '窗']);
+    expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['选择', '框选', '垭口', '门', '窗']);
     expect(render().find(n => n.type === Library)!.props.structureTools).toBe(true);
     const more = tools(render()).find(node => node.props['aria-label'] === '更多')!;
     expect(more.props.className).toContain('compact-only');

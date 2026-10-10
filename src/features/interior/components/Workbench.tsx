@@ -13,6 +13,8 @@ import { syncAccountFurniture, syncAccountMaterials } from '../model/furnitureSy
 import { splitWall as splitWallModel } from '../model/wallSplit';
 import { removeWall as removeWallModel } from '../model/wallRemoval';
 import { clearRoomFurniture } from '../model/roomFurniture';
+import { removeRoom as removeRoomModel, type RoomRemoval } from '../model/roomRemoval';
+import { groupIds, moveGroup, removeGroup } from '../model/furnitureGroup';
 import { reconcileRoomsWithWalls } from '../model/roomEnclosed';
 import { followWallFurniture } from '../model/furnitureFollow';
 import { splitAtJunctionsOf } from '../model/wallAutoSplit';
@@ -39,6 +41,7 @@ import {
   Minus,
   Moon,
   MousePointer2,
+  SquareDashedMousePointer,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
@@ -88,6 +91,7 @@ import {
   type Point,
   type Project,
   type Selection,
+  selectionKey,
   type Tool,
 } from "../model/types";
 import { blankDesign, designForTemplate, presetById, isAiDesign } from "../data/templates";
@@ -178,7 +182,9 @@ export function Workbench(p: Props) {
     { design: d, change, commit, sync, preview, undo, redo, counts, sizeTransaction, current: designRef } = model;
   const structureTools = canEditStructure(d, readOnly);
   const [selection, setSelection] = useState<Selection>(null),
-    [tool, setTool] = useState<Tool>("select");
+    [tool, setTool] = useState<Tool>("select"),
+    /** 框选开关：开启时 2D 画布左键拖动空白处为框选家具，关闭时为平移。 */
+    [marquee, setMarquee] = useState(false);
   // 3D 的打开 / 首帧 / 失败 / 自动恢复全部由这一个状态机决定
   const lifecycle = useSceneLifecycle(),
     view = lifecycle.view,
@@ -190,7 +196,11 @@ export function Workbench(p: Props) {
     [drawer, setDrawer] = useState<"lib" | "panel" | null>(null),
     [scale, setScale] = useState(0.05),
     [pendingFile, setPendingFile] = useState<PendingFile | null>(null);
-  useEffect(()=>{ sizeTransaction.flush(); },[selection?.id,tool,view,sizeTransaction]);
+  const selectionId = selectionKey(selection);
+  useEffect(()=>{ sizeTransaction.flush(); },[selectionId,tool,view,sizeTransaction]);
+  // 框选只在 2D 选择模式下有效：切到绘墙 / 门窗工具或 3D 时自动关闭；3D 没有成组选择。
+  useEffect(() => { if (tool !== "select" || view !== "2d") setMarquee(false); }, [tool, view]);
+  useEffect(() => { if (view !== "2d") setSelection(s => (s?.kind === "group" ? null : s)); }, [view]);
   // 页面被切走前，先把尺寸输入框里未提交的修改并入设计，随后的立即保存才能带上它
   useEffect(() => onPageHide(() => sizeTransaction.flush(), "flush"), [sizeTransaction]);
   const coordLabel = useRef<HTMLSpanElement>(null);
@@ -527,7 +537,7 @@ export function Workbench(p: Props) {
       } catch (cause) {
         return notify.fail(cause instanceof Error ? cause.message : "无法删除这个房间");
       }
-      if (model.current.current !== before) return notify.fail("设计已变化，请重新选择房间");
+      if (designRef.current !== before) return notify.fail("设计已变化，请重新选择房间");
       commit(result.design, before);
       setSelection(null);
       const parts = [`已删除「${room.name}」及 ${result.removedWalls} 面独立墙`];
@@ -536,7 +546,7 @@ export function Workbench(p: Props) {
       if (result.exposed.length) parts.push(`${result.exposed.join("、")} 现在与本区域连成一片`);
       notify.success(parts.join("，") + "，可撤销恢复");
     },
-    [readOnly, confirm, commit, designRef, model.current],
+    [readOnly, confirm, commit, designRef],
   );
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -571,11 +581,11 @@ export function Workbench(p: Props) {
         if (view === "2d") canvas.current?.fit();
         else scene.current?.iso();
       } else if (k === "v") setTool("select");
-      else if (k === "m" && view === "2d") setMarquee(v => !v);
+      else if (k === "m" && view === "2d") { setTool("select"); setMarquee(v => !v); }
       else if (k.startsWith("arrow") && (selection?.kind === "furniture" || selection?.kind === "group")) {
         e.preventDefault();
         const st = e.shiftKey ? 100 : 10;
-        const ids = selection.kind === "furniture" ? [selection.id] : selection.ids;
+        const ids = selection.kind === "group" ? selection.ids : [selection.id];
         change((d) => moveGroup(d, ids, [
           k === "arrowright" ? st : k === "arrowleft" ? -st : 0,
           k === "arrowdown" ? st : k === "arrowup" ? -st : 0,
@@ -716,7 +726,9 @@ export function Workbench(p: Props) {
         ? "点击墙体放置门窗或垭口，选中后可沿墙拖动或使用可视编辑工具条调整"
         : view === "3d"
           ? "拖动旋转 · 滚轮缩放 · 选中家具可移动 · 点击门开关"
-          : "拖入家具，开始规划你的理想空间";
+          : marquee
+            ? "拖动框选家具 · 拖动选中的家具整组移动 · M 关闭框选"
+            : "拖入家具，开始规划你的理想空间";
   return (
     <div className="workbench-shell">
       {readOnly && (
@@ -809,6 +821,16 @@ export function Workbench(p: Props) {
             >
               <MousePointer2 size={16} />
             </ToolButton>
+            {!readOnly && (
+              <ToolButton
+                label="框选"
+                shortcut="M"
+                active={tool === "select" && marquee}
+                onClick={() => { setTool("select"); setMarquee(v => !v); }}
+              >
+                <SquareDashedMousePointer size={16} />
+              </ToolButton>
+            )}
             {structureTools && (
               <>
                 <ToolButton label="垭口" active={tool === "passage"} onClick={() => setTool("passage")}>
@@ -875,26 +897,7 @@ export function Workbench(p: Props) {
             </ToolButton>
           </div>
         )}
-        <span className="toolbar-divider" />
-        <div className="tool-group">
-          <ToolButton
-            label="撤销"
-            shortcut="Ctrl Z"
-            onClick={undo}
-            disabled={!counts.undo}
-          >
-            <Undo2 size={16} />
-          </ToolButton>
-          <ToolButton
-            label="重做"
-            shortcut="Ctrl ⇧ Z"
-            onClick={redo}
-            disabled={!counts.redo}
-          >
-            <Redo2 size={16} />
-          </ToolButton>
-        </div>
-        <span className="toolbar-divider" />
+        <span className="toolbar-divider danger-divider" />
         <div className="tool-group danger-actions">
           <ToolButton label="重置方案" onClick={resetDesign}>
             <RotateCcw size={16} />
@@ -918,6 +921,25 @@ export function Workbench(p: Props) {
               ])}
             </DropdownMenuContent>
           </DropdownMenu>
+        </div>
+        <span className="toolbar-divider" />
+        <div className="tool-group">
+          <ToolButton
+            label="撤销"
+            shortcut="Ctrl Z"
+            onClick={undo}
+            disabled={!counts.undo}
+          >
+            <Undo2 size={16} />
+          </ToolButton>
+          <ToolButton
+            label="重做"
+            shortcut="Ctrl ⇧ Z"
+            onClick={redo}
+            disabled={!counts.redo}
+          >
+            <Redo2 size={16} />
+          </ToolButton>
         </div>
         </div>
         <div className="toolbar-right">
@@ -1061,6 +1083,7 @@ export function Workbench(p: Props) {
             startWallTool={structureTools ? () => setTool('wall') : undefined}
             onDimensionSelect={openDimension}
             selectedDimension={dimensionValid ? dimensionEdit.binding : undefined}
+            marquee={marquee}
           />
         ) : Scene ? (
           <ErrorBoundary key={lifecycle.generation} fallback={null} onError={() => lifecycle.fail("crash")}>
@@ -1218,7 +1241,8 @@ export function Workbench(p: Props) {
           splitWall={view === '2d' ? openWallSplit : undefined}
           mergeWall={view === '2d' ? id => void cancelWallSplit(id) : undefined}
           removeWall={view === '2d' ? removeWall : undefined}
-          key={`${selection?.kind}:${selection?.id}`}
+          removeRoom={view === '2d' && tool === 'select' && !readOnly ? id => void removeRoom(id) : undefined}
+          key={selectionId}
           ref={editor}
           design={d}
           selection={selection}

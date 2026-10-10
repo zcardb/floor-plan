@@ -9,7 +9,7 @@ describe('账号成本分类与清单', () => {
   it('五类硬装材料并复用家具分类，不含施工', () => {
     expect(costCategories).toEqual(['地面', '墙面', '门窗', '屋面', '吊顶', ...categories]);
     expect(entries.some(entry => entry.group === 'constructionPrices')).toBe(false);
-    expect(entries).toHaveLength(24 + library.length);
+    expect(entries).toHaveLength(25 + library.length);
     expect(entries.find(entry => entry.key === library[0].catalogId)?.category).toBe(library[0].category);
   });
   it('按catalogId合并去重，名称与分类共同筛选', () => {
@@ -20,7 +20,7 @@ describe('账号成本分类与清单', () => {
     expect(filterCostEntries(merged, '全部', '')).toHaveLength(entries.length);
   });
   it('硬装软装切换仅展示对应大类，搜索不跨类泄露', () => {
-    expect(filterCostEntries(entries, '全部', '', '硬装')).toHaveLength(24);
+    expect(filterCostEntries(entries, '全部', '', '硬装')).toHaveLength(25);
     expect(filterCostEntries(entries, '全部', '', '软装')).toHaveLength(library.length);
     expect(filterCostEntries(entries, '全部', '地板', '软装')).toHaveLength(0);
     expect(filterCostEntries(entries, '卧室', '床', '软装').every(entry => entry.category === '卧室')).toBe(true);
