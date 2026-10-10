@@ -13,16 +13,16 @@ function binding(d:Design,startId:string,endId:string,axis:0|1=0):DimensionBindi
 describe('净距驱动真实墙体',()=>{
   it('用户承重标记固定目标和连接端点，普通另一侧仍可移动',()=>{
     const d=fixture();d.walls.find(w=>w.id==='partition')!.loadBearing=true;
-    expect(dimensionEditPolicy(d,binding(d,'partition','outer-1')).reason).toBeTruthy();
+    expect(dimensionEditPolicy(d,binding(d,'partition','outer-1'))).toEqual({fixed:'start',chooseSide:false});
     d.walls.push(wall('second',[5000,0],[5000,d.depth]));
     const b=binding(d,'partition','second');expect(dimensionEditPolicy(d,b).fixed).toBe('start');
     const next=editDimensionWalls(d,b,1500,'start');expect(next.walls.find(w=>w.id==='partition')).toEqual(d.walls.find(w=>w.id==='partition'));
     const connected=fixture();connected.walls.push({...wall('locked',[1000,2000],[3000,2000]),loadBearing:true});
     expect(()=>editDimensionWalls(connected,binding(connected,'partition','outer-1'),1500,'end')).toThrow('承重');
   });
-  it('外墙固定，隔墙移动到指定墙面净距，不改变厚度或家具',()=>{
+  it('外墙也可移动；保持外墙一侧时隔墙移动到指定墙面净距，不改变厚度或家具',()=>{
     const d=fixture(),b=binding(d,'partition','outer-1'),before=JSON.stringify(d);
-    expect(dimensionEditPolicy(d,b)).toEqual({fixed:'end',chooseSide:false});
+    expect(dimensionEditPolicy(d,b)).toEqual({fixed:undefined,chooseSide:true});
     const next=editDimensionWalls(d,b,2200,'end');
     const moved=next.walls.find(w=>w.id==='partition')!;
     expect(moved.a[0]).toBe(d.width-2200-120);expect(moved.b[0]).toBe(moved.a[0]);expect(moved.thickness).toBe(240);
@@ -65,7 +65,8 @@ describe('净距驱动真实墙体',()=>{
     const d=fixture(),b=binding(d,'partition','outer-1');
     expect(dimensionEditPolicy(referenceDesign(),b).reason).toBeTruthy();expect(dimensionEditPolicy(d).reason).toBeTruthy();
     for(const v of [0,-1,NaN,Infinity,100001])expect(()=>editDimensionWalls(d,b,v,'end')).toThrow();
-    expect(()=>editDimensionWalls(d,b,2000,'start')).toThrow('固定');
+    const pinned={...d,walls:d.walls.map(w=>w.id==='outer-1'?{...w,loadBearing:true}:w)};
+    expect(()=>editDimensionWalls(pinned,b,2000,'start')).toThrow('固定');
     expect(editDimensionWalls(d,b,b.end-b.start,'end')).toBe(d);
     const stale={...d,walls:d.walls.map(w=>w.id==='partition'?{...w,a:[3100,0] as Wall['a'],b:[3100,d.depth] as Wall['b']}:w)};
     expect(()=>editDimensionWalls(stale,b,2000,'end')).toThrow('变化');
@@ -76,14 +77,16 @@ describe('净距驱动真实墙体',()=>{
     const locked=fixture();locked.walls.push({...wall('locked',[1000,2000],[3000,2000]),kind:'bearing'});
     expect(()=>editDimensionWalls(locked,binding(locked,'partition','outer-1'),1500,'end')).toThrow('承重');
   });
-  it('结构解锁的参考户型可以按净距移动墙体',()=>{
-    const d={...referenceDesign(),structureUnlocked:true};
-    const b=binding(d,'w6','w10');
-    const policy=dimensionEditPolicy(d,b);
-    expect(policy.reason).toBeUndefined();
-    const fixed=policy.fixed??'start',moving=fixed==='start'?'w10':'w6';
-    const next=editDimensionWalls(d,b,b.end-b.start-100,fixed);
-    expect(next.walls.find(w=>w.id===moving)!.a).not.toEqual(d.walls.find(w=>w.id===moving)!.a);
+  it('参考户型（含无解锁标记的旧项目）可以按净距移动墙体',()=>{
+    const d=referenceDesign();
+    const candidates=perimeterDimensions(d)!.chains.flatMap(c=>c.overall?[]:c.segments).flatMap(s=>s.binding?[s.binding]:[]);
+    const found=candidates.map(b=>({b,policy:dimensionEditPolicy(d,b)})).filter(({policy})=>!policy.reason).flatMap(({b,policy})=>{
+      const fixed=policy.fixed??'start';
+      try{return [{b,fixed,next:editDimensionWalls(d,b,b.end-b.start-100,fixed)}];}catch{return [];}
+    })[0];
+    expect(found).toBeDefined();
+    const {b,fixed,next}=found!,moving=fixed==='start'?b.endWalls:b.startWalls;
+    for(const id of moving)expect(next.walls.find(w=>w.id===id)).not.toEqual(d.walls.find(w=>w.id===id));
     expect(next.rooms.map(r=>r.name)).toEqual(d.rooms.map(r=>r.name));
   });
 });

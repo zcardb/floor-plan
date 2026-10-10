@@ -65,12 +65,12 @@ describe("家具 2D / 3D 视角", () => {
     expect(visual(sofa, "top", false)).not.toContain("AI 调整");
     expect(visual(sofa, "top")).toContain("AI 调整");
   });
-  it("AI 调整默认带上当前图片：3D 无图时用 2D 图，都没有时为空", () => {
+  it("AI 调整默认素材按视角对应：2D 用 2D 图、3D 用 3D 图，不跨视角混用", () => {
     const withTop = { ...sofa, imageUrl: "https://x/top.webp" };
     expect(defaultAdjustImage(withTop, "top")).toBe("https://x/top.webp");
-    expect(defaultAdjustImage(withTop, "perspective")).toBe("https://x/top.webp");
+    expect(defaultAdjustImage(withTop, "perspective")).toBeUndefined();
     expect(defaultAdjustImage({ ...withTop, image3dUrl: "https://x/3d.webp" }, "perspective")).toBe("https://x/3d.webp");
-    expect(defaultAdjustImage(sofa, "top")).toBeUndefined();
+    expect(defaultAdjustImage({ ...sofa, image3dUrl: "https://x/3d.webp" }, "top")).toBeUndefined();
   });
   it("AI 调整弹窗：标题含家具名与视角，无名称输入与模型选择器", () => {
     const out = html(createElement(FurnitureAiDialog, { item: { ...sofa, imageUrl: "https://x/top.webp" }, view: "top", onClose: () => {}, onApply: async () => true }));

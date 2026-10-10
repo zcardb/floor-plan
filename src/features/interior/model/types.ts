@@ -87,7 +87,7 @@ export interface Design {
   rooms: Room[];
   furniture: Furniture[];
   demolished: string[];
-  /** 复制/新建的项目可以自由调整墙体结构尺寸；旧项目没有该字段，保持结构锁定。 */
+  /** @deprecated 旧版「复制/新建才解锁结构」的标记；墙体可编辑性现只看承重，仅为兼容已保存数据保留。 */
   structureUnlocked?: boolean;
   dimensionSettings?: { visible?: boolean; top?: number; bottom?: number; left?: number; right?: number };
   /** 北方相对图纸正上方的顺时针角度（0–359°）；旧项目没有该字段，视为上北。 */

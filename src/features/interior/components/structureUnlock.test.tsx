@@ -4,43 +4,36 @@ import { describe, expect, it } from 'vitest';
 import { blankDesign, createProject, referenceDesign } from '../data/templates';
 import { createSizeTransaction } from '../model/sizeTransaction';
 import type { Design } from '../model/types';
-import { BEARING_WALL_WARNING, isBearingWall, setWallBearing } from '../model/wallPolicy';
+import { BEARING_WALL_LOCKED, BEARING_WALL_WARNING, isBearingWall, setWallBearing } from '../model/wallPolicy';
 import { SizeFields } from './SizeFields';
 
-const LOCKED_TEXT = '此项目创建时锁定了结构尺寸';
+const OLD_LOCK_TEXT = '复制该项目';
 const render = (design: Design, selection: Parameters<typeof SizeFields>[0]['selection']) => {
   const transaction = createSizeTransaction(() => design, () => {}, () => {});
   return renderToStaticMarkup(createElement(SizeFields, { design, selection, transaction }));
 };
-const wallOfKind = (d: Design, kind: Design['walls'][number]['kind']) => d.walls.find(w => w.kind === kind)!;
+const wallOfKind = (d: Design, kind: Design['walls'][number]['kind']) => d.walls.find(w => w.kind === kind && (kind === 'bearing' || !isBearingWall(w)))!;
+/** renderToStaticMarkup 会转义引号，按转义后的文本比对。 */
+const escaped = (text: string) => text.replace(/"/g, '&quot;');
 
-describe('墙体尺寸面板：复制/新建项目的结构解锁', () => {
-  it('新建的参考户型项目可以直接修改外围墙尺寸', () => {
-    const design = createProject('reference').state;
-    const html = render(design, { kind: 'wall', id: wallOfKind(design, 'exterior').id });
-    expect(html).not.toContain(LOCKED_TEXT);
-    expect(html).toContain('墙厚');
+describe('墙体尺寸面板：只有承重墙锁定', () => {
+  it('旧项目、新建项目、空白项目的外围墙都可直接改尺寸', () => {
+    for (const design of [referenceDesign(), createProject('reference').state, blankDesign()]) {
+      const html = render(design, { kind: 'wall', id: wallOfKind(design, 'exterior').id });
+      expect(html).toContain('<input');
+      expect(html).toContain('墙厚');
+      expect(html).not.toContain(OLD_LOCK_TEXT);
+    }
   });
 
-  it('解锁项目选中承重墙时显示结构风险提示', () => {
-    const design = createProject('reference').state;
-    const html = render(design, { kind: 'wall', id: wallOfKind(design, 'bearing').id });
-    expect(html).toContain(BEARING_WALL_WARNING);
-    expect(html).not.toContain(LOCKED_TEXT);
-  });
-
-  it('旧项目（无解锁标记）保持锁定，并说明复制即可编辑', () => {
+  it('承重墙显示锁定提示，并说明取消承重标记后可编辑', () => {
     const design = referenceDesign();
-    const html = render(design, { kind: 'wall', id: wallOfKind(design, 'exterior').id });
-    expect(html).toContain(LOCKED_TEXT);
-    expect(html).toContain('复制该项目后副本可自由调整');
+    const html = render(design, { kind: 'wall', id: wallOfKind(design, 'bearing').id });
+    expect(html).toContain(escaped(BEARING_WALL_LOCKED));
     expect(html).not.toContain('<input');
-  });
-
-  it('空白项目的外围墙仍走整体重设，不在单墙尺寸里放开', () => {
-    const design = { ...blankDesign(), structureUnlocked: true };
-    const html = render(design, { kind: 'wall', id: wallOfKind(design, 'exterior').id });
-    expect(html).toContain(LOCKED_TEXT);
+    expect(html).not.toContain(OLD_LOCK_TEXT);
+    const cleared = setWallBearing(design, wallOfKind(design, 'bearing').id, false);
+    expect(render(cleared, { kind: 'wall', id: wallOfKind(design, 'bearing').id })).toContain('<input');
   });
 
   it('承重墙上的门窗可编辑尺寸，并显示承重提醒', () => {
@@ -57,6 +50,5 @@ describe('墙体尺寸面板：复制/新建项目的结构解锁', () => {
     const html = render(bearing, { kind: 'opening', id: opening!.id });
     expect(html).toContain('<input');
     expect(html).toContain(BEARING_WALL_WARNING);
-    expect(html).not.toContain(LOCKED_TEXT);
   });
 });

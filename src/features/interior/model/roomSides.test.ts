@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { blankDesign, referenceDesign } from '../data/templates';
 import { rebuildRooms, area } from './geometry';
 import { createSizeTransaction } from './sizeTransaction';
-import { editRoomSide, normalizedOutline, roomSides, ROOM_STRUCTURE_LOCKED } from './roomSides';
+import { editRoomSide, normalizedOutline, roomSides } from './roomSides';
+import { setWallBearing } from './wallPolicy';
 import type { Design, Point, Wall } from './types';
 
 const wall = (id: string, a: Point, b: Point, extra: Partial<Wall> = {}): Wall => ({ id, a, b, thickness: 240, kind: 'partition', ...extra });
@@ -21,8 +22,8 @@ describe('房间逐边尺寸', () => {
     expect(sides.map(s => s.facing)).toEqual(['up', 'right', 'down', 'left']);
     expect(sides.map(s => Math.round(s.length))).toEqual([9000, 10000, 9000, 10000]);
     expect(sides[0]!.a).toEqual([0, 0]);
-    // 空白户型的外围墙不能单独移动
-    expect(sides.every(s => s.reason)).toBe(true);
+    // 空白户型的外围墙也可以单独移动，每条边两端都可选固定
+    expect(sides.every(s => !s.reason && s.chooseSide)).toBe(true);
   });
 
   it('共线顶点合并为一条边，逆时针输入也统一为顺时针', () => {
@@ -37,7 +38,7 @@ describe('房间逐边尺寸', () => {
     const d = split(), room = leftRoom(d), before = JSON.stringify(d);
     const top = roomSides(d, room.id).find(s => s.facing === 'up')!;
     expect(Math.round(top.length)).toBe(2880);
-    expect(top.fixed).toBe('start');
+    expect(top.chooseSide).toBe(true);
     expect(top.reason).toBeUndefined();
     const next = editRoomSide(d, room.id, top.index, 2500, 'start');
     expect(JSON.stringify(d)).toBe(before);
@@ -52,7 +53,7 @@ describe('房间逐边尺寸', () => {
   });
 
   it('同值不产生修改；非法长度、错误的固定端被拒绝', () => {
-    const d = split(), room = leftRoom(d);
+    const d = setWallBearing(split(), 'outer-3', true), room = leftRoom(d);
     const top = roomSides(d, room.id).find(s => s.facing === 'up')!;
     expect(editRoomSide(d, room.id, top.index, top.length, 'start')).toBe(d);
     for (const v of [0, 99, NaN, Infinity, 100001]) expect(() => editRoomSide(d, room.id, top.index, v, 'start')).toThrow('0.10–100 m');
@@ -70,18 +71,14 @@ describe('房间逐边尺寸', () => {
   it('承重隔墙一侧的边列出长度并说明锁定原因', () => {
     const d = blankDesign({ width: 9000, depth: 10000 });
     d.walls.push(wall('p', [3000, 0], [3000, 10000], { loadBearing: true }));
-    const designed = rebuildRooms(d), room = leftRoom(designed);
+    const designed = rebuildRooms(setWallBearing(d, 'outer-3', true)), room = leftRoom(designed);
     const top = roomSides(designed, room.id).find(s => s.facing === 'up')!;
     expect(Math.round(top.length)).toBe(2880);
-    expect(top.reason).toMatch('固定结构');
+    expect(top.reason).toMatch('承重墙');
   });
 
-  it('参考户型未解锁时整间只读，解锁后可以改边长且房间名称保留', () => {
-    const locked = referenceDesign();
-    const lockedSides = locked.rooms.flatMap(r => roomSides(locked, r.id));
-    expect(lockedSides.length).toBeGreaterThan(0);
-    expect(lockedSides.every(s => s.reason === ROOM_STRUCTURE_LOCKED || s.axis === null)).toBe(true);
-    const d = { ...referenceDesign(), structureUnlocked: true };
+  it('参考户型（含无解锁标记的旧项目）可以直接改边长且房间名称保留', () => {
+    const d = referenceDesign();
     const candidate = d.rooms.flatMap(r => roomSides(d, r.id).map(s => ({ room: r.id, side: s })))
       .find(({ room, side }) => {
         if (side.reason) return false;

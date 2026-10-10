@@ -25,12 +25,12 @@ import { yuan } from "../model/money";
 import { useCostDesign } from './CostDefaultsContext';
 import { SizeFields } from './SizeFields';
 import { WallOptionsMenu } from './WallOptionsMenu';
-import { canEditWall, canResizeWall, wallKindName } from '../model/wallPolicy';
+import { BEARING_WALL_LOCKED, canResizeWall, wallKindName } from '../model/wallPolicy';
 import { DimensionSettings } from './DimensionSettings';
 import { NorthSettings } from './NorthSettings';
 import { DragStepSettings } from './DragStepSettings';
 import type { SizeTransaction } from '../model/sizeTransaction';
-import { area, bbox, inRoom, length, perim, resizeBlank } from "../model/geometry";
+import { BLANK_FRAME_CHANGED, area, bbox, blankFrameIntact, inRoom, length, perim, resizeBlank } from "../model/geometry";
 import type { CustomFloor, CustomOpening, CustomWall, Design, Selection } from "../model/types";
 import { openingName, openingPriceKey } from "../model/hardMaterials";
 import { OpeningVariantSelect } from "./OpeningVariantSelect";
@@ -98,6 +98,8 @@ export function PropertyPanel({
     w = s?.kind === "wall" ? d.walls.find((w) => w.id === s.id) : null,
     o = s?.kind === "opening" ? d.openings.find((o) => o.id === s.id) : null;
   const blank = d.template === "blank";
+  /** 空白户型外框未被单独调整时，才能整体重设净宽 / 净深 / 外围墙厚。 */
+  const frameResizable = blank && blankFrameIntact(d);
   const input = (
     label: string,
     value: number,
@@ -405,9 +407,8 @@ export function PropertyPanel({
     );
   }
   if (w) {
-    const editable = canEditWall(design, w);
-    const resizable = canResizeWall(design, w);
-    const status = editable ? "可编辑" : resizable ? "可调尺寸" : "受保护";
+    const editable = canResizeWall(design, w);
+    const status = editable ? "可编辑" : "已锁定";
     return (
       <>
         <div className="panel-heading">
@@ -433,8 +434,8 @@ export function PropertyPanel({
           <SizeFields key={w.id} design={design} selection={s} transaction={transaction}/>
           <p className="muted-note">
             {editable
-              ? "拖动墙体移动，拖动两端圆点调整长度；封闭隔墙会自动划分房间。"
-              : "此墙体尺寸已锁定；分割、承重标记与删除可在「墙选项」中操作。"}
+              ? "拖动墙体移动，拖动两端圆点调整长度；封闭墙体会自动划分房间。"
+              : BEARING_WALL_LOCKED}
           </p>
         </section>
         <div className="panel-note">
@@ -513,16 +514,18 @@ export function PropertyPanel({
               户型尺寸
             </h3>
             <p className="muted-note">
-              {blank
+              {frameResizable
                 ? "尺寸为墙内净尺寸，外围墙随参数自动更新。"
-                : "参考户型的外围尺寸已锁定；如需调整，请新建空白项目。层高仍可修改。"}
+                : blank
+                  ? `${BLANK_FRAME_CHANGED}；请直接拖动或选中外围墙调整。层高仍可修改。`
+                  : "参考户型的外围尺寸请直接拖动或选中外围墙调整；层高仍可在此修改。"}
             </p>
             <div className="property-form">
               {input(
                 "净宽 / m",
                 d.width,
                 async (v) => {
-                  if (!blank) return false;
+                  if (!frameResizable) return false;
                   const outside =
                     d.furniture.some((f) => f.cx > v) ||
                     d.walls.some(
@@ -544,13 +547,13 @@ export function PropertyPanel({
                 },
                 500,
                 50000,
-                !blank,
+                !frameResizable,
               )}
               {input(
                 "净深 / m",
                 d.depth,
                 async (v) => {
-                  if (!blank) return false;
+                  if (!frameResizable) return false;
                   const outside =
                     d.furniture.some((f) => f.cy > v) ||
                     d.walls.some(
@@ -572,18 +575,18 @@ export function PropertyPanel({
                 },
                 500,
                 50000,
-                !blank,
+                !frameResizable,
               )}
               {input(
                 "外围墙厚 / m",
                 d.thickness,
                 (v) => {
-                  if (!blank) return false;
+                  if (!frameResizable) return false;
                   change((d) => resizeBlank(d, d.width, d.depth, v));
                 },
                 50,
                 1000,
-                !blank,
+                !frameResizable,
               )}
               {input(
                 "层高 / m",

@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/popover";
 import { applyRoomFloor, floorMaterialOf, pickableFloors } from "../model/floorMaterials";
 import { WallOptionsMenu } from './WallOptionsMenu';
-import { canDeleteWall, canResizeWall, wallKindName } from '../model/wallPolicy';
+import { BEARING_WALL_LOCKED, canDeleteWall, canResizeWall, wallKindName } from '../model/wallPolicy';
 import { length, bbox } from "../model/geometry";
 import { SizeFields } from './SizeFields';
 import { RoomSidesEditor } from './RoomSidesEditor';
@@ -300,7 +300,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
               {w && !resizableWall ? (
                 <p className="visual-locked">
                   <LockKeyhole size={15} />
-                  此项目创建时锁定了结构尺寸，复制该项目后副本可自由调整。
+                  {BEARING_WALL_LOCKED}
                 </p>
               ) : (
                 <SizeFields key={p.selection?.id} design={p.design} selection={p.selection} transaction={p.transaction} close={()=>setOpen(null)}/>

@@ -10,13 +10,13 @@ function nodes(element:unknown):ReactElement<Record<string,unknown>>[]{
   const e=element as ReactElement<Record<string,unknown>>;
   return [e,...Children.toArray(e.props.children as React.ReactNode).flatMap(nodes)];
 }
-function fixture(){const d=blankDesign();d.walls.push({id:'partition',a:[3000,0],b:[3000,d.depth],thickness:240,kind:'partition'});
+function fixture(){const d=blankDesign();d.walls=d.walls.map(w=>w.id==='outer-1'?{...w,loadBearing:true}:w);d.walls.push({id:'partition',a:[3000,0],b:[3000,d.depth],thickness:240,kind:'partition'});
   const binding=perimeterDimensions(d)!.chains.flatMap(c=>c.segments).find(s=>s.binding?.startWalls.includes('partition')&&s.binding.endWalls.includes('outer-1'))!.binding!;
   return {design:d,binding};}
 function harness(){const props={...fixture(),onApply:vi.fn(),onClose:vi.fn()};const render=()=>{hooks.index=0;return nodes(DimensionEditDialog(props));};return {...props,render};}
 beforeEach(()=>{hooks.values=[];hooks.index=0;});
 describe('净距对话框',()=>{
-  it('输入仅修改草稿，应用时米转毫米且固定外墙侧',()=>{
+  it('输入仅修改草稿，应用时米转毫米且固定承重外墙侧',()=>{
     const h=harness();let all=h.render();const input=all.find(e=>e.props.id==='dimension-gap')!;
     (input.props.onChange as (e:unknown)=>void)({target:{value:'2.2'}});expect(h.onApply).not.toHaveBeenCalled();
     all=h.render();const apply=all.find(e=>e.props.children==='应用距离')!;(apply.props.onClick as ()=>void)();

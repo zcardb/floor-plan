@@ -47,7 +47,7 @@ describe('取消分割合并连续墙', () => {
     const d = splitWall(blankDesign(), 'outer-0', [300, 800]).design; d.walls[2].color = '#abcdef';
     const next = mergeWall(d, 'outer-0').design;
     expect(next.walls[0].exteriorRootId).toBe('outer-0'); expect(length(next.walls[0])).toBe(800);
-    expect(() => resizeBlank(next, next.width + 10, next.depth, next.thickness)).toThrow('已分割');
+    expect(() => resizeBlank(next, next.width + 10, next.depth, next.thickness)).toThrow('外围墙已单独调整');
   });
   it('原始承重合并后仍承重且可取消、未知ID拒绝，洞口冲突原子拒绝', () => {
     const d = splitWall(blankDesign(), 'outer-0', [300]).design;

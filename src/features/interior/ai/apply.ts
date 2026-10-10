@@ -26,7 +26,7 @@ function registerCatalog(design: Design, furniture: Furniture[], catalog: AiCata
 export function planToDesign(spec: PlanSpec, catalog: AiCatalog): Design {
   // 生成时每个门窗各占一段满宽墙，门窗无法沿墙拖动：默认执行一次「清空分割」。
   const built = mergeAllSplits(buildPlan(spec, catalogResolver(catalog))).design;
-  const design: Design = { ...built, templateId: AI_TEMPLATE_ID, structureUnlocked: true };
+  const design: Design = { ...built, templateId: AI_TEMPLATE_ID };
   return validateDesign({ ...design, customCatalog: registerCatalog(design, design.furniture, catalog) });
 }
 

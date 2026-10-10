@@ -1,11 +1,8 @@
 import { useEffect,useRef,useState } from 'react';
-import { Plus,Loader2,Cloud,ChevronDown } from 'lucide-react';
-import { FurniturePicker } from './FurniturePicker';
-import { typePickerItems } from './pickerItems';
+import { Plus,Loader2,Cloud } from 'lucide-react';
 import { LoadError } from './LoadError';
 import { Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select,SelectContent,SelectGroup,SelectItem,SelectLabel,SelectSeparator,SelectTrigger,SelectValue } from '@/components/ui/select';
@@ -22,52 +19,48 @@ import { HARD_CATEGORIES,OPENING_CATEGORY,surfaceCategory,surfaceKindOfCategory,
 import { CustomColorMaterialForm } from './CustomColorMaterialForm';
 import { CustomOpeningForm } from './CustomOpeningForm';
 import { AccountMaterialList } from './AccountMaterialList';
-import { ColorPickerField } from './ColorPickerField';
 import { CustomFloorForm } from './CustomFloorForm';
 import { FloorSwatch } from './FloorSwatch';
-import { validPrice } from '../model/costs';
-import { parseMeterDraft } from '../model/lengthUnits';
 import { useFurnitureImage } from '../cloud/useFurnitureImage';
 import { useFurnitureCatalog } from '../cloud/useFurnitureCatalog';
 import { FurnitureShape } from './FurnitureShape';
-import { furnitureTypes, matchFurnitureType, resolvedFurnitureType, appearanceDimensions, needsParameterOnly, type FurnitureOutline } from '../model/furnitureAppearance';
+import { needsParameterOnly } from '../model/furnitureAppearance';
+import { emptyFurnitureDraft, parseFurnitureDraft, previewFurnitureDraft, FURNITURE_DRAFT_ERROR, type FurnitureDraft } from '../model/furnitureDraft';
+import { FurnitureFormFields } from './FurnitureFormFields';
 import { notify } from '@/lib/notify';
 type Props = { open:boolean; onOpenChange:(v:boolean)=>void; loggedIn:boolean; login:()=>void; onCreate:(i:LibraryItem)=>void; onImport:(i:LibraryItem)=>void; onCreateFloor?:(f:CustomFloor)=>void; onCreateWall?:(w:CustomWall)=>void; onCreateOpening?:(o:CustomOpening)=>void; onCreateRoof?:(r:CustomWall)=>void; onCreateCeiling?:(c:CustomWall)=>void; ownerKey:string; accountOnly?:boolean; initialCategory?:string };
 const tabTrigger = 'gap-[5px] rounded px-2.5 py-1.5 text-[11px] max-[700px]:px-[7px] max-[700px]:text-[10px]';
 const surfaceDescription:Record<SurfaceKind,string>={wall:'设置墙面颜色与单价，可在房间材质中选用。',roof:'设置屋面颜色与单价，可在房间材质中选用并设置坡度。',ceiling:'设置吊顶颜色与单价，可在房间材质中选用。'};
 export function CustomFurnitureDialog({open,onOpenChange,loggedIn,login,onCreate,onImport,onCreateFloor,onCreateWall,onCreateOpening,onCreateRoof,onCreateCeiling,ownerKey,accountOnly=false,initialCategory='客厅'}:Props){
-  const [name,setName]=useState(''),[category,setCategory]=useState(()=>newFurnitureCategory(initialCategory)),[w,setW]=useState('1.8'),[d,setD]=useState('0.8'),[h,setH]=useState('0.8'),[price,setPrice]=useState(''),[color,setColor]=useState('#b7c4b0'),[account,setAccount]=useState(accountOnly),[error,setError]=useState(''),[saving,setSaving]=useState(false),[tab,setTab]=useState('create'),[pending,setPending]=useState<LibraryItem|null>(null);
+  const [draft,setDraft]=useState<FurnitureDraft>(()=>emptyFurnitureDraft(newFurnitureCategory(initialCategory))),[account,setAccount]=useState(accountOnly),[error,setError]=useState(''),[saving,setSaving]=useState(false),[tab,setTab]=useState('create'),[pending,setPending]=useState<LibraryItem|null>(null);
   const ai=useFurnitureImage(),catalog=useFurnitureCatalog(),floors=useFloorCatalog(),walls=useWallCatalog(),openings=useOpeningCatalog(),roofs=useRoofCatalog(),ceilings=useCeilingCatalog(),cancel=ai.cancel,reset=catalog.reset;
   const epoch=useRef(0),lock=useRef(false),id=useRef(uid()),pendingRef=useRef<LibraryItem|null>(null),latest=useRef({open,ownerKey}); latest.current={open,ownerKey};
   useEffect(()=>{const generation=epoch;epoch.current++;lock.current=false;pendingRef.current=null;setPending(null);setSaving(false);setError('');cancel();reset();id.current=uid();return()=>{generation.current++;};},[open,ownerKey,cancel,reset]);
   const loadCatalog=catalog.load,loadFloors=floors.load,loadWalls=walls.load,loadOpenings=openings.load,loadRoofs=roofs.load,loadCeilings=ceilings.load,hasFloors=!!onCreateFloor,hasWalls=!!onCreateWall,hasOpenings=!!onCreateOpening,hasRoofs=!!onCreateRoof,hasCeilings=!!onCreateCeiling;
   useEffect(()=>{if(open&&!accountOnly&&tab==='account'){void loadCatalog();if(hasFloors)void loadFloors();if(hasWalls)void loadWalls();if(hasOpenings)void loadOpenings();if(hasRoofs)void loadRoofs();if(hasCeilings)void loadCeilings();}},[open,accountOnly,tab,loadCatalog,loadFloors,loadWalls,loadOpenings,loadRoofs,loadCeilings,hasFloors,hasWalls,hasOpenings,hasRoofs,hasCeilings]);
-  const [typeChoice,setTypeChoice]=useState('auto'),[shape,setShape]=useState<FurnitureOutline>('reference');
-  const type=resolvedFurnitureType(name,typeChoice);
-  const parametersRequired=needsParameterOnly({type,shape});
-  const typeItems=typePickerItems(furnitureTypes,furnitureTypes.find(option=>option.value=== matchFurnitureType(name))?.label??'通用物件');
+  const category=draft.category,patch=(next:Partial<FurnitureDraft>)=>setDraft(current=>({...current,...next})),setCategory=(value:string)=>patch({category:value});
+  const parametersRequired=needsParameterOnly(previewFurnitureDraft(draft));
   const finish=async(item:LibraryItem,run:number)=>{
     if(run!==epoch.current||!latest.current.open)return;
     setSaving(true);
-    try { if(account||accountOnly)await catalog.save(item);if(run!==epoch.current)return;onCreate(item);if(accountOnly)notify.success('已保存到账号家具库「'+item.name+'」');pendingRef.current=null;setPending(null);setName('');onOpenChange(false); }
+    try { if(account||accountOnly)await catalog.save(item);if(run!==epoch.current)return;onCreate(item);if(accountOnly)notify.success('已保存到账号家具库「'+item.name+'」');pendingRef.current=null;setPending(null);patch({name:''});onOpenChange(false); }
     catch(e){if(run===epoch.current){setError(e instanceof Error?e.message:'保存失败，图片已保留，请重试保存');notify.error('家具「'+item.name+'」保存失败',e);}}
     finally {if(run===epoch.current)setSaving(false);}
   };
   const create=async(parametersOnly=false)=>{
     if(!loggedIn){login();return;}if(lock.current)return;
-    const width=parseMeterDraft(w),depth=shape==='circle'?width:parseMeterDraft(d),height=parseMeterDraft(h),amount=price.trim()===''?null:Number(price);
-    if(!name.trim()||![width,depth].every(n=>Number.isFinite(n)&&n>=50&&n<=20000)||!Number.isFinite(height)||height<50||height>8000||(amount!==null&&!validPrice(amount))){setError('请填写名称、有效尺寸及非负单价');notify.fail('请填写名称、有效尺寸及非负单价');return;}
+    const parsed=parseFurnitureDraft(draft);
+    if(!parsed){setError(FURNITURE_DRAFT_ERROR);notify.fail(FURNITURE_DRAFT_ERROR);return;}
     lock.current=true;setError('');const run=epoch.current;
-    let item=pendingRef.current||{catalogId:id.current,name:name.trim(),category,type,shape,w:width,d:depth,height,color,price:amount};
+    let item:LibraryItem=pendingRef.current||{catalogId:id.current,...parsed};
     pendingRef.current=item;setPending(item);
     try {
       if(!parametersOnly&&!item.imageUrl){const url=await ai.generate(item);if(run!==epoch.current)return;if(!url)return;item={...item,imageUrl:url};pendingRef.current=item;setPending(item);}
       await finish(item,run);
     }finally {if(run===epoch.current)lock.current=false;}
   };
-  const reference=pending||{name,category,type,shape,...appearanceDimensions(shape,parseMeterDraft(w)||1800,parseMeterDraft(d)||800),color};
+  const reference=pending||previewFurnitureDraft(draft);
   const locked=ai.busy||saving||!!pending;
-  const dimensions:[string,string,string,(v:string)=>void][]=[shape==='circle'?['直径 m','furniture-width',w,setW]:['宽 m','furniture-width',w,setW],...(shape==='circle'?[]:[['深 m','furniture-depth',d,setD] as [string,string,string,(v:string)=>void]]),['高 m','furniture-height',h,setH]];
   const saveFloor=async(floor:CustomFloor,toAccount:boolean)=>{
     if(!loggedIn){login();return;}
     if(toAccount)await floors.save(floor);
@@ -114,21 +107,7 @@ export function CustomFurnitureDialog({open,onOpenChange,loggedIn,login,onCreate
   </div>;
   const furnitureForm=<form onSubmit={e=>{e.preventDefault();void create(parametersRequired);}}>
     <div className="custom-furniture-layout">
-      <fieldset className="custom-furniture-fields" disabled={locked}>
-        <div className="custom-field">
-          <Label htmlFor="furniture-name">名称</Label>
-          <Input id="furniture-name" aria-label="家具名称" maxLength={100} required value={name} disabled={locked} onChange={e=>setName(e.target.value)}/>
-        </div>
-        {categoryField}
-        <div className="custom-field"><Label htmlFor="furniture-type">参考类型</Label><FurniturePicker items={typeItems} label="选择参考类型" placeholder="搜索类型或家具名称…" disabled={locked} onPick={item=>setTypeChoice(item.id)}><button type="button" id="furniture-type" className="picker-trigger" disabled={locked} aria-label={`参考类型：${typeItems.find(item=>item.id===typeChoice)?.label??''}`}><span>{typeItems.find(item=>item.id===typeChoice)?.label}</span><ChevronDown size={12}/></button></FurniturePicker></div>
-        <div className="custom-field"><Label htmlFor="furniture-outline">外形</Label><Select value={shape} onValueChange={value=>setShape(value as FurnitureOutline)} disabled={locked}><SelectTrigger id="furniture-outline"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="reference">参考原形</SelectItem><SelectItem value="rectangle">方形</SelectItem><SelectItem value="circle">圆形</SelectItem></SelectContent></Select></div>
-        <div className="custom-dimensions">{dimensions.map(([label,fieldId,value,setter])=><div className="custom-field" key={fieldId}><Label htmlFor={fieldId}>{label}</Label><Input id={fieldId} type="number" step={0.01} min={0.05} max={fieldId==='furniture-height'?8:20} value={value} disabled={locked} onChange={e=>setter(e.target.value)}/></div>)}</div>
-        <div className="custom-field">
-          <Label htmlFor="furniture-price">价格 / 元每件</Label>
-          <Input id="furniture-price" type="number" min={0} placeholder="未定价" value={price} disabled={locked} onChange={e=>setPrice(e.target.value)}/>
-        </div>
-        <ColorPickerField label="模型颜色" value={color} onChange={setColor} disabled={locked}/>
-      </fieldset>
+      <FurnitureFormFields draft={draft} onChange={patch} categoryField={categoryField} disabled={locked}/>
       <div className="custom-image-panel">
         <div className="custom-image-preview">{pending?.imageUrl||ai.image?<img src={pending?.imageUrl||ai.image} crossOrigin="anonymous" alt="家具生成外观"/>:ai.busy?<><Loader2 className="animate-spin"/><span>正在生成统一风格外观…</span></>:<><svg viewBox={`${-reference.w/2-100} ${-reference.d/2-100} ${reference.w+200} ${reference.d+200}`}><FurnitureShape f={reference}/></svg><span>{parametersRequired?'参考几何预览':'参考符号 · 创建时生成外观图'}</span></>}</div>
         <small>{parametersRequired?'此类型或外形先保存参考几何，不生成图片、不消耗 AI 额度。':'生成可能消耗 AI 额度；每次创建只提交一次，不随字段修改生成。'}</small>

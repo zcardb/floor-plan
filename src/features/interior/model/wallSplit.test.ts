@@ -5,7 +5,7 @@ import { area, length, rebuildRooms, resizeBlank, ringArea } from './geometry';
 import { splitMaxCuts, splitWall } from './wallSplit';
 import { connectedWallPoly, wallSectionPolygons } from './wallConnections';
 import { validateDesign } from './validation';
-import { setWallBearing, canEditWall, isBearingWall, isOnBearingWall } from './wallPolicy';
+import { setWallBearing, canResizeWall, isBearingWall, isOnBearingWall } from './wallPolicy';
 import { dimensionBinding } from './dimensionBinding';
 import { dimensionEditPolicy } from './dimensionWallEdit';
 import { calculateCosts } from './costs';
@@ -45,7 +45,7 @@ describe('图纸墙段分割', () => {
     const d = referenceDesign(), w = d.walls.find(w => w.kind === 'bearing')!;
     const next = splitWall(d, w.id, [300]).design;
     for (const segment of next.walls.filter(s => s.id === w.id || !d.walls.some(old => old.id === s.id))) {
-      expect(canEditWall(next, segment)).toBe(false); expect(isBearingWall(segment)).toBe(true);
+      expect(canResizeWall(next, segment)).toBe(false); expect(isBearingWall(segment)).toBe(true);
       expect(isBearingWall(setWallBearing(next, segment.id, false).walls.find(s => s.id === segment.id)!)).toBe(false);
     }
     const marked = setWallBearing(fixture(), 'p', true); expect(splitWall(marked, 'p', [300]).design.walls.slice(-2).every(s => s.loadBearing)).toBe(true);
@@ -53,7 +53,7 @@ describe('图纸墙段分割', () => {
     const twice = splitWall(outer.design, outer.selectedId, [300]).design;
     expect(twice.walls.filter(w => w.exteriorRootId).every(w => w.exteriorRootId === 'outer-0')).toBe(true);
     expect(resizeBlank(twice, twice.width, twice.depth, twice.thickness)).toBe(twice);
-    for (const params of [[twice.width + 10, twice.depth, twice.thickness], [twice.width, twice.depth + 10, twice.thickness], [twice.width, twice.depth, twice.thickness + 10]]) expect(() => resizeBlank(twice, ...params as [number, number, number])).toThrow('已分割外围墙');
+    for (const params of [[twice.width + 10, twice.depth, twice.thickness], [twice.width, twice.depth + 10, twice.thickness], [twice.width, twice.depth, twice.thickness + 10]]) expect(() => resizeBlank(twice, ...params as [number, number, number])).toThrow('外围墙已单独调整');
     expect(validateDesign(JSON.parse(JSON.stringify(twice))).walls).toEqual(twice.walls);
     const invalid = structuredClone(twice); invalid.walls[0].exteriorRootId = ''; expect(() => validateDesign(invalid)).toThrow();
   });
@@ -113,6 +113,6 @@ describe('图纸墙段分割', () => {
     const a = dimensionBinding(d.walls, true, 3120, d.width, 2000)!;
     const b = dimensionBinding(next.walls, true, 3120, d.width, 2000)!;
     expect(b.start).toBe(a.start); expect(b.end).toBe(a.end); expect(b.startWalls).toHaveLength(3);
-    expect(dimensionEditPolicy(setWallBearing(next, 'p', true), b).reason).toBeTruthy();
+    expect(dimensionEditPolicy(setWallBearing(next, 'p', true), b)).toEqual({ fixed: 'start', chooseSide: false });
   });
 });

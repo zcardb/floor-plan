@@ -6,7 +6,8 @@ import { notify } from '@/lib/notify';
 import { AiComposer, type AiComposerValue } from './AiComposer';
 import { AiResults } from './AiResults';
 import { VIEW_LABEL, viewImage } from './FurnitureVisual';
-import { readyFiles, readyImageUrls, uploadedImage, type AiFileRef } from '../ai/referenceImages';
+import { readyFiles, readyImageUrls, uploadedImage, type AiFileRef, type AiImageDraft } from '../ai/referenceImages';
+import { uploadReferenceImage } from '../ai/client';
 import { useAiBatch } from '../ai/useAiBatch';
 import { DEFAULT_AI_COUNT } from '../ai/useRoomAi';
 import { DEFAULT_AI_ENGINE } from '../ai/models';
@@ -20,24 +21,42 @@ interface Request { description: string; images: string[]; files: AiFileRef[] }
 export const defaultFurniturePrompt = (item: LibraryItem) =>
   `${item.name}，${formatMeters(item.w)} × ${formatMeters(item.d)}${item.height ? ` × ${formatMeters(item.height)}` : ''} m，主色 ${item.color}`;
 
-/** 默认带上的原图：当前视角的图；3D 还没有时用 2D 图作参考；都没有则不带（即重新生成）。 */
-export const defaultAdjustImage = (item: LibraryItem, view: FurnitureView) => viewImage(item, view) ?? (view === 'perspective' ? item.imageUrl : undefined);
+/** 默认带上的原图只取当前视角：2D 用 2D 图、3D 用 3D 图，不跨视角混用。 */
+export const defaultAdjustImage = (item: LibraryItem, view: FurnitureView) => viewImage(item, view);
 
 /**
  * 家具图片「AI 调整」：复用 AI 布局 / AI 创建的输入框与候选网格。
  * 默认把当前图片放进附件区（调整）；移除后即不参考原图（重新生成），界面不区分两种。
  */
-export function FurnitureAiDialog({ item, view, onClose, onApply }: {
+export function FurnitureAiDialog({ item, view, seed, onClose, onApply }: {
   item: LibraryItem;
   view: FurnitureView;
+  /** 当前视角没有图片时的默认素材（3D 为实时模型截图），打开后自动上传。 */
+  seed?: File | null;
   onClose: () => void;
   /** 保存选中的图片；成功返回 true。 */
   onApply: (url: string) => Promise<boolean>;
 }) {
+  const [seedDraft] = useState<AiImageDraft | null>(() => !defaultAdjustImage(item, view) && seed
+    ? { id: crypto.randomUUID(), preview: URL.createObjectURL(seed), uploading: true, kind: 'image', name: seed.name, ext: 'png' } : null);
   const [composer, setComposer] = useState<AiComposerValue>(() => {
     const original = defaultAdjustImage(item, view);
-    return { description: defaultFurniturePrompt(item), images: original ? [uploadedImage(original)] : [], count: DEFAULT_AI_COUNT, engine: DEFAULT_AI_ENGINE };
+    const images = original ? [uploadedImage(original)] : seedDraft ? [seedDraft] : [];
+    return { description: defaultFurniturePrompt(item), images, count: DEFAULT_AI_COUNT, engine: DEFAULT_AI_ENGINE };
   });
+  useEffect(() => {
+    if (!seedDraft || !seed) return;
+    let alive = true;
+    uploadReferenceImage(seed).then(
+      url => { if (alive) setComposer(c => ({ ...c, images: c.images.map(image => image.id === seedDraft.id ? { ...image, url, uploading: false } : image) })); },
+      cause => {
+        if (!alive) return;
+        setComposer(c => ({ ...c, images: c.images.filter(image => image.id !== seedDraft.id) }));
+        notify.error('3D 模型截图上传失败，可手动添加参考图', cause);
+      },
+    );
+    return () => { alive = false; };
+  }, [seedDraft, seed]);
   const [mode, setMode] = useState<'input' | 'results'>('input'), [picked, setPicked] = useState<number | null>(null), [applying, setApplying] = useState(false);
   const ai = useAiBatch<Request, { url: string }>();
   /** 每次发送 / 返回 / 关闭都换代：旧任务停止轮询，迟到结果丢弃。 */
@@ -85,7 +104,7 @@ export function FurnitureAiDialog({ item, view, onClose, onApply }: {
     <DialogContent className="ai-dialog">
       <DialogHeader>
         <DialogTitle>AI 调整 · {item.name} · {VIEW_LABEL[view]}</DialogTitle>
-        <DialogDescription>默认在当前图片基础上调整；移除附件中的原图即重新生成。预览后选择一张应用。</DialogDescription>
+        <DialogDescription>默认在当前{view === 'top' ? '2D 俯视图' : '3D 视角图（没有时用实时 3D 模型截图）'}基础上调整；移除附件中的原图即重新生成。预览后选择一张应用。</DialogDescription>
       </DialogHeader>
       {mode === 'results' && ai.batch
         ? <div className="ai-create-results">

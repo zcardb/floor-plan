@@ -28,7 +28,7 @@ function jointsAt(d: Design, moving: Wall, p: Point): Joints {
     if (Math.abs(dot(unit(c), [-u[1], u[0]])) < MIN_ANGLE_SIN) continue;
     const tol = Math.max(moving.thickness, c.thickness) / 2 + 1;
     const end = (['a', 'b'] as const).find(k => Math.hypot(c[k][0] - p[0], c[k][1] - p[1]) <= tol);
-    // 端点相接的可调整墙随之伸缩；不可调整的墙（如空白户型外框）只当滑轨。
+    // 端点相接的可调整墙随之伸缩；承重墙不可调整，只当滑轨。
     if (end && canResizeWall(d, c)) { ends.push({ wall: c, end }); continue; }
     const near = nearestOnWall(p, c);
     const gap = Math.hypot(near.point[0] - p[0], near.point[1] - p[1]);

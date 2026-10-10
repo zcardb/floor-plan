@@ -55,6 +55,12 @@ export function useDesign(initial: Design, onChange: (d: Design) => void, readOn
     setCounts({ undo: past.current.length, redo: future.current.length });
     notify.current(d);
   }, [set]);
+  /** 外部数据同步（例如账号家具库更新）：写入并保存，但不进撤销历史。 */
+  const sync = useCallback((d: Design) => {
+    if (locked.current) return;
+    set(d);
+    notify.current(d);
+  }, [set]);
   if(!transaction.current)transaction.current=createSizeTransaction(()=>current.current,set,commit);
-  return { design, current, change, commit, preview: set, undo, redo, counts, sizeTransaction: transaction.current };
+  return { design, current, change, commit, sync, preview: set, undo, redo, counts, sizeTransaction: transaction.current };
 }

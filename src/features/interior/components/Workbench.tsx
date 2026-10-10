@@ -9,6 +9,7 @@ import { DimensionEditDialog } from './DimensionEditDialog';
 import { WallSplitDialog } from './WallSplitDialog';
 import { CompassRose } from './CompassRose';
 import { northAngle } from '../model/northAngle';
+import { syncAccountFurniture } from '../model/furnitureSync';
 import { splitWall as splitWallModel } from '../model/wallSplit';
 import { removeWall as removeWallModel } from '../model/wallRemoval';
 import { removeRoom } from '../model/roomFurniture';
@@ -171,7 +172,7 @@ export function Workbench(p: Props) {
   const confirm = useConfirm();
   const readOnly = !!p.project.builtin;
   const model = useDesign(p.project.state, p.update, readOnly),
-    { design: d, change, commit, preview, undo, redo, counts, sizeTransaction, current: designRef } = model;
+    { design: d, change, commit, sync, preview, undo, redo, counts, sizeTransaction, current: designRef } = model;
   const structureTools = canEditStructure(d, readOnly);
   const [selection, setSelection] = useState<Selection>(null),
     [tool, setTool] = useState<Tool>("select");
@@ -267,6 +268,13 @@ export function Workbench(p: Props) {
   const accountFurniture = p.loggedIn
     ? furnitureCatalog.items.filter((item) => !projectCatalog.some((i) => i.catalogId === item.catalogId))
     : [];
+  // 账号家具库里改过的家具同步到本项目（项目内单独改过的单价、尺寸等保留）。
+  const accountFurnitureItems = furnitureCatalog.items;
+  useEffect(() => {
+    if (!p.loggedIn || readOnly || !d.customCatalog?.length) return;
+    const next = syncAccountFurniture(designRef.current, accountFurnitureItems);
+    if (next) sync(next);
+  }, [p.loggedIn, readOnly, d.customCatalog, accountFurnitureItems, sync, designRef]);
   // 登录后读取账号地面 / 墙面 / 门窗 / 屋面 / 吊顶 / 家具库；新建弹窗关闭后刷新，让刚建的材料立即可选。
   useEffect(() => {
     if (!p.loggedIn || customOpen) return;
@@ -648,10 +656,7 @@ export function Workbench(p: Props) {
       tone: "destructive",
     });
     if (!ok) return;
-    change((d) => ({
-      ...(d.template === "blank" ? blankDesign() : d.templateId ? designForTemplate(d.templateId) : designForTemplate("reference")),
-      ...(d.structureUnlocked ? { structureUnlocked: true } : {}),
-    }));
+    change((d) => (d.template === "blank" ? blankDesign() : d.templateId ? designForTemplate(d.templateId) : designForTemplate("reference")));
     setSelection(null);
     notify.success("已重置为初始模板，可撤销恢复");
   };

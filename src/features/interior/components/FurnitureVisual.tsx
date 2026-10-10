@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, type MutableRefObject } from 'react';
 import { Box, Sparkles, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { HARD_CATEGORIES } from '../model/hardMaterials';
 import type { LibraryItem } from '../model/types';
 import type { FurnitureView } from '../cloud/useFurnitureImage';
 import { FurnitureShape } from './FurnitureShape';
-import { FurnitureModelPreview } from './FurnitureModelPreview';
+import { FurnitureModelPreview, type ModelSnapshot } from './FurnitureModelPreview';
 
 export const VIEW_LABEL: Record<FurnitureView, string> = { top: '2D 俯视图', perspective: '3D 视角图' };
 
@@ -20,11 +20,13 @@ export const hasViews = (item: LibraryItem) => !HARD_CATEGORIES.includes(item.ca
  * 硬装只有 2D 一张图，不显示视角切换。2D 无图时显示参考符号；3D 无图时实时渲染与项目 3D 场景
  * 相同的参考几何模型，WebGL 不可用时才退回说明与生成入口。
  */
-export function FurnitureVisual({ item, view, onView, onAdjust }: {
+export function FurnitureVisual({ item, view, onView, onAdjust, snapshotRef }: {
   item: LibraryItem;
   view: FurnitureView;
   onView: (view: FurnitureView) => void;
   onAdjust?: () => void;
+  /** 3D 实时模型的截图函数（无 3D 图时作为 AI 调整的默认素材）。 */
+  snapshotRef?: MutableRefObject<ModelSnapshot | null>;
 }) {
   const views = hasViews(item), image = viewImage(item, views ? view : 'top'), [modelFailed, setModelFailed] = useState(false);
   const empty3d = views && view === 'perspective' && !image;
@@ -38,7 +40,7 @@ export function FurnitureVisual({ item, view, onView, onAdjust }: {
     {onAdjust && !(empty3d && modelFailed) && <Button type="button" size="sm" variant="secondary" className="furniture-visual-ai" onClick={onAdjust}>
       <Sparkles size={14} />AI 调整
     </Button>}
-    {empty3d && !modelFailed && <FurnitureModelPreview item={item} onFail={() => setModelFailed(true)} />}
+    {empty3d && !modelFailed && <FurnitureModelPreview item={item} snapshotRef={snapshotRef} onFail={() => setModelFailed(true)} />}
     {!(empty3d && !modelFailed) && <div className="furniture-visual-stage">
       {image
         ? <img src={image} crossOrigin="anonymous" alt={`${item.name}${VIEW_LABEL[views ? view : 'top']}`} />

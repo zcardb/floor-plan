@@ -340,10 +340,7 @@ export function createProject(
     id: uid(),
     name:
       name || (design ? "AI 户型" : template === "blank" ? "未命名户型" : presetById(template)?.name ?? TEMPLATE_PRESETS[0].name),
-    state: {
-      ...(design ?? (template === "blank" ? blankDesign(size) : designForTemplate(template))),
-      structureUnlocked: true,
-    },
+    state: design ?? (template === "blank" ? blankDesign(size) : designForTemplate(template)),
     updatedAt: new Date().toISOString(),
     revision: 0,
   };

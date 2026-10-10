@@ -28,6 +28,7 @@ import { CustomColorMaterialForm } from './CustomColorMaterialForm';
 import { CustomOpeningForm } from './CustomOpeningForm';
 import { CustomFurnitureDialog } from './CustomFurnitureDialog';
 import { CustomFloorForm } from './CustomFloorForm';
+import { FurnitureFormFields } from './FurnitureFormFields';
 import { AccountCMS } from './AccountCMS';
 import type { useFurnitureCatalog } from '../cloud/useFurnitureCatalog';
 import type { useProjects } from '../cloud/useProjects';
@@ -37,6 +38,8 @@ type Node = ReactElement<Record<string, unknown>>;
 function nodes(tree: ReactNode): Node[] {
   if (Array.isArray(tree)) return tree.flatMap(nodes);
   if (!isValidElement<Record<string, unknown>>(tree)) return [];
+  // 共用的家具表单项是无状态组件，展开后才能找到其中的字段
+  if (tree.type === FurnitureFormFields) return [tree, ...nodes(FurnitureFormFields(tree.props as Parameters<typeof FurnitureFormFields>[0]))];
   // 页头的主操作通过 actions 插槽传入，也要遍历到
   return [tree, ...nodes(tree.props.children as ReactNode), ...nodes(tree.props.actions as ReactNode)];
 }

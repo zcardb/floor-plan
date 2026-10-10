@@ -18,7 +18,7 @@ const roomWithoutId = (r: Room) => {
 /**
  * 模版指纹：只看「方案内容」（墙体、门窗、房间、材质、家具与位置、拆改标记）。
  * 与内容无关的编辑器状态不参与比较：
- * - structureUnlocked：复制/新建时写入的解锁标记，不改变内容；
+ * - structureUnlocked：已退役的旧版解锁标记，旧数据里可能还有，不改变内容；
  * - dimensionSettings：尺寸标注是否显示，属于视图偏好。
  */
 const fingerprint = (design: Design): string =>

@@ -15,7 +15,7 @@ export function junctionCuts(design: Design, wallId: string): Map<string, number
   const box = bbox([wall.a, wall.b]);
   for (const other of design.walls) {
     if (design.demolished.includes(other.id)) continue;
-    // 空白户型的外围墙是可整体重设尺寸的外框，分割后 resizeBlank 会拒绝改尺寸。
+    // 空白户型的外围墙是可整体重设尺寸的外框，新画墙不在其上留交接点（分割后 resizeBlank 会拒绝改尺寸）。
     if (design.template === 'blank' && other.kind === 'exterior') continue;
     if (other.id !== wallId) {
       // Cheap pre-filter: walls that cannot touch the drawn one have no junction with it.

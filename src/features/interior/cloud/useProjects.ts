@@ -592,8 +592,7 @@ export function useProjects() {
       const current = activeRef.current;
       if (!current) return false;
       const name = current.name + " · 副本";
-      // 副本解锁结构尺寸：原项目保持不变，副本可自由调整墙体。
-      if (!(await create({ ...current, name, state: { ...current.state, structureUnlocked: true } }, !!p.cloud))) return false;
+      if (!(await create({ ...current, name }, !!p.cloud))) return false;
       notify.success("已复制为「" + name + "」");
       return true;
     },

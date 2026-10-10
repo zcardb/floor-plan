@@ -3,7 +3,7 @@ import { LockKeyhole } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { EditorTooltip } from '@/components/ui/editor-tooltip';
 import { formatMeters, meterDraft, resolveMeterDraft } from '../model/lengthUnits';
-import { ROOM_STRUCTURE_LOCKED, editRoomSide, roomSides, type RoomSide, type RoomSideAnchor } from '../model/roomSides';
+import { editRoomSide, roomSides, type RoomSide, type RoomSideAnchor } from '../model/roomSides';
 import type { SizeTransaction } from '../model/sizeTransaction';
 import type { Design } from '../model/types';
 import { RoomSidesDiagram } from './RoomSidesDiagram';
@@ -99,7 +99,6 @@ export function RoomSidesEditor({ design, roomId, transaction, close }: {
   };
 
   if (!sides.length) return null;
-  const locked = design.template !== 'blank' && design.structureUnlocked !== true;
   const current = active === null ? undefined : sides[active];
 
   return <div className="room-sides" onKeyDown={event => event.stopPropagation()}>
@@ -120,7 +119,6 @@ export function RoomSidesEditor({ design, roomId, transaction, close }: {
       </div>
     </div>
     <div className="room-sides-list">
-      {locked && <p className="room-sides-banner"><LockKeyhole size={13} />{ROOM_STRUCTURE_LOCKED}</p>}
       {sides.map(side => {
         const error = errors[side.index], on = active === side.index;
         return <div key={side.index} ref={node => { rows.current[side.index] = node; }}

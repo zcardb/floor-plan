@@ -104,7 +104,6 @@ export function recognizeDxf(segments: DxfSegment[], { roles, unit }: RecognizeO
     rooms,
     furniture: [],
     demolished: [],
-    structureUnlocked: true,
   } satisfies Design);
   return {
     design,

@@ -131,19 +131,39 @@ export function outerWalls(width: number, depth: number, t: number): Wall[] {
     kind: "exterior",
   }));
 }
+/** 空白户型的外围墙是否仍是外框矩形（尺寸 = width / depth / thickness）。 */
+export const BLANK_FRAME_CHANGED = "外围墙已单独调整，当前不支持整体重设外围尺寸";
+/**
+ * 外围墙被单独移动、改厚、分割或删除后为 false，此时不能再整体重设外围尺寸。
+ */
+export function blankFrameIntact(d: Design): boolean {
+  const expected = outerWalls(d.width, d.depth, d.thickness);
+  return expected.every((want) => {
+    const wall = d.walls.find((w) => w.id === want.id);
+    return !!wall && wall.kind === "exterior" && !wall.exteriorRootId && !d.demolished.includes(wall.id) &&
+      wall.thickness === want.thickness &&
+      wall.a[0] === want.a[0] && wall.a[1] === want.a[1] && wall.b[0] === want.b[0] && wall.b[1] === want.b[1];
+  });
+}
+/** rebuildRooms 在墙体包围盒外留出的作图余量（mm）。 */
+const frameMargin = 1000;
+/**
+ * 空白户型的房间按实际墙体轮廓重算：以作图余量框减去全部墙体带，室外那一块去掉，其余即房间。
+ * 因此外围墙单独移动、门洞开向外侧后，房间跟随真实墙体，而不是跟着 width / depth 的外框矩形。
+ */
 export function rebuildRooms(d: Design): Design {
   if (d.template !== "blank") return d;
-  const cuts = d.walls.filter(
-    (w) => w.kind === "partition" && !d.demolished.includes(w.id),
-  );
-  const polygons = cuts.length
-    ? polygonClipping.difference(
-        [rect(0, 0, d.width, d.depth)],
-        ...cuts.map((w) => [connectedWallPoly(w, d.walls, d.demolished)]),
-      )
-    : [[rect(0, 0, d.width, d.depth)]];
+  const standing = d.walls.filter((w) => !d.demolished.includes(w.id) && w.kind !== "low");
+  const box = standing.length ? bbox(standing.flatMap((w) => [w.a, w.b])) : { x: -100, y: -100, x2: d.width + 100, y2: d.depth + 100 };
+  const frame = rect(box.x - frameMargin, box.y - frameMargin, box.x2 - box.x + frameMargin * 2, box.y2 - box.y + frameMargin * 2);
+  const polygons = standing.length
+    ? polygonClipping.difference([frame], ...standing.map((w) => [connectedWallPoly(w, d.walls, d.demolished)]))
+    : [[frame]];
+  const outside: Point = [frame[0][0] + 1, frame[0][1] + 1];
+  // 含室外探针的那块是墙体外的空间（可能是带洞多边形，洞即户型轮廓）。
+  const regions = polygons.filter((poly) => !inRing(outside, poly[0] as Point[]));
   const used = new Set<string>();
-  const rooms: Room[] = polygons
+  const rooms: Room[] = regions
     .filter((poly) => ringArea(poly[0] as Point[]) > 10000)
     .map((poly, i) => {
       const rings = poly.map(
@@ -195,14 +215,9 @@ export function resizeBlank(
   depth: number,
   thickness: number,
 ): Design {
-  if (d.walls.some(w => w.kind === 'exterior' && w.exteriorRootId)) {
+  if (!blankFrameIntact(d)) {
     if (width !== d.width || depth !== d.depth || thickness !== d.thickness)
-      throw new Error('已分割外围墙，当前不支持整体重设外围尺寸');
-    return d;
-  }
-  if ([0, 1, 2, 3].some(i => !d.walls.some(w => w.id === 'outer-' + i))) {
-    if (width !== d.width || depth !== d.depth || thickness !== d.thickness)
-      throw new Error('已删除外围墙，当前不支持整体重设外围尺寸');
+      throw new Error(BLANK_FRAME_CHANGED);
     return d;
   }
   const exterior = outerWalls(width, depth, thickness).map(w => {

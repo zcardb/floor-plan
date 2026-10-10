@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { LibraryItem } from '../model/types';
 import { toFurnitureModel } from '../model/furnitureModel';
 
@@ -6,8 +6,11 @@ import { toFurnitureModel } from '../model/furnitureModel';
  * 3D 视角的兜底：没有 AI 效果图时，直接按参考几何渲染画布里那套程序化模型，
  * 可以拖动旋转，让「项目里 3D 能看到」的家具在详情弹窗里也看得到。
  * three 只在真正需要时下载（和场景同一份模块）。
+ * snapshotRef：截取当前视角为 PNG，供「AI 调整」作为 3D 的默认素材。
  */
-export function FurnitureModelPreview({ item, onFail }: { item: LibraryItem; onFail?: () => void }) {
+export type ModelSnapshot = () => Promise<File | null>;
+
+export function FurnitureModelPreview({ item, onFail, snapshotRef }: { item: LibraryItem; onFail?: () => void; snapshotRef?: MutableRefObject<ModelSnapshot | null> }) {
   const host = useRef<HTMLDivElement>(null), [failed, setFailed] = useState(false), fail = useRef(onFail), latest = useRef(item);
   fail.current = onFail;
   latest.current = item;
@@ -74,7 +77,16 @@ export function FurnitureModelPreview({ item, onFail }: { item: LibraryItem; onF
         let raf = 0;
         const loop = () => { raf = requestAnimationFrame(loop); orbit.update(); renderer.render(scene, camera); };
         loop();
+        if (snapshotRef) snapshotRef.current = () => {
+          // 截图用弹窗视觉区的底色，避免透明背景；同一任务内渲染后立即读取画面。
+          scene.background = new THREE.Color(getComputedStyle(el.parentElement ?? el).backgroundColor);
+          renderer.render(scene, camera);
+          const canvas = renderer.domElement;
+          scene.background = null;
+          return new Promise(resolve => canvas.toBlob(blob => resolve(blob ? new File([blob], `${latest.current.name}-3d.png`, { type: 'image/png' }) : null), 'image/png'));
+        };
         cleanup = () => {
+          if (snapshotRef) snapshotRef.current = null;
           cancelAnimationFrame(raf);
           observer.disconnect();
           orbit.dispose();
@@ -88,7 +100,7 @@ export function FurnitureModelPreview({ item, onFail }: { item: LibraryItem; onF
       } catch { if (!stopped) { setFailed(true); fail.current?.(); } }
     })();
     return () => { stopped = true; cleanup(); };
-  }, [geometryKey]);
+  }, [geometryKey, snapshotRef]);
   if (failed) return null;
   return <div className="furniture-model-preview" ref={host} role="img" aria-label={`${item.name}实时 3D 模型预览`}>
     <span className="furniture-model-hint">参考几何实时 3D · 可拖动旋转</span>

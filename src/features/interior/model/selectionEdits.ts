@@ -1,5 +1,5 @@
 import { length, norm } from "./geometry";
-import { canResizeWall } from './wallPolicy';
+import { BEARING_WALL_LOCKED, canResizeWall } from './wallPolicy';
 import { syncRooms } from './roomFollow';
 import { placementShift, wallPlacement } from './wallPlacement';
 import type { Design, Selection } from "./types";
@@ -75,8 +75,8 @@ export function editSelection(
     };
   if (s.kind === "wall") {
     const w = d.walls.find((w) => w.id === s.id);
-    if (!w || !canResizeWall(d, w))
-      throw new Error("此墙体的结构尺寸已锁定");
+    if (!w) throw new Error("墙体不存在，请重新选择");
+    if (!canResizeWall(d, w)) throw new Error(BEARING_WALL_LOCKED);
     const L = length(w),
       next = {
         ...w,

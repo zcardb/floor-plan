@@ -169,7 +169,7 @@ describe("整户户型候选清洗与落地", () => {
   });
   it("落地为 AI 户型：结构可编辑、可通过校验、家具都在各自房间内、不能视为初始模板", () => {
     const design = planToDesign(sanitizePlan(plan, { catalog }), catalog);
-    expect(design).toMatchObject({ templateId: "ai", width: 8000, depth: 9000, structureUnlocked: true });
+    expect(design).toMatchObject({ templateId: "ai", width: 8000, depth: 9000 });
     expect(() => validateDesign(design)).not.toThrow();
     expect(design.rooms.reduce((s, r) => s + area(r), 0)).toBeGreaterThan(65);
     for (const f of design.furniture) expect(design.rooms.some((r) => inRoom([f.cx, f.cy], r))).toBe(true);

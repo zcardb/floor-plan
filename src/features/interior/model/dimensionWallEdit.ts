@@ -9,9 +9,8 @@ const sameIds = (a: string[], b: string[]) => a.length === b.length && a.every(i
 const movable = (d: Design, ids: string[]) => ids.length > 0 && ids.every(id => d.walls.some(w => w.id === id && canResizeWall(d, w) && !d.demolished.includes(id)));
 export function dimensionEditPolicy(d: Design, binding?: DimensionBinding): { reason?: string; fixed?: FixedDimensionSide; chooseSide: boolean } {
   if (!binding) return { reason: '总尺寸、墙厚或未明确对应墙体的标注仅供查看', chooseSide: false };
-  if (d.template !== 'blank' && d.structureUnlocked !== true) return { reason: '参考户型的结构尺寸已锁定', chooseSide: false };
   const start = movable(d, binding.startWalls), end = movable(d, binding.endWalls);
-  if (!start && !end) return { reason: '两侧均为固定结构，不能通过净距移动', chooseSide: false };
+  if (!start && !end) return { reason: '两侧均为承重墙或开敞边界，不能通过净距移动', chooseSide: false };
   return { fixed: !start ? 'start' : !end ? 'end' : undefined, chooseSide: start && end };
 }
 function bindingExists(d: Design, binding: DimensionBinding) {

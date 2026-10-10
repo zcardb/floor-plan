@@ -1,6 +1,7 @@
 import { useEffect,useRef,useState } from 'react';
+import { LockKeyhole } from 'lucide-react';
 import { length } from '../model/geometry';
-import { canResizeWall, isBearingWall, isOnBearingWall, BEARING_WALL_WARNING } from '../model/wallPolicy';
+import { canResizeWall, isOnBearingWall, BEARING_WALL_LOCKED, BEARING_WALL_WARNING } from '../model/wallPolicy';
 import { RotationControls } from './RotationControls';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -51,8 +52,8 @@ export function SizeFields({design,selection,transaction,close}:{design:Design;s
   const furniture=selection?.kind==='furniture'?design.furniture.find(f=>f.id===selection.id):null;
   const wall=selection?.kind==='wall'?design.walls.find(w=>w.id===selection.id):null;
   const opening=selection?.kind==='opening'?design.openings.find(o=>o.id===selection.id):null;
-  const bearingWarning=(wall&&design.template!=='blank'&&isBearingWall(wall))||(opening&&isOnBearingWall(design,opening.wallId));
-  if(wall&&!canResizeWall(design,wall))return <p className="visual-locked">此项目创建时锁定了结构尺寸，复制该项目后副本可自由调整。</p>;
+  const bearingWarning=opening&&isOnBearingWall(design,opening.wallId);
+  if(wall&&!canResizeWall(design,wall))return <p className="visual-locked"><LockKeyhole size={15}/>{BEARING_WALL_LOCKED}</p>;
   const placement=wallPlacement(design,selection);
   const field=([key,label]:[string,string,number])=><Label key={key} className="field-label">{label}<Input className="editor-control" aria-label={label} type="number" step={key==='rot'?1:0.01} value={draft[key]??''} onFocus={()=>setFocusGap(key==='gapA'?0:key==='gapB'?1:null)} onChange={e=>{
     if(!token.current||!transaction.isActive(token.current)){token.current=transaction.begin(selection);edited.current.clear();}

@@ -9,7 +9,6 @@ const faceEpsilon = 1.5;
 const minSide = 1;
 export const MIN_ROOM_SIDE = 100;
 export const MAX_ROOM_SIDE = 100000;
-export const ROOM_STRUCTURE_LOCKED = '此项目创建时锁定了结构尺寸，复制该项目后副本可自由调整。';
 export type RoomSideAnchor = 'start' | 'end';
 export type RoomSideFacing = 'up' | 'right' | 'down' | 'left' | 'slant';
 
@@ -95,7 +94,6 @@ export function roomSides(d: Design, roomId: string): RoomSide[] {
   const points = normalizedOutline(ring);
   const n = points.length;
   const walls = d.walls.filter(w => !d.demolished.includes(w.id));
-  const locked = d.template !== 'blank' && d.structureUnlocked !== true;
   return points.map((a, index) => {
     const b = points[(index + 1) % n]!;
     const axis = axisOf(a, b), facing = facingOf(a, b, axis);
@@ -119,9 +117,8 @@ export function roomSides(d: Design, roomId: string): RoomSide[] {
     const aIsStart = a[axis] <= b[axis];
     const startWalls = aIsStart ? aWalls : bWalls, endWalls = aIsStart ? bWalls : aWalls;
     const side = { ...base, at, start, end, startWalls, endWalls };
-    if (locked) return { ...side, reason: ROOM_STRUCTURE_LOCKED };
     const startMovable = movable(d, startWalls), endMovable = movable(d, endWalls);
-    if (!startMovable && !endMovable) return { ...side, reason: '两端都是固定结构（外围墙、承重墙或开敞边界）' };
+    if (!startMovable && !endMovable) return { ...side, reason: '两端都是承重墙或开敞边界' };
     return { ...side, fixed: !startMovable ? 'start' as const : !endMovable ? 'end' as const : undefined, chooseSide: startMovable && endMovable };
   });
 }

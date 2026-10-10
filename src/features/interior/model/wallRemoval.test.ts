@@ -143,7 +143,7 @@ describe('删除当前墙', () => {
   it('删除外围墙后，户型设置不能整体重设尺寸', () => {
     const d = { ...blank(), walls: blank().walls.filter(w => w.id !== 'outer-0') };
     expect(resizeBlank(d, d.width, d.depth, d.thickness)).toBe(d);
-    expect(() => resizeBlank(d, d.width + 10, d.depth, d.thickness)).toThrow('已删除外围墙');
+    expect(() => resizeBlank(d, d.width + 10, d.depth, d.thickness)).toThrow('外围墙已单独调整');
   });
 });
 

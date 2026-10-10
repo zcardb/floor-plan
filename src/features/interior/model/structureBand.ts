@@ -49,7 +49,7 @@ export function moveStructureBand(before: Design, band: StructureBand, requested
     if (!aConnected && !bConnected) return w;
     // A moving wall may slide along the INTERIOR of a fixed wall; its endpoint
     // does not require changing that fixed wall. A fixed endpoint joint cannot.
-    if (!canResizeWall(before, w)) throw new Error('该移动会改变外墙或承重墙的连接端点');
+    if (!canResizeWall(before, w)) throw new Error('该移动会改变承重墙的连接端点');
     const next = { ...w, a: aConnected ? translate(w.a) : w.a, b: bConnected ? translate(w.b) : w.b };
     if (Math.abs(w.a[0] - w.b[0]) < epsilon && Math.abs(next.a[0] - next.b[0]) >= epsilon ||
       Math.abs(w.a[1] - w.b[1]) < epsilon && Math.abs(next.a[1] - next.b[1]) >= epsilon) throw new Error('该连接无法保持原墙体方向');
@@ -60,8 +60,6 @@ export function moveStructureBand(before: Design, band: StructureBand, requested
     const next = nextById.get(original.id)!;
     if (length(next) < 100 || (next.b[0] - next.a[0]) * (original.b[0] - original.a[0]) + (next.b[1] - next.a[1]) * (original.b[1] - original.a[1]) <= 0)
       throw new Error('移动会使连接墙反向或短于0.1 m');
-    for (const p of [next.a, next.b]) if (p[0] < -before.thickness - epsilon || p[0] > before.width + before.thickness + epsilon ||
-      p[1] < -before.thickness - epsilon || p[1] > before.depth + before.thickness + epsilon) throw new Error('移动不能超出当前户型边界');
     if (targetIds.has(original.id)) for (const key of ['a', 'b'] as const) {
       for (const fixedWall of before.walls.filter(w => !changed.has(w.id) && !before.demolished.includes(w.id))) {
         if (distance(nearestOnWall(original[key], fixedWall).point, original[key]) < epsilon &&
