@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { blankDesign } from '../data/templates';
 import { rect } from './geometry';
-import { dropOrphanFurniture, removeRoom } from './roomFurniture';
+import { clearRoomFurniture, dropOrphanFurniture } from './roomFurniture';
 import { followWallFurniture } from './furnitureFollow';
 import { moveWallWithJoints } from './wallMove';
 import { splitAtJunctionsOf } from './wallAutoSplit';
@@ -10,6 +10,7 @@ import { editSelection } from './selectionEdits';
 import { placementGaps, wallPlacement } from './wallPlacement';
 import { keepOpeningsInPlace, openingsFitWalls } from './openingAnchor';
 import { dragStep, stepDelta } from './dragStep';
+import { addEnclosedRooms } from './roomEnclosed';
 import type { Design, Furniture, Wall } from './types';
 
 const furn = (id: string, cx: number, cy: number, w = 1000, d = 600, rot = 0): Furniture =>
@@ -27,16 +28,16 @@ const design = (): Design => ({
   furniture: [furn('in-left', 1000, 3000), furn('in-right', 4000, 3000)],
 });
 
-describe('删除房间', () => {
-  it('删除房间及其中家具，墙与其他房间的家具不变', () => {
-    const before = design(), next = removeRoom(before, 'left');
-    expect(next.rooms.map(r => r.id)).toEqual(['right']);
+describe('清空房间家具', () => {
+  it('只删该房间内的家具，房间、墙与其他房间的家具不变', () => {
+    const before = design(), next = clearRoomFurniture(before, 'left');
+    expect(next.rooms).toBe(before.rooms);
     expect(next.furniture.map(f => f.id)).toEqual(['in-right']);
     expect(next.walls).toBe(before.walls);
   });
-  it('只剩一个房间时拒绝删除', () => {
-    const d = { ...design(), rooms: design().rooms.slice(0, 1) };
-    expect(() => removeRoom(d, 'left')).toThrow('至少保留一个房间');
+  it('房间里没有家具时原样返回', () => {
+    const d = { ...design(), furniture: [] };
+    expect(clearRoomFurniture(d, 'left')).toBe(d);
   });
   it('dropOrphanFurniture：只删原来在房间里、现在不在任何房间里的家具', () => {
     const before = design();
@@ -204,5 +205,36 @@ describe('编辑栏避开门窗距离标注', () => {
     }
     expect(r.right).toBeLessThanOrEqual(viewport.width);
     expect(r.bottom).toBeLessThanOrEqual(viewport.height);
+  });
+});
+
+describe('墙围出的空白区域自动成为房间', () => {
+  // 外框 6000 × 6000，左右两间各占 y 0–6000；加一面横墙把右间下半截隔开后再去掉右间下半截的房间轮廓，模拟「隔出来却没有房间」。
+  const enclosedGap = (): Design => {
+    const d = design();
+    d.walls = [...d.walls, { id: 'cut', kind: 'partition', a: [2500, 4000], b: [6000, 4000], thickness: 200 }];
+    d.rooms = [d.rooms[0]!, { ...d.rooms[1]!, rings: [rect(2600, 0, 3400, 3900)] }];
+    return d;
+  };
+  it('补出新房间「房间」，已有房间不变', () => {
+    const before = enclosedGap(), next = addEnclosedRooms(before);
+    expect(next.rooms.slice(0, 2)).toEqual(before.rooms);
+    expect(next.rooms).toHaveLength(3);
+    const added = next.rooms[2]!;
+    expect(added.name).toBe('房间');
+    const xs = added.rings[0]!.map(p => p[0]), ys = added.rings[0]!.map(p => p[1]);
+    expect(Math.min(...xs)).toBeCloseTo(2600);
+    expect(Math.min(...ys)).toBeCloseTo(4100);
+    expect(Math.max(...ys)).toBeCloseTo(6000);
+  });
+  it('房间已铺满时不新增；房间轮廓与墙面之间的细缝不算房间', () => {
+    const d = design();
+    expect(addEnclosedRooms(d)).toBe(d);
+    const gap = { ...d, rooms: [d.rooms[0]!, { ...d.rooms[1]!, rings: [rect(2700, 0, 3300, 6000)] }] };
+    expect(addEnclosedRooms(gap)).toBe(gap);
+  });
+  it('空白户型不处理（由按墙重算负责）', () => {
+    const d = { ...enclosedGap(), template: 'blank' as const };
+    expect(addEnclosedRooms(d)).toBe(d);
   });
 });

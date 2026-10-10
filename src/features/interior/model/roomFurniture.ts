@@ -3,16 +3,12 @@ import type { Design, Furniture, Room } from './types';
 
 const inside = (f: Furniture, room: Room) => inRoom([f.cx, f.cy], room);
 
-/** 删除房间（地板）及中心点落在该房间内的家具；墙保持不动。 */
-export function removeRoom(d: Design, roomId: string): Design {
+/** 清空房间：删除中心点落在该房间内的家具；房间、墙体、门窗保持不动。 */
+export function clearRoomFurniture(d: Design, roomId: string): Design {
   const room = d.rooms.find(r => r.id === roomId);
   if (!room) throw new Error('房间不存在，请重新选择');
-  if (d.rooms.length <= 1) throw new Error('至少保留一个房间');
-  return {
-    ...d,
-    rooms: d.rooms.filter(r => r.id !== roomId),
-    furniture: d.furniture.filter(f => !inside(f, room)),
-  };
+  const furniture = d.furniture.filter(f => !inside(f, room));
+  return furniture.length === d.furniture.length ? d : { ...d, furniture };
 }
 
 /** 编辑前中心点在某个房间里、编辑后不在任何房间里的家具一并删除（被删房间里的家具）。 */

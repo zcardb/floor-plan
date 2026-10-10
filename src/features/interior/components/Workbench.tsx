@@ -12,7 +12,8 @@ import { northAngle } from '../model/northAngle';
 import { syncAccountFurniture, syncAccountMaterials } from '../model/furnitureSync';
 import { splitWall as splitWallModel } from '../model/wallSplit';
 import { removeWall as removeWallModel } from '../model/wallRemoval';
-import { removeRoom } from '../model/roomFurniture';
+import { clearRoomFurniture } from '../model/roomFurniture';
+import { addEnclosedRooms } from '../model/roomEnclosed';
 import { followWallFurniture } from '../model/furnitureFollow';
 import { splitAtJunctionsOf } from '../model/wallAutoSplit';
 import { mergeWall as mergeWallModel, wallMergeGroup } from '../model/wallMerge';
@@ -268,6 +269,16 @@ export function Workbench(p: Props) {
   const accountFurniture = p.loggedIn
     ? furnitureCatalog.items.filter((item) => !projectCatalog.some((i) => i.catalogId === item.catalogId))
     : [];
+  // 打开项目时补一次：已被墙围起来、却不属于任何房间的区域补成新房间（之后由改墙流程负责）。
+  const projectId = p.project.id;
+  useEffect(() => {
+    if (readOnly) return;
+    const current = designRef.current, next = addEnclosedRooms(current);
+    if (next !== current) {
+      sync(next);
+      notify.info(`墙体围出的 ${next.rooms.length - current.rooms.length} 块区域已自动划为房间`);
+    }
+  }, [projectId, readOnly, sync, designRef]);
   // 账号家具库里改过的家具同步到本项目（项目内单独改过的单价、尺寸等保留）。
   const accountFurnitureItems = furnitureCatalog.items;
   useEffect(() => {
@@ -461,14 +472,17 @@ export function Workbench(p: Props) {
     if (!selection) return;
     const s = selection;
     if (s.kind === "room") {
+      // 房间的删除 = 清空房间内家具；房间本身由墙体决定，不单独删除。
       const before = designRef.current;
       try {
-        const next = removeRoom(before, s.id);
+        const next = clearRoomFurniture(before, s.id);
+        if (next === before) return notify.info("这个房间里没有家具");
         commit(next, before);
-        notify.success(`已删除房间及其中 ${before.furniture.length - next.furniture.length} 件家具，可撤销恢复`);
+        notify.success(`已清空房间内 ${before.furniture.length - next.furniture.length} 件家具，可撤销恢复`);
       } catch (cause) {
-        return notify.fail(cause instanceof Error ? cause.message : "无法删除房间");
+        return notify.fail(cause instanceof Error ? cause.message : "无法清空房间");
       }
+      return;
     }
     else if (s.kind === "furniture") {
       const f = d.furniture.find((f) => f.id === s.id);

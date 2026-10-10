@@ -443,10 +443,10 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         )}
         {(f || o || r || deletableWall) && (
           <EditorTooltip
-            label="删除对象"
+            label={r ? "清空房间家具" : "删除对象"}
             shortcut="Delete"
           >
-            <button type="button" aria-label="删除对象" onClick={p.remove}>
+            <button type="button" aria-label={r ? "清空房间家具" : "删除对象"} onClick={p.remove}>
               <Trash2 size={15} />
             </button>
           </EditorTooltip>
