@@ -59,6 +59,14 @@ export interface StairSpec {
   steps: number;
   /** L / U / 三跑各跑梯段宽（mm），长度 = 跑数；缺省时每跑都用 flightWidth。 */
   flightWidths?: number[];
+  /** 各跑水平长度（mm），长度 = 跑数；缺省时在外框内均分（旧数据行为）。螺旋楼梯不使用。 */
+  flightLengths?: number[];
+  /** 踏面宽（mm），缺省 280（住宅套内常用值）。 */
+  treadDepth?: number;
+  /** 踏步高（mm），缺省 175（住宅套内常用值）；踏步数由层高 ÷ 踏步高推算。 */
+  riserHeight?: number;
+  /** true 表示踏步数由用户指定，不随层高自动变化。 */
+  stepsManual?: boolean;
   /** 行走方向反转：起步端与箭头对调。 */
   reverse?: boolean;
   /** 转向：right（默认，第一跑上行后向右转）/ left（左右镜像）；仅 L / U / 三跑生效。 */

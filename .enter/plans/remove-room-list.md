@@ -47,18 +47,18 @@
 
 ## Implementation checklist
 
-- [ ] 删除 `RoomList.tsx`
-- [ ] `Workbench.tsx`：移除 RoomList import、`rooms={...}` 传参、`focusRoom` 函数、`roomFocus` 状态
-- [ ] `Library.tsx`：移除 `rooms` 属性与渲染，清理不再使用的 `ReactNode` 导入
-- [ ] `index.css`：移除 `.room-list*` 全部规则
+- [x] 删除 `RoomList.tsx`
+- [x] `Workbench.tsx`：移除 RoomList import、`rooms={...}` 传参、`focusRoom` 函数、`roomFocus` 状态
+- [x] `Library.tsx`：移除 `rooms` 属性与渲染，清理不再使用的 `ReactNode` 导入
+- [x] `index.css`：移除 `.room-list*` 全部规则
 
 ## Verification checklist
 
-- [ ] `grep -rn "RoomList\|room-list\|roomFocus\|focusRoom" src` 无残留引用（except 已删除文件）
-- [ ] `pnpm run lint` 通过（无未使用变量 / 未使用导入报错）
-- [ ] `pnpm test` 通过（现有 interior 组件测试不回归）
-- [ ] `pnpm run build` 通过
-- [ ] 浏览器打开编辑器：左侧面板顶部不再出现「房间 · 点击飞到该房间」区块，家具库从「构件与家具」标题开始
-- [ ] 正向：2D 点击画布中的房间仍能选中；3D 选中房间仍执行飞行动画
-- [ ] 边界：切到 3D / 漫游模式、以及 2D 下点击空白处，均无报错（控制台无异常）
-- [ ] 响应式：移动端抽屉展开家具库时顶部同样不再出现该区块
+- [x] `grep -rn "RoomList\|room-list\|roomFocus\|focusRoom" src` 无残留引用（仅剩无关的 `focusRoomId` 缩略图参数）
+- [x] `pnpm run lint` 通过（0 error，10 条既有 warning）
+- [x] `pnpm test` 通过（93 文件 / 776 测试）
+- [x] `pnpm run build` 通过
+- [x] 桌面 1280 编辑器：左侧面板从「构件与家具」开始，「房间 · 点击飞到该房间」区块已消失
+- [x] 正向：2D 点击画布中的房间仍能选中；3D 选中房间仍执行飞行动画（`select()` 未改动）
+- [x] 边界：切视图 / 点击空白处无控制台异常
+- [ ] 移动端 390 抽屉展开家具库：结构上与桌面同一 `Library` 组件，未做交互级截图验证（抽屉需点击展开）
