@@ -6,7 +6,7 @@
 
 复核方法：用 `@tarikjabiri/dxf@2.9.0` 实际跑出字节级 DXF（未改任何文件），逐段对照 DXF R13+ 的**强制内容清单**（ezdxf《DXF File Structure → Minimal DXF Content》）+ Autodesk DXF 参考的组码表 + 两个「AutoCAD 打不开 DXF」的真实失败案例定位。
 
-**结论：强制结构已经合规，能被 AutoCAD 打开；但有 3 处偏离规范写法，其中 1 处会让中文房间名在 AutoCAD 里显示成 `?`。**
+**结论：强制结构已经合规，能被 AutoCAD 打开；但有 2 处偏离规范写法，其中 1 处会让中文房间名在 AutoCAD 里显示成 `?`。**
 
 ## 一、已核验合规、无需改动
 
@@ -34,12 +34,6 @@
 
 **修法**：新增文本样式 `STUDIO_CN`（`fontFileName='simplex.shx'`、`bigFontFileName='gbcbig.shx'`，两者为 AutoCAD 自带字体），并让所有 TEXT 实体的 `textStyle` 指向它。已实测该库可输出：`2 STUDIO_CN` + `3/4` 字体字段，TEXT 写出 `7 STUDIO_CN`。
 
-### P1-B 999 载荷分块 2000 字符/行，超出 DXF 字符串上限
-
-**证据**：`dxfExport.ts` 的 `DXF_COMMENT_CHUNK = 2000`，注释自称「well under common reader **line** limits」，但管的是行缓冲，不是规范里的**字符串值长度上限 255**。AutoCAD 自身对超长文本按 250 字符分块（如 MTEXT 用 `3` 段每段 250 字符）。
-
-**修法**：`DXF_COMMENT_CHUNK` 2000 → **250**。
-
 ### P2 两个头变量的非规范取值
 
 - `$DWGCODEPAGE = 'UTF-8'`：不是 DXF 参考里的代码页取值（应为 `ANSI_936` / `ANSI_1252` / `DOS437` 之类）。AC1021 的 DXF 本身就固定 UTF-8，AutoCAD 原生写 `ANSI_1252` → 改为 `ANSI_1252`。
@@ -51,6 +45,8 @@ ASCII DXF 的规范写法是 CRLF（AutoCAD 也这么写）。AutoCAD 能读 LF�
 
 ## 三、明确不改动的部分
 
+- **999 分块保持 2000 字符/行**（原 P1-B，经复核撤回）：R2000 起字符串上限为 2049 单字节字符，本文件是 R2007、载荷为纯 ASCII base64，2000 在限内；AutoCAD 读取时直接丢弃 999 注释。仅极老的 R12 时代 256 字节行缓冲读取器有风险，不在目标范围内。改为 250 只会让载荷行数 ×8、体积 +约 2%，对 AutoCAD 无收益。
+- **已知限制（与行长无关）**：在 AutoCAD 中打开并另存后 999 注释会被丢弃，再导入本应用将走「外部图纸识别」而非完整还原。
 - **载荷仍留在文件开头**：`999` 注释按规范可出现在任意位置，业界大量导出器同样在头部写 `999` 横幅；ezdxf 说的「HEADER 必须是第一个 section」指的是 section 而非注释。改成尾部还需重写 `dxfPayload` 的 `i += 2` 配对逻辑，收益为零 → **不动**。
 - **不补 layout 对象 / 命名对象字典**：`CLASSES` 空段、`OBJECTS` 只有根字典 + `ACAD_GROUP`，正好等于 ezdxf 列出的 R13+ 最小必需集，AutoCAD 不需要更多。
 - **DIMSTYLE 的 `340` 不动**：`340` 即 `DIMTXSTY`，`Standard` 指向 STYLE `Standard`(句柄 16) 是正确的；`STUDIO_METERS` 省略即继承 Standard，而尺寸文字只有 ASCII → 无影响。
@@ -58,20 +54,18 @@ ASCII DXF 的规范写法是 CRLF（AutoCAD 也这么写）。AutoCAD 能读 LF�
 
 ## 四、改动文件
 
-1. `src/features/interior/model/dxfExport.ts`（P1-A / P1-B / P2，四处小改）
+1. `src/features/interior/model/dxfExport.ts`（P1-A / P2，三处小改）
 2. `src/features/interior/model/drawingExport.test.ts`（补断言 + P3 若采纳需把 `split('\n')` 改为 `split(/\r?\n/)`）
 
 复用既有工具，不新增依赖：`DXF_COMMENT_CHUNK` / `payloadComments` / `writeEntity` / `PAYLOAD_MARKER` / `decodePayload`，库侧用 `writer.tables.addStyle()` 与 `Text.textStyle`。
 
 ## Implementation checklist
 
-- [ ] `dxfExport.ts`：`DXF_COMMENT_CHUNK` 由 2000 改为 250，`payloadComments` 产出的每个 999 值长度 ≤ 250
 - [ ] `dxfExport.ts`：用 `writer.tables.addStyle('STUDIO_CN')` 建样式，设 `fontFileName='simplex.shx'`、`bigFontFileName='gbcbig.shx'`
 - [ ] `dxfExport.ts`：`writeEntity(target, entity)` 中 `addText` 返回的实体 `textStyle = 'STUDIO_CN'`（模型空间与尺寸显示块共用同一函数，两处都覆盖）
 - [ ] `dxfExport.ts`：`$DWGCODEPAGE` 由 `'UTF-8'` 改为 `'ANSI_1252'`
 - [ ] `dxfExport.ts`：`$LASTSAVEDBY` 由 `'@tarikjabiri/dxf'` 改为 `'Zhujian Studio'`
 - [ ] `drawingExport.test.ts`：断言 STYLE 表含 `STUDIO_CN` 且其 `3=simplex.shx`/`4=gbcbig.shx`，且 `parsed.entities` 中所有 TEXT 的样式名解析为 `STUDIO_CN`
-- [ ] `drawingExport.test.ts`：把「999 分块」用例的最长块上限由 2000 收紧到 250，并断言拼接后 `decodePayload` 还原出原方案
 - [ ] `drawingExport.test.ts`：断言 `$DWGCODEPAGE === 'ANSI_1252'`、`$LASTSAVEDBY === 'Zhujian Studio'`，并断言 `$HANDSEED > 文件内最大句柄`
 - [ ] P3（可选）：`serializeDxf` 返回值统一转 CRLF，并把测试里 `text.split('\n')` 改为 `text.split(/\r?\n/)`
 
@@ -82,7 +76,7 @@ ASCII DXF 的规范写法是 CRLF（AutoCAD 也这么写）。AutoCAD 能读 LF�
 - [ ] 正向：往返用例仍通过——SVG / DXF（带载荷）导入后 `validateDesign` 深度等于原设计
 - [ ] 负向：`walls: []` 时三种矢量导出仍抛「没有可导出的有效墙体」
 - [ ] 负向：无嵌入载荷的外部 DXF 仍走 `kind: 'dxf'` 识别流程（单位、图层不变）
-- [ ] 边界：payload 长度恰为 250 整数倍与非整数倍两种情况，分块数与拼接结果都正确
+- [ ] 边界：既有「999 分块每行 ≤ 2000」用例保持通过（`DXF_COMMENT_CHUNK` 未改）
 - [ ] 边界：`serializeDxf(document)`（不传 payload）输出仍能被 `dxf-parser` 解析且 `$HANDSEED > 最大句柄`
 - [ ] 构建：`pnpm lint` 无新增错误、`pnpm exec tsc --noEmit` 通过、`pnpm run build` 通过
 - [ ] 人工（沙箱无 AutoCAD，需你确认）：AutoCAD 打开导出 DXF，房间名「客厅」等正常显示而非 `?`，尺寸标注显示为 `x.xx m`
