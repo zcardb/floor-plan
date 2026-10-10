@@ -3,6 +3,7 @@ import { purgeDemolished } from './wallRemoval';
 import { stripStrayHoleRooms } from './roomHoles';
 import { validFurnitureType, validFurnitureOutline } from './furnitureAppearance';
 import { validModel3d } from './furniture3d';
+import { validStairSpec } from './stairs';
 import { referenceDesign } from "../data/templates";
 import { length } from "./geometry";
 import { validateProcurement } from "./materialProcurement";
@@ -135,6 +136,7 @@ export function validateDesign(value: unknown): Design {
         typeof item.category !== "string" ||
         !validFurnitureType(item.type) ||
         !validFurnitureOutline(item.shape) ||
+        (item.stair !== undefined && (item.type !== 'stairs' || !validStairSpec(item.stair))) ||
         !finite(item.w, 50, 20000) ||
         !finite(item.d, 50, 20000) ||
         !finite(item.height, 50, 8000) ||
@@ -219,6 +221,7 @@ export function validateDesign(value: unknown): Design {
   for (const f of v.furniture)
     if (
       (f.height !== undefined && !finite(f.height, 50, 8000)) ||
+      (f.stair !== undefined && (f.type !== 'stairs' || !validStairSpec(f.stair))) ||
       (f.imageUrl !== undefined && !/^https:\/\//.test(f.imageUrl)) ||
       (f.model3d !== undefined && !validModel3d(f.model3d))
     )

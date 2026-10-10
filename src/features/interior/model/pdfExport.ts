@@ -23,6 +23,16 @@ function arcPoints(e: Extract<DrawingEntity, { kind: 'arc' }>): Point[] {
   });
 }
 
+/** Full circle / ellipse as a closed polyline in model space, sampled at roughly 20 mm chord length. */
+function ellipsePoints(e: Extract<DrawingEntity, { kind: 'circle' | 'ellipse' }>): Point[] {
+  const major: Point = e.kind === 'circle' ? [e.radius, 0] : e.major, ratio = e.kind === 'circle' ? 1 : e.ratio;
+  const minor: Point = [-major[1] * ratio, major[0] * ratio], count = Math.max(16, Math.ceil(2 * Math.PI * Math.hypot(...major) / 20));
+  return Array.from({ length: count }, (_, i) => {
+    const a = 2 * Math.PI * i / count, c = Math.cos(a), s = Math.sin(a);
+    return [e.center[0] + major[0] * c + minor[0] * s, e.center[1] + major[1] * c + minor[1] * s];
+  });
+}
+
 /** Vector PDF at the shared drawing scale; each drawing layer is a toggleable optional-content group. */
 export async function serializePdf(document: DrawingDocument, options: { fontBytes: ArrayBuffer | Uint8Array; title?: string }): Promise<Uint8Array> {
   const sheet = drawingSheet(document), k = MM_TO_PT / sheet.scale;
@@ -51,7 +61,8 @@ export async function serializePdf(document: DrawingDocument, options: { fontByt
     );
     for (const e of items) {
       if (e.kind === 'text') { drawText(page, font, e, at, k, style.stroke); continue; }
-      const points = (e.kind === 'arc' ? arcPoints(e) : e.points).map(at), closed = e.kind === 'polyline' && e.closed;
+      const points = (e.kind === 'arc' ? arcPoints(e) : e.kind === 'polyline' ? e.points : ellipsePoints(e)).map(at);
+      const closed = e.kind === 'polyline' ? e.closed : e.kind !== 'arc';
       page.pushOperators(moveTo(...points[0]), ...points.slice(1).map(p => lineTo(...p)),
         ...(closed ? [closePath()] : []), closed && style.fill ? fillAndStroke() : stroke());
     }

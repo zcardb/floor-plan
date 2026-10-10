@@ -150,6 +150,7 @@ function ToolButton({
   children,
   onClick,
   disabled = false,
+  iconOnly = false,
 }: {
   label: string;
   shortcut?: string;
@@ -157,6 +158,8 @@ function ToolButton({
   children: React.ReactNode;
   onClick: () => void;
   disabled?: boolean;
+  /** 只显示图标（名称放进提示里）。 */
+  iconOnly?: boolean;
 }) {
   const button = (
     <span className="tool-button-wrap">
@@ -168,12 +171,12 @@ function ToolButton({
         aria-pressed={active}
       >
         {children}
-        <span>{label}</span>
+        {!iconOnly && <span>{label}</span>}
       </button>
     </span>
   );
-  // 有文字的按钮只在有快捷键时才需要提示
-  return shortcut ? <EditorTooltip label={label} shortcut={shortcut}>{button}</EditorTooltip> : button;
+  // 有文字的按钮只在有快捷键时才需要提示；纯图标按钮总是提示名称
+  return shortcut || iconOnly ? <EditorTooltip label={label} shortcut={shortcut}>{button}</EditorTooltip> : button;
 }
 export function Workbench(p: Props) {
   const confirm = useConfirm();
@@ -182,13 +185,13 @@ export function Workbench(p: Props) {
     { design: d, change, commit, sync, preview, undo, redo, counts, sizeTransaction, current: designRef } = model;
   const structureTools = canEditStructure(d, readOnly);
   const [selection, setSelection] = useState<Selection>(null),
-    [tool, setTool] = useState<Tool>("select"),
-    /** 框选开关：开启时 2D 画布左键拖动空白处为框选家具，关闭时为平移。 */
-    [marquee, setMarquee] = useState(false);
+    [tool, setTool] = useState<Tool>("select");
   // 3D 的打开 / 首帧 / 失败 / 自动恢复全部由这一个状态机决定
   const lifecycle = useSceneLifecycle(),
     view = lifecycle.view,
     sceneLoading = lifecycle.loading;
+  /** 框选开关：开启时 2D 画布左键拖动空白处为框选家具，关闭时为平移。 */
+  const [marquee, setMarquee] = useState(false);
   const [Scene, setScene] = useState<SceneComponent | null>(null),
     [roomFocus, setRoomFocus] = useState<string | null>(null),
     [hideLib, setHideLib] = useState(false),
@@ -580,7 +583,7 @@ export function Workbench(p: Props) {
       else if (k === "f") {
         if (view === "2d") canvas.current?.fit();
         else scene.current?.iso();
-      } else if (k === "v") setTool("select");
+      } else if (k === "v") { setTool("select"); setMarquee(false); }
       else if (k === "m" && view === "2d") { setTool("select"); setMarquee(v => !v); }
       else if (k.startsWith("arrow") && (selection?.kind === "furniture" || selection?.kind === "group")) {
         e.preventDefault();
@@ -816,8 +819,8 @@ export function Workbench(p: Props) {
             <ToolButton
               label="选择"
               shortcut="V"
-              active={tool === "select"}
-              onClick={() => setTool("select")}
+              active={tool === "select" && !marquee}
+              onClick={() => { setTool("select"); setMarquee(false); }}
             >
               <MousePointer2 size={16} />
             </ToolButton>
@@ -899,7 +902,7 @@ export function Workbench(p: Props) {
         )}
         <span className="toolbar-divider danger-divider" />
         <div className="tool-group danger-actions">
-          <ToolButton label="重置方案" onClick={resetDesign}>
+          <ToolButton label="重置" onClick={resetDesign}>
             <RotateCcw size={16} />
           </ToolButton>
           <DropdownMenu>
@@ -922,10 +925,12 @@ export function Workbench(p: Props) {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+        </div>
         <span className="toolbar-divider" />
-        <div className="tool-group">
+        <div className="tool-group undo-actions">
           <ToolButton
             label="撤销"
+            iconOnly
             shortcut="Ctrl Z"
             onClick={undo}
             disabled={!counts.undo}
@@ -934,13 +939,13 @@ export function Workbench(p: Props) {
           </ToolButton>
           <ToolButton
             label="重做"
+            iconOnly
             shortcut="Ctrl ⇧ Z"
             onClick={redo}
             disabled={!counts.redo}
           >
             <Redo2 size={16} />
           </ToolButton>
-        </div>
         </div>
         <div className="toolbar-right">
           <DropdownMenu>

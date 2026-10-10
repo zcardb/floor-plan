@@ -141,30 +141,30 @@ export type Selection = { kind: "furniture" | "room" | "wall" | "opening"; id: s
 
 ## Implementation checklist
 
-- [ ] `types.ts` 的 `Selection` 增加 `{ kind: 'group'; ids: string[] }`，仓库内所有 `s.id` 访问点按 TS 报错补齐分支
-- [ ] `rectSelect.ts`：`furnitureInRect` 按「四角全部在框内」返回 id，`normalizeRect` 支持任意方向的拖拽
-- [ ] `furnitureGroup.ts`：`groupIds` 过滤失效 id、`groupBounds` 返回整组外接框、`moveGroup` 用同一步进取整位移平移
-- [ ] `Workbench` 新增 `marquee` 状态与 2D 工具栏「框选」开关（`SquareDashedMousePointer` 图标、快捷键 M），切换绘墙 / 门 / 窗 / 3D 时自动关闭，只读不显示
-- [ ] `PlanCanvas` 新 prop `marquee`：开启时空白处左键拖动进入 `marquee` 并实时渲染选框；关闭时空白处拖动仍是 `pan`
-- [ ] `PlanCanvas` 圈选松开：0 件清空选择、1 件单选、≥2 件 `{kind:'group'}`；`pointercancel` 清掉选框
-- [ ] 开关开启时画布光标为十字、状态栏提示框选操作
-- [ ] `PlanCanvas` 拖动组内任一家具走 `groupmove`，整组按同一位移 `preview`，松手 `commit` 可撤销
-- [ ] 覆盖层渲染 `marquee` 选框与 `group` 的逐件虚线框 + 整组外框；`selectionPoints` 支持 `group`
-- [ ] `Workbench.remove()` 支持 `group` 批量删除；方向键在有 `group` 时整组移动；切 3D 时清空 `group`
-- [ ] `SelectionEditor` 在 `group` 下只显示「已选中 N 件家具」+ 删除 + 取消选择
-- [ ] `roomRemoval.roomOwnWalls` 只把「单独围出该房间」的墙判为独立墙，两侧都有房间的墙判为共用墙
-- [ ] `roomRemoval.removeRoom` 逐面复用 `removeWall` 的愈合 / 并房 / 清理流水线，并清除房内家具
-- [ ] `removeRoom` 在房间仍被围合（共用墙 / 承重墙）时抛错，不产生半拆状态（提交前完成全部校验）
-- [ ] `SelectionEditor` 房间工具条改为下拉：「清空房间家具（Delete）」+ 二次确认的「删除房间」，`Workbench` 透传 `removeRoom`
-- [ ] `Workbench` 工具栏把「撤销 / 重做」组移到「重置方案 / 清空」组右侧，窄屏下不出现重复分隔线
+- [x] `types.ts` 的 `Selection` 增加 `{ kind: 'group'; ids: string[] }`，仓库内所有 `s.id` 访问点按 TS 报错补齐分支
+- [x] `furnitureGroup.ts`（框选函数并入此文件）：`furnitureInRect` 按「四角全部在框内」返回 id，`normalizeRect` 支持任意方向的拖拽
+- [x] `furnitureGroup.ts`：`groupIds` 过滤失效 id、`groupBounds` 返回整组外接框、`moveGroup` 用同一步进取整位移平移
+- [x] `Workbench` 新增 `marquee` 状态与 2D 工具栏「框选」开关（`SquareDashedMousePointer` 图标、快捷键 M），切换绘墙 / 门 / 窗 / 3D 时自动关闭，只读不显示
+- [x] `PlanCanvas` 新 prop `marquee`：开启时空白处左键拖动进入 `marquee` 并实时渲染选框；关闭时空白处拖动仍是 `pan`
+- [x] `PlanCanvas` 圈选松开：0 件清空选择、1 件单选、≥2 件 `{kind:'group'}`；`pointercancel` 清掉选框
+- [x] 开关开启时画布光标为十字、状态栏提示框选操作
+- [x] `PlanCanvas` 拖动组内任一家具走 `groupmove`，整组按同一位移 `preview`，松手 `commit` 可撤销
+- [x] 覆盖层渲染 `marquee` 选框与 `group` 的逐件虚线框 + 整组外框；`selectionPoints` 支持 `group`
+- [x] `Workbench.remove()` 支持 `group` 批量删除；方向键在有 `group` 时整组移动；切 3D 时清空 `group`
+- [x] `SelectionEditor` 在 `group` 下只显示「已选中 N 件家具」+ 删除 + 取消选择
+- [x] `roomRemoval.roomOwnWalls` 只把「单独围出该房间」的墙判为独立墙，两侧都有房间的墙判为共用墙
+- [x] `roomRemoval.removeRoom` 逐面复用 `removeWall` 的愈合 / 并房 / 清理流水线，并清除房内家具
+- [x] `removeRoom` 在房间仍被围合（共用墙 / 承重墙）时抛错，不产生半拆状态（提交前完成全部校验）
+- [x] `SelectionEditor` 房间工具条改为下拉：「清空房间家具（Delete）」+ 二次确认的「删除房间」，`Workbench` 透传 `removeRoom`
+- [x] `Workbench` 工具栏把「撤销 / 重做」组移到「重置方案 / 清空」组右侧，窄屏下不出现重复分隔线
 
 ## Verification checklist
 
-- [ ] `pnpm test`（vitest）：新增 `rectSelect.test.ts`（全含选中 / 一角在外不选 / 空框）、
+- [x] `pnpm test`（vitest）：新增 `rectSelect.test.ts`（全含选中 / 一角在外不选 / 空框）、
       `furnitureGroup.test.ts`（整组相对位置不变、失效 id 过滤、单件降级）、`roomRemoval.test.ts`
       （只删独立墙、共用墙保留、外墙一并删除、固定户型删后房间数 -1、承重墙围合时抛错）
-- [ ] `pnpm lint`、`pnpm run build` 通过（`pnpm exec tsc --noEmit` 确认 `Selection` 新变体无遗漏分支）
-- [ ] 手工验证 2D（`pnpm dev`，桌面 1280 宽）：
+- [x] `pnpm lint`、`pnpm run build` 通过（`pnpm exec tsc --noEmit` 确认 `Selection` 新变体无遗漏分支）
+- [x] 手工验证 2D（`pnpm dev`，桌面 1280 宽）：
   - 开关关闭：左键拖空白处平移画布，与改动前一致；
   - 开关开启（或按 M）：拖出矩形 → 框内（四角全在框内）家具整组选中，可见选框；点空白未拖动仍是选房间 / 取消选择；
     滚轮缩放可用；切到绘墙后开关自动关闭；
@@ -174,4 +174,4 @@ export type Selection = { kind: "furniture" | "room" | "wall" | "opening"; id: s
     顶栏提示数量正确、Ctrl+Z 可撤销；对「四周都是共用墙」的房间给出明确失败提示而不是拆一半；
   - 选中房间时下拉可见两项，Delete 仍只清空家具、不改动墙体；
   - 顶部工具栏顺序为 选择 / 框选 / 绘墙 / 门 / 窗 | 重置方案 / 清空 | 撤销 / 重做，撤销重做的禁用状态与 Ctrl+Z 正常。
-- [ ] 移动端宽度（≤1100）下「框选」按钮可见可点，开关开启时单指拖动为圈选、关闭时为平移，双指缩放始终可用
+- [x] 移动端宽度（≤1100）下「框选」按钮可见可点，开关开启时单指拖动为圈选、关闭时为平移，双指缩放始终可用

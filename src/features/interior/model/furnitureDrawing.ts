@@ -29,6 +29,11 @@ function transform(text: string): Matrix {
   }
   return matrix;
 }
+/** Uniform scale of a rotation + uniform-scale + translation matrix; null when it skews or scales unevenly. */
+function similarityScale(m: Matrix): number | null {
+  const sx = Math.hypot(m[0], m[1]), sy = Math.hypot(m[2], m[3]);
+  return Math.abs(sx - sy) < 1e-6 * Math.max(1, sx) && Math.abs(m[0] * m[2] + m[1] * m[3]) < 1e-6 * Math.max(1, sx * sy) && m[0] * m[3] - m[1] * m[2] > 0 ? sx : null;
+}
 // Adaptive sampling guarantees <=1mm chord error for current SVG furniture curves.
 function samplePath(path: string): Point[][] {
   const subpaths = path.match(/[Mm][^Mm]*/g) || [];
@@ -64,9 +69,20 @@ export function furnitureDrawing(f: Furniture): DrawingEntity[] {
         if(rx>0&&ry>0){const p=`M${x+rx} ${y}H${x+w-rx}A${rx} ${ry} 0 0 1 ${x+w} ${y+ry}V${y+h-ry}A${rx} ${ry} 0 0 1 ${x+w-rx} ${y+h}H${x+rx}A${rx} ${ry} 0 0 1 ${x} ${y+h-ry}V${y+ry}A${rx} ${ry} 0 0 1 ${x+rx} ${y}Z`;samplePath(p).forEach(points=>push(points,true));}
         else push([[x,y],[x+w,y],[x+w,y+h],[x,y+h]],true);
       }else if(tag==='ellipse'||tag==='circle'){
-        const rx=n(tag==='circle'?'r':'rx'),ry=n(tag==='circle'?'r':'ry'),r=Math.max(rx,ry);
-        const count=Math.max(16,Math.ceil(Math.PI/Math.acos(Math.max(-1,1-1/Math.max(r,1)))));
-        push(Array.from({length:count},(_,i)=>[n('cx')+rx*Math.cos(i*2*Math.PI/count),n('cy')+ry*Math.sin(i*2*Math.PI/count)]),true);
+        const rx=n(tag==='circle'?'r':'rx'),ry=n(tag==='circle'?'r':'ry'),scale=similarityScale(matrix);
+        if(scale!==null&&rx>0&&ry>0){
+          const center=apply([n('cx'),n('cy')]);
+          if(Math.abs(rx-ry)<1e-9)entities.push({kind:'circle',layer:'FURNITURE',center,radius:rx*scale});
+          else{const major:Point=rx>=ry?[rx,0]:[0,ry];entities.push({kind:'ellipse',layer:'FURNITURE',center,ratio:Math.min(rx,ry)/Math.max(rx,ry),
+            major:[matrix[0]*major[0]+matrix[2]*major[1],matrix[1]*major[0]+matrix[3]*major[1]]});}
+        }else{
+          const r=Math.max(rx,ry),count=Math.max(16,Math.ceil(Math.PI/Math.acos(Math.max(-1,1-1/Math.max(r,1)))));
+          push(Array.from({length:count},(_,i)=>[n('cx')+rx*Math.cos(i*2*Math.PI/count),n('cy')+ry*Math.sin(i*2*Math.PI/count)]),true);
+        }
+      }else if(tag==='text'){
+        const text=((node[tag] as XmlNode[])||[]).map(child=>String(child['#text']??'')).join('').trim(),scale=similarityScale(matrix)??1;
+        if(text)entities.push({kind:'text',layer:'FURNITURE',point:apply([n('x'),n('y')]),height:n('font-size',100)*scale,text,
+          rotation:Math.atan2(matrix[1],matrix[0])*180/Math.PI});
       }else if(tag==='path')samplePath(attrs.d||'').forEach((points,i)=>push(points,/[zZ]\s*$/.test((attrs.d.match(/[Mm][^Mm]*/g)||[])[i]||'')));
       else throw new Error(`暂不支持导出家具图元：${tag}`);
     }

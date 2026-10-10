@@ -15,6 +15,11 @@ function element(e: DrawingEntity): string {
     const [x, y] = e.point, style = LAYER_STYLES[e.layer];
     return `<text x="${number(x)}" y="${number(y + e.height * TEXT_BASELINE_SHIFT)}" font-size="${e.height}" fill="${style.stroke}" stroke="none" text-anchor="middle"${e.rotation ? ` transform="rotate(${number(e.rotation)} ${number(x)} ${number(y)})"` : ''}>${escape(e.text)}</text>`;
   }
+  if (e.kind === 'circle') return `<circle cx="${number(e.center[0])}" cy="${number(e.center[1])}" r="${number(e.radius)}"/>`;
+  if (e.kind === 'ellipse') {
+    const [cx, cy] = e.center, rx = Math.hypot(...e.major), angle = Math.atan2(e.major[1], e.major[0]) * 180 / Math.PI;
+    return `<ellipse cx="${number(cx)}" cy="${number(cy)}" rx="${number(rx)}" ry="${number(rx * e.ratio)}"${angle ? ` transform="rotate(${number(angle)} ${number(cx)} ${number(cy)})"` : ''}/>`;
+  }
   const a = [e.center[0] + e.radius * Math.cos(e.start), e.center[1] + e.radius * Math.sin(e.start)];
   const b = [e.center[0] + e.radius * Math.cos(e.end), e.center[1] + e.radius * Math.sin(e.end)];
   const angle = ((e.clockwise ? e.end - e.start : e.start - e.end) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);

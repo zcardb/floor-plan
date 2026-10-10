@@ -1,8 +1,10 @@
 import type { Furniture } from "../model/types";
+import { stairSpec } from "../model/stairs";
+import { StairPlan } from "./StairPlan";
 export function FurnitureShape({
   f,
 }: {
-  f: Pick<Furniture, "type" | "w" | "d" | "color" | "shape">;
+  f: Pick<Furniture, "type" | "w" | "d" | "color" | "shape" | "stair">;
 }) {
   const { type: t, w, d, color: c } = f,
     x = -w / 2,
@@ -29,10 +31,7 @@ export function FurnitureShape({
   );
   let shape;
   if (t === 'stairs') {
-    shape = <g aria-label="楼梯平面示意">{r(x,y,w,d,c,0)}
-      {Array.from({length:11},(_,i)=><line key={i} x1={x} x2={w/2} y1={y+d*(i+1)/12} y2={y+d*(i+1)/12}/>)}
-      <path d={`M0 ${d*.35}V${-d*.35}M${-w*.12} ${-d*.23}L0 ${-d*.35}L${w*.12} ${-d*.23}`} fill="none"/>
-    </g>;
+    shape = <StairPlan spec={stairSpec(f)} w={w} d={d} color={c} />;
   } else if (t === 'fireplace') {
     shape = <>{f.shape === 'circle' ? e(0,0,w/2,d/2,c) : r(x,y,w,d,c,35)}{e(0,-d*.15,w*.17,d*.17,'var(--plan-metal)')}{r(-w*.24,d*.12,w*.48,d*.15,'var(--plan-screen)',15)}</>;
   } else if (f.shape === 'circle') shape = e(0,0,w/2,d/2,c);

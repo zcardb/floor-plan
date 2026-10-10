@@ -1,4 +1,5 @@
 import type { LibraryItem, Material } from "../model/types";
+import { stairLibrary } from "../model/stairs";
 export const materials: Record<string, Material> = {
   wood: { name: "橡木地板", price: 320, color: "#d8b88a" },
   walnut: { name: "胡桃木地板", price: 380, color: "#9b7250" },
@@ -41,7 +42,6 @@ const groups: [string, [string, string, number, number, string][]][] = [
       ["rug", "地毯", 2400, 1700, "#d9cbb8"],
       ["shoecab", "鞋柜", 1000, 350, "#efe6d8"],
       ["shoecab", "玄关柜", 1400, 380, "#e6dccc"],
-      ["stairs", "楼梯", 1000, 3000, "#e6dccc"],
       ["floorlamp", "落地灯", 450, 450, "#3d3a34"],
       ["plant", "绿植", 500, 500, "#a9c39b"],
       ["plant", "大绿植", 700, 700, "#9dbb8c"],
@@ -113,5 +113,5 @@ export const library: LibraryItem[] = groups.flatMap(([category, items]) =>
     d,
     color,
   })),
-);
+).concat(stairLibrary);
 export const categories = groups.map(([category]) => category);

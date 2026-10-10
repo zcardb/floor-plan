@@ -20,6 +20,7 @@ import {
   DoorOpen,
   Sparkles,
   Loader2,
+  Footprints,
 } from "lucide-react";
 import {
   Popover,
@@ -55,6 +56,7 @@ import { formatMeters } from '../model/lengthUnits';
 import { Button } from '@/components/ui/button';
 import { EditorTooltip } from '@/components/ui/editor-tooltip';
 import { DoorOrientationControls } from './DoorOrientationControls';
+import { StairEditor } from './StairEditor';
 import { changeDoorOrientation } from '../model/doorOrientation';
 import { useEditorDrag } from './useEditorDrag';
 import type { AiEntryTone } from '../ai/useRoomAi';
@@ -392,6 +394,15 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </PopoverContent>
           </Popover>
         )}
+        {f?.type === 'stairs' && <Popover open={open === 'stair'} onOpenChange={value => setPanel(value, 'stair')}>
+          <EditorTooltip label="楼梯类别、梯段宽与踏步数">
+            <PopoverTrigger asChild><button type="button" aria-label="编辑楼梯参数"><Footprints size={15} />楼梯<ChevronDown size={12} /></button></PopoverTrigger>
+          </EditorTooltip>
+          <PopoverContent className="visual-editor-popover stair-popover" side="bottom" align="start" collisionPadding={12}>
+            <h3>楼梯</h3>
+            <StairEditor design={p.design} furniture={f} change={p.change} />
+          </PopoverContent>
+        </Popover>}
         {o?.kind === 'door' && <Popover open={open === 'direction'} onOpenChange={value => setPanel(value, 'direction')}>
           <EditorTooltip label="门开向">
             <PopoverTrigger asChild><button type="button" aria-label="调整门开向"><DoorOpen size={15} />开向<ChevronDown size={12} /></button></PopoverTrigger>
