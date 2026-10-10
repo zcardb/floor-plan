@@ -64,28 +64,28 @@ export interface StairSpec {
 - 更新 `docs/features/stairs.md`（新参数、外框推导、自动踏步数）与 `docs/features/drawing-export.md`（图块签名必须包含所有影响几何的参数，含新参数）。
 
 ## Implementation checklist
-- [ ] `types.ts`：`StairSpec` 增加 `flightLengths`、`treadDepth`、`riserHeight`、`stepsManual`
-- [ ] `stairs.ts`：新增 `STAIR_DEFAULTS`、`stairRiser`、`stairTread`、`stairSteps`、`stairFlightLengths`、`stairSizeOf`（5 种形式的推导）
-- [ ] `stairs.ts`：`stairLayout` 在有 `flightLengths` 时以梯段长为准，平台随之变化；缺省时行为与现在完全一致
-- [ ] `stairs.ts`：`validStairSpec` 校验 4 个新字段；`applyStairForm` 接收层高并重算踏步数（`stepsManual` 除外）
-- [ ] `Workbench.tsx`：放置楼梯时按 `d.height` 自动写踏步数并用 `stairSizeOf` 定外框
-- [ ] `StairEditor.tsx`：每跑“宽 + 长”、踏步数（自动/手动 + 恢复自动）、踏面宽、踏步高，推导结果里显示外框
-- [ ] `SelectionEditor.tsx` + `index.css`：`side="right"`、`max-height: min(72vh, 520px)`、面板内滚动、两列栅格
-- [ ] `docs/features/stairs.md` 与 `drawing-export.md` 同步新规则
+- [x] `types.ts`：`StairSpec` 增加 `flightLengths`、`treadDepth`、`riserHeight`、`stepsManual`
+- [x] `stairs.ts`：新增 `STAIR_DEFAULTS`、`stairRiser`、`stairTread`、`stairSteps`、`stairFlightLengths`、`stairSizeOf`（5 种形式的推导）
+- [x] `stairs.ts`：`stairLayout` 在有 `flightLengths` 时以梯段长为准，平台随之变化；缺省时行为与现在完全一致
+- [x] `stairs.ts`：`validStairSpec` 校验 4 个新字段；`applyStairForm` 接收层高并重算踏步数（`stepsManual` 除外）
+- [x] `Workbench.tsx`：放置楼梯时按 `d.height` 自动写踏步数并用 `stairSizeOf` 定外框
+- [x] `StairEditor.tsx`：每跑“宽 + 长”、踏步数（自动/手动 + 恢复自动）、踏面宽、踏步高，推导结果里显示外框
+- [x] `SelectionEditor.tsx` + `index.css`：`side="right"`、`max-height: min(72vh, 520px)`、面板内滚动、两列栅格
+- [x] `docs/features/stairs.md` 与 `drawing-export.md` 同步新规则
 
 ## Verification checklist
-- [ ] 正向：直跑设梯段长 4.00 m → 外框长为 4000、11 条以上踏步线按 `steps` 均分；设梯段长 2.80 m → 外框随之变短
-- [ ] 正向：L 型设第 1 跑长 2.40 / 第 2 跑长 1.60 → 外框 `W = w1 + 1600`、`D = w2 + 2400`，平台为 w1 × w2
-- [ ] 正向：U 型设两跑长不等时，行走线仍贯通两个梯段，梯井与平台分界线存在
-- [ ] 正向：螺旋设踏面宽 300、踏步数 13 → 外圆 = `13 × 300 ÷ (300° 弧度) ÷ 2 + w1/2` 对应值，`W = D = 2 × 外圆`
-- [ ] 正向：层高 2800、踏步高 175 → 自动踏步数 16；层高改 3200 → 变 18（未手动时）
-- [ ] 正向：手动改踏步数后标记为“手动”，再改层高不变；点“恢复自动”后跟随层高
-- [ ] 正向：踏面宽 / 踏步高的默认值分别为 280 / 175，界面显示与实际值一致
-- [ ] 正向：编辑面板在 L 型时出现“第 1 跑长 / 第 2 跑长”，直跑时只有 1 组，三跑时 3 组
+- [x] 正向：直跑设梯段长 4.00 m → 外框长为 4000、11 条以上踏步线按 `steps` 均分；设梯段长 2.80 m → 外框随之变短
+- [x] 正向：L 型设第 1 跑长 2.40 / 第 2 跑长 1.60 → 外框 `W = w1 + 1600`、`D = w2 + 2400`，平台为 w1 × w2
+- [x] 正向：U 型设两跑长不等时，行走线仍贯通两个梯段，梯井与平台分界线存在
+- [x] 正向：螺旋设踏面宽 300、踏步数 13 → 外圆 = `13 × 300 ÷ (300° 弧度) ÷ 2 + w1/2` 对应值，`W = D = 2 × 外圆`
+- [x] 正向：层高 2800、踏步高 175 → 自动踏步数 16；层高改 3200 → 变 18（未手动时）
+- [x] 正向：手动改踏步数后标记为“手动”，再改层高不变；点“恢复自动”后跟随层高
+- [x] 正向：踏面宽 / 踏步高的默认值分别为 280 / 175，界面显示与实际值一致
+- [x] 正向：编辑面板在 L 型时出现“第 1 跑长 / 第 2 跑长”，直跑时只有 1 组，三跑时 3 组
 - [ ] 界面：`desktop_1280` 截图确认面板为单列窄面板、高度不超过约 72vh、溢出时内部滚动、不盖住选中楼梯（若无缝可截图，改为人工确认）
-- [ ] DXF：改变梯段长或踏面宽后，楼梯图块几何或块名随之变化（不复用旧块）；楼梯块内仍无 TEXT；`STAIRS` 图层 ACI / 线宽 / 线型不变
-- [ ] DXF：旋转 180° 的楼梯“上”字仍可读；左转楼梯不出现负比例
-- [ ] 默认：没有新字段的旧楼梯渲染与现在完全一致，现有 stairs 测试保持通过
-- [ ] 负向：`flightLengths` 长度不对、某项 100、`treadDepth: 50`、`riserHeight: 500`、`stepsManual: 'yes'`，`validateDesign` 均拒绝
-- [ ] 边界：外框极小（1000×1000）与梯段长极大（20 m）时都不出现 NaN 或负尺寸
-- [ ] 构建：`pnpm test` 全绿、`pnpm run build` 通过、改动文件 eslint 无错误
+- [x] DXF：改变梯段长或踏面宽后，楼梯图块几何或块名随之变化（不复用旧块）；楼梯块内仍无 TEXT；`STAIRS` 图层 ACI / 线宽 / 线型不变
+- [x] DXF：旋转 180° 的楼梯“上”字仍可读；左转楼梯不出现负比例
+- [x] 默认：没有新字段的旧楼梯渲染与现在完全一致，现有 stairs 测试保持通过
+- [x] 负向：`flightLengths` 长度不对、某项 100、`treadDepth: 50`、`riserHeight: 500`、`stepsManual: 'yes'`，`validateDesign` 均拒绝
+- [x] 边界：外框极小（1000×1000）与梯段长极大（20 m）时都不出现 NaN 或负尺寸
+- [x] 构建：`pnpm test` 全绿、`pnpm run build` 通过、改动文件 eslint 无错误

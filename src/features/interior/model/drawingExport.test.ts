@@ -214,7 +214,7 @@ describe('工程交换图',()=>{
     const d=fixture();
     d.furniture=[pair({}),pair({flightLengths:[4000]}),pair({treadDepth:300}),pair({riserHeight:160}),pair({stepsManual:true})].map((f,i)=>({...f,id:`s${i}`,cx:2000+i*2000}));
     const text=serializeDxf(createExportDocument(d)),parsed=new DxfParser().parseSync(text)!;
-    const inserts=parsed.entities.filter(e=>e.type==='INSERT'&&e.layer==='STAIRS') as unknown as {name:string}[];
+    const inserts=parsed.entities.filter(e=>e.type==='INSERT'&&e.layer===CAD_LAYER_NAMES.STAIRS) as unknown as {name:string}[];
     expect(inserts).toHaveLength(5);
     expect(new Set(inserts.map(i=>i.name)).size).toBe(5);
     for(const name of new Set(inserts.map(i=>i.name))){
