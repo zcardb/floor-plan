@@ -32,7 +32,8 @@ describe('编辑控件与米制 UI',()=>{
   });
   it('素材库尺寸摘要统一米制',()=>{
     const html=render(createElement(Library,{add:()=>{},setTool:()=>{},structureTools:true}));
-    expect(html).toContain('2.40 × 0.90 m');
+    // 默认「全部」首屏 12 件，第一件是双人床 1.8m
+    expect(html).toContain('1.80 × 2.00 m');
     expect(html).not.toContain(' mm');
   });
   it('单价保留禁用和空值语义',()=>{

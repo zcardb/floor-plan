@@ -40,7 +40,8 @@ export function saveState({ status, loggedIn, readOnly, guestDirty, saving, pend
 }
 
 /**
- * 顶栏右侧主按钮：文案固定「保存」，状态只用按钮上的小标记和下拉第一行表达；
+ * 顶栏右侧「保存」按钮：文案固定「保存」，状态只用按钮上的小标记和下拉第一行表达；
+ * 登录后是主按钮；游客时右侧另有主按钮「登录」，这里降为副按钮（`.save-button.is-secondary`）。
  * 下拉其余部分是导出：「按格式导出」5 项 + 分隔线 +「导出到其他软件」。
  */
 export function ExportMenu(p: Props) {
@@ -55,14 +56,14 @@ export function ExportMenu(p: Props) {
   return <DropdownMenu>
     <EditorTooltip label="保存与导出">
       <DropdownMenuTrigger asChild>
-        <Button size="sm" className="save-button" aria-label="保存与导出" aria-busy={state.mark === 'busy'}>
+        <Button size="sm" variant={p.loggedIn ? 'default' : 'secondary'} className={'save-button' + (p.loggedIn ? '' : ' is-secondary')} aria-label="保存与导出" aria-busy={state.mark === 'busy'}>
           {state.mark === 'busy' ? <Loader2 className="animate-spin" /> : state.mark !== 'none' && <i className="save-button-mark" data-tone={state.mark} aria-hidden="true" />}
           <span>保存</span>
           <ChevronDown className="save-button-caret" />
         </Button>
       </DropdownMenuTrigger>
     </EditorTooltip>
-    <DropdownMenuContent align="end" className="export-menu">
+    <DropdownMenuContent align="end" className="toolbar-menu export-menu">
       <div className={'save-menu-status' + ('problem' in state && state.problem ? ' is-error' : '')} role="status">
         <i className="save-button-mark" data-tone={state.mark === 'none' ? 'ok' : state.mark} aria-hidden="true" />
         {state.label}

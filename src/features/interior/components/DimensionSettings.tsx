@@ -9,7 +9,8 @@ export function DimensionSettings({ design, change }: { design: Design; change: 
   const settings = dimensionSettings(design);
   return <section>
     <h3 className="section-title">外围尺寸标注</h3>
-    <label className="property-field full">显示尺寸标注
+    {/* 开关是一整行：左文字、右开关，点文字也能切换 */}
+    <label className="setting-row"><span>显示尺寸标注</span>
       <Switch aria-label="显示尺寸标注" checked={settings.visible} onCheckedChange={value => change(d => changeDimensionSetting(d, 'visible', value))} />
     </label>
     <div className="property-form">

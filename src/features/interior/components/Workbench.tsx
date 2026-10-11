@@ -38,6 +38,7 @@ import {
   LayoutTemplate,
   Loader2,
   Minus,
+  LogIn,
   Moon,
   Plus,
   Redo2,
@@ -96,7 +97,7 @@ import { WallToolMenu } from './WallToolMenu';
 import { CostPanel } from "./CostPanel";
 import { SidePanel, type PanelKind } from "./SidePanel";
 import { CanvasRail } from "./CanvasRail";
-import { CollectionMenu } from "./CollectionMenu";
+import { ViewMenu } from "./ViewMenu";
 import { AiChatPanel } from "./AiChatPanel";
 import { OverviewPanel } from "./OverviewPanel";
 import { HouseSettingsPanel } from "./HouseSettingsPanel";
@@ -801,7 +802,7 @@ export function Workbench(p: Props) {
               className={view === "2d" ? "active" : ""}
               onClick={() => void toggleView("2d")}
             >
-              <LayoutTemplate size={15} />
+              <LayoutTemplate size={16} />
               2D<span className="view-switch-suffix">平面</span>
             </button>
           </EditorTooltip>
@@ -816,9 +817,9 @@ export function Workbench(p: Props) {
               disabled={sceneLoading}
             >
               {sceneLoading ? (
-                <Loader2 className="animate-spin" size={15} />
+                <Loader2 className="animate-spin" size={16} />
               ) : (
-                <Layers3 size={15} />
+                <Layers3 size={16} />
               )}
               3D<span className="view-switch-suffix">场景</span>
             </button>
@@ -939,17 +940,14 @@ export function Workbench(p: Props) {
           </ToolButton>
         </div>
         <div className="toolbar-right">
-          <CollectionMenu
+          <ViewMenu
             layers={layers}
             view={view}
-            active={sidePanel}
-            loggedIn={p.loggedIn}
             onToggleLayer={(key) => {
               if (key === "dims") change(d => ({ ...d, dimensionSettings: { ...d.dimensionSettings, visible: !(d.dimensionSettings?.visible ?? true) } }));
               else setLayers((l) => ({ ...l, [key]: !l[key] }));
             }}
             onRatio={(ratio) => canvas.current?.ratio(ratio)}
-            onOpen={openPanel}
           />
           <ExportMenu
             view={view}
@@ -962,6 +960,12 @@ export function Workbench(p: Props) {
             saving={cloudSave.pending}
             onSave={() => { sizeTransaction.cancel(); void cloudSave.run(); }}
           />
+          {/* 游客：右上角固定一个主按钮「登录」，保存降为副按钮；登录后不显示 */}
+          {!p.loggedIn && (
+            <Button size="sm" className="toolbar-login" onClick={p.login}>
+              <LogIn />登录
+            </Button>
+          )}
         </div>
       </div>
       <main className="stage" ref={stage}>
@@ -1161,7 +1165,7 @@ export function Workbench(p: Props) {
           hidden={readOnly || tool !== 'select' || (!!sidePanel && isDrawerLayout()) || (view === "3d" && sceneOptions.mode === "walk")}
           costs={() => openPanel("cost")}
         />
-        <CanvasRail sidePanel={sidePanel} stage={stage} showCosts={p.loggedIn} onToggle={togglePanel} />
+        <CanvasRail sidePanel={sidePanel} stage={stage} loggedIn={p.loggedIn} onToggle={togglePanel} />
       </main>
       {sidePanel && (
         <SidePanel title={PANEL_TITLES[sidePanel]} readOnly={readOnly && sidePanel !== "library"} onClose={() => { sizeTransaction.flush(); setSidePanel(null); }}>

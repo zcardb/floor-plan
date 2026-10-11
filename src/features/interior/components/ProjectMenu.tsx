@@ -85,7 +85,7 @@ export function ProjectMenu(p: Props) {
           {busy ? <Loader2 className="animate-spin" size={14} /> : <ChevronDown size={14} />}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="project-menu" onCloseAutoFocus={event => { if (creation.dialogOpen) event.preventDefault(); }}>
+      <DropdownMenuContent align="start" className="toolbar-menu project-menu" onCloseAutoFocus={event => { if (creation.dialogOpen) event.preventDefault(); }}>
         {p.loggedIn && <DropdownMenuItem className="project-menu-entry" disabled={busy} onSelect={p.onBack}>返回</DropdownMenuItem>}
         {p.loggedIn && p.onCreateProject && <DropdownMenuSub>
           <DropdownMenuSubTrigger className="project-menu-entry" disabled={busy}>新建项目</DropdownMenuSubTrigger>
@@ -95,7 +95,7 @@ export function ProjectMenu(p: Props) {
         </DropdownMenuSub>}
         <DropdownMenuSub>
           <DropdownMenuSubTrigger className="project-menu-entry">{p.loggedIn ? '切换项目' : '切换户型'}</DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="project-switch-menu" sideOffset={6}>
+          <DropdownMenuSubContent className="toolbar-menu project-switch-menu" sideOffset={6}>
             <div className="project-menu-list" role="group" aria-label={p.loggedIn ? '项目列表' : '内置模板'}>
               {p.projectList.map(row => {
                 const current = row.id === p.project.id || (!p.loggedIn && row.templateId === p.project.templateId);

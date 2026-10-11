@@ -38,7 +38,7 @@ import { DimensionEditDialog } from './DimensionEditDialog';
 import { WallSplitDialog } from './WallSplitDialog';
 import { SidePanel } from './SidePanel';
 import { CanvasRail } from './CanvasRail';
-import { CollectionMenu } from './CollectionMenu';
+import { ViewMenu } from './ViewMenu';
 import { AiChatPanel } from './AiChatPanel';
 import { OverviewPanel } from './OverviewPanel';
 import { HouseSettingsPanel } from './HouseSettingsPanel';
@@ -275,12 +275,12 @@ describe('账号家具库并入左侧家具库', () => {
   });
 });
 describe('单行顶部工具栏', () => {
-  it('只有一行工具栏：品牌 logo 在最左，右侧只有集合与保存', () => {
+  it('只有一行工具栏：品牌 logo 在最左，右侧只有视图设置与保存', () => {
     const tree = render();
     expect(tree.some(n => typeof n.props.className === 'string' && (n.props.className as string).includes('main-header'))).toBe(false);
     const toolbar = tree.find(n => n.props.className === 'main-toolbar')!;
     const inside = nodes(toolbar);
-    const order = [ProjectMenu, CollectionMenu, ExportMenu].map(type => inside.findIndex(n => n.type === type));
+    const order = [ProjectMenu, ViewMenu, ExportMenu].map(type => inside.findIndex(n => n.type === type));
     expect(order.every(i => i >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
     // 品牌 logo 现在在项目菜单的触发按钮里，两者是同一个点击区。
@@ -394,12 +394,12 @@ describe('内置模板只读预览提示条', () => {
 describe('编辑器分区：侧栏、竖条与画布', () => {
   const rail = (tree: Node[]) => tree.find(n => n.type === CanvasRail)!;
   const panel = (tree: Node[]) => tree.find(n => n.type === SidePanel);
-  it('默认打开家具库侧栏，竖条「家具」高亮，集合菜单与竖条都没有 AI 之外的额外入口', () => {
+  it('默认打开家具库侧栏，竖条「家具」高亮', () => {
     const tree = render();
     expect(panel(tree)!.props.title).toBe('家具库');
     expect(nodes(panel(tree)!).find(n => n.type === Library)).toBeDefined();
     expect(rail(tree).props.sidePanel).toBe('library');
-    expect(tree.some(n => n.type === CollectionMenu)).toBe(true);
+    expect(tree.some(n => n.type === ViewMenu)).toBe(true);
   });
   it('竖条点「家具」关闭默认打开的侧栏，再点重新打开；「AI 模式」切到 AI 侧栏', () => {
     const tree = render();
@@ -410,14 +410,15 @@ describe('编辑器分区：侧栏、竖条与画布', () => {
     expect(panel(render())!.props.title).toBe('AI 模式');
     expect(nodes(panel(render())!).find(n => n.type === AiChatPanel)).toBeDefined();
   });
-  it('集合菜单打开对应侧栏，方案总览与户型设置各有自己的面板', () => {
+  it('竖条打开对应侧栏，方案总览与户型设置各有自己的面板', () => {
     const open = (kind: string) => {
       const tree = render();
-      (tree.find(n => n.type === CollectionMenu)!.props.onOpen as (k: string) => void)(kind);
+      (rail(tree).props.onToggle as (k: string) => void)(kind);
       return render();
     };
-    expect(panel(open('settings'))!.props.title).toBe('户型设置');
-    expect(nodes(panel(open('settings'))!).find(n => n.type === HouseSettingsPanel)).toBeDefined();
+    const settings = panel(open('settings'))!;
+    expect(settings.props.title).toBe('户型设置');
+    expect(nodes(settings).find(n => n.type === HouseSettingsPanel)).toBeDefined();
     expect(nodes(panel(open('overview'))!).find(n => n.type === OverviewPanel)).toBeDefined();
     expect(panel(open('cost'))!.props.title).toBe('成本管理');
   });

@@ -576,10 +576,12 @@
     background: hsl(var(--card));
     z-index: 8;
   }
+  /* 顶栏刻度：所有控件外高统一 --ctl-md（32px）、图标统一 16px、文字 --fs-control。
+     分段控件 = 2px 内缩 + 内部 --ctl-sm（28px），外框正好 32px，与旁边的工具按钮、右侧按钮齐平。 */
   .view-switch {
     display: flex;
-    gap: 3px;
-    padding: 3px;
+    gap: 2px;
+    padding: 2px;
     border-radius: var(--ctl-radius);
     background: hsl(var(--secondary));
     flex: none;
@@ -588,15 +590,16 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 7px;
+    gap: 6px;
     border-radius: var(--ctl-radius-in);
     font-size: var(--fs-control);
     font-weight: 500;
-    min-height: 30px;
-    padding: 4px 12px;
+    min-height: var(--ctl-sm);
+    padding: 0 12px;
     color: hsl(var(--muted-foreground));
-    min-width: 91px;
+    min-width: 92px;
   }
+  .view-switch button > svg { width: 16px; height: 16px; }
   .view-switch button:hover:not(.active) { color: hsl(var(--foreground)); }
   .view-switch button.active {
     background: hsl(var(--card));
@@ -605,16 +608,21 @@
     box-shadow: var(--shadow-segment);
   }
   .toolbar-divider {
-    height: 23px;
+    height: 18px;
     width: 1px;
     background: hsl(var(--border));
     flex: none;
   }
-  .tool-group,
-  .toolbar-right {
+  .tool-group {
     display: flex;
     align-items: center;
     gap: 3px;
+  }
+  /* 右侧：视图设置 / 保存 / 登录 三个按钮彼此留 6px，主次分明又不挤在一起 */
+  .toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
   .tool-button {
     display: flex;
@@ -1178,6 +1186,8 @@
     transition: background-color .15s ease, color .15s ease;
   }
   .canvas-rail-button > svg { width: 20px; height: 20px; }
+  /* 竖条里的 AI 星标不带默认主色，跟其他图标一样随按钮状态变色 */
+  .canvas-rail-button > .ai-icon { color: inherit; }
   .canvas-rail-toggle > svg { width: 18px; height: 18px; }
   .canvas-rail-button:hover,
   .canvas-rail-toggle:hover { background: hsl(var(--secondary)); color: hsl(var(--foreground)); }
@@ -2074,7 +2084,7 @@
   }
   .view-switch button {
     min-width: 62px;
-    padding: 4px 6px;
+    padding: 0 8px;
     font-size: var(--fs-meta);
     gap: 4px;
   }
@@ -3616,24 +3626,39 @@ button.room-cost-row:hover {
 @media (max-width: 1100px) { .toolbar-scroll { gap:8px; } }
 @media (max-width: 600px) {
   .toolbar-scroll { gap:5px; }
-  .view-switch button { min-width:0; padding:7px 9px; }
+  .view-switch button { min-width:0; padding:0 9px; }
   .view-switch svg,.view-switch-suffix { display:none; }
   .toolbar-login { height:36px; padding:0 10px; }
 }
 /* 单行工具栏：左侧项目菜单 */
 /* Logo + 项目名 + 箭头是同一个点击区，悬停整块高亮。 */
-.project-menu-trigger { display:flex; align-items:center; gap:8px; flex:none; min-width:0; max-width:260px; height:38px; padding:0 8px 0 6px; margin-left:-6px; border-radius:8px; font-size:13px; font-weight:600; color:hsl(var(--foreground)); transition:background-color .15s ease; }
+.project-menu-trigger { display:flex; align-items:center; gap:8px; flex:none; min-width:0; max-width:260px; height:var(--ctl-md); padding:0 8px 0 6px; margin-left:-6px; border-radius:var(--ctl-radius-in); font-size:var(--fs-title); font-weight:600; color:hsl(var(--foreground)); transition:background-color .15s ease; }
 .project-menu-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
 .project-menu-trigger>svg:last-child { flex:none; color:hsl(var(--muted-foreground)); transition:transform .15s ease; }
 .project-menu-trigger[data-state="open"]>svg:last-child { transform:rotate(180deg); }
 .project-menu-trigger:hover,.project-menu-trigger[data-state="open"] { background:hsl(var(--secondary)); }
 .project-menu-trigger:focus-visible { outline:2px solid hsl(var(--ring)); outline-offset:1px; }
-/* 窄菜单：只有「返回项目管理 / 新建项目 / 切换项目」三项纯文字入口，后两项悬停展开二级菜单。 */
-.project-menu { width:min(184px,calc(100vw - 24px)); padding:6px; }
-.project-menu [role="menuitem"].project-menu-entry { min-height:var(--ctl-md); padding:0 9px; font-size:var(--fs-group); }
-.project-menu [role="menuitem"].project-menu-entry>svg:last-child { margin-left:auto; width:14px; height:14px; color:hsl(var(--muted-foreground)); }
-.project-menu [role="menuitem"].project-menu-entry[data-state="open"],
-.project-menu [role="menuitem"].project-menu-entry:focus { background:hsl(var(--accent)); }
+/* 顶栏下拉统一样式（.toolbar-menu）：左上项目菜单、右上集合菜单 / 视图二级菜单、保存与导出菜单共用。
+   刻度对齐「2D 平面 / 3D 场景」分段控件：--fs-control 12px、字重 500；行高 32px，图标 16px 灰、悬停转前景色。 */
+.toolbar-menu { padding:6px; border-radius:12px; }
+.toolbar-menu [role="menuitem"] { min-height:var(--ctl-md); gap:10px; padding:0 10px; border-radius:var(--ctl-radius-in); font-size:var(--fs-control); font-weight:500; color:hsl(var(--foreground)); }
+.toolbar-menu [role="menuitem"] > svg { flex:none; width:16px; height:16px; stroke-width:1.75; color:hsl(var(--muted-foreground)); transition:color .15s ease; }
+.toolbar-menu [role="menuitem"][data-highlighted],
+.toolbar-menu [role="menuitem"][data-state="open"] { background:hsl(var(--secondary)); color:hsl(var(--foreground)); }
+.toolbar-menu [role="menuitem"][data-highlighted] > svg,
+.toolbar-menu [role="menuitem"][data-state="open"] > svg { color:hsl(var(--foreground)); }
+.toolbar-menu [role="menuitem"][data-disabled] { opacity:.5; }
+/* 当前打开的侧栏 / 当前项目：浅主色底 + 主色字 */
+.toolbar-menu [role="menuitem"][data-active],
+.toolbar-menu [role="menuitem"][data-active][data-highlighted] { background:hsl(var(--accent)); color:hsl(var(--primary)); font-weight:600; }
+.toolbar-menu [role="menuitem"][data-active] > svg { color:hsl(var(--primary)); }
+/* 二级菜单入口自带的右箭头：14px 灰，靠右 */
+.toolbar-menu [role="menuitem"][aria-haspopup] > svg:last-child { margin-left:auto; width:14px; height:14px; }
+.toolbar-menu [role="separator"] { margin:6px -6px; }
+/* 菜单内分组标题与状态行：11px 灰，左边距与菜单项文字对齐 */
+.toolbar-menu .project-menu-heading { margin:0; padding:8px 10px 4px; font-size:var(--fs-label); font-weight:500; color:hsl(var(--muted-foreground)); }
+.toolbar-menu .project-menu-email { padding:6px 10px 4px; }
+.project-menu { width:min(196px,calc(100vw - 24px)); }
 /* 切换项目二级菜单：名称 + 日期 + 当前勾选，项目本身的重命名 / 删除只留在项目管理页。 */
 .project-switch-menu { width:min(300px,calc(100vw - 24px)); padding:6px; }
 .project-menu-list { max-height:min(360px,calc(var(--radix-dropdown-menu-content-available-height) - 40px)); overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }
@@ -3662,7 +3687,7 @@ button.room-cost-row:hover {
 .field-counter { justify-self:end; font-size:11px; color:hsl(var(--muted-foreground)); font-variant-numeric:tabular-nums; }
 /* 右侧：导出按钮与账号 */
 /* 顶栏主按钮「保存」：主色实底，状态只用小标记和下拉第一行表达 */
-.save-button { height:32px; padding:0 10px 0 12px; gap:6px; font-size:12px; font-weight:600; background:hsl(var(--primary)); color:hsl(var(--primary-foreground)); }
+.save-button { height:var(--ctl-md); padding:0 8px 0 12px; gap:6px; border-radius:var(--ctl-radius-in); font-size:var(--fs-control); font-weight:600; background:hsl(var(--primary)); color:hsl(var(--primary-foreground)); }
 .save-button:hover,.save-button[data-state="open"] { background:hsl(var(--primary) / 0.9); color:hsl(var(--primary-foreground)); }
 .save-button .save-button-caret { width:14px; height:14px; opacity:.75; }
 .save-button-mark { flex:none; width:6px; height:6px; border-radius:50%; background:hsl(var(--muted-foreground)); }
@@ -3670,7 +3695,15 @@ button.room-cost-row:hover {
 .save-button-mark[data-tone="error"] { background:hsl(var(--destructive)); }
 .save-button-mark[data-tone="busy"] { background:hsl(var(--primary-foreground) / 0.75); }
 .save-button-mark[data-tone="ok"] { background:hsl(var(--teal)); }
-.toolbar-right>.save-button { margin:0 4px; }
+.toolbar-right>.save-button { margin:0; }
+/* 顶栏既有 32px 的单行按钮，也有 32px 的方图标按钮：两者的图标统一 16px。 */
+.view-menu-trigger>svg { width:16px; height:16px; }
+/* 游客：保存降为副按钮（浅底前景色），主按钮让给「登录」 */
+.save-button.is-secondary { background:hsl(var(--secondary)); color:hsl(var(--foreground)); }
+.save-button.is-secondary:hover,.save-button.is-secondary[data-state="open"] { background:hsl(var(--accent)); color:hsl(var(--primary)); }
+.save-button.is-secondary .save-button-mark[data-tone="dirty"] { background:hsl(var(--primary)); }
+.save-button.is-secondary .save-button-caret { opacity:.6; }
+.toolbar-right>.save-button.is-secondary { margin-right:0; }
 /* 保存与导出下拉：第一行是保存状态（+ 立即保存 / 登录并保存），下面才是导出 */
 .save-menu-status { display:flex; align-items:center; gap:8px; padding:8px 10px 6px; font-size:var(--fs-label); color:hsl(var(--muted-foreground)); }
 .save-menu-status.is-error { color:hsl(var(--destructive)); }
@@ -3678,29 +3711,25 @@ button.room-cost-row:hover {
 .save-menu-status.is-error .save-button-mark { background:hsl(var(--destructive)); }
 /* 顶栏「集合」：立方体图标按钮，与项目下拉同一刻度 */
 /* 集合按钮：默认就有底色，悬停 / 打开时更亮，图标略大 */
-.collection-trigger { width:36px; height:36px; background:hsl(var(--secondary)); color:hsl(var(--foreground)); }
-.collection-trigger > svg { width:20px; height:20px; }
-.collection-trigger:hover { background:hsl(var(--accent)); color:hsl(var(--primary)); }
-.collection-trigger[data-state="open"] { background:hsl(var(--primary) / 0.16); color:hsl(var(--primary)); }
-.collection-menu { width:min(232px,calc(100vw - 24px)); padding:6px; }
-.collection-menu [role="menuitem"].project-menu-entry { min-height:var(--ctl-md); padding:0 9px; gap:10px; font-size:var(--fs-group); }
-.collection-menu [role="menuitem"].project-menu-entry>svg { width:15px; height:15px; color:hsl(var(--muted-foreground)); }
-/* 「视图设置」二级菜单朝左展开：箭头朝左放在最前，颜色用前景灰 */
-.collection-menu [role="menuitem"].collection-sub-trigger>svg.collection-caret { margin-left:0 !important; width:16px; height:16px; color:hsl(var(--muted-foreground)); }
-.collection-menu [role="menuitem"].collection-sub-trigger>svg:not(.collection-caret) { display:none; }
-.collection-menu [role="menuitem"].project-menu-entry[data-active] { color:hsl(var(--primary)); font-weight:600; }
-.collection-menu [role="menuitem"].project-menu-entry[data-active]>svg { color:hsl(var(--primary)); }
-.collection-submenu { width:min(232px,calc(100vw - 24px)); padding:6px; }
-.collection-submenu [role="menuitem"] { min-height:var(--ctl-md); padding:0 10px; gap:8px; font-size:var(--fs-group); }
-.collection-submenu [role="menuitem"]>svg { width:14px; height:14px; color:hsl(var(--muted-foreground)); }
+/* 顶栏「视图设置」：图层图标按钮，默认有浅底，悬停 / 打开时更亮 */
+.view-menu-trigger { width:var(--ctl-md); height:var(--ctl-md); background:hsl(var(--secondary)); color:hsl(var(--foreground)); }
+.view-menu-trigger:hover { background:hsl(var(--accent)); color:hsl(var(--primary)); }
+.view-menu-trigger[data-state="open"] { background:hsl(var(--primary) / 0.16); color:hsl(var(--primary)); }
+.view-menu { width:min(208px,calc(100vw - 24px)); }
+.view-menu .layer-checkbox { width:16px; height:16px; border-radius:4px; }
 .project-menu-email { padding:6px 9px 4px; font-size:var(--fs-meta); color:hsl(var(--muted-foreground)); font-weight:400; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.export-menu { min-width:200px; }
+.export-menu { width:min(220px,calc(100vw - 24px)); }
+/* 导出菜单里的保存行：图标与文字同菜单项刻度 */
+.toolbar-menu .save-menu-status { padding:8px 10px 6px; }
+.toolbar-menu [role="menuitem"].save-menu-action { color:hsl(var(--primary)); }
+.toolbar-menu [role="menuitem"].save-menu-action > svg { color:hsl(var(--primary)); }
 .account-trigger { display:grid; place-items:center; flex:none; width:40px; height:40px; border-radius:50%; }
 .account-trigger .account-avatar { transition:box-shadow .2s ease; }
 .account-trigger:hover .account-avatar,.account-trigger[data-state="open"] .account-avatar { box-shadow:0 0 0 3px hsl(var(--secondary)),0 0 0 4px hsl(var(--border)); }
 .account-trigger:focus-visible { outline:2px solid hsl(var(--ring)); outline-offset:1px; }
 .account-menu { min-width:240px; max-width:min(300px,calc(100vw - 24px)); }
-.toolbar-login { height:32px; padding:0 12px; font-size:12px; font-weight:600; }
+.toolbar-login { height:var(--ctl-md); padding:0 12px; gap:6px; border-radius:var(--ctl-radius-in); font-size:var(--fs-control); font-weight:600; }
+.toolbar-login > svg { width:16px; height:16px; }
 /* 暂未开放的第三方软件：可悬停，悬停/聚焦时显示 Coming soon */
 .soon-item { color:hsl(var(--muted-foreground)); }
 .soon-badge { margin-left:auto; padding:1px 7px; border-radius:999px; font-size:10px; font-weight:600; letter-spacing:.2px; background:hsl(var(--accent)); color:hsl(var(--primary)); opacity:0; transition:opacity .15s ease; }
@@ -3709,6 +3738,9 @@ button.room-cost-row:hover {
   .project-menu-trigger { max-width:132px; gap:6px; padding:0 4px; margin-left:-4px; font-size:12px; }
   .save-button { padding:0 10px; }
   .toolbar-right>.save-button { margin:0 2px; }
+  /* 窄屏顶栏挤：登录按钮只留文字 */
+  .toolbar-login { padding:0 10px; }
+  .toolbar-login > svg { display:none; }
 }
 
 /* 工作台顶部提示条（游客改模版 / 内置模板只读预览共用 WorkbenchBanner）：放在工作台栅格之外，避免打乱 .workbench 的三行布局 */
@@ -3726,41 +3758,176 @@ button.room-cost-row:hover {
   .workbench-banner .workbench-banner-action,.workbench-banner .workbench-banner-dismiss { height:32px; padding:0 10px; }
 }
 
-/* ── 右侧属性 / 成本面板：统一间距节奏（4px 栅格）──
-   面板左右边距 16 · 分节上下 16 · 分组间 16 · 标题→内容 8 · 字段行距 12 / 列距 8 · 标签→输入 6 */
+/* ── 右侧统一侧栏：内容设计层（家具库 / 方案总览 / 成本 / 户型 / AI 共用）──
+   规则（与顶栏、管理页同一套刻度，见 UI_GUIDELINES「侧栏内容」）：
+   · 间距 4px 栅格：左右 16 · 分组上下 16 · 组标题→内容 12 · 字段行距 12 / 列距 8 · 标签→控件 6
+   · 字号：组标题 12/600 · 正文与控件 12/500 · 标签、说明、计量 11 · 大数字 --fs-figure 或 24（成本主金额）
+   · 控件高度：输入框、按钮、分段控件统一 32px（--ctl-md），行内小按钮 28px（--ctl-sm），圆角 --ctl-radius-in
+   · 分组：每个 section 一组，组与组之间 1px 分隔线；同组内多条记录用卡片或细分隔线，不再嵌套标题
+   · 说明文字一律放在控件下方、11px 灰色，最多两行；警示用浅色底条，不用整段红字 */
 .side-panel {
   --rp-x: var(--sp-x);
   --rp-section: var(--sp-section);
   --rp-group: var(--sp-group);
-  --rp-title: var(--sp-title);
+  --rp-title: var(--sp-row);
   --rp-row: var(--sp-row);
   --rp-col: var(--sp-col);
 }
-.side-panel .panel-heading { padding: 14px var(--rp-x) 4px; }
-.side-panel section { padding: var(--rp-section) var(--rp-x); }
-.side-panel .back-link { margin-bottom: 12px; }
-.side-panel .object-title { margin-bottom: var(--rp-group); }
-.side-panel .object-title h3 { margin-bottom: 2px; }
-.side-panel .furniture-exterior-preview { margin-bottom: var(--rp-group); }
-.side-panel .section-title { margin-bottom: var(--rp-title); }
-.side-panel .property-subtitle { margin: var(--rp-group) 0 var(--rp-title); }
-.side-panel .property-form { gap: var(--rp-row) var(--rp-col); margin-bottom: 0; }
-.side-panel .stat-grid { gap: var(--rp-col); margin-top: var(--rp-group); }
-.side-panel .material-grid { gap: var(--rp-col); }
-.side-panel .muted-note { margin-top: var(--rp-title); line-height: 1.7; }
-.side-panel .footnote { line-height: 1.6; margin-top: var(--rp-title); }
-.side-panel .property-actions { gap: var(--rp-col); }
-.side-panel .wall-options-trigger { margin: 0 0 4px -7px; }
-.side-panel .room-cost-link { margin-top: 0; }
-.side-panel .room-row { padding: 10px 0; }
-.side-panel .panel-note { padding: 12px var(--rp-x); line-height: 1.7; }
-/* 面板内色板：左对齐、无分隔线、可换行 */
-/* 单价：元/单位与来源 → 同步勾选 → 输入 + 应用 → 说明，层级间距 8 */
-.side-panel .price-field-meta,
-.side-panel .price-sync-option { margin-bottom: var(--rp-title); }
+/* 分组：统一内边距 + 组间分隔线 */
+.side-panel section { padding: var(--rp-section) var(--rp-x); border-bottom: 1px solid hsl(var(--border)); }
+.side-panel section:last-child { border-bottom: 0; }
+/* 组标题：文字靠左，计量 / 金额 / 提示靠右 */
+.side-panel .section-title { display: flex; align-items: baseline; justify-content: flex-start; gap: 6px; margin: 0 0 var(--rp-title); font-size: var(--fs-group); font-weight: 600; line-height: 18px; color: hsl(var(--foreground)); }
+.side-panel .section-title > svg { display: none; }
+.side-panel .section-title > small,
+.side-panel .section-title > span { margin-left: auto; font-size: var(--fs-meta); font-weight: 400; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
+.side-panel .section-title > span { font-weight: 600; color: hsl(var(--foreground)); }
+/* 面板顶部的口径标题行（成本）：可选返回 + 标题左 / 计量右 */
+.side-panel .panel-heading { display: grid; gap: 8px; padding: var(--rp-section) var(--rp-x) 0; font-size: var(--fs-group); }
+.side-panel .panel-heading-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
+.side-panel .panel-heading-row > h3 { margin: 0; overflow: hidden; font-size: var(--fs-title); font-weight: 600; color: hsl(var(--foreground)); text-overflow: ellipsis; white-space: nowrap; }
+.side-panel .panel-heading + section { padding-top: var(--rp-row); }
+.side-panel .mini-label { font-size: var(--fs-meta); font-weight: 400; color: hsl(var(--muted-foreground)); white-space: nowrap; }
+.side-panel .back-link { display: inline-flex; align-items: center; justify-self: start; gap: 4px; height: var(--ctl-sm); margin: 0 0 0 -8px; padding: 0 8px; border-radius: var(--ctl-radius-in); font-size: var(--fs-control); font-weight: 500; color: hsl(var(--muted-foreground)); transition: background-color .15s ease, color .15s ease; }
+.side-panel .back-link:hover { background: hsl(var(--secondary)); color: hsl(var(--foreground)); }
+.side-panel .back-link:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
+/* 说明与脚注：控件下方，11px 灰 */
+.side-panel .muted-note,
+.side-panel .footnote { margin: var(--sp-title) 0 0; font-size: var(--fs-meta); line-height: 1.6; color: hsl(var(--muted-foreground)); }
+.side-panel .muted-note:first-child { margin-top: 0; }
+.side-panel .section-title + .muted-note { margin: calc(var(--rp-title) * -0.5) 0 var(--rp-title); }
+/* 字段：两列网格，标签 11/500 灰，控件 32px */
+.side-panel .property-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--rp-row) var(--rp-col); margin: 0; }
+.side-panel .property-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: var(--fs-label); font-weight: 500; color: hsl(var(--muted-foreground)); }
+.side-panel .editor-control,
+.side-panel input.editor-control { height: var(--ctl-md); padding: 0 10px; border-radius: var(--ctl-radius-in); font-size: var(--fs-input); font-variant-numeric: tabular-nums; }
+.side-panel .editor-control:disabled { background: hsl(var(--muted) / 0.5); color: hsl(var(--muted-foreground)); opacity: 1; }
+.side-panel .editor-action { height: var(--ctl-md); padding: 0 12px; border-radius: var(--ctl-radius-in); font-size: var(--fs-control); font-weight: 500; }
+/* 开关行：左文字、右开关 */
+.side-panel .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: var(--ctl-md); margin-bottom: var(--rp-row); font-size: var(--fs-control); font-weight: 500; color: hsl(var(--foreground)); cursor: pointer; }
+/* 分段控件：与「2D 平面 / 3D 场景」同一外观 */
+.panel-segmented { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; gap: 3px; padding: 3px; border-radius: var(--ctl-radius); background: hsl(var(--secondary)); }
+.panel-segmented > button { min-height: calc(var(--ctl-md) - 6px); padding: 0 6px; border-radius: var(--ctl-radius-in); font-size: var(--fs-control); font-weight: 500; color: hsl(var(--muted-foreground)); white-space: nowrap; transition: background-color .15s ease, color .15s ease; }
+.panel-segmented > button:hover:not(.is-active) { color: hsl(var(--foreground)); }
+.panel-segmented > button.is-active { background: hsl(var(--card)); color: hsl(var(--foreground)); font-weight: 600; box-shadow: var(--shadow-segment); }
+.panel-segmented > button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
+/* 朝向：指北针预览 + 角度输入 + 分段快捷 */
+.side-panel .north-settings { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: center; gap: var(--rp-row); }
+.side-panel .north-settings-preview { width: 64px; height: 64px; }
+.side-panel .north-settings-fields { gap: var(--sp-title); }
+/* 提示条与快捷键 */
+.side-panel .panel-note { display: flex; gap: 8px; margin: var(--rp-section) var(--rp-x); padding: 10px 12px; border-radius: var(--ctl-radius); background: hsl(var(--secondary) / 0.6); font-size: var(--fs-meta); line-height: 1.6; color: hsl(var(--muted-foreground)); }
+.side-panel .panel-note svg { width: 14px; height: 14px; margin-top: 2px; }
+.side-panel .panel-note p { display: flex; align-items: center; gap: 6px; }
+.side-panel .shortcut-list { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px 10px; font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); }
+.side-panel .shortcut-list kbd { justify-self: start; min-width: 22px; padding: 2px 6px; border: 1px solid hsl(var(--border)); border-radius: 5px; background: hsl(var(--card)); font-family: inherit; font-size: var(--fs-meta); font-weight: 500; color: hsl(var(--foreground)); text-align: center; box-shadow: 0 1px 0 hsl(var(--border)); }
+/* 方案总览：房间列表行 36px，色块 + 名称左、面积右 */
+.side-panel .room-table { display: grid; }
+.side-panel .room-row { min-height: 36px; padding: 0 8px; margin: 0 -8px; width: calc(100% + 16px); border: 0; border-radius: var(--ctl-radius-in); font-size: var(--fs-control); font-weight: 500; color: hsl(var(--foreground)); }
+.side-panel .room-row + .room-row { box-shadow: 0 -1px 0 hsl(var(--border) / 0.6); }
+.side-panel .room-row:hover { background: hsl(var(--secondary)); color: hsl(var(--foreground)); box-shadow: none; }
+.side-panel .room-row:hover + .room-row { box-shadow: none; }
+.side-panel .room-row i { width: 10px; height: 10px; border-radius: 3px; }
+.side-panel .room-row small { font-size: var(--fs-meta); }
+.side-panel .room-row > span:last-child { gap: 4px; font-variant-numeric: tabular-nums; }
+.side-panel .room-row > span:last-child > svg { color: hsl(var(--muted-foreground)); }
+/* 成本入口 / 总览里的成本行：整行卡片 */
+.side-panel .room-cost-link { display: grid; grid-template-columns: minmax(0, 1fr) auto 14px; align-items: center; gap: 8px; width: 100%; min-height: 40px; margin: var(--rp-row) 0 0; padding: 0 12px; border: 1px solid hsl(var(--border)); border-radius: var(--ctl-radius); background: hsl(var(--card)); font-size: var(--fs-control); font-weight: 500; color: hsl(var(--foreground)); transition: border-color .15s ease, background-color .15s ease; }
+.side-panel .room-cost-link:hover { border-color: hsl(var(--primary) / 0.4); background: hsl(var(--accent) / 0.5); }
+.side-panel .room-cost-link b { font-size: var(--fs-group); font-weight: 600; color: hsl(var(--primary)); font-variant-numeric: tabular-nums; }
+.side-panel .room-cost-link > svg { color: hsl(var(--muted-foreground)); }
+/* 成本主卡：金额 → 硬软装比例 → 定价进度，一张卡片 */
+.side-panel .cost-hero { display: grid; gap: 10px; padding: 14px; border: 1px solid hsl(var(--border)); border-radius: var(--ctl-radius); background: hsl(var(--card)); }
+.side-panel .cost-hero-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; }
+.side-panel .cost-hero-top small { font-size: var(--fs-meta); font-weight: 500; color: hsl(var(--muted-foreground)); }
+.side-panel .cost-share { padding: 2px 8px; border-radius: 999px; background: hsl(var(--accent)); font-size: var(--fs-meta); font-weight: 500; color: hsl(var(--primary)); }
+.side-panel .cost-hero > strong { display: block; margin: -2px 0 2px; font-size: 24px; line-height: 1.15; font-weight: 600; letter-spacing: -0.3px; color: hsl(var(--primary)); font-variant-numeric: tabular-nums; }
+.side-panel .cost-split { height: 6px; margin: 0; border-radius: 999px; }
+.side-panel .cost-split-legend { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; margin: 0; font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); }
+.side-panel .cost-split-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+.side-panel .cost-split-legend b { font-size: var(--fs-meta); font-weight: 600; color: hsl(var(--foreground)); font-variant-numeric: tabular-nums; }
+.side-panel .cost-split-legend i { width: 8px; height: 8px; border-radius: 2px; }
+.side-panel .cost-progress { display: grid; gap: 8px; margin: 2px 0 0; padding-top: 12px; border-top: 1px dashed hsl(var(--border)); }
+.side-panel .cost-progress-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); }
+.side-panel .cost-progress-head b { font-weight: 600; color: hsl(var(--foreground)); }
+.side-panel .cost-progress-head button { height: 24px; padding: 0 10px; border: 1px solid hsl(var(--border)); border-radius: 999px; background: hsl(var(--card)); font-size: var(--fs-meta); font-weight: 500; color: hsl(var(--foreground)); transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
+.side-panel .cost-progress-head button:hover { border-color: hsl(var(--primary) / 0.4); color: hsl(var(--primary)); }
+.side-panel .cost-progress-head button.active { border-color: hsl(var(--primary) / 0.45); background: hsl(var(--accent)); color: hsl(var(--primary)); }
+.side-panel .cost-progress-bar { height: 4px; margin: 0; border-radius: 999px; }
+.side-panel .cost-warning { display: block; margin: var(--rp-row) 0 0; padding: 8px 10px; border: 0; border-radius: var(--ctl-radius-in); background: hsl(var(--primary) / 0.08); font-size: var(--fs-meta); line-height: 1.5; color: hsl(var(--foreground)); }
+/* 费用明细：一类一张可展开卡片 */
+.side-panel .cost-categories { display: grid; gap: var(--sp-title); }
+.side-panel .cost-category { margin: 0; border: 1px solid hsl(var(--border)); border-radius: var(--ctl-radius); background: hsl(var(--card)); overflow: hidden; }
+.side-panel .cost-category.is-open { border-color: hsl(var(--primary) / 0.3); }
+.side-panel .cost-category-head { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; align-items: center; gap: 8px; width: 100%; min-height: 48px; padding: 8px 12px; text-align: left; }
+.side-panel .cost-category-head:hover { background: hsl(var(--secondary) / 0.6); }
+.side-panel .cost-category-head > svg { width: 14px; height: 14px; color: hsl(var(--muted-foreground)); transform: rotate(-90deg); transition: transform .15s ease; }
+.side-panel .cost-category.is-open .cost-category-head > svg { transform: none; }
+.side-panel .cost-category-head > span { display: grid; gap: 2px; min-width: 0; font-size: var(--fs-control); font-weight: 600; color: hsl(var(--foreground)); }
+.side-panel .cost-category-head small { overflow: hidden; font-size: var(--fs-meta); font-weight: 400; color: hsl(var(--muted-foreground)); text-overflow: ellipsis; white-space: nowrap; }
+.side-panel .cost-category-head > b { display: grid; justify-items: end; gap: 2px; font-size: var(--fs-control); font-weight: 600; color: hsl(var(--foreground)); font-variant-numeric: tabular-nums; }
+.side-panel .cost-category-head > b em { font-size: var(--fs-meta); font-style: normal; font-weight: 500; color: hsl(var(--destructive)); }
+.side-panel .cost-category-body { padding: 0 12px; border-top: 1px solid hsl(var(--border)); background: hsl(var(--secondary) / 0.25); }
+/* 单条价格：名称 + 金额 → 计量 → 单价编辑 */
 .side-panel .cost-detail { padding: var(--rp-row) 0; }
-.side-panel .cost-detail > small { margin: 4px 0 10px; }
-.side-panel .procurement-editor { margin-top: var(--rp-title); }
+.side-panel .cost-detail + .cost-detail { border-top: 1px solid hsl(var(--border) / 0.7); }
+.side-panel section > .cost-detail:first-of-type { padding-top: 0; }
+.side-panel .cost-detail.is-highlight { margin: 0 -8px; padding-inline: 8px; border-radius: var(--ctl-radius-in); background: hsl(var(--accent)); }
+.side-panel .cost-detail-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.side-panel .cost-detail-heading b { font-size: var(--fs-control); font-weight: 600; color: hsl(var(--foreground)); }
+.side-panel .cost-detail-heading span { font-size: var(--fs-control); font-weight: 600; font-variant-numeric: tabular-nums; }
+.side-panel .cost-detail > small { display: block; margin: 2px 0 10px; font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); }
+.side-panel .cost-unpriced-tag { padding: 1px 8px; border-radius: 999px; background: hsl(var(--destructive) / 0.1); font-size: var(--fs-meta) !important; font-weight: 500 !important; color: hsl(var(--destructive)); }
+.side-panel .price-field { display: grid; gap: var(--sp-title); }
+.side-panel .price-field-meta,
+.side-panel .price-sync-option { margin: 0; }
+.side-panel .price-field-meta { font-size: var(--fs-meta); }
+.side-panel .price-source-tag { font-size: var(--fs-meta); }
+.side-panel .price-sync-option { font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); }
+.side-panel .price-entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px var(--sp-col); }
+.side-panel .price-entry .price-control { width: auto; }
+.side-panel .price-entry small { grid-column: 1 / -1; }
+.side-panel .price-field .footnote { margin: 0; }
+/* 地面采购规格 */
+.side-panel .procurement-editor { margin-top: var(--sp-title); padding-top: var(--sp-title); }
+.side-panel .procurement-result { gap: 2px; font-size: var(--fs-meta); }
+.side-panel .procurement-result > small { font-size: var(--fs-meta); }
+.side-panel .editor-procurement-toggle { height: var(--ctl-sm); padding: 0; font-size: var(--fs-meta); font-weight: 500; }
+.side-panel .procurement-fields { gap: var(--rp-row) var(--rp-col); margin-top: var(--sp-title); }
+.side-panel .procurement-fields label { display: grid; gap: 6px; font-size: var(--fs-label); font-weight: 500; color: hsl(var(--muted-foreground)); }
+/* 人工：条目 + 新增表单，控件 32px */
+.side-panel .labor-item { padding: var(--rp-row) 0; }
+.side-panel .labor-item + .labor-item { border-top: 1px solid hsl(var(--border) / 0.7); }
+.side-panel .labor-item > div:first-child { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-title); }
+.side-panel .labor-item b { font-size: var(--fs-control); font-weight: 600; }
+.side-panel .labor-item button[aria-label^="删除"] { display: grid; place-items: center; width: var(--ctl-sm); height: var(--ctl-sm); border-radius: var(--ctl-radius-in); color: hsl(var(--muted-foreground)); }
+.side-panel .labor-item button[aria-label^="删除"]:hover { background: hsl(var(--destructive) / 0.1); color: hsl(var(--destructive)); }
+.side-panel .labor-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--sp-title); padding: var(--rp-row) 0; border-top: 1px solid hsl(var(--border) / 0.7); }
+.side-panel .labor-form input { height: var(--ctl-md); padding: 0 10px; border: 1px solid hsl(var(--input)); border-radius: var(--ctl-radius-in); background: hsl(var(--background)); font-size: var(--fs-input); }
+.side-panel .labor-form .editor-tooltip-trigger,
+.side-panel .labor-form > button { grid-column: 1 / -1; }
+.side-panel .labor-form button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: 100%; height: var(--ctl-md); border: 1px dashed hsl(var(--border)); border-radius: var(--ctl-radius-in); background: transparent; font-size: var(--fs-control); font-weight: 500; color: hsl(var(--primary)); }
+.side-panel .labor-form button:hover { border-color: hsl(var(--primary) / 0.5); background: hsl(var(--accent) / 0.6); }
+.side-panel .labor-form small { grid-column: 1 / -1; font-size: var(--fs-meta); }
+/* 按房间：名称 · 占比条 · 金额 · 箭头，行高 36 */
+.side-panel .room-cost-list { display: grid; }
+.side-panel .room-cost-row { display: grid; grid-template-columns: minmax(0, 1fr) 56px auto 14px; align-items: center; gap: 10px; width: calc(100% + 16px); min-height: 36px; margin: 0 -8px; padding: 0 8px; border-radius: var(--ctl-radius-in); font-size: var(--fs-control); font-weight: 500; color: hsl(var(--foreground)); }
+.side-panel button.room-cost-row:hover { background: hsl(var(--secondary)); }
+.side-panel .room-cost-row b { font-size: var(--fs-control); font-weight: 600; font-variant-numeric: tabular-nums; }
+.side-panel .room-cost-row > svg { color: hsl(var(--muted-foreground)); }
+.side-panel .room-cost-row.is-shared { color: hsl(var(--muted-foreground)); }
+.side-panel .room-cost-bar { height: 4px; border-radius: 999px; }
+.side-panel .room-cost-name i { width: 10px; height: 10px; border-radius: 3px; }
+.side-panel .room-cost-total { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; margin-top: var(--sp-title); padding-top: var(--sp-title); border-top: 1px dashed hsl(var(--border)); font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); }
+.side-panel .room-cost-total b { font-size: var(--fs-meta); font-weight: 600; color: hsl(var(--foreground)); font-variant-numeric: tabular-nums; }
+/* 家具库卡片：名称 12/500、尺寸 11 */
+.side-panel .library-grid { gap: var(--sp-col); padding: 0 var(--rp-x) var(--rp-section); }
+.side-panel .library-item { padding: 0 0 10px; border-radius: var(--ctl-radius); }
+.side-panel .library-visual { height: 76px; margin-bottom: 8px; }
+.side-panel .library-item b { margin: 0 10px 2px; overflow: hidden; font-size: var(--fs-control); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.side-panel .library-item small { margin: 0 10px; font-size: var(--fs-meta); }
+.side-panel .structural-items { margin: 0 var(--rp-x) var(--rp-section); gap: var(--rp-row); }
+.side-panel .structural-group > h4 { font-size: var(--fs-label); }
 
 /* ── 分割墙段：步骤编号、复选标识、轻量操作、底部结果摘要 ── */
 .wall-split-dialog { gap: 16px; padding: 24px; }

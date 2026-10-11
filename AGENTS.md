@@ -43,14 +43,27 @@
 | 家具 2D 符号 | `FurnitureShape` |
 | 面板底部操作提示（可关闭） | `PanelHint` |
 
+### 1.4 编辑器外壳
+
+| 场景 | 组件 | 说明 |
+|---|---|---|
+| 右侧侧栏（家具库 / 方案总览 / 成本 / 户型 / AI 共用） | `SidePanel`（`PanelKind`） | 标题 + 关闭 + 滚动区，宽 340px；≤1100px 变抽屉。内容按 UI_GUIDELINES §10 的刻度写 |
+| 侧栏入口 | `CanvasRail` | 画布右侧竖条：方案总览 → 家具设计 → 成本设计 → 户型设计 → AI 设计 + 收起；整条可拖动 |
+| 顶栏视图设置 | `ViewMenu`（`LAYER_ITEMS`） | 图层开关 + 显示比例 |
+| 顶栏保存与导出 | `ExportMenu`（`saveState`） | 登录后主按钮；游客为副按钮，右侧另有主按钮「登录」 |
+| AI 对话侧栏 | `AiChatPanel` | 复用 `AiComposer` |
+| 侧栏里的 2–4 个互斥选项 | `PanelSegmented` | 与「2D 平面 / 3D 场景」同一外观 |
+| 单行分类胶囊（溢出渐隐、滚轮横滑） | `CmsFilterBar` | 管理页与家具库侧栏共用；侧栏传 `className="library-categories"` 变紧凑 |
+| 滚动自动加载（12 条一页） | `ProjectLoadMore` | 家具管理、家具库侧栏共用 |
+
 基础控件（Button、Popover、DropdownMenu、Command、Dialog、Input……）统一用 `src/components/ui/` 里的 shadcn 组件。
 
-## 2. 方向：用 Visual Editor 工具条替代右侧属性面板
+## 2. 方向：对象编辑在 Visual Editor 工具条，全局内容在右侧侧栏
 
-最终目标是去掉右侧属性面板，所有编辑都在选中对象的浮动工具条（`SelectionEditor`）里完成。所以：
+右侧属性面板已删除：选中对象的编辑都在浮动工具条（`SelectionEditor`）里完成；方案总览、户型、成本、家具库、AI 这类全局内容放在 `SidePanel`，入口统一在 `CanvasRail`。所以：
 
-- 面板里新增或调整一项能力时，工具条里也要有对应入口，并且两边用同一个组件，不要各写一份。
-- 信息展示类的内容（例如房间指标）用小字放进对应的工具条弹层，不再单独加面板区块。
+- 对象编辑能力只加在工具条里，不要再往侧栏塞对象属性。
+- 信息展示类的内容（例如房间指标）用小字放进对应的工具条弹层。
 
 ## 3. 改完要跑的检查
 

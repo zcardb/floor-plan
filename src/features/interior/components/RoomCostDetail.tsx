@@ -1,4 +1,4 @@
-import { Armchair, ArrowLeft, Hammer } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { EditorTooltip } from "@/components/ui/editor-tooltip";
 import type { CostPart, RoomCost } from "../model/costBreakdown";
 import { yuan } from "../model/money";
@@ -70,16 +70,19 @@ export function RoomCostDetail({
     <>
       <div className="panel-heading">
         <EditorTooltip label="返回全屋成本">
-          <button className="back-link" onClick={back}>
-            <ArrowLeft size={13} />
+          <button type="button" className="back-link" onClick={back}>
+            <ArrowLeft size={14} />
             全屋成本
           </button>
         </EditorTooltip>
-        <span className="mini-label">房间口径</span>
+        <div className="panel-heading-row">
+          <h3>{target?.name || "房间"}</h3>
+          <span className="mini-label">房间口径</span>
+        </div>
       </div>
       <section>
         <CostHero
-          eyebrow={target?.name || "房间"}
+          eyebrow="本间合计 · 硬装 + 软装"
           amount={room.total}
           hard={room.hardTotal}
           soft={room.softTotal}
@@ -92,7 +95,6 @@ export function RoomCostDetail({
       </section>
       <section>
         <h3 className="section-title">
-          <Hammer size={14} />
           硬装 <span>{yuan(room.hardTotal)}</span>
         </h3>
         {hard.map((part) => (
@@ -107,7 +109,6 @@ export function RoomCostDetail({
       </section>
       <section>
         <h3 className="section-title">
-          <Armchair size={14} />
           房内家具 <small>{soft.reduce((s, p) => s + p.quantity, 0)} 件</small>
         </h3>
         {soft.map((part) => (

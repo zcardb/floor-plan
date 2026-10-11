@@ -1,4 +1,3 @@
-import { Ruler } from "lucide-react";
 import { Input } from '@/components/ui/input';
 import { meterDraft, parseMeterDraft, toMeters } from '../model/lengthUnits';
 import { notify } from "@/lib/notify";
@@ -72,10 +71,7 @@ export function HouseSettingsPanel({ design, change }: {
   return (
     <>
       <section>
-        <h3 className="section-title">
-          <Ruler size={15} />
-          户型尺寸
-        </h3>
+        <h3 className="section-title">户型尺寸</h3>
         <p className="muted-note">
           {frameResizable
             ? "尺寸为墙内净尺寸，外围墙随参数自动更新。"
