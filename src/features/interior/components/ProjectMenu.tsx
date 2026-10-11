@@ -8,6 +8,7 @@ import { ProjectDeleteDialog, ProjectRenameDialog } from './ProjectDialogs';
 import { ProjectRowActions } from './ProjectRowActions';
 import { CreateProjectMenuItems } from './CreateProjectMenuItems';
 import { useProjectCreation } from './useProjectCreation';
+import { Logo } from './Logo';
 import type { ProjectSummary } from '../cloud/useProjects';
 import type { Project } from '../model/types';
 
@@ -47,7 +48,7 @@ export function LoadMoreSentinel({ disabled, onVisible }: { disabled: boolean; o
   return <div ref={ref} className="project-menu-sentinel" aria-hidden="true" />;
 }
 
-/** Left of the toolbar: current project name; opens back-to-manager, project switching, rename and delete. */
+/** Left of the toolbar: brand logo plus the current project name, in one click target that opens project switching. */
 export function ProjectMenu(p: Props) {
   const [pending, setPending] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<ProjectSummary | null>(null), [deleting, setDeleting] = useState<ProjectSummary | null>(null);
@@ -76,21 +77,26 @@ export function ProjectMenu(p: Props) {
     <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
       <DropdownMenuTrigger asChild>
         <button type="button" className="project-menu-trigger" aria-label={'项目：' + name} aria-busy={busy}>
-          <span>{name}</span>{pending || duplicating || creation.importing ? <Loader2 className="animate-spin" size={14} /> : <ChevronDown size={14} />}
+          <Logo size={24} />
+          <span className="project-menu-title">{name}</span>
+          {pending || duplicating || creation.importing ? <Loader2 className="animate-spin" size={14} /> : <ChevronDown size={14} />}
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="project-menu" onCloseAutoFocus={event => { if (renaming || deleting || creation.dialogOpen) event.preventDefault(); }}>
-        {p.loggedIn && <>
-          <DropdownMenuItem disabled={busy} onSelect={p.onBack}><ArrowLeft />返回项目管理</DropdownMenuItem>
-          {/* 与项目管理页的「新建项目」同一套选项：悬停展开，点击选项再创建。 */}
-          {p.onCreateProject && <DropdownMenuSub>
-            <DropdownMenuSubTrigger className="project-menu-create" disabled={busy}><Plus size={14} />新建项目</DropdownMenuSubTrigger>
+        {p.loggedIn && p.onCreateProject && <>
+          {/* 主色卡片：悬停展开二级菜单，卡片上直接写清有哪几种新建方式。 */}
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="project-menu-create" disabled={busy}>
+              <span className="create-option-icon" aria-hidden="true"><Plus /></span>
+              <span className="create-option-text"><b>新建项目</b><small>手动、AI 创建或导入图纸</small></span>
+            </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="create-menu" sideOffset={6}>
               <CreateProjectMenuItems actions={creation.actions} />
             </DropdownMenuSubContent>
-          </DropdownMenuSub>}
+          </DropdownMenuSub>
           <DropdownMenuSeparator />
         </>}
+        <p className="project-menu-heading">{p.loggedIn ? '切换项目' : '内置模板'}</p>
         <div className="project-menu-list" role="group" aria-label="项目列表">
           {rows.map(row => {
             const current = row.id === p.project.id || (!p.loggedIn && row.templateId === p.project.templateId);
@@ -112,6 +118,10 @@ export function ProjectMenu(p: Props) {
           {p.loggedIn && p.hasMore && <LoadMoreSentinel disabled={p.listLoading} onVisible={p.onLoadMore} />}
           {p.loggedIn && p.listLoading && <div className="project-menu-loading" role="status" aria-label="加载更多项目"><Loader2 className="animate-spin" size={15} /></div>}
         </div>
+        {p.loggedIn && <>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem disabled={busy} onSelect={p.onBack}><ArrowLeft />返回项目管理</DropdownMenuItem>
+        </>}
       </DropdownMenuContent>
     </DropdownMenu>
     <ProjectRenameDialog project={renaming} onClose={() => setRenaming(null)} onSubmit={p.onRename} />

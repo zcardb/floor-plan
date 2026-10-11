@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { blankDesign } from '../data/templates';
-import { furnitureInRect, groupBounds, groupIds, moveGroup, normalizeRect, removeGroup, selectionOf } from './furnitureGroup';
+import { expandToGroups, furnitureInRect, groupBounds, groupFurniture, groupIds, isPersistentGroup, moveGroup, normalizeRect, persistentGroupOf, removeGroup, selectionOf, ungroupFurniture } from './furnitureGroup';
 import type { Design, Furniture } from './types';
 
 const item = (id: string, cx: number, cy: number, rot = 0): Furniture => ({ id, type: 'chair', name: id, cx, cy, w: 400, d: 400, rot, color: '#888888' });
@@ -36,5 +36,31 @@ describe('框选家具', () => {
     expect(groupIds(d, { kind: 'furniture', id: 'a' })).toEqual([]);
     expect(groupBounds(d, ['a', 'b'])).toEqual([[800, 800], [2200, 800], [2200, 1200], [800, 1200]]);
     expect(removeGroup(d, ['a', 'b']).furniture.map(f => f.id)).toEqual(['c']);
+  });
+});
+
+describe('家具组合', () => {
+  it('组合写入同一个 groupId，点中任意一件都得到整组', () => {
+    const d = groupFurniture(design(), ['a', 'b'], 'g1');
+    expect(d.furniture.map(f => f.groupId)).toEqual(['g1', 'g1', undefined]);
+    expect(persistentGroupOf(d, 'b')).toEqual(['a', 'b']);
+    expect(persistentGroupOf(d, 'c')).toEqual(['c']);
+    expect(isPersistentGroup(d, ['a', 'b'])).toBe(true);
+    expect(isPersistentGroup(d, ['a', 'b', 'c'])).toBe(false);
+  });
+  it('框到组合里的一件即补全整组；与已有组合再组合时合并为一组', () => {
+    const d = groupFurniture(design(), ['a', 'b'], 'g1');
+    expect(expandToGroups(d, ['a'])).toEqual(['a', 'b']);
+    const merged = groupFurniture(d, ['b', 'c'], 'g2');
+    expect(merged.furniture.map(f => f.groupId)).toEqual(['g2', 'g2', 'g2']);
+  });
+  it('解除组合清除 groupId；少于两件不组合；旧数据（无 groupId）不受影响', () => {
+    const d = groupFurniture(design(), ['a', 'b'], 'g1');
+    const free = ungroupFurniture(d, ['a', 'b']);
+    expect(free.furniture.every(f => !('groupId' in f))).toBe(true);
+    expect(groupFurniture(design(), ['a'], 'g1').furniture.every(f => !f.groupId)).toBe(true);
+    const legacy = design();
+    expect(ungroupFurniture(legacy, ['a'])).toBe(legacy);
+    expect(expandToGroups(legacy, ['a'])).toEqual(['a']);
   });
 });

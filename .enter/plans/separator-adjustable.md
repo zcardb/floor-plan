@@ -82,33 +82,33 @@
 - 判断方式：`isBuiltinItem` 为真且账号库里有同 id 记录，就是「已调整的内置家具」，不再被误当成可删除的自定义家具。
 
 ## Implementation checklist
-- [ ] `Workbench.tsx`：删除 `marquee` 状态、「框选」按钮、M 快捷键和框选提示；V 仍然切换到选择
-- [ ] `PlanCanvas.tsx`：选择模式下在空白处或房间上拖动改为 `marquee`；在家具、墙、门窗、分隔线上拖动的行为不变；只读时仍然平移
-- [ ] `PlanCanvas.tsx`：wheel 事件按 `wheelIntent` 区分，触控板双指平移、ctrl 加 wheel 缩放、鼠标滚轮缩放；中键拖动或空格加拖动平移
-- [ ] `model/wheelIntent.ts`：纯函数加连续滚动粘滞判断
-- [ ] `index.css`：选择模式下空白处显示十字光标，家具上显示移动光标
-- [ ] `types.ts` 新增 `Furniture.groupId`；`validation.ts` 和 `costs.normalizeFurniture` 校验并保留这个字段
-- [ ] `furnitureGroup.ts`：新增 `groupFurniture` / `ungroupFurniture` / `expandToGroups` / `persistentGroupOf`
-- [ ] `PlanCanvas.tsx`：点击或拖动已组合的家具时选中并移动整组；框选结果补全为整组
-- [ ] `SelectionEditor.tsx` 和 `Workbench.tsx`：「组合 / 解除组合」按钮、Ctrl G / Ctrl Shift G、提示和撤销
-- [ ] 新增 `ColorPicker.tsx`（`swatch` / `field` 两种触发器，共用一个弹层：常用色 + 自定义取色）
-- [ ] `SelectionEditor`、`PropertyPanel`、`FurnitureFormFields`、`CustomFloorForm`、`CustomColorMaterialForm` 全部改用 `ColorPicker`
-- [ ] 删除 `ColorSwatches.tsx`、`ColorPickerField.tsx`，以及 `index.css` 里旧颜色样式和没用到的 `input[type="color"]` 规则；之后全局搜索确认没有残留引用
-- [ ] 新增 `VisualSelectField.tsx` 和 `materialThumbs.tsx`
-- [ ] 地面、墙面、屋面、吊顶、门窗款式、外形改用带图下拉（`SelectionEditor`、`RoomSurfaceFields`、`OpeningVariantSelect`、`PropertyPanel`、`RoomSurfacePanel`、`FurnitureFormFields`）
-- [ ] `ProjectMenu.tsx`：Logo 并入触发按钮；`Workbench.tsx` 去掉单独的 Logo
-- [ ] 「新建项目」卡片和二级菜单改版（`ProjectMenu`、`CreateProjectMenuItems`、`index.css`）
-- [ ] `AccountFurnitureDialog`：内置家具开放「AI 调整」，只保存 `imageUrl` / `model3d`，并提供「恢复默认素材」
-- [ ] `accountCostEntries` 和 `AccountFurnitureLibrary`：区分已调整的内置家具和自定义家具，角标显示「已调整」
-- [ ] `Workbench.tsx`：素材库里有覆盖的内置家具用覆盖版本替换；`furnitureSync.ts` 同步已放置的内置家具素材
+- [x] `Workbench.tsx`：删除 `marquee` 状态、「框选」按钮、M 快捷键和框选提示；V 仍然切换到选择
+- [x] `PlanCanvas.tsx`：选择模式下在空白处或房间上拖动改为 `marquee`；在家具、墙、门窗、分隔线上拖动的行为不变；只读时仍然平移
+- [x] `PlanCanvas.tsx`：wheel 事件按 `wheelIntent` 区分，触控板双指平移、ctrl 加 wheel 缩放、鼠标滚轮缩放；中键拖动或空格加拖动平移
+- [x] `model/wheelIntent.ts`：纯函数加连续滚动粘滞判断
+- [x] `index.css`：选择模式下空白处显示十字光标，家具上显示移动光标
+- [x] `types.ts` 新增 `Furniture.groupId`；`validation.ts` 和 `costs.normalizeFurniture` 校验并保留这个字段
+- [x] `furnitureGroup.ts`：新增 `groupFurniture` / `ungroupFurniture` / `expandToGroups` / `persistentGroupOf`
+- [x] `PlanCanvas.tsx`：点击或拖动已组合的家具时选中并移动整组；框选结果补全为整组
+- [x] `SelectionEditor.tsx` 和 `Workbench.tsx`：「组合 / 解除组合」按钮、Ctrl G / Ctrl Shift G、提示和撤销
+- [x] 新增 `ColorPicker.tsx`（`swatch` / `field` 两种触发器，共用一个弹层：常用色 + 自定义取色）
+- [x] `SelectionEditor`、`PropertyPanel`、`FurnitureFormFields`、`CustomFloorForm`、`CustomColorMaterialForm` 全部改用 `ColorPicker`
+- [x] 删除 `ColorSwatches.tsx`、`ColorPickerField.tsx`，以及 `index.css` 里旧颜色样式和没用到的 `input[type="color"]` 规则；之后全局搜索确认没有残留引用
+- [x] 新增 `VisualSelectField.tsx` 和 `materialThumbs.tsx`
+- [x] 地面、墙面、屋面、吊顶、门窗款式、外形改用带图下拉（`SelectionEditor`、`RoomSurfaceFields`、`OpeningVariantSelect`、`PropertyPanel`、`RoomSurfacePanel`、`FurnitureFormFields`）
+- [x] `ProjectMenu.tsx`：Logo 并入触发按钮；`Workbench.tsx` 去掉单独的 Logo
+- [x] 「新建项目」卡片和二级菜单改版（`ProjectMenu`、`CreateProjectMenuItems`、`index.css`）
+- [x] `AccountFurnitureDialog`：内置家具开放「AI 调整」，只保存 `imageUrl` / `model3d`，并提供「恢复默认素材」
+- [x] `accountCostEntries` 和 `AccountFurnitureLibrary`：区分已调整的内置家具和自定义家具，角标显示「已调整」
+- [x] `Workbench.tsx`：素材库里有覆盖的内置家具用覆盖版本替换；`furnitureSync.ts` 同步已放置的内置家具素材
 
 ## Verification checklist
-- [ ] 单元测试 `wheelIntent`：鼠标滚轮判为缩放，触控板小增量或带 `deltaX` 判为平移，ctrl 判为缩放，连续滚动不会中途切换
-- [ ] 单元测试 `furnitureGroup`：组合会合并旧组；解除组合会清除；框到组内一件会补全整组；没有 `groupId` 的旧数据结果不变
-- [ ] `validation`：`groupId` 不是字符串时报错；合法时保存后再读取不丢失
-- [ ] 单元测试 `furnitureSync`：已调整的内置家具，只同步未在项目里改过的 `imageUrl` / `model3d`
-- [ ] 更新 `Workbench.test.tsx`：工具按钮只剩「选择」「门」「窗」
-- [ ] 更新 `SelectionEditor.test.tsx`：工具条只有一个色块；多选显示「组合」，选中已有组显示「解除组合」
-- [ ] 新增 `ColorPicker` 测试：点常用色只调用一次 `onChange` 并关闭；自定义色在 change 时提交；两种触发器打开的是同一个弹层
-- [ ] 截图检查（desktop_1280）：工具条色块、带图下拉、项目切换弹层
-- [ ] 运行 `pnpm exec tsc -p tsconfig.app.json --noEmit`（`wallFaces.ts` 原有的那个错误除外）、`pnpm exec vitest run src`、`pnpm run lint` 和 `pnpm run build`
+- [x] 单元测试 `wheelIntent`：鼠标滚轮判为缩放，触控板小增量或带 `deltaX` 判为平移，ctrl 判为缩放，连续滚动不会中途切换
+- [x] 单元测试 `furnitureGroup`：组合会合并旧组；解除组合会清除；框到组内一件会补全整组；没有 `groupId` 的旧数据结果不变
+- [x] `validation`：`groupId` 不是字符串时报错；合法时保存后再读取不丢失
+- [x] 单元测试 `furnitureSync`：已调整的内置家具，只同步未在项目里改过的 `imageUrl` / `model3d`
+- [x] 更新 `Workbench.test.tsx`：工具按钮只剩「选择」「门」「窗」
+- [x] 更新 `SelectionEditor.test.tsx`：工具条只有一个色块；多选显示「组合」，选中已有组显示「解除组合」
+- [x] 新增 `ColorPicker` 测试：点常用色只调用一次 `onChange` 并关闭；自定义色在 change 时提交；两种触发器打开的是同一个弹层
+- [x] 截图检查（desktop_1280）：顶部 logo + 项目名触发器、工具栏只剩「选择」（弹层类交互未截图）
+- [x] 运行 `pnpm exec tsc -p tsconfig.app.json --noEmit`（`wallFaces.ts` 原有的那个错误除外）、`pnpm exec vitest run src`、`pnpm run lint` 和 `pnpm run build`

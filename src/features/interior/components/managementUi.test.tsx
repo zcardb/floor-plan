@@ -150,7 +150,7 @@ describe('管理端精简与加载分支', () => {
     expect(failed).not.toContain('还没有设计项目');
   });
   it('家具管理采用成本版式：搜索框原位反馈、硬装软装两行与价格卡片', () => {
-    const catalog = { items: [], count: 0, counts: {}, loading: true, error: '', hasMore: false } as unknown as ReturnType<typeof useFurnitureCatalog>;
+    const catalog = { items: [], overrides: [], count: 0, counts: {}, loading: true, error: '', hasMore: false } as unknown as ReturnType<typeof useFurnitureCatalog>;
     const html = render(createElement(AccountFurnitureLibrary, { catalog, defaults: {}, saveDefaults: async () => true, onDirty: () => {}, onNew: () => {} }));
     expect(html).toContain('aria-busy="true"');
     expect(html).toContain('cms-item-card--cost');
@@ -183,7 +183,7 @@ describe('管理端精简与加载分支', () => {
     expect(html).not.toContain('正在读取');
   });
   it('家具读取仍显示内置家具并保留错误，但不增加读取文字行', () => {
-    const catalog = { items: [], count: 0, counts: {}, loading: true, error: '读取失败', hasMore: false } as unknown as ReturnType<typeof useFurnitureCatalog>;
+    const catalog = { items: [], overrides: [], count: 0, counts: {}, loading: true, error: '读取失败', hasMore: false } as unknown as ReturnType<typeof useFurnitureCatalog>;
     const html = render(createElement(AccountFurnitureLibrary, { catalog, defaults: {}, saveDefaults: async () => true, onDirty: () => {}, onNew: () => {} }));
     expect(html).toContain('aria-busy="true"');
     expect(html).toContain('cms-item-card');

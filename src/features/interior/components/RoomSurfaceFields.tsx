@@ -4,7 +4,8 @@ import { Label } from '@/components/ui/label';
 import { notify } from '@/lib/notify';
 import { applyRoomCeiling, applyRoomRoof, pickableSurfaces, ROOF_SLOPE_MAX, setRoomRoofSlope } from '../model/hardMaterials';
 import type { CustomWall, Design, Room } from '../model/types';
-import { EditorSelect } from './EditorSelect';
+import { VisualSelectField } from './VisualSelectField';
+import { colorThumb, noneThumb } from './materialThumbs';
 import { runSurfaceChange } from './runSurfaceChange';
 
 const NONE = '__none__';
@@ -34,14 +35,14 @@ export function RoofSlopeInput({ room, change, className }: Pick<RoomSurfaceProp
 /** 房间材质弹层里的屋面 / 坡度 / 吊顶：没有屋面时不展示坡度；吊顶独立于屋面。 */
 export function RoomSurfaceFields({ design, room, change, accountRoofs, accountCeilings }: RoomSurfaceProps) {
   const options = (kind: 'roof' | 'ceiling', account: CustomWall[], none: string) => [
-    { value: NONE, label: none },
-    ...pickableSurfaces(design, kind, account).map(({ key, name, fromAccount }) => ({ value: key, label: fromAccount ? `${name} · 账号库` : name })),
+    { value: NONE, label: none, visual: noneThumb() },
+    ...pickableSurfaces(design, kind, account).map(({ key, name, material, fromAccount }) => ({ value: key, label: name, visual: colorThumb(material.color), badge: fromAccount ? '账号库' : undefined })),
   ];
   return <>
-    <EditorSelect label="屋面" value={room.roofMat || NONE} options={options('roof', accountRoofs, '无屋面')}
+    <VisualSelectField label="屋面" value={room.roofMat || NONE} options={options('roof', accountRoofs, '无屋面')}
       onChange={value => runSurfaceChange(change, d => applyRoomRoof(d, room.id, value === NONE ? null : value, accountRoofs), '屋面设置失败')} />
     {room.roofMat && <RoofSlopeInput key={room.id + ':' + (room.roofSlope ?? 0)} room={room} change={change} />}
-    <EditorSelect label="吊顶" value={room.ceilingMat || NONE} options={options('ceiling', accountCeilings, '原顶（无吊顶）')}
+    <VisualSelectField label="吊顶" value={room.ceilingMat || NONE} options={options('ceiling', accountCeilings, '原顶（无吊顶）')}
       onChange={value => runSurfaceChange(change, d => applyRoomCeiling(d, room.id, value === NONE ? null : value, accountCeilings), '吊顶设置失败')} />
   
   </>;

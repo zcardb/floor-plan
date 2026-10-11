@@ -5,17 +5,17 @@ import { ExportMenu, type ExportFormat } from './ExportMenu';
 import { ProjectMenu, type ProjectNavigation } from './ProjectMenu';
 import { WorkbenchBanner } from './WorkbenchBanner';
 import { AccountMenu } from './AccountMenu';
-import { Logo } from './Logo';
 import { DimensionEditDialog } from './DimensionEditDialog';
 import { WallSplitDialog } from './WallSplitDialog';
 import { CompassRose } from './CompassRose';
 import { northAngle } from '../model/northAngle';
 import { syncAccountFurniture, syncAccountMaterials } from '../model/furnitureSync';
+import { libraryWithOverrides, syncBuiltinFurniture } from '../model/builtinAssets';
 import { splitWall as splitWallModel } from '../model/wallSplit';
 import { removeWall as removeWallModel } from '../model/wallRemoval';
 import { clearRoomFurniture } from '../model/roomFurniture';
 import { removeRoom as removeRoomModel, type RoomRemoval } from '../model/roomRemoval';
-import { groupIds, moveGroup, removeGroup } from '../model/furnitureGroup';
+import { expandToGroups, groupFurniture, groupIds, isPersistentGroup, moveGroup, removeGroup, ungroupFurniture } from '../model/furnitureGroup';
 import { rotateUnit } from '../model/movableUnit';
 import { deriveRooms } from '../model/roomDerive';
 import { isStairs, resizeStair } from '../model/stairs';
@@ -45,7 +45,6 @@ import {
   Minus,
   Moon,
   MousePointer2,
-  SquareDashedMousePointer,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
@@ -126,6 +125,8 @@ import { DXF_TEMPLATE_ID } from "../model/externalDxf/recognize";
 type SceneComponent = typeof Scene3D;
 /** 3D 模块只下载一次：空闲时预加载，点击时复用同一个 promise。 */
 let scenePromise: Promise<typeof import("../scene/Scene3D")> | null = null;
+/** 未登录时没有素材覆盖：固定引用，同步副作用不会因为新数组反复触发。 */
+const emptyOverrides: LibraryItem[] = [];
 const loadScene = () =>
   (scenePromise ??= import("../scene/Scene3D").catch((e) => {
     scenePromise = null;
@@ -194,8 +195,6 @@ export function Workbench(p: Props) {
   const lifecycle = useSceneLifecycle(),
     view = lifecycle.view,
     sceneLoading = lifecycle.loading;
-  /** 框选开关：开启时 2D 画布左键拖动空白处为框选家具，关闭时为平移。 */
-  const [marquee, setMarquee] = useState(false);
   const [Scene, setScene] = useState<SceneComponent | null>(null),
     [hideLib, setHideLib] = useState(false),
     [hidePanel, setHidePanel] = useState(false),
@@ -204,8 +203,7 @@ export function Workbench(p: Props) {
     [pendingFile, setPendingFile] = useState<PendingFile | null>(null);
   const selectionId = selectionKey(selection);
   useEffect(()=>{ sizeTransaction.flush(); },[selectionId,tool,view,sizeTransaction]);
-  // 框选只在 2D 选择模式下有效：切到绘墙 / 门窗工具或 3D 时自动关闭；3D 没有成组选择。
-  useEffect(() => { if (tool !== "select" || view !== "2d") setMarquee(false); }, [tool, view]);
+  // 3D 没有成组选择。
   useEffect(() => { if (view !== "2d") setSelection(s => (s?.kind === "group" ? null : s)); }, [view]);
   // 页面被切走前，先把尺寸输入框里未提交的修改并入设计，随后的立即保存才能带上它
   useEffect(() => onPageHide(() => sizeTransaction.flush(), "flush"), [sizeTransaction]);
@@ -297,6 +295,15 @@ export function Workbench(p: Props) {
       notify.info('已按墙体与房间分隔线重新划分房间，请检查名称与地面材质');
     }
   }, [projectId, readOnly, sync, designRef]);
+  // 内置家具套用账号里的 2D / 3D 素材覆盖：左侧素材库、新放置的家具都用调整后的素材。
+  const builtinOverrides = p.loggedIn ? furnitureCatalog.overrides : emptyOverrides;
+  const builtinLibrary = libraryWithOverrides(builtinOverrides);
+  // 已放置的内置家具跟随素材覆盖（只改素材字段）。
+  useEffect(() => {
+    if (readOnly || !builtinOverrides.length) return;
+    const next = syncBuiltinFurniture(designRef.current, builtinOverrides);
+    if (next) sync(next);
+  }, [readOnly, d.furniture, builtinOverrides, sync, designRef]);
   // 账号家具库里改过的家具同步到本项目（项目内单独改过的单价、尺寸等保留）。
   const accountFurnitureItems = furnitureCatalog.items;
   useEffect(() => {
@@ -435,6 +442,21 @@ export function Workbench(p: Props) {
     },
     [selection, change, sizeTransaction],
   );
+  /** 组合 / 解除组合：选中的多件家具写入同一个 groupId，之后点选、拖动都作为整体。 */
+  const toggleGroup = useCallback(() => {
+    if (selection?.kind !== "group") return;
+    const ids = groupIds(d, selection);
+    if (ids.length < 2) return;
+    if (isPersistentGroup(d, ids)) {
+      change((d) => ungroupFurniture(d, ids));
+      notify.success(`已解除组合，${ids.length} 件家具可单独编辑`);
+      return;
+    }
+    const members = expandToGroups(d, ids);
+    change((d) => groupFurniture(d, members, uid()));
+    setSelection({ kind: "group", ids: members });
+    notify.success(`已将 ${members.length} 件家具组合，可整体移动`);
+  }, [d, selection, change]);
   const duplicate = useCallback(() => {
     if (selection?.kind !== "furniture") return;
     const f = d.furniture.find((f) => f.id === selection.id);
@@ -563,6 +585,9 @@ export function Workbench(p: Props) {
         e.preventDefault();
         if (e.shiftKey) redo();
         else undo();
+      } else if (mod && k === "g") {
+        e.preventDefault();
+        if (selection?.kind === "group" && isPersistentGroup(d, groupIds(d, selection)) === e.shiftKey) toggleGroup();
       } else if (mod && k === "d") {
         e.preventDefault();
         duplicate();
@@ -581,8 +606,7 @@ export function Workbench(p: Props) {
       else if (k === "f") {
         if (view === "2d") canvas.current?.fit();
         else scene.current?.iso();
-      } else if (k === "v") { setTool("select"); setMarquee(false); }
-      else if (k === "m" && view === "2d") { setTool("select"); setMarquee(v => !v); }
+      } else if (k === "v") setTool("select");
       else if (k.startsWith("arrow") && (selection?.kind === "furniture" || selection?.kind === "group")) {
         e.preventDefault();
         const st = e.shiftKey ? 100 : 10;
@@ -729,9 +753,7 @@ export function Workbench(p: Props) {
         ? "点击墙体放置门窗或垭口，选中后可沿墙拖动或使用可视编辑工具条调整"
         : view === "3d"
           ? "拖动旋转 · 滚轮缩放 · 选中家具可移动 · 点击门开关"
-          : marquee
-            ? "拖动框选家具 · 拖动选中的家具整组移动 · M 关闭框选"
-            : "拖入家具，开始规划你的理想空间";
+          : "拖动空白处框选 · 双指滑动平移 · 拖入家具，开始规划你的理想空间";
   return (
     <div className="workbench-shell">
       {readOnly && (
@@ -770,7 +792,6 @@ export function Workbench(p: Props) {
       }
     >
       <div className="main-toolbar">
-        <Logo size={24} />
         <ProjectMenu
           {...p.projectNavigation}
           project={p.project}
@@ -820,21 +841,11 @@ export function Workbench(p: Props) {
             <ToolButton
               label="选择"
               shortcut="V"
-              active={tool === "select" && !marquee}
-              onClick={() => { setTool("select"); setMarquee(false); }}
+              active={tool === "select"}
+              onClick={() => setTool("select")}
             >
               <MousePointer2 size={16} />
             </ToolButton>
-            {!readOnly && (
-              <ToolButton
-                label="框选"
-                shortcut="M"
-                active={tool === "select" && marquee}
-                onClick={() => { setTool("select"); setMarquee(v => !v); }}
-              >
-                <SquareDashedMousePointer size={16} />
-              </ToolButton>
-            )}
             {structureTools && (
               <>
                 <WallToolMenu tool={tool} setTool={setTool} />
@@ -1027,6 +1038,7 @@ export function Workbench(p: Props) {
           }}
           structureTools={structureTools}
           customItems={[...projectCatalog, ...accountFurniture]}
+          builtinItems={builtinLibrary}
           onNew={p.loggedIn && !readOnly ? () => setCustomOpen(true) : undefined}
           readOnly={readOnly}
         />
@@ -1081,7 +1093,6 @@ export function Workbench(p: Props) {
             startWallTool={structureTools ? () => setTool('wall') : undefined}
             onDimensionSelect={openDimension}
             selectedDimension={dimensionValid ? dimensionEdit.binding : undefined}
-            marquee={marquee}
           />
         ) : Scene ? (
           <ErrorBoundary key={lifecycle.generation} fallback={null} onError={() => lifecycle.fail("crash")}>
@@ -1248,6 +1259,7 @@ export function Workbench(p: Props) {
           change={change}
           rotate={() => rotate()}
           duplicate={duplicate}
+          toggleGroup={toggleGroup}
           remove={remove}
           close={() => setSelection(null)}
           transaction={sizeTransaction} showCosts={p.loggedIn}

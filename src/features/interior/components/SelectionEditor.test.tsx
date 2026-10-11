@@ -26,16 +26,17 @@ vi.mock('./CostDefaultsContext', async importOriginal => {
 import { SelectionEditor } from './SelectionEditor';
 import { EditorTooltip } from '@/components/ui/editor-tooltip';
 import { Button } from '@/components/ui/button';
+import { ColorPicker } from './ColorPicker';
 
 type Props = React.ComponentProps<typeof SelectionEditor>;
-function harness(kind: Opening['kind'], hidden = false) {
+function harness(kind: Opening['kind'], hidden = false, extra: Partial<Props> = {}) {
   const design = { ...blankDesign(), openings: [{ id: 'opening', wallId: 'wall', kind, width: 1000, offset: 2000 }] };
   const node = { style: { visibility: '', pointerEvents: '', transform: '' }, offsetWidth: 250, offsetHeight: 40, contains: () => false };
   state.node = node;
   const stage = { clientWidth: 800, clientHeight: 600, querySelectorAll: () => [] };
   const props: Props = { design, selection: { kind: 'opening', id: 'opening' }, stage: { current: stage as unknown as HTMLElement },
     hidden, showCosts: false, transaction: createSizeTransaction(() => design, vi.fn(), vi.fn()),
-    change: vi.fn(), rotate: vi.fn(), duplicate: vi.fn(), remove: vi.fn(), close: vi.fn(), details: vi.fn(), costs: vi.fn() };
+    change: vi.fn(), rotate: vi.fn(), duplicate: vi.fn(), remove: vi.fn(), close: vi.fn(), details: vi.fn(), costs: vi.fn(), ...extra };
   const component = SelectionEditor as unknown as { render: (props: Props, ref: null) => ReactElement };
   const element = component.render(props, null);
   return { node, element, update: state.handle.update };
@@ -75,6 +76,57 @@ describe('门窗 Visual editor 定位与可见性', () => {
   });
 });
 
+const furniture = (id: string, cx: number, groupId?: string) => ({ id, type: 'chair', name: id, cx, cy: 1000, w: 400, d: 400, rot: 0, color: '#efe6d8', ...(groupId ? { groupId } : {}) });
+describe('家具组合与颜色', () => {
+  const buttons = (element: ReactElement) => {
+    const out: ReactElement<{ 'aria-label'?: string; onClick?: () => void }>[] = [];
+    const walk = (tree: React.ReactNode) => {
+      if (Array.isArray(tree)) return tree.forEach(walk);
+      if (!tree || typeof tree !== 'object' || !('props' in tree)) return;
+      const node = tree as ReactElement<{ children?: React.ReactNode }>;
+      if (node.type === 'button') out.push(node as never);
+      walk(node.props.children);
+    };
+    walk((element.props as { children?: React.ReactNode }).children);
+    return out;
+  };
+  const groupHarness = (items: ReturnType<typeof furniture>[], toggleGroup = vi.fn()) => {
+    const design = { ...blankDesign(), furniture: items };
+    return harness('door', false, { design, selection: { kind: 'group', ids: items.map(item => item.id) }, toggleGroup });
+  };
+  it('未组合的多选显示「组合」，点击触发组合', () => {
+    const toggleGroup = vi.fn();
+    const h = groupHarness([furniture('a', 1000), furniture('b', 2000)], toggleGroup);
+    const toggle = buttons(h.element).find(button => button.props['aria-label'] === '组合')!;
+    toggle.props.onClick!();
+    expect(toggleGroup).toHaveBeenCalledOnce();
+    expect(buttons(h.element).some(button => button.props['aria-label'] === '解除组合')).toBe(false);
+  });
+  it('选中一个完整组合时显示「解除组合」，标题写明已组合', () => {
+    const h = groupHarness([furniture('a', 1000, 'g1'), furniture('b', 2000, 'g1')]);
+    expect(buttons(h.element).some(button => button.props['aria-label'] === '解除组合')).toBe(true);
+    expect(collectText(h.element)).toContain('已组合 2 件家具');
+  });
+  it('工具条只有一个色块触发器，打开的是统一颜色弹层', () => {
+    const design = { ...blankDesign(), furniture: [furniture('a', 1000)] };
+    const h = harness('door', false, { design, selection: { kind: 'furniture', id: 'a' } });
+    const pickers = elements(h.element).filter(node => node.type === ColorPicker);
+    expect(pickers).toHaveLength(1);
+    expect(pickers[0]!.props).toMatchObject({ variant: 'swatch', value: '#efe6d8', label: '家具颜色' });
+    expect(elements(h.element).some(node => node.type === 'input')).toBe(false);
+  });
+});
+const elements = (tree: React.ReactNode): ReactElement<Record<string, unknown>>[] => {
+  if (Array.isArray(tree)) return tree.flatMap(elements);
+  if (!tree || typeof tree !== 'object' || !('props' in tree)) return [];
+  const node = tree as ReactElement<Record<string, unknown> & { children?: React.ReactNode }>;
+  return [node, ...elements(node.props.children)];
+};
+const collectText = (tree: React.ReactNode): string => {
+  if (typeof tree === 'string' || typeof tree === 'number') return String(tree);
+  if (Array.isArray(tree)) return tree.map(collectText).join('');
+  return tree && typeof tree === 'object' && 'props' in tree ? collectText((tree as ReactElement<{ children?: React.ReactNode }>).props.children) : '';
+};
 describe('Visual editor 悬浮提示覆盖', () => {
   const walk = (tree: React.ReactNode, insideTooltip = false): { label?: string; covered: boolean }[] => {
     if (Array.isArray(tree)) return tree.flatMap(child => walk(child, insideTooltip));

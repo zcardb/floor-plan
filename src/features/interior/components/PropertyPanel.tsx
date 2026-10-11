@@ -39,7 +39,8 @@ import { RoomSidesDiagram } from "./RoomSidesDiagram";
 import { roomSides } from "../model/roomSides";
 import { cardPrice } from "../model/priceLabel";
 import { syncStairsToHeight } from "../model/stairs";
-import { ColorSwatches } from "./ColorSwatches";
+import { ColorPicker } from "./ColorPicker";
+import { floorThumb } from "./materialThumbs";
 import { PanelHint, ShortcutList } from "./PanelHint";
 import { BackingNote } from "./BackingNote";
 import { Button } from "@/components/ui/button";
@@ -177,7 +178,7 @@ export function PropertyPanel({
           className={"material-card " + (key === value ? "active" : "")}
           onClick={() => update(key)}
         >
-          <span className="material-swatch" style={{ background: m.color }} />
+          <span className="material-swatch">{floorThumb(m)}</span>
           <span>
             {m.name}
             {fromAccount && <em className="material-source">账号库</em>}
@@ -247,7 +248,7 @@ export function PropertyPanel({
           <h4 className="property-subtitle">尺寸与位置</h4>
           <SizeFields key={f.id} design={design} selection={s} transaction={transaction} />
           <h4 className="property-subtitle">颜色</h4>
-          <ColorSwatches value={f.color} onPick={(color) =>
+          <ColorPicker label="模型颜色" variant="swatch" value={f.color} onChange={(color) =>
             change((d) => ({
               ...d,
               furniture: d.furniture.map((g) => (g.id === f.id ? { ...g, color } : g)),

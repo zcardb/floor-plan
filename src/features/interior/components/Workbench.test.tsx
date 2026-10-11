@@ -21,7 +21,7 @@ vi.mock('../cloud/useFloorCatalog', () => ({ useFloorCatalog: () => ({ items: []
 vi.mock('../cloud/useWallCatalog', () => ({ useWallCatalog: () => ({ items: [], loading: false, error: '', load: async () => {}, save: async () => {} }) }));
 vi.mock('../cloud/useOpeningCatalog', () => ({ useOpeningCatalog: () => ({ items: [], loading: false, error: '', load: async () => {}, save: async () => {} }) }));
 vi.mock('../cloud/useSurfaceCatalogs', () => ({ useRoofCatalog: () => ({ items: [], loading: false, error: '', load: async () => {}, save: async () => {} }), useCeilingCatalog: () => ({ items: [], loading: false, error: '', load: async () => {}, save: async () => {} }) }));
-vi.mock('../cloud/useFurnitureCatalog', () => ({ useFurnitureCatalog: () => ({ items: state.furniture, loading: false, error: '', hasMore: false, count: state.furniture.length, counts: {}, load: async () => {}, save: async () => {}, remove: async () => {}, reset: () => {} }) }));
+vi.mock('../cloud/useFurnitureCatalog', () => ({ useFurnitureCatalog: () => ({ items: state.furniture, overrides: [], loading: false, error: '', hasMore: false, count: state.furniture.length, counts: {}, load: async () => {}, save: async () => {}, remove: async () => {}, reset: () => {} }) }));
 vi.mock('../ai/useAiCatalog', () => ({ useAiCatalog: () => ({ catalog: { entries: [], byCode: new Map(), byId: new Map(), codeOf: () => undefined }, items: [], loading: false, error: '', reload: async () => {} }) }));
 vi.mock('../ai/useRoomAi', () => ({ useRoomAi: () => ({ toneOf: () => 'idle', open: vi.fn(), room: undefined }) }));
 vi.mock('../model/useDesign', () => ({ useDesign: () => ({
@@ -159,8 +159,8 @@ describe('尺寸驱动墙体提交链', () => {
   });
 });
 describe('2D 常用工具与顶部工具栏', () => {
-  it('直接展示选择、框选、墙 ▾、门、窗，墙下拉切换墙 / 垭口 / 房间分隔线', () => {
-    expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['选择', '框选', '门', '窗']);
+  it('直接展示选择、墙 ▾、门、窗，墙下拉切换墙 / 垭口 / 房间分隔线', () => {
+    expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['选择', '门', '窗']);
     const menu = () => tools(render()).find(node => node.type === WallToolMenu)!;
     expect(menu()).toBeDefined();
     for (const tool of ['wall', 'passage', 'separator'] as const) {
@@ -221,7 +221,7 @@ describe('2D 常用工具与顶部工具栏', () => {
   });
   it('可编辑的参考户型（游客/复制项目）开放绘墙和门窗，3D 保持原有工具', () => {
     state.design = referenceDesign();
-    expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['选择', '框选', '门', '窗']);
+    expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['选择', '门', '窗']);
     expect(tools(render()).some(node => node.type === WallToolMenu)).toBe(true);
     expect(render().find(n => n.type === Library)!.props.structureTools).toBe(true);
     const more = tools(render()).find(node => node.props['aria-label'] === '更多')!;
@@ -273,8 +273,9 @@ describe('单行顶部工具栏', () => {
     expect(order.every(i => i >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
     const lead = toolbar.props.children as ReactNode[];
-    expect(nodes(lead[0])[0].type).toBe(Logo);
-    expect(nodes(lead[1])[0].type).toBe(ProjectMenu);
+    // 品牌 logo 现在在项目菜单的触发按钮里，两者是同一个点击区。
+    expect(nodes(lead[0])[0].type).toBe(ProjectMenu);
+    expect(inside.some(n => n.type === Logo)).toBe(false);
     expect(tree.some(n => n.props['aria-label'] === '操作帮助')).toBe(false);
     expect(tree.some(n => n.props['aria-label'] === '视图')).toBe(true);
     expect(tree.some(n => n.props['aria-label'] === '文件' || n.props['aria-label'] === '图层')).toBe(false);

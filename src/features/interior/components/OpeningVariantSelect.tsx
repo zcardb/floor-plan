@@ -1,7 +1,8 @@
 import { notify } from '@/lib/notify';
 import { applyOpeningVariant, pickableOpenings, standardOpeningName } from '../model/hardMaterials';
 import type { CustomOpening, Design, Opening } from '../model/types';
-import { EditorSelect } from './EditorSelect';
+import { VisualSelectField } from './VisualSelectField';
+import { openingThumb } from './materialThumbs';
 
 const STANDARD = '__standard__';
 
@@ -20,7 +21,8 @@ export function OpeningVariantSelect({ design, opening, accountOpenings = [], ch
     } catch (cause) { notify.error('切换门窗款式失败', cause); return; }
     if (kept) notify.warning('已切换款式，宽度保持不变', '墙段长度不足或会与其他门窗重叠');
   };
-  return <EditorSelect label="款式" value={opening.variant ?? STANDARD} disabled={disabled}
-    options={[{ value: STANDARD, label: standard }, ...choices.map(({ key, item, fromAccount }) => ({ value: key, label: fromAccount ? `${item.name} · 账号库` : item.name }))]}
+  return <VisualSelectField label="款式" value={opening.variant ?? STANDARD} disabled={disabled}
+    options={[{ value: STANDARD, label: standard, visual: openingThumb(opening.kind) },
+      ...choices.map(({ key, item, fromAccount }) => ({ value: key, label: item.name, visual: openingThumb(item.kind), badge: fromAccount ? '账号库' : undefined }))]}
     onChange={select} />;
 }

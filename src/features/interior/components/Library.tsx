@@ -32,6 +32,7 @@ export function Library({
   setTool,
   structureTools,
   customItems = [],
+  builtinItems = library,
   onNew,
   readOnly = false,
 }: {
@@ -42,11 +43,13 @@ export function Library({
   setTool: (t: Tool) => void;
   structureTools: boolean;
   customItems?: LibraryItem[];
+  /** 内置素材库（已套用账号里的 2D / 3D 素材覆盖）；默认是原始内置库。 */
+  builtinItems?: LibraryItem[];
   onNew?: () => void;
 }) {
   const [category, setCategory] = useState("客厅"),
     [query, setQuery] = useState("");
-  const items = [...customItems, ...library].filter((i) =>
+  const items = [...customItems, ...builtinItems].filter((i) =>
     query ? i.name.includes(query) : (i.type === 'stairs' ? '硬装' : i.category) === category,
   );
   return (

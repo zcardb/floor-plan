@@ -56,7 +56,8 @@ import { doorOrientation } from '../model/doorOrientation';
 import { defaultOpeningSize } from '../model/hardMaterials';
 import { dragOpening } from '../model/openingDrag';
 import { isCompletionClick, supportsPointerCompletion } from '../model/toolCompletion';
-import { furnitureCorners, furnitureInRect, groupBounds, groupIds, normalizeRect, selectionOf, type Rect } from '../model/furnitureGroup';
+import { createWheelIntent } from '../model/wheelIntent';
+import { expandToGroups, furnitureCorners, furnitureInRect, groupBounds, groupIds, normalizeRect, persistentGroupOf, selectionOf, type Rect } from '../model/furnitureGroup';
 export interface CanvasHandle {
   zoom: (k: number) => void;
   fit: () => void;
@@ -83,8 +84,6 @@ interface Props {
   startWallTool?: () => void;
   onDimensionSelect?: (segment: DimensionSegment) => void;
   selectedDimension?: DimensionBinding;
-  /** 框选模式：在空白处左键拖动画框批量选家具（关闭时拖动空白处平移画布）。 */
-  marquee?: boolean;
 }
 interface Drag {
   pid: number;
@@ -120,7 +119,6 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     startWallTool,
     onDimensionSelect,
     selectedDimension,
-    marquee = false,
   },
   ref,
 ) {
@@ -128,6 +126,9 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     current = useRef(design);
   current.current = design;
   const [box, setBox] = useState<Rect | null>(null);
+  /** 按住空格：左键拖动临时变为平移画布。 */
+  const [spacePan, setSpacePan] = useState(false), spaceHeld = useRef(false);
+  spaceHeld.current = spacePan;
   /** 正在拖动分隔线（端点或整线）：在线旁标注实时长度。 */
   const [separatorDragging, setSeparatorDragging] = useState(false);
   const group = groupIds(design, selection);
@@ -263,17 +264,38 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
   }, []);
   useEffect(() => onScale(view.s), [view.s, onScale]);
   useEffect(() => {
-    const el = svg.current!;
+    const el = svg.current!, intent = createWheelIntent();
     const wheel = (e: WheelEvent) => {
       e.preventDefault();
+      if (intent(e) === 'pan') {
+        // 触控板双指滑动：只平移画布。
+        const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1;
+        setView(v => ({ ...v, x: v.x + (e.deltaX * unit) / v.s, y: v.y + (e.deltaY * unit) / v.s }));
+        return;
+      }
       const r = el.getBoundingClientRect();
-      zoom(Math.exp(-e.deltaY * 0.0015), [
+      // 触控板捏合的增量远小于鼠标滚轮，放大系数让两者手感接近。
+      zoom(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), [
         e.clientX - r.left,
         e.clientY - r.top,
       ]);
     };
     el.addEventListener("wheel", wheel, { passive: false });
     return () => el.removeEventListener("wheel", wheel);
+  }, []);
+  useEffect(() => {
+    const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+    const down = (e: KeyboardEvent) => {
+      if (e.code !== 'Space' || typing(e.target)) return;
+      e.preventDefault();
+      if (!e.repeat) setSpacePan(true);
+    };
+    const up = (e: KeyboardEvent) => { if (e.code === 'Space') setSpacePan(false); };
+    const blur = () => setSpacePan(false);
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    window.addEventListener('blur', blur);
+    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); window.removeEventListener('blur', blur); };
   }, []);
   useImperativeHandle(ref, () => ({
     zoom,
@@ -341,15 +363,17 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       return;
     }
     if (dr.kind === 'marquee') {
-      // 框选模式下点击（没有拖出框）与平时一样：选中房间或取消选择。
+      // 点击（没有拖出框）：选中房间或取消选择。框到组合里任意一件即选中整组。
       if (!dr.moved || !dr.end) return select(dr.room ? { kind: 'room', id: dr.room } : null);
-      return select(layers.furn ? selectionOf(furnitureInRect(d, normalizeRect(dr.start, dr.end))) : null);
+      return select(layers.furn ? selectionOf(expandToGroups(d, furnitureInRect(d, normalizeRect(dr.start, dr.end)))) : null);
     }
     if (dr.kind === 'groupmove') {
-      if (!dr.moved) return select({ kind: 'furniture', id: dr.id! });
+      // 点了一下没拖：组合里的家具保持整组选中；临时多选里的则改为单选这一件。
+      if (!dr.moved) return persistentGroupOf(d, dr.id!).length > 1 ? undefined : select({ kind: 'furniture', id: dr.id! });
       if (d !== dr.before) commit(d, dr.before);
       return;
     }
+    if (dr.kind === 'viewpan') return;
     if ((dr.kind === 'wallmove' || dr.kind === 'wallclick') && !dr.moved) {
       // 单击墙身（没有拖动）：切到绘墙，并以吸附点作为第一段墙的起点；双击才选中墙（见 completeTool）。
       if (!startWallTool) return select({ kind: 'wall', id: dr.id! });
@@ -422,7 +446,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
   return (
     <svg
       ref={svg}
-      className={"plan-canvas tool-" + tool + (marquee && tool === 'select' ? " marquee-on" : "")}
+      className={"plan-canvas tool-" + tool + (readOnly ? " read-only" : "") + (spacePan ? " is-panning" : "")}
       viewBox={`${view.x} ${view.y} ${size.w / view.s} ${size.h / view.s}`}
       role="application"
       aria-label="户型平面编辑画布"
@@ -440,7 +464,9 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         }
       }}
       onPointerDown={(e) => {
-        if (e.button) return;
+        // 中键拖动或按住空格拖动：只平移画布（鼠标用户的平移方式；触控板用双指滑动）。
+        const viewPan = e.button === 1 || (e.button === 0 && spaceHeld.current);
+        if (e.button && !viewPan) return;
         const begin = () => {
         closePanels();
         clearSelectHover();
@@ -472,6 +498,10 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           moved: false,
           view: vr.current,
         };
+        if (viewPan) {
+          drag.current = { ...base, kind: 'viewpan' };
+          return;
+        }
         const wallEl = el.closest("[data-wall]"),
           fid = el.closest("[data-fid]")?.getAttribute("data-fid"),
           wid = wallEl?.getAttribute("data-wall"),
@@ -479,7 +509,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           handle = el.closest("[data-handle]")?.getAttribute("data-handle"),
           sid = el.closest("[data-separator]")?.getAttribute("data-separator");
         if (readOnly) {
-          if (fid) select({ kind: 'furniture', id: fid });
+          if (fid) select(selectionOf(persistentGroupOf(design, fid)));
           else if (oid) select({ kind: 'opening', id: oid });
           else if (wid) select({ kind: 'wall', id: wid });
           else base.room = el.closest('[data-room]')?.getAttribute('data-room') || undefined;
@@ -492,12 +522,12 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         if (tool === 'separator') {
           select(null); separatorDrawing.down(p, e.pointerId, [e.clientX, e.clientY]); return;
         }
-        if (tool === 'select' && !marquee && selection?.kind === 'separator' && (handle === 'sepa' || handle === 'sepb')) {
+        if (tool === 'select' && selection?.kind === 'separator' && (handle === 'sepa' || handle === 'sepb')) {
           // 选中分隔线的端点手柄：沿分隔线方向伸缩。
           drag.current = { ...base, kind: 'sependpoint', id: selection.id, room: handle === 'sepa' ? 'a' : 'b' };
           return;
         }
-        if (sid && tool === 'select' && !marquee && !fid) {
+        if (sid && tool === 'select' && !fid) {
           // 点中即选中；按住拖动时整条线沿法向平移。
           select({ kind: 'separator', id: sid });
           drag.current = { ...base, kind: 'sepmove', id: sid };
@@ -554,14 +584,12 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           base.id = fid;
           base.ids = group;
         } else if (fid) {
-          select({ kind: "furniture", id: fid });
-          base.kind = "move";
+          // 组合里的家具：点中即选中整组，拖动时整组一起移动。
+          const members = persistentGroupOf(design, fid);
+          select(selectionOf(members));
+          base.kind = members.length > 1 ? 'groupmove' : 'move';
           base.id = fid;
-          base.ids = [fid];
-        } else if (marquee && tool === 'select') {
-          // 框选模式：从墙、门窗或空白处起拖都是画框（家具上起拖仍是移动家具）。
-          base.kind = 'marquee';
-          base.room = el.closest("[data-room]")?.getAttribute("data-room") || undefined;
+          base.ids = members;
         } else if (oid) {
           select({ kind: "opening", id: oid });
           if (isOpeningTool(tool)) finishTool();
@@ -573,16 +601,21 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           // 墙体双击选中（单击是开始绘墙）；拖动时才选中并移动。
           base.kind = canResizeWall(design, w) ? "wallmove" : "wallclick";
           base.id = wid;
-        } else
+        } else {
           base.room =
             el.closest("[data-room]")?.getAttribute("data-room") || undefined;
+          // 选择模式：从空白处或房间上起拖就是框选（单击仍是选中房间 / 取消选择）。
+          if (tool === 'select') base.kind = 'marquee';
+        }
         drag.current = base;
         };
         // MouseEvent.detail contains the native double-click count; PointerEvent.detail does not.
-        if (e.pointerType === 'mouse' && supportsPointerCompletion(tool)) mouseDown.current = begin;
+        if (!viewPan && e.pointerType === 'mouse' && supportsPointerCompletion(tool)) mouseDown.current = begin;
         else begin();
       }}
+      onAuxClick={(e) => { if (e.button === 1) e.preventDefault(); }}
       onMouseDown={(e) => {
+        if (e.button === 1) e.preventDefault();
         const begin = mouseDown.current;
         mouseDown.current = null;
         if (isCompletionClick(tool, e.button, e.detail)) {
@@ -661,7 +694,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           showGuides(moved.guides);
           return;
         }
-        if (dr.kind === "pan") {
+        if (dr.kind === "pan" || dr.kind === "viewpan") {
           setView({
             ...dr.view!,
             x: dr.view!.x - (e.clientX - dr.screen[0]) / dr.view!.s,

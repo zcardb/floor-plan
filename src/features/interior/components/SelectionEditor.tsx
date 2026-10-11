@@ -21,6 +21,8 @@ import {
   Sparkles,
   Loader2,
   Footprints,
+  Group,
+  Ungroup,
 } from "lucide-react";
 import {
   Popover,
@@ -31,7 +33,7 @@ import { applyRoomFloor, floorMaterialOf, pickableFloors } from "../model/floorM
 import { WallOptionsMenu } from './WallOptionsMenu';
 import { BEARING_WALL_LOCKED, canDeleteWall, canResizeWall, wallKindName } from '../model/wallPolicy';
 import { length, bbox, inRoom } from "../model/geometry";
-import { groupIds } from "../model/furnitureGroup";
+import { groupIds, isPersistentGroup } from "../model/furnitureGroup";
 import { RoomDeleteMenu } from './RoomDeleteMenu';
 import { SizeFields } from './SizeFields';
 import { SeparatorLengthFields } from './SeparatorLengthFields';
@@ -48,10 +50,11 @@ import { yuan } from "../model/money";
 import type { CustomFloor, CustomOpening, CustomWall, Design, Selection } from "../model/types";
 import { applyRoomWall, openingHeight, openingName, openingPriceKey, pickableWalls } from "../model/hardMaterials";
 import { PriceField } from "./PriceField";
-import { ColorSwatches } from "./ColorSwatches";
+import { ColorPicker } from "./ColorPicker";
 import { useCostDesign } from './CostDefaultsContext';
 import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
-import { EditorSelect } from './EditorSelect';
+import { VisualSelectField } from './VisualSelectField';
+import { colorThumb, floorThumb } from './materialThumbs';
 import { RoomSurfaceFields } from './RoomSurfaceFields';
 import { formatMeters } from '../model/lengthUnits';
 import { Button } from '@/components/ui/button';
@@ -72,6 +75,8 @@ interface Props {
   change: (fn: (d: Design) => Design) => void;
   rotate: () => void;
   duplicate: () => void;
+  /** 组合 / 解除组合选中的家具；没有多选时不传。 */
+  toggleGroup?: () => void;
   remove: () => void;
   close: () => void;
   details: () => void;
@@ -183,6 +188,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           ? p.design.separators?.find((l) => l.id === sid)
           : null,
       group = groupIds(p.design, sel);
+    const grouped = isPersistentGroup(p.design, group);
     const roomFurniture = r ? p.design.furniture.filter(f => inRoom([f.cx, f.cy], r)).length : 0;
     const deletableWall = w && canDeleteWall(w);
     const resizableWall = w && canResizeWall(p.design, w);
@@ -287,7 +293,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           <Button type="button" variant="ghost" size="icon" className="visual-editor-drag-handle" aria-label="拖动编辑工具条" {...editorDrag.handlers}><GripVertical size={15} /></Button>
         </EditorTooltip>
         <span className="visual-object-name">
-          {group.length > 1 && `已选中 ${group.length} 件家具`}
+          {group.length > 1 && (grouped ? `已组合 ${group.length} 件家具` : `已选中 ${group.length} 件家具`)}
           {f?.name ||
             r?.name ||
             (w ? wallKindName(w) : o ? openingName(p.design, o) : separator ? "房间分隔线" : "")}
@@ -358,11 +364,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           </Popover>
         )}
         {w && <WallOptionsMenu design={p.design} wall={w} change={p.change} splitWall={p.splitWall} mergeWall={p.mergeWall} removeWall={p.removeWall} />}
-        {(f || w) && (
-          <EditorTooltip label="常用颜色">
-            <ColorSwatches value={f?.color || w?.color || ""} onPick={paint} />
-          </EditorTooltip>
-        )}
+        {(f || w) && <ColorPicker label={f ? "家具颜色" : "墙体颜色"} variant="swatch" value={f?.color || w?.color || ""} onChange={paint} />}
         {r && (
           <Popover
             open={open === "roomsize"}
@@ -415,11 +417,11 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </EditorTooltip>
             <PopoverContent className="visual-editor-popover">
               <h3>房间材质</h3>
-              <EditorSelect label="地面" value={r.mat}
-                options={pickableFloors(p.design, p.accountFloors || []).map(({ key, material, fromAccount }) => ({ value: key, label: fromAccount ? `${material.name} · 账号库` : material.name }))}
+              <VisualSelectField label="地面" value={r.mat}
+                options={pickableFloors(p.design, p.accountFloors || []).map(({ key, material, fromAccount }) => ({ value: key, label: material.name, visual: floorThumb(material), badge: fromAccount ? '账号库' : undefined }))}
                 onChange={value => p.change(d => applyRoomFloor(d, r.id, value, p.accountFloors || []))} />
-              <EditorSelect label="墙面" value={r.wallMat || 'paint'}
-                options={pickableWalls(p.design, p.accountWalls || []).map(({ key, name, fromAccount }) => ({ value: key, label: fromAccount ? `${name} · 账号库` : name }))}
+              <VisualSelectField label="墙面" value={r.wallMat || 'paint'}
+                options={pickableWalls(p.design, p.accountWalls || []).map(({ key, name, material, fromAccount }) => ({ value: key, label: name, visual: colorThumb(material.color), badge: fromAccount ? '账号库' : undefined }))}
                 onChange={value => p.change(d => applyRoomWall(d, r.id, value, p.accountWalls || []))} />
               <RoomSurfaceFields design={p.design} room={r} change={p.change} accountRoofs={p.accountRoofs || []} accountCeilings={p.accountCeilings || []} />
             </PopoverContent>
@@ -507,6 +509,13 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           </EditorTooltip>
         )}
         {r && <RoomDeleteMenu furniture={roomFurniture} clear={p.remove} removeRoom={p.removeRoom ? () => p.removeRoom!(r.id) : undefined} />}
+        {group.length > 1 && p.toggleGroup && (
+          <EditorTooltip label={grouped ? "解除组合" : "组合"} shortcut={grouped ? "Ctrl Shift G" : "Ctrl G"}>
+            <button type="button" aria-label={grouped ? "解除组合" : "组合"} aria-pressed={grouped} onClick={p.toggleGroup}>
+              {grouped ? <Ungroup size={15} /> : <Group size={15} />}
+            </button>
+          </EditorTooltip>
+        )}
         {group.length < 2 && !separator && (
           <EditorTooltip label="详细属性">
             <button type="button" aria-label="详细属性" onClick={p.details}>

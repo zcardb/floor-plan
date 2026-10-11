@@ -13,6 +13,7 @@ import type { AccountCostSettings } from '../model/costDefaults';
 import { accountCostEntries, accountCostSource, filterCostEntries, materialCostCategories, type CostEntry, type CostMajor } from '../model/accountCostEntries';
 import { referenceDesign } from '../data/templates';
 import { furnitureGeometryPayload } from '../model/furnitureGeometrySave';
+import { assetsAdjusted, builtinOf, withBuiltinAssets } from '../model/builtinAssets';
 import type { useFurnitureCatalog } from '../cloud/useFurnitureCatalog';
 import type { CustomFloor, CustomOpening, CustomWall, Design, LibraryItem } from '../model/types';
 import { CmsFilterBar } from './CmsFilterBar';
@@ -35,7 +36,17 @@ export function AccountFurnitureLibrary({ catalog, floors = [], walls = [], open
   const [category, setCategory] = useState('全部'), [query, setQuery] = useState(''), [editing, setEditing] = useState<CostEntry | null>(null), [detail, setDetail] = useState<LibraryItem | null>(null);
   const commit = useAccountCostCommit({ settings: defaults, save: saveDefaults, onDirty });
   const design: Design = { ...referenceDesign(), customCatalog: catalog.items, customFloors: floors, customWalls: walls, customOpenings: openings, customRoofs: roofs, customCeilings: ceilings, costSettings: commit.settings };
-  const entries = accountCostEntries(catalog.items, commit.settings, floors, walls, openings, { roofs, ceilings });
+  /** 内置家具的素材覆盖行（账号库里与内置同 catalogId 的那一行）。 */
+  const overrideById = new Map(catalog.overrides.map(item => [item.catalogId, item]));
+  // 内置家具套用账号里的素材覆盖：卡片缩略图、详情预览都用调整后的素材。
+  const entries = accountCostEntries(catalog.items, commit.settings, floors, walls, openings, { roofs, ceilings }).map(entry => {
+    const builtin = builtinOf(entry.furniture?.catalogId);
+    return builtin ? { ...entry, furniture: withBuiltinAssets(builtin, overrideById.get(builtin.catalogId)) } : entry;
+  });
+  const adjustedOf = (catalogId: string | undefined) => {
+    const builtin = builtinOf(catalogId);
+    return !!builtin && assetsAdjusted(builtin, overrideById.get(catalogId));
+  };
   const visible = filterCostEntries(entries, category, query);
   const blocks = [...materialCostCategories, ...categories].map(title => ({ title, entries: visible.filter(entry => entry.category === title) })).filter(block => block.entries.length);
   const groups: { major: CostMajor; icon: typeof Layers; names: string[] }[] = [{ major: '硬装', icon: Layers, names: materialCostCategories }, { major: '软装', icon: Armchair, names: categories }];
@@ -74,7 +85,7 @@ export function AccountFurnitureLibrary({ catalog, floors = [], walls = [], open
         const price = priceOf(design, entry.group, entry.key), source = accountCostSource(design, entry);
         return <EditorTooltip key={entry.group + ':' + entry.key} label={entry.name} disabled={locked}>
           <button type="button" className="cms-item-card cms-item-card--cost" aria-label={(entry.furniture ? '查看' : '编辑') + entry.name + (entry.furniture ? '' : '单价')} disabled={locked} onClick={() => open(entry)}>
-            <span className="cms-item-visual"><CostItemVisual entry={entry}/><span className={'cms-item-badge' + (entry.custom ? ' custom' : '')}>{entry.custom && source !== '账号默认' && source !== '未定价' ? '自定义' : source}</span></span>
+            <span className="cms-item-visual"><CostItemVisual entry={entry}/><span className={'cms-item-badge' + (entry.custom ? ' custom' : '')}>{entry.custom && source !== '账号默认' && source !== '未定价' ? '自定义' : source}</span>{adjustedOf(entry.furniture?.catalogId) && <span className="cms-item-badge adjusted">素材已调整</span>}</span>
             <b>{entry.name}</b><small>{entry.category}{sizeOf(entry)}</small>
             <span className="cms-item-price">{price === null ? '未定价' : `¥${price.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`}<small> / {entry.unit}</small></span>
           </button>
@@ -86,8 +97,9 @@ export function AccountFurnitureLibrary({ catalog, floors = [], walls = [], open
     {editing && materialSaves && <AccountMaterialDialog key={editing.group + ':' + editing.key} entry={{ ...editing, unit: entries.find(entry => entry.key === editing.key && entry.group === editing.group)?.unit || editing.unit }} design={design} change={change} price={priceOf(design, editing.group, editing.key)} saves={materialSaves}
       applyDefaultPrice={price => commit.apply(current => ({ ...current, [editing.group]: { ...current[editing.group], [editing.key]: price } }))}
       busy={busy} error={failure} retry={commit.pending ? () => void retry() : undefined} onSaved={kind => reloadMaterial?.(kind)} onClose={() => { if (!busy) setEditing(null); }}/>}
-    {detail && <AccountFurnitureDialog key={detail.catalogId} item={{ ...detail, price: priceOf(design, 'furniturePrices', detail.catalogId!) }} isCustom={customIds.has(detail.catalogId!)} referencePrice={priceOf(design, 'furniturePrices', detail.catalogId!)} commitBusy={commit.busy} commitError={commit.error} retryPrice={commit.pending ? commit.retry : undefined} saved={commit.saved}
-      saveGeometry={next => { const stored = catalog.items.find(item => item.catalogId === next.catalogId); if (!stored) return Promise.reject(new Error('家具数据尚未就绪，请重新加载后重试')); return catalog.save(furnitureGeometryPayload(next, stored)); }}
+    {detail && <AccountFurnitureDialog key={detail.catalogId} item={{ ...detail, price: priceOf(design, 'furniturePrices', detail.catalogId!) }} isCustom={customIds.has(detail.catalogId!)} adjusted={adjustedOf(detail.catalogId)} referencePrice={priceOf(design, 'furniturePrices', detail.catalogId!)} commitBusy={commit.busy} commitError={commit.error} retryPrice={commit.pending ? commit.retry : undefined} saved={commit.saved}
+      saveGeometry={customIds.has(detail.catalogId!) ? next => { const stored = catalog.items.find(item => item.catalogId === next.catalogId); if (!stored) return Promise.reject(new Error('家具数据尚未就绪，请重新加载后重试')); return catalog.save(furnitureGeometryPayload(next, stored)); } : undefined}
+      saveAssets={builtinOf(detail.catalogId) ? assets => catalog.saveOverride({ ...builtinOf(detail.catalogId)!, ...assets }) : undefined}
       onOpenChange={v => { if (!v) setDetail(null); }} onChanged={next => { setDetail(next); void catalog.load(); }}
       applyDefaultPrice={price => commit.apply(current => ({ ...current, furniturePrices: { ...current.furniturePrices, [detail.catalogId!]: price } }))} remove={catalog.remove}/>}
   </div>;

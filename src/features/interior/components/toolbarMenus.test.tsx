@@ -18,6 +18,7 @@ import { ProjectDeleteDialog, ProjectRenameDialog } from './ProjectDialogs';
 import { NewProjectDialog } from './NewProjectDialog';
 import { AiCreateProjectDialog } from './AiCreateProjectDialog';
 import { CreateProjectMenuItems, type CreateProjectActions } from './CreateProjectMenuItems';
+import { Logo } from './Logo';
 import { ProjectRowActions } from './ProjectRowActions';
 import { AccountMenu } from './AccountMenu';
 import { AccountAvatar } from './AccountAvatar';
@@ -51,15 +52,20 @@ function menu(overrides: Partial<Parameters<typeof ProjectMenu>[0]> = {}) {
   return { props, tree: nodes(ProjectMenu(props)) };
 }
 const items = (tree: Node[]) => tree.filter(n => n.type === DropdownMenuItem);
+const options = (tree: Node[]) => items(tree).filter(n => n.props.className === 'project-menu-option');
+/** 新建方式条目（图标块 + 标题 + 说明）。 */
+const createOptions = (tree: Node[]) => tree.filter(n => typeof n.props.title === 'string' && typeof n.props.onSelect === 'function');
 const actions = (tree: Node[]) => tree.filter(n => n.type === ProjectRowActions);
 beforeEach(() => { state.values = []; state.cursor = 0; state.refs = []; state.effects = []; });
 
 describe('ProjectMenu', () => {
-  it('触发器只显示项目名；顶部为返回项目管理，列表为名称 + 日期 + 当前勾选，无头像', () => {
+  it('触发器是 logo + 项目名，两者同一点击区；列表为名称 + 日期 + 当前勾选，底部为返回项目管理', () => {
     const { props, tree } = menu();
     const trigger = tree.find(n => n.props.className === 'project-menu-trigger')!;
-    expect(text(trigger.props.children as ReactNode)).toBe('三室两厅两卫');
-    const [back, ...rows] = items(tree);
+    expect(nodes(trigger).some(n => n.type === Logo)).toBe(true);
+    expect(trigger.props['aria-label']).toBe('项目：三室两厅两卫');
+    expect(text(nodes(trigger).find(n => n.props.className === 'project-menu-title')!.props.children as ReactNode)).toBe('三室两厅两卫');
+    const all = items(tree), back = all[all.length - 1]!, rows = options(tree);
     expect(text(back.props.children as ReactNode)).toBe('返回项目管理');
     expect(rows).toHaveLength(2);
     expect(tree.some(n => n.type === AccountAvatar)).toBe(false);
@@ -72,7 +78,7 @@ describe('ProjectMenu', () => {
   });
   it('点击其他项目切换，当前项不可再点', () => {
     const { props, tree } = menu();
-    const [, mine, theirs] = items(tree);
+    const [mine, theirs] = options(tree);
     const event = { preventDefault: vi.fn() };
     (mine.props.onSelect as (e: typeof event) => void)(event);
     expect(event.preventDefault).toHaveBeenCalled();
@@ -80,7 +86,7 @@ describe('ProjectMenu', () => {
     (theirs.props.onSelect as (e: typeof event) => void)({ preventDefault: vi.fn() });
     expect(props.onOpen).toHaveBeenCalledWith(other);
     expect(state.values[0]).toBe('b');
-    expect(items(menu().tree).slice(1).every(n => n.props.disabled === !n.props['aria-current'])).toBe(true);
+    expect(options(menu().tree).every(n => n.props.disabled === !n.props['aria-current'])).toBe(true);
   });
   it('有下一页时渲染底部哨兵，加载中显示 spinner', () => {
     expect(menu().tree.some(n => n.type === LoadMoreSentinel)).toBe(false);
@@ -132,7 +138,7 @@ describe('ProjectMenu', () => {
     const { tree } = menu({ onCreateProject });
     const trigger = tree.find(n => n.type === DropdownMenuSubTrigger)!;
     expect(trigger.props.className).toBe('project-menu-create');
-    expect(text(trigger.props.children as ReactNode)).toBe('新建项目');
+    expect(text(trigger.props.children as ReactNode)).toContain('新建项目');
     const options = tree.find(n => n.type === DropdownMenuSubContent)!;
     const shared = nodes(options.props.children as ReactNode).find(n => n.type === CreateProjectMenuItems)!;
     const actions = shared.props.actions as CreateProjectActions;
@@ -146,12 +152,13 @@ describe('ProjectMenu', () => {
   it('共享的新建选项：手动创建、AI 创建（可选）、导入 DXF、其他软件 Coming soon', () => {
     const actions = { blank: vi.fn(), ai: vi.fn(), importFile: vi.fn() };
     const tree = nodes(CreateProjectMenuItems({ actions }));
-    const labels = items(tree).map(n => text(n.props.children as ReactNode));
+    const labels = createOptions(tree).map(n => n.props.title);
     expect(labels).toEqual(['手动创建', 'AI 创建…', '导入 DXF 图纸…']);
+    expect(createOptions(tree).every(n => typeof n.props.hint === 'string' && n.props.hint)).toBe(true);
     expect(tree.some(n => n.type === SoftwareSoonItem && n.props.label === '从其他软件导入')).toBe(true);
-    items(tree).forEach(n => (n.props.onSelect as () => void)());
+    createOptions(tree).forEach(n => (n.props.onSelect as () => void)());
     expect([actions.blank, actions.ai, actions.importFile].every(f => f.mock.calls.length === 1)).toBe(true);
-    expect(items(nodes(CreateProjectMenuItems({ actions: { ...actions, ai: undefined } }))).map(n => text(n.props.children as ReactNode))).not.toContain('AI 创建…');
+    expect(createOptions(nodes(CreateProjectMenuItems({ actions: { ...actions, ai: undefined } }))).map(n => n.props.title)).not.toContain('AI 创建…');
   });
   it('复刻当前项目是子菜单里的第二项，只在可复刻时出现，点击复刻当前项目', () => {
     const onCreateProject = vi.fn(async () => true);
@@ -162,8 +169,8 @@ describe('ProjectMenu', () => {
     };
     expect(items(menu().tree).some(n => text(n.props.children as ReactNode) === '复制当前项目')).toBe(false);
     expect(submenuActions().duplicate).toBeUndefined();
-    const labels = items(nodes(CreateProjectMenuItems({ actions: submenuActions({ onDuplicate: vi.fn(async () => true) }) })))
-      .map(n => text(n.props.children as ReactNode));
+    const labels = createOptions(nodes(CreateProjectMenuItems({ actions: submenuActions({ onDuplicate: vi.fn(async () => true) }) })))
+      .map(n => n.props.title);
     expect(labels.slice(0, 2)).toEqual(['手动创建', '复刻当前项目']);
     const onDuplicate = vi.fn(async () => true);
     const actions = submenuActions({ onDuplicate });

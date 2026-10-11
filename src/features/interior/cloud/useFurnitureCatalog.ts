@@ -6,10 +6,19 @@ import { categories } from '../data/catalog';
 import type { LibraryItem } from '../model/types';
 import { validFurnitureType, validFurnitureOutline } from '../model/furnitureAppearance';
 import { sanitizeModel3d } from '../model/furniture3d';
+import { BUILTIN_IDS } from '../model/builtinAssets';
+/** PostgREST 的 in 列表：值里有冒号和中文，逐个加双引号。 */
+const BUILTIN_IN = `(${BUILTIN_IDS.map(id => `"${id.replace(/"/g, '\\"')}"`).join(',')})`;
 export function useFurnitureCatalog() {
   const [items,setItems] = useState<LibraryItem[]>([]), [loading,setLoading] = useState(false), [error,setError] = useState(''), [count,setCount] = useState(0), [counts,setCounts] = useState<Record<string,number>>({}), [hasMore,setHasMore] = useState(false);
+  /** 内置家具的素材覆盖行（与内置家具同 catalogId）：不在翻页列表里，单独一次读全。 */
+  const [overrides,setOverrides] = useState<LibraryItem[]>([]);
   const epoch = useRef(0), offset = useRef(0);
-  const reset = useCallback(() => { epoch.current++; offset.current=0; setItems([]); setCount(0); setCounts({}); setError(''); setLoading(false); }, []);
+  const reset = useCallback(() => { epoch.current++; offset.current=0; setItems([]); setCount(0); setCounts({}); setError(''); setLoading(false); setOverrides([]); }, []);
+  const loadOverrides = useCallback(async (run: number) => {
+    const {data,error} = await supabase.from('interior_furniture_catalog').select('*').in('catalog_id', BUILTIN_IDS);
+    if (!error && run === epoch.current) setOverrides((data||[]).map(furnitureFromRow));
+  }, []);
   const load = useCallback(async (more=false) => {
     const run=++epoch.current; setLoading(true); setError('');
     try {
@@ -18,19 +27,21 @@ export function useFurnitureCatalog() {
     if (!session) { reset(); return; }
     const start=more?offset.current:0;
     const [page,stats] = await Promise.all([
-      supabase.from('interior_furniture_catalog').select('*',{count:'exact'}).order('created_at',{ascending:false}).order('catalog_id').range(start,start+23),
-      Promise.all(categories.map(async category => { const {count,error} = await supabase.from('interior_furniture_catalog').select('catalog_id',{count:'exact',head:true}).eq('category',category); if(error)throw error; return [category,count||0] as const; })).catch((e:Error)=>e),
+      supabase.from('interior_furniture_catalog').select('*',{count:'exact'}).not('catalog_id','in',BUILTIN_IN).order('created_at',{ascending:false}).order('catalog_id').range(start,start+23),
+      Promise.all(categories.map(async category => { const {count,error} = await supabase.from('interior_furniture_catalog').select('catalog_id',{count:'exact',head:true}).not('catalog_id','in',BUILTIN_IN).eq('category',category); if(error)throw error; return [category,count||0] as const; })).catch((e:Error)=>e),
     ]);
     if(run!==epoch.current)return;
     setLoading(false);
     if(page.error || stats instanceof Error){setError(page.error?.message || (stats as Error).message);return;}
+    // 内置家具的覆盖行走 overrides，不出现在账号家具列表与计数里。
+    if(!more)void loadOverrides(run);
     const mapped=(page.data||[]).map(furnitureFromRow);
     offset.current=start+mapped.length; setItems(old=>more?[...old,...mapped]:mapped); setCount(page.count||0); setCounts(Object.fromEntries(stats)); setHasMore(offset.current<(page.count||0));
     } catch(cause) {
       if(run!==epoch.current)return;
       setLoading(false);setError(cause instanceof Error?cause.message:'家具读取失败，请重试');
     }
-  },[reset]);
+  },[reset,loadOverrides]);
   const save=useCallback(async(item:LibraryItem)=>{
     if(!validFurnitureType(item.type)||!validFurnitureOutline(item.shape))throw new Error('参考类型或外形无效');
     const {data:{session}}=await supabase.auth.getSession(); if(!session)throw new Error('请先登录');
@@ -42,5 +53,11 @@ export function useFurnitureCatalog() {
     const {error}=await supabase.from('interior_furniture_catalog').delete().eq('owner_id',session.user.id).eq('catalog_id',catalogId);
     if(error)throw new Error(error.message);return true;
   },[]);
-  return {items,loading,error,count,counts,hasMore,load,save,remove,reset};
+  /** 保存内置家具的素材覆盖，成功后立即更新本地覆盖（素材库、画布同步都依赖它）。 */
+  const saveOverride=useCallback(async(item:LibraryItem)=>{
+    const ok=await save(item);
+    if(ok)setOverrides(old=>[...old.filter(row=>row.catalogId!==item.catalogId),item]);
+    return ok;
+  },[save]);
+  return {items,overrides,loading,error,count,counts,hasMore,load,save,remove,saveOverride,reset};
 }

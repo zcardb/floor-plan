@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { uid, type CustomWall } from '../model/types';
 import { validCustomWall, type SurfaceKind } from '../model/hardMaterials';
-import { ColorPickerField } from './ColorPickerField';
+import { ColorPicker } from './ColorPicker';
 import { notify } from '@/lib/notify';
 import { parsePriceDraft, priceDraft, type MaterialFormEdit } from './materialFormEdit';
 
@@ -39,7 +39,7 @@ export function CustomColorMaterialForm({ kind, categoryField, accountOnly, onCa
         <div className="custom-field"><Label htmlFor={kind + '-name'}>名称</Label><Input id={kind + '-name'} aria-label={text.label + '名称'} maxLength={100} required disabled={locked} placeholder={text.placeholder} value={name} onChange={e => setName(e.target.value)} /></div>
         {categoryField}
         <div className="custom-field"><Label htmlFor={kind + '-price'}>{priceLabel}</Label><Input id={kind + '-price'} type="number" min={0} placeholder="未定价" value={price} onChange={e => setPrice(e.target.value)} />{priceHint && <small className="custom-field-hint">{priceHint}</small>}</div>
-        <ColorPickerField label={text.label + '颜色'} value={color} onChange={setColor} disabled={locked} />
+        <div className="custom-field"><Label htmlFor={kind + '-color'}>{text.label + '颜色'}</Label><ColorPicker label={text.label + '颜色'} value={color} onChange={setColor} disabled={locked} triggerId={kind + '-color'} /></div>
       </fieldset>
       <div className="custom-image-panel">
         <div className="custom-image-preview custom-material-preview"><span className="custom-material-swatch" style={{ background: color }}><Icon size={30} strokeWidth={1.4} /></span><span>{name.trim() || text.label + '材料'} · 色块预览</span></div>

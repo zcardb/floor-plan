@@ -8,7 +8,7 @@ import { uid, type CustomFloor, type FloorPattern } from '../model/types';
 import { customFloorMaterial, floorPatterns, validCustomFloor } from '../model/floorMaterials';
 import { meterDraft, parseMeterDraft } from '../model/lengthUnits';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ColorPickerField } from './ColorPickerField';
+import { ColorPicker } from './ColorPicker';
 import { FloorSwatch } from './FloorSwatch';
 import { notify } from '@/lib/notify';
 import { parsePriceDraft, priceDraft, type MaterialFormEdit } from './materialFormEdit';
@@ -45,7 +45,7 @@ export function CustomFloorForm({ categoryField, accountOnly, onCancel, onSave, 
           <div className="custom-field"><Label htmlFor="floor-width">{pattern === 'plank' ? '板宽 m' : '砖宽 m'}</Label><Input id="floor-width" type="number" step={0.01} min={0.05} max={20} disabled={locked} value={width} onChange={e => setWidth(e.target.value)} /></div>
         </div>}
         <div className="custom-field"><Label htmlFor="floor-price">{priceLabel}</Label><Input id="floor-price" type="number" min={0} placeholder="未定价" value={price} onChange={e => setPrice(e.target.value)} />{priceHint && <small className="custom-field-hint">{priceHint}</small>}</div>
-        <ColorPickerField label="地面颜色" value={color} onChange={setColor} disabled={locked} />
+        <div className="custom-field"><Label htmlFor="floor-color">地面颜色</Label><ColorPicker label="地面颜色" value={color} onChange={setColor} disabled={locked} triggerId="floor-color" /></div>
       </fieldset>
       <div className="custom-image-panel">
         <div className="custom-image-preview custom-floor-preview"><FloorSwatch material={preview} /><span>{floorPatterns.find(p => p.value === pattern)?.label} · 平面图预览</span></div>

@@ -362,6 +362,7 @@
   .cms-item-visual img,.cms-item-visual svg { width:100%; height:100%; object-fit:contain; }
   .cms-item-badge { position:absolute; top:8px; left:8px; padding:3px 8px; border:1px solid hsl(var(--border)); border-radius:999px; background:hsl(var(--card)); color:hsl(var(--muted-foreground)); font-size:10px; }
   .cms-item-badge.custom { border-color:hsl(var(--primary)/0.28); background:hsl(var(--accent)); color:hsl(var(--accent-foreground)); font-weight:600; }
+  .cms-item-badge.adjusted { left:auto; right:8px; border-color:hsl(var(--success)/0.3); background:hsl(var(--success)/0.1); color:hsl(var(--success)); font-weight:600; }
   .cms-item-card>b { font-size:13px; font-weight:600; }
   .cms-item-card>small { font-size:11px; color:hsl(var(--muted-foreground)); }
   .cms-item-card>small.cms-item-group { font-size:10px; letter-spacing:.05em; text-transform:none; }
@@ -994,20 +995,23 @@
   .plan-separator:hover line + line {
     stroke: var(--plan-selection);
   }
-  /* 选择模式：画布空白处十字光标（准备框选），房间 / 家具 / 墙等子元素各用自己的光标。 */
-  .plan-canvas.tool-select {
+  /* 选择模式：空白处和房间上是十字光标（拖动即框选），家具 / 墙 / 门窗沿用各自光标。 */
+  .plan-canvas.tool-select,
+  .plan-canvas.tool-select .plan-room {
     cursor: crosshair;
   }
-  .plan-canvas.tool-select .plan-room,
-  .plan-canvas.tool-select .plan-wall {
-    cursor: default;
-  }
-  /* 按住空格或中键拖动平移画布。 */
-  .plan-canvas.is-panning {
+  /* 按住空格或中键拖动平移画布；只读预览拖动空白处也是平移。 */
+  .plan-canvas.read-only,
+  .plan-canvas.read-only .plan-room {
     cursor: grab;
   }
-  .plan-canvas.is-panning:active {
-    cursor: grabbing;
+  .plan-canvas.is-panning,
+  .plan-canvas.is-panning * {
+    cursor: grab !important;
+  }
+  .plan-canvas.is-panning:active,
+  .plan-canvas.is-panning:active * {
+    cursor: grabbing !important;
   }
   .plan-marquee {
     fill: hsl(var(--primary) / 0.12);
@@ -1564,18 +1568,6 @@
   .property-field.full {
     grid-column: 1/-1;
   }
-  .property-field input[type="color"] {
-    background: hsl(var(--background));
-    border: 1px solid hsl(var(--border));
-    border-radius: 5px;
-    min-width: 0;
-    width: 100%;
-    color: hsl(var(--foreground));
-  }
-  .property-field input[type="color"] {
-    padding: 3px;
-    height: 31px;
-  }
   .property-actions {
     display: flex;
     flex-wrap: wrap;
@@ -1647,6 +1639,15 @@
     height: 29px;
     border-radius: 3px;
     flex: none;
+  }
+  .material-swatch {
+    overflow: hidden;
+  }
+  .material-swatch > .material-thumb {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
   }
   .material-swatch-empty {
     border: 1px dashed hsl(var(--border));
@@ -2511,37 +2512,97 @@
 .visual-selection-editor button:hover {
   background: hsl(var(--accent));
 }
-.visual-colors {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 0 7px;
-  border-left: 1px solid hsl(var(--border));
-  border-right: 1px solid hsl(var(--border));
-}
-.visual-colors > button {
-  width: 19px;
-  height: 19px;
+/* 颜色选择（全项目唯一一套，见 ColorPicker.tsx）：触发器只有一个色块，弹层 = 常用色 + 自定义取色。 */
+.color-picker-swatch {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  min-height: 0;
+  padding: 0;
+  margin: 0 4px;
   border-radius: 50%;
   border: 1px solid hsl(var(--foreground) / 0.2);
+  box-shadow: inset 0 0 0 2px hsl(var(--card));
+  transition: transform .15s ease, box-shadow .15s ease;
 }
-.visual-colors > button.selected {
-  outline: 2px solid hsl(var(--primary));
-  outline-offset: 2px;
+.visual-selection-editor .color-picker-swatch { min-height: 0; padding: 0; }
+.color-picker-swatch:hover { transform: scale(1.08); }
+.color-picker-swatch[data-state="open"],
+.color-picker-swatch:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 2px; }
+.color-picker-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: var(--ctl-lg);
+  padding: 0 12px;
+  border: 1px solid hsl(var(--input));
+  border-radius: var(--ctl-radius);
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-size: var(--fs-control);
+  font-variant-numeric: tabular-nums;
+  text-align: left;
 }
-.visual-custom-color {
-  position: relative;
-  padding: 5px;
+.color-picker-field > span:nth-child(2) { flex: 1; min-width: 0; }
+.color-picker-field > svg { flex: none; color: hsl(var(--muted-foreground)); }
+.color-picker-field:disabled { opacity: .5; cursor: not-allowed; }
+.color-picker-field:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
+.color-picker-chip {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 4px;
+}
+.color-picker-panel {
+  width: 236px;
+  padding: var(--sp-x);
+  background: hsl(var(--card));
+  border-radius: 10px;
+}
+.color-picker-panel h3 {
+  margin: 0 0 10px;
+  font-size: var(--fs-title);
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+.color-picker-grid {
   display: grid;
-  place-items: center;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.color-picker-grid button {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid hsl(var(--border));
+  border-radius: 7px;
+  transition: transform .15s ease;
+}
+.color-picker-grid button:hover { transform: scale(1.06); }
+.color-picker-grid button.selected {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 1px;
+}
+.color-picker-custom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid hsl(var(--border));
+  font-size: var(--fs-label);
+  color: hsl(var(--muted-foreground));
   cursor: pointer;
 }
-.visual-custom-color input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  width: 100%;
-  height: 100%;
+.color-picker-custom input[type="color"] {
+  width: 48px;
+  height: 30px;
+  padding: 2px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  background: hsl(var(--background));
   cursor: pointer;
 }
 .visual-editor-popover {
@@ -3406,14 +3467,6 @@ button.room-cost-row:hover {
     font-size: 10px;
     max-width: 75px;
   }
-  .visual-colors {
-    padding: 2px 6px;
-    gap: 6px;
-  }
-  .visual-colors > button {
-    width: 20px;
-    height: 20px;
-  }
   .visual-size-trigger {
     font-size: 10px;
   }
@@ -3480,8 +3533,7 @@ button.room-cost-row:hover {
   font-size: 11px;
   color: hsl(var(--muted-foreground));
 }
-.custom-field,
-.custom-color-field {
+.custom-field {
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -3494,56 +3546,6 @@ button.room-cost-row:hover {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 7px;
-}
-.furniture-color-trigger {
-  justify-content: flex-start;
-  gap: 8px;
-  width: 100%;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  color: hsl(var(--foreground));
-}
-.furniture-color-swatch {
-  flex: 0 0 auto;
-  width: 16px;
-  height: 16px;
-  border: 1px solid hsl(var(--border));
-  border-radius: 4px;
-}
-.furniture-color-panel {
-  width: 236px;
-}
-.furniture-color-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-}
-.furniture-color-grid button {
-  width: 100%;
-  aspect-ratio: 1;
-  border: 1px solid hsl(var(--border));
-  border-radius: 7px;
-}
-.furniture-color-grid button.selected {
-  outline: 2px solid hsl(var(--primary));
-  outline-offset: 1px;
-}
-.furniture-color-custom {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 12px;
-  font-size: 11px;
-  color: hsl(var(--muted-foreground));
-}
-.furniture-color-custom input[type="color"] {
-  width: 48px;
-  height: 30px;
-  padding: 2px;
-  border: 1px solid hsl(var(--border));
-  border-radius: 6px;
-  background: hsl(var(--background));
 }
 .custom-image-panel {
   display: flex;
@@ -3870,14 +3872,30 @@ button.room-cost-row:hover {
   .toolbar-login { height:36px; padding:0 10px; }
 }
 /* 单行工具栏：左侧项目菜单 */
-.project-menu-trigger { display:flex; align-items:center; gap:6px; flex:none; min-width:0; max-width:220px; height:34px; padding:0 8px; margin-left:-8px; border-radius:6px; font-size:13px; font-weight:600; color:hsl(var(--foreground)); }
-.project-menu-trigger>span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
-.project-menu-trigger>svg { flex:none; color:hsl(var(--muted-foreground)); }
+/* Logo + 项目名 + 箭头是同一个点击区，悬停整块高亮。 */
+.project-menu-trigger { display:flex; align-items:center; gap:8px; flex:none; min-width:0; max-width:260px; height:38px; padding:0 8px 0 6px; margin-left:-6px; border-radius:8px; font-size:13px; font-weight:600; color:hsl(var(--foreground)); transition:background-color .15s ease; }
+.project-menu-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.project-menu-trigger>svg:last-child { flex:none; color:hsl(var(--muted-foreground)); transition:transform .15s ease; }
+.project-menu-trigger[data-state="open"]>svg:last-child { transform:rotate(180deg); }
 .project-menu-trigger:hover,.project-menu-trigger[data-state="open"] { background:hsl(var(--secondary)); }
 .project-menu-trigger:focus-visible { outline:2px solid hsl(var(--ring)); outline-offset:1px; }
-.project-menu { width:min(360px,calc(100vw - 24px)); }
-.project-menu-create { font-weight:600; color:hsl(var(--primary)); }
-.project-menu-create:focus,.project-menu-create[data-state="open"] { color:hsl(var(--primary)); }
+.project-menu { width:min(360px,calc(100vw - 24px)); padding:6px; }
+.project-menu-heading { margin:6px 10px 4px; font-size:11px; font-weight:500; color:hsl(var(--muted-foreground)); }
+/* 新建方式：图标块 + 标题 + 一行说明（工作台下拉的「新建项目」卡片与二级菜单、项目管理页新建菜单共用）。 */
+.create-option-icon { display:grid; place-items:center; flex:none; width:32px; height:32px; border-radius:8px; background:hsl(var(--accent)); color:hsl(var(--primary)); transition:background-color .15s ease,color .15s ease; }
+.create-option-icon>svg { width:16px; height:16px; }
+.create-option-text { display:flex; flex-direction:column; gap:1px; flex:1; min-width:0; }
+.create-option-text>b { font-size:13px; font-weight:600; color:hsl(var(--foreground)); }
+.create-option-text>small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; color:hsl(var(--muted-foreground)); }
+.project-menu [role="menuitem"].project-menu-create { min-height:52px; gap:10px; padding:8px 10px 8px 8px; border:1px solid hsl(var(--primary) / 0.18); border-radius:10px; background:hsl(var(--primary) / 0.06); }
+.project-menu-create>.create-option-icon { background:hsl(var(--primary)); color:hsl(var(--primary-foreground)); }
+.project-menu-create>svg:last-child { flex:none; color:hsl(var(--primary)); }
+.project-menu [role="menuitem"].project-menu-create:focus,.project-menu [role="menuitem"].project-menu-create[data-state="open"] { background:hsl(var(--primary) / 0.12); border-color:hsl(var(--primary) / 0.35); }
+.create-menu { min-width:256px; padding:6px; }
+.create-menu [role="menuitem"].create-option { min-height:48px; gap:10px; padding:6px 10px 6px 6px; border-radius:8px; }
+.create-option[data-highlighted] .create-option-icon { background:hsl(var(--primary)); color:hsl(var(--primary-foreground)); }
+.create-option[data-tone="ai"] .create-option-icon { background:hsl(var(--success) / 0.14); color:hsl(var(--success)); }
+.create-option[data-tone="ai"][data-highlighted] .create-option-icon { background:hsl(var(--success)); color:hsl(var(--success-foreground)); }
 /* 菜单条目统一尺度：父级菜单、新建子菜单、导出、账号共用一套行高与 14px 图标，避免 24px 与 16px 混用 */
 .project-menu [role="menuitem"]:not(.project-menu-option),
 .create-menu [role="menuitem"],
@@ -3905,7 +3923,7 @@ button.room-cost-row:hover {
 .export-button:hover,.export-button[data-state="open"] { background:hsl(var(--primary) / 0.08); border-color:hsl(var(--primary)); color:hsl(var(--primary)); }
 .export-button .export-button-caret { width:14px; height:14px; opacity:.7; }
 .toolbar-right>.export-button { margin:0 4px; }
-.export-menu,.create-menu { min-width:200px; }
+.export-menu { min-width:200px; }
 .account-trigger { display:grid; place-items:center; flex:none; width:40px; height:40px; border-radius:50%; }
 .account-trigger .account-avatar { transition:box-shadow .2s ease; }
 .account-trigger:hover .account-avatar,.account-trigger[data-state="open"] .account-avatar { box-shadow:0 0 0 3px hsl(var(--secondary)),0 0 0 4px hsl(var(--border)); }
@@ -3917,7 +3935,7 @@ button.room-cost-row:hover {
 .soon-badge { margin-left:auto; padding:1px 7px; border-radius:999px; font-size:10px; font-weight:600; letter-spacing:.2px; background:hsl(var(--accent)); color:hsl(var(--primary)); opacity:0; transition:opacity .15s ease; }
 .soon-item[data-highlighted] .soon-badge,.soon-item:focus-visible .soon-badge { opacity:1; }
 @media (max-width: 600px) {
-  .project-menu-trigger { max-width:96px; padding:0 4px; margin-left:-4px; font-size:12px; }
+  .project-menu-trigger { max-width:132px; gap:6px; padding:0 4px; margin-left:-4px; font-size:12px; }
   .export-button { width:36px; height:36px; padding:0; }
   .export-button>span,.export-button .export-button-caret { display:none; }
   .toolbar-right>.export-button { margin:0 2px; }
@@ -3971,8 +3989,6 @@ button.room-cost-row:hover {
 .property-panel .area-description { margin: 6px 0 var(--rp-row); }
 .property-panel .small-stats { padding-top: var(--rp-row); }
 /* 面板内色板：左对齐、无分隔线、可换行 */
-.property-panel .visual-colors { padding: 0; border: 0; flex-wrap: wrap; gap: var(--rp-col); }
-.property-panel .visual-colors > button { width: 22px; height: 22px; }
 /* 单价：元/单位与来源 → 同步勾选 → 输入 + 应用 → 说明，层级间距 8 */
 .property-panel .price-field-meta,
 .property-panel .price-sync-option { margin-bottom: var(--rp-title); }
@@ -4170,6 +4186,17 @@ button.ai-candidate:hover { border-color: hsl(var(--primary) / 0.5); }
 .furniture-picker [cmdk-empty] { font-size: var(--fs-control); color: hsl(var(--muted-foreground)); }
 .furniture-picker-visual { display: grid; place-items: center; flex: none; width: 24px; height: 24px; }
 .furniture-picker-visual svg, .furniture-picker-visual img { max-width: 100%; max-height: 100%; }
+/* 带图下拉的材料缩略图：与平面图同一套纹理 / 色块 / 门窗符号。 */
+.material-thumb { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 5px; border: 1px solid hsl(var(--foreground) / 0.12); overflow: hidden; }
+svg.material-thumb { display: block; }
+.material-thumb-icon { background: hsl(var(--accent)); color: hsl(var(--primary)); border-color: transparent; }
+.material-thumb-empty { border-style: dashed; background: hsl(var(--muted) / 0.4); color: hsl(var(--muted-foreground)); }
+.visual-select-trigger { justify-content: flex-start; padding-left: 8px; }
+.visual-select-trigger > span:nth-of-type(2) { flex: 1; }
+.visual-select-visual { display: grid; place-items: center; flex: none; width: 24px; height: 24px; }
+.visual-select-visual:empty { display: none; }
+.visual-select-visual svg, .visual-select-visual img { max-width: 100%; max-height: 100%; }
+.visual-select-badge { flex: none; padding: 0 6px; border-radius: 999px; background: hsl(var(--accent)); color: hsl(var(--primary)); font-size: var(--fs-meta); }
 .furniture-picker-label { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .furniture-picker-label small { flex: none; padding: 0 6px; border-radius: 999px; background: hsl(var(--accent)); color: hsl(var(--primary)); font-size: var(--fs-meta); }
 .furniture-picker-hint { flex: none; font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }

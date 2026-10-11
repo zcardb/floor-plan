@@ -45,3 +45,15 @@ describe('承重标记方案兼容性', () => {
     expect(validateDesign({ ...d, separators: [{ id: 's', a: [0, 0], b: [500, 0] }] }).separators).toHaveLength(1);
   });
 });
+
+describe('家具组合字段', () => {
+  const withGroup = (groupId: unknown) => ({ ...blankDesign(), furniture: [{ id: 'f1', type: 'chair', name: '餐椅', cx: 1000, cy: 1000, w: 450, d: 500, rot: 0, color: '#efe6d8', groupId }] });
+  it('合法的 groupId 保存后仍保留', () => {
+    const d = withGroup('g1');
+    expect(validateDesign(JSON.parse(JSON.stringify(d))).furniture[0]!.groupId).toBe('g1');
+  });
+  it('非字符串或空 groupId 视为格式错误', () => {
+    expect(() => validateDesign(withGroup(3))).toThrow();
+    expect(() => validateDesign(withGroup(''))).toThrow();
+  });
+});
