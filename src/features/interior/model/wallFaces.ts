@@ -31,12 +31,8 @@ export function withAlignedThickness(d: Design, wall: Wall, thickness: number): 
   const delta = thickness - wall.thickness;
   if (Math.abs(delta) < 0.001) return wall;
   const side = roomFaceSide(d, wall);
-  if (!side) {
-    const u: Point = [(wall.b[0] - wall.a[0]) / length(wall), (wall.b[1] - wall.a[1]) / length(wall)];
-    const n: Point = [-u[1], u[0]];
-    const shift = (delta * side0(delta)) / 2;
-    return { ...wall, thickness, a: [wall.a[0] + n[0] * shift, wall.a[1] + n[1] * shift], b: [wall.b[0] + n[0] * shift, wall.b[1] + n[1] * shift] };
-  }
+  // 隔墙或无法判断朝向：维持原中心线，两侧各变化一半。
+  if (!side) return { ...wall, thickness };
   const u: Point = [(wall.b[0] - wall.a[0]) / length(wall), (wall.b[1] - wall.a[1]) / length(wall)];
   const n: Point = [-u[1], u[0]];
   const shift = -side * delta / 2;
