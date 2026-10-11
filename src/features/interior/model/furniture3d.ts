@@ -72,8 +72,16 @@ export function sanitizeModel3d(raw: unknown): FurnitureModel3d | null {
   return parts.length ? { version: 1, parts } : null;
 }
 
-/** 项目 / 目录里存着的模型是否完整合法（与整理后的结果一致）。 */
+/** 按键名排序后序列化：数据库存 JSON 时会重排字段，比较内容时不能受字段顺序影响。 */
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (value && typeof value === 'object')
+    return `{${Object.keys(value).sort().map(k => `${JSON.stringify(k)}:${canonical((value as Record<string, unknown>)[k])}`).join(',')}}`;
+  return JSON.stringify(value) ?? 'null';
+}
+
+/** 项目 / 目录里存着的模型是否完整合法（内容与整理后的结果一致，不看字段顺序）。 */
 export const validModel3d = (value: unknown) => {
   const clean = sanitizeModel3d(value);
-  return !!clean && JSON.stringify(clean) === JSON.stringify(value);
+  return !!clean && canonical(clean) === canonical(value);
 };

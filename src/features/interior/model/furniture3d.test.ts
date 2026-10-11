@@ -35,6 +35,14 @@ describe('AI 简易 3D 模型', () => {
     expect(validModel3d(clean)).toBe(true);
     expect(validModel3d({ ...clean, parts: [{ ...clean!.parts[0], x: 0.0001 }] })).toBe(false);
   });
+  it('数据库重排字段顺序后仍判为合法，数值不同仍拒绝', () => {
+    // 数据库返回的 JSON 字段顺序与写入时不同（短键在前）。
+    const stored = { parts: [{ d: 0.09, h: 0.92, w: 0.075, x: -0.39, y: 0.045, z: 0, kind: 'box', color: '#666665' }], version: 1 };
+    expect(validModel3d(stored)).toBe(true);
+    expect(validModel3d({ ...stored, parts: [{ ...stored.parts[0], x: -0.3901 }] })).toBe(false);
+    const design = { ...blankDesign(), customCatalog: [{ ...sofa, model3d: stored }] };
+    expect(validateDesign(JSON.parse(JSON.stringify(design))).customCatalog?.[0]?.model3d?.parts).toHaveLength(1);
+  });
   it('方案校验接受合法模型、拒绝越界部件；缺省仍兼容', () => {
     const item = { ...sofa, model3d: sanitizeModel3d({ parts: [part(), part({ kind: 'sphere', y: 0.5 })] })! };
     const base = { ...blankDesign(), customCatalog: [item] };
