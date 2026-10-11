@@ -11,7 +11,7 @@ export interface CreateProjectActions {
   importFile: () => void;
 }
 
-/** 新建方式：图标块 + 标题 + 一行说明，让每种方式「做什么」一眼可辨。 */
+/** 新建方式：16px 图标 + 标题 + 一行说明（与墙体选项菜单同一套两行刻度）。 */
 function CreateOption({ icon: Icon, title, hint, onSelect, tone }: { icon: LucideIcon; title: string; hint: string; onSelect: () => void; tone?: 'ai' }) {
   return <DropdownMenuItem className="create-option" data-tone={tone} onSelect={onSelect}>
     <span className="create-option-icon" aria-hidden="true"><Icon /></span>

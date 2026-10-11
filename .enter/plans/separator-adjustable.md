@@ -10,7 +10,7 @@
   - 点击：和现在一样，选中房间、家具、墙、门窗或分隔线，点空白处取消选择。
   - 在房间或空白处按住拖动：画选框（原来的 `kind:'marquee'` 分支），不再平移。
   - 在家具、墙、门窗、分隔线上拖动：和现在一样移动对象。
-  - 光标：画布空白处和房间上显示十字，家具上显示移动光标（复用现有 `.marquee-on` 的样式，改为选择模式默认生效）。
+  - 光标：选择模式沿用默认箭头，不切成十字；家具、墙、门窗各用自己的光标，按住空格或中键时显示抓手。
 - 平移改到两指上：
   - 触控板双指滑动（`wheel` 事件，没按 ctrl）：只平移画布。
   - 触控板双指捏合（`wheel` 加 `ctrlKey`）：缩放。
@@ -86,7 +86,7 @@
 - [x] `PlanCanvas.tsx`：选择模式下在空白处或房间上拖动改为 `marquee`；在家具、墙、门窗、分隔线上拖动的行为不变；只读时仍然平移
 - [x] `PlanCanvas.tsx`：wheel 事件按 `wheelIntent` 区分，触控板双指平移、ctrl 加 wheel 缩放、鼠标滚轮缩放；中键拖动或空格加拖动平移
 - [x] `model/wheelIntent.ts`：纯函数加连续滚动粘滞判断
-- [x] `index.css`：选择模式下空白处显示十字光标，家具上显示移动光标
+- [x] `index.css`：选择模式保持默认箭头光标（不用十字），平移时显示抓手
 - [x] `types.ts` 新增 `Furniture.groupId`；`validation.ts` 和 `costs.normalizeFurniture` 校验并保留这个字段
 - [x] `furnitureGroup.ts`：新增 `groupFurniture` / `ungroupFurniture` / `expandToGroups` / `persistentGroupOf`
 - [x] `PlanCanvas.tsx`：点击或拖动已组合的家具时选中并移动整组；框选结果补全为整组

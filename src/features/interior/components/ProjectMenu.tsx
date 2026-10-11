@@ -84,7 +84,7 @@ export function ProjectMenu(p: Props) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="project-menu" onCloseAutoFocus={event => { if (renaming || deleting || creation.dialogOpen) event.preventDefault(); }}>
         {p.loggedIn && p.onCreateProject && <>
-          {/* 主色卡片：悬停展开二级菜单，卡片上直接写清有哪几种新建方式。 */}
+          {/* 主操作：浅主色底 + 主色图标，悬停展开二级菜单，说明行写清有哪几种新建方式。 */}
           <DropdownMenuSub>
             <DropdownMenuSubTrigger className="project-menu-create" disabled={busy}>
               <span className="create-option-icon" aria-hidden="true"><Plus /></span>
