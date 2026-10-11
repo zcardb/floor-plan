@@ -70,6 +70,7 @@ import { StairEditor } from './StairEditor';
 import { changeDoorOrientation } from '../model/doorOrientation';
 import { useEditorDrag } from './useEditorDrag';
 import { separatorLength } from '../model/separators';
+import { overlaps } from '../model/layoutRules';
 import type { AiEntryTone } from '../ai/useRoomAi';
 export interface SelectionEditorHandle {
   update: (r: ScreenRect | null) => void;
@@ -197,6 +198,10 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           : null,
       group = groupIds(p.design, sel);
     const grouped = isPersistentGroup(p.design, group);
+    // 图层顺序只在家具互相压住时才有意义：选中的家具与其它家具没有任何重叠，就不显示「图层」。
+    // 判据复用布局校验的 overlaps（超过 50mm 才算，地毯压家具、椅子收进桌下这类正常叠放不算）。
+    const picked = f ? [f] : p.design.furniture.filter(item => group.includes(item.id));
+    const layered = picked.some(item => p.design.furniture.some(other => other.id !== item.id && overlaps(item, other)));
     const roomItems = r ? p.design.furniture.filter(f => inRoom([f.cx, f.cy], r)) : [];
     const roomFurniture = roomItems.length;
     // 门窗款式：只有标准款且未换过款式时没有可切换项，不显示入口（与属性面板一致）。
@@ -468,7 +473,30 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           </EditorTooltip>
           <PopoverContent className="visual-editor-popover"><h3>门开向</h3><DoorOrientationControls door={o} onChange={patch => p.change(d => changeDoorOrientation(d, o.id, patch))} /></PopoverContent>
         </Popover>}
-        {/* 房间：金额按钮直接展开右侧本间成本面板（单价在面板里逐项调整），没有下拉。 */}
+        {(f || group.length > 1) && (
+          <EditorTooltip label={group.length > 1 ? "整组旋转 90°" : "旋转 90°"} shortcut="R">
+            <button type="button" aria-label={group.length > 1 ? "整组旋转 90°" : "旋转 90°"} onClick={p.rotate}>
+              <RotateCw size={15} />
+            </button>
+          </EditorTooltip>
+        )}
+        {f && (
+          <EditorTooltip label="复制对象" shortcut="Ctrl D">
+            <button type="button" aria-label="复制对象" onClick={p.duplicate}>
+              <Copy size={15} />
+            </button>
+          </EditorTooltip>
+        )}
+        {(f || group.length > 1) && layered && <LayerMenu design={p.design} ids={f ? [f.id] : group} change={p.change} variant="toolbar" />}
+        {group.length > 1 && p.toggleGroup && (
+          <EditorTooltip label={grouped ? "解除组合" : "组合"} shortcut={grouped ? "Ctrl Shift G" : "Ctrl G"}>
+            <button type="button" aria-label={grouped ? "解除组合" : "组合"} aria-pressed={grouped} onClick={p.toggleGroup}>
+              {grouped ? <Ungroup size={15} /> : <Group size={15} />}
+            </button>
+          </EditorTooltip>
+        )}
+        {/* 金额紧挨在删除左边；删除是最后一个操作，后面只剩「取消选择」。 */}
+        {/* 房间的金额按钮直接展开右侧本间成本面板（单价在面板里逐项调整），没有下拉。 */}
         {p.showCosts && r && (
           <EditorTooltip label="本间成本 · 点击查看明细">
             <button type="button" className="visual-cost-trigger" aria-label={`本间成本 ${costLabel}，查看明细`} onClick={p.costs}>
@@ -513,21 +541,6 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </PopoverContent>
           </Popover>
         )}
-        {(f || group.length > 1) && (
-          <EditorTooltip label={group.length > 1 ? "整组旋转 90°" : "旋转 90°"} shortcut="R">
-            <button type="button" aria-label={group.length > 1 ? "整组旋转 90°" : "旋转 90°"} onClick={p.rotate}>
-              <RotateCw size={15} />
-            </button>
-          </EditorTooltip>
-        )}
-        {f && (
-          <EditorTooltip label="复制对象" shortcut="Ctrl D">
-            <button type="button" aria-label="复制对象" onClick={p.duplicate}>
-              <Copy size={15} />
-            </button>
-          </EditorTooltip>
-        )}
-        {(f || group.length > 1) && <LayerMenu design={p.design} ids={f ? [f.id] : group} change={p.change} variant="toolbar" />}
         {(f || o || deletableWall || separator || group.length > 1) && (
           <EditorTooltip label={group.length > 1 ? "删除选中家具" : "删除对象"} shortcut="Delete">
             <button type="button" aria-label={group.length > 1 ? "删除选中家具" : "删除对象"} onClick={p.remove}>
@@ -536,13 +549,6 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           </EditorTooltip>
         )}
         {r && <RoomDeleteMenu furniture={roomFurniture} clear={p.remove} removeRoom={p.removeRoom ? () => p.removeRoom!(r.id) : undefined} />}
-        {group.length > 1 && p.toggleGroup && (
-          <EditorTooltip label={grouped ? "解除组合" : "组合"} shortcut={grouped ? "Ctrl Shift G" : "Ctrl G"}>
-            <button type="button" aria-label={grouped ? "解除组合" : "组合"} aria-pressed={grouped} onClick={p.toggleGroup}>
-              {grouped ? <Ungroup size={15} /> : <Group size={15} />}
-            </button>
-          </EditorTooltip>
-        )}
         <EditorTooltip label="取消选择" shortcut="Esc">
           <button type="button" aria-label="取消选择" onClick={p.close}>
             <X size={15} />

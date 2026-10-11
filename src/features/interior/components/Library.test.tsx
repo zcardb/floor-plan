@@ -6,7 +6,10 @@ vi.mock('react',async original=>({...await original<typeof import('react')>(),us
   if(!(index in state.values))state.values[index]=initial;
   return [state.values[index],(value:unknown)=>{state.values[index]=value;}];
 }}));
-import { Library, StructuralItems } from './Library';
+import { Library, LIBRARY_PAGE_SIZE, StructuralItems } from './Library';
+import { CmsFilterBar } from './CmsFilterBar';
+import { ProjectLoadMore } from './ProjectLoadMore';
+import { library } from '../data/catalog';
 type Node=ReactElement<Record<string,unknown>>;
 function nodes(tree:ReactNode):Node[]{
   if(Array.isArray(tree))return tree.flatMap(nodes);
@@ -25,15 +28,14 @@ function harness(structureTools=true){
   return {render,add,setTool};
 }
 beforeEach(()=>{state.values=[];state.cursor=0;});
+type Bar=Parameters<typeof CmsFilterBar>[0];
+const barOf=(tree:Node[])=>tree.find(n=>n.type===CmsFilterBar)!.props as unknown as Bar;
 describe('硬装分类入口',()=>{
-  it('硬装有独立图标，切换后集中显示五种楼梯与工具，并移除软装列表',()=>{
+  it('硬装切换后集中显示五种楼梯与工具，并移除软装列表',()=>{
     const h=harness();
     let tree=h.render();
-    const category=tree.find(n=>n.type==='button'&&n.props.children==='硬装')!;
-    // 分类已收成一行胶囊：不再有图标，只有文字与选中态
-    expect(nodes(category).some(n=>typeof n.type==='string'&&n.type==='svg')).toBe(false);
     expect(tree.some(n=>n.props.className==='structural-items')).toBe(false);
-    (category.props.onClick as ()=>void)();tree=h.render();
+    barOf(tree).onChange('硬装');tree=h.render();
     expect(tree.some(n=>n.props.className==='structural-items')).toBe(true);
     for(const name of ['直跑楼梯','L 型楼梯','U 型楼梯','三跑楼梯','螺旋楼梯'])
       expect(tree.some(n=>n.props['aria-label']==='添加'+name),name).toBe(true);
@@ -60,24 +62,44 @@ describe('硬装分类入口',()=>{
   });
 });
 describe('家具库头部与引导提示',()=>{
-  it('搜索框与新建按钮同一行，分类是一行胶囊，操作提示并入分组小标题',()=>{
+  it('头部（搜索 + 新建、通用分类胶囊、分组小标题）固定，只有列表区滚动',()=>{
     const h=harness();
     const tree=h.render();
-    const toolbar=tree.findIndex(n=>n.props.className==='library-toolbar');
-    const categories=tree.findIndex(n=>n.props.className==='library-categories');
-    const subheading=tree.findIndex(n=>n.props.className==='library-subheading');
+    const head=tree.find(n=>n.props.className==='library-head')!;
+    const inHead=nodes(head);
+    const toolbar=inHead.findIndex(n=>n.props.className==='library-toolbar');
+    const categories=inHead.findIndex(n=>n.type===CmsFilterBar);
+    const subheading=inHead.findIndex(n=>n.props.className==='library-subheading');
     expect(toolbar).toBeGreaterThan(-1);
     expect(toolbar).toBeLessThan(categories);
     expect(categories).toBeLessThan(subheading);
-    // 提示卡片已并入分组小标题的右侧灰字
-    expect(tree.some(n=>n.props.className==='library-tip')).toBe(false);
-    expect(text(tree[subheading]!.props.children as ReactNode)).toContain('点击添加或拖入');
-    // 分类胶囊是纯文字按钮，当前项用 aria-pressed 表达
-    const bar=tree.find(n=>n.props.className==='library-categories')!;
-    const chips=nodes(bar).filter(n=>typeof n.props['aria-pressed']==='boolean');
-    expect(chips.map(n=>n.props.children)).toEqual(['卧室','客厅','餐厨','卫浴','家电','书房','硬装']);
-    expect(chips.filter(n=>n.props['aria-pressed']).map(n=>n.props.children)).toEqual(['客厅']);
-    expect(tree.some(n=>n.props.className==='item-add')).toBe(false);
+    expect(text(inHead[subheading]!.props.children as ReactNode)).toContain('点击添加或拖入');
+    // 家具卡片只在滚动区里
+    const scroll=tree.find(n=>n.props.className==='library-scroll')!;
+    expect(nodes(head).some(n=>n.props.className==='library-item')).toBe(false);
+    expect(nodes(scroll).some(n=>n.props.className==='library-item')).toBe(true);
+    // 分类沿用管理页的 CmsFilterBar，紧凑尺寸，第一项是默认选中的「全部」
+    const bar=barOf(tree);
+    expect(bar.className).toBe('library-categories');
+    expect(bar.chips.map(c=>c.label)).toEqual(['全部','卧室','客厅','餐厨','卫浴','家电','书房','硬装']);
+    expect(bar.value).toBe('全部');
+  });
+  it('「全部」按 12 件一页滚动加载：12 → 24 → 36',()=>{
+    const h=harness();
+    let tree=h.render();
+    const cards=()=>tree.filter(n=>n.props.className==='library-item').length;
+    expect(text(tree.find(n=>n.props.className==='library-subheading')!.props.children as ReactNode)).toContain(`全部家具 · ${library.length} 件`);
+    expect(cards()).toBe(LIBRARY_PAGE_SIZE);
+    for(const expected of [24,36]){
+      const more=tree.find(n=>n.type===ProjectLoadMore)!.props as Parameters<typeof ProjectLoadMore>[0];
+      expect(more.total).toBe(library.length);
+      more.onReach();tree=h.render();
+      expect(cards()).toBe(Math.min(expected,library.length));
+    }
+    // 切换分类后回到第一页
+    barOf(tree).onChange('客厅');tree=h.render();
+    expect(cards()).toBeLessThanOrEqual(LIBRARY_PAGE_SIZE);
+    expect(tree.every(n=>n.props.className!=='library-item'||library.find(i=>'添加'+i.name===n.props['aria-label'])?.category==='客厅')).toBe(true);
     const card=tree.find(n=>n.props['aria-label']==='添加三人沙发')!;
     (card.props.onClick as ()=>void)();
     expect(h.add).toHaveBeenCalledWith(expect.objectContaining({name:'三人沙发'}));

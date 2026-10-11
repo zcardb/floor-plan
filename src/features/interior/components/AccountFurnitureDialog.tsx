@@ -24,13 +24,16 @@ const fieldsChanged = (item: LibraryItem, next: Omit<LibraryItem, 'price'>) =>
   || JSON.stringify(item.model3d ?? null) !== JSON.stringify(next.model3d ?? null);
 
 /**
- * 家具详情：表单项与「新建你的家具」一致。自定义家具所有项都可改，内置家具只能改账号默认单价。
- * 修改同步到使用该家具的项目；项目里单独改过的单价仍以项目为准。
+ * 家具详情：表单项与「新建你的家具」一致。自定义家具所有项都可改；内置家具可改名称、尺寸、颜色
+ * （写进账号库的覆盖行，分类与参考类型保持只读），并设置账号默认单价。
+ * 素材与名称 / 尺寸 / 颜色的覆盖对新放置的家具生效；已放置的家具只跟随素材，项目内单独改过的以项目为准。
  */
-export function AccountFurnitureDialog({ item, isCustom, referencePrice, onOpenChange, onChanged, applyDefaultPrice, remove, saveGeometry, saveAssets, adjusted = false, commitBusy = false, commitError = '', retryPrice, saved = false }: {
+export function AccountFurnitureDialog({ item, isCustom, referencePrice, onOpenChange, onChanged, applyDefaultPrice, remove, saveGeometry, saveFields, saveAssets, adjusted = false, commitBusy = false, commitError = '', retryPrice, saved = false }: {
   commitBusy?: boolean; commitError?: string; retryPrice?: () => Promise<boolean>; saved?: boolean;
   saveGeometry?: (item: LibraryItem) => Promise<boolean>;
-  /** 内置家具：只保存 2D / 3D 素材覆盖（名称、尺寸等仍是内置值）。 */
+  /** 内置家具：把名称、尺寸、颜色与 2D / 3D 素材写进账号覆盖行。 */
+  saveFields?: (item: LibraryItem) => Promise<boolean>;
+  /** 内置家具：只保存 2D / 3D 素材覆盖（AI 调整与「恢复默认素材」走这里）。 */
   saveAssets?: (assets: Assets) => Promise<boolean>;
   /** 内置家具的素材已调整过（可恢复默认）。 */
   adjusted?: boolean;
@@ -47,13 +50,15 @@ export function AccountFurnitureDialog({ item, isCustom, referencePrice, onOpenC
   const [view, setView] = useState<FurnitureView>('top'), [adjusting, setAdjusting] = useState<{ seed: File | null } | null>(null);
   const snapshot = useRef<ModelSnapshot | null>(null);
   const editable = isCustom && !!saveGeometry;
+  /** 内置家具：名称、尺寸、颜色可改，写的是覆盖行。 */
+  const fieldsEditable = editable || (!!saveFields && !retryPrice);
   /** 视觉区跟随表单实时预览：参考符号与 3D 模型按当前草稿绘制，图片沿用已保存的。 */
-  const display: LibraryItem = editable ? { ...item, ...previewFurnitureDraft(draft, { w: item.w, d: item.d, height: item.height || 700 }), name: draft.name.trim() || item.name } : item;
+  const display: LibraryItem = fieldsEditable ? { ...item, ...previewFurnitureDraft(draft, { w: item.w, d: item.d, height: item.height || 700 }), name: draft.name.trim() || item.name } : item;
   /** 硬装只有 2D，一律按俯视图处理。 */
   const activeView: FurnitureView = hasViews(display) ? view : 'top';
   const canAdjust = (editable || !!saveAssets) && !retryPrice;
-  /** 内置家具可以调素材但没有覆盖行：表单其余字段仍按内置值只读。 */
-  const assetsOnly = !isCustom && !!saveAssets;
+  /** 内置家具：分类、参考类型、外形只读（改了等于换一款家具），其余字段可改。 */
+  const assetsOnly = !isCustom;
   const working = busy || commitBusy;
   const failure = commitError || error;
   const patch = (next: Partial<FurnitureDraft>) => { setError(''); setDraft(current => ({ ...current, ...next })); };
@@ -96,11 +101,12 @@ export function AccountFurnitureDialog({ item, isCustom, referencePrice, onOpenC
     if (!parsed) { setError(FURNITURE_DRAFT_ERROR); notify.fail(FURNITURE_DRAFT_ERROR); return; }
     const { price, ...fields } = parsed;
     const next: LibraryItem = { ...item, ...fields };
-    const changedFields = editable && fieldsChanged(item, next), changedPrice = price !== initialPrice;
+    const changedFields = fieldsEditable && fieldsChanged(item, next), changedPrice = price !== initialPrice;
     if (!changedFields && !changedPrice) { onOpenChange(false); return; }
     setBusy(true); setError('');
     try {
-      if (changedFields && !(await saveGeometry!(next))) { setError('未能保存，本次修改已保留，请重试。'); return; }
+      const writeFields = saveGeometry ?? saveFields;
+      if (changedFields && !(await writeFields!(next))) { setError('未能保存，本次修改已保留，请重试。'); return; }
       if (changedPrice && !retryPrice && !(await applyDefaultPrice(price))) { setError('单价未能保存，本次修改已保留，请重试。'); onChanged(next); return; }
       onChanged({ ...next, price });
       notify.success(`「${next.name}」已保存，使用它的项目会同步更新`);
@@ -139,12 +145,12 @@ export function AccountFurnitureDialog({ item, isCustom, referencePrice, onOpenC
       <DialogContent className="cms-detail-dialog furniture-detail-dialog" onEscapeKeyDown={event => { if (working) event.preventDefault(); }} onInteractOutside={event => { if (working) event.preventDefault(); }}>
         <DialogHeader>
           <DialogTitle>{item.name}</DialogTitle>
-          <DialogDescription>{item.category} · {isCustom ? '自定义家具，所有项都可修改' : saveAssets ? '内置家具，可用「AI 调整」更换 2D / 3D 素材并设置账号默认单价' : '内置家具，可设置账号默认单价'}。修改会同步到使用它的项目；项目里单独改过的单价以项目为准。</DialogDescription>
+          <DialogDescription>{item.category} · {fieldsEditable ? isCustom ? '自定义家具，所有项都可修改' : '内置家具，可改名称、尺寸、颜色，并用「AI 调整」更换 2D / 3D 素材；分类与参考类型不可改' : '内置家具，可设置账号默认单价'}。素材与名称、尺寸、颜色对新放置的家具生效；项目里单独改过的以项目为准。</DialogDescription>
         </DialogHeader>
         <div className="furniture-detail-body">
           <FurnitureVisual item={display} view={view} onView={setView} snapshotRef={snapshot} onAdjust={canAdjust ? () => void openAdjust() : undefined} />
           <form id="furniture-detail-form" className="furniture-detail-side" onSubmit={e => { e.preventDefault(); void finish(); }}>
-            <FurnitureFormFields draft={draft} onChange={patch} categoryField={categoryField} priceOnly={assetsOnly || !editable} disabled={working || !!retryPrice}
+            <FurnitureFormFields draft={draft} onChange={patch} categoryField={categoryField} priceOnly={!fieldsEditable} identityLocked={assetsOnly} disabled={working || !!retryPrice}
               priceLabel="账号默认单价 · 元 / 件" priceHint="仅影响未单独调价的项目；项目内改价仍以项目为准。" />
             {failure && <div className="cost-save-error" role="alert"><span>{failure}</span>{retryPrice && <Button type="button" variant="outline" disabled={working} onClick={() => void retry()}>重试保存</Button>}</div>}
           </form>

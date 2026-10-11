@@ -760,36 +760,41 @@
   }
   .library-new:hover { background: hsl(var(--accent)); border-color: hsl(var(--primary) / 0.35); }
   .library-new:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
-  .library-categories {
+  /* 家具库：头部固定，只有 .library-scroll 滚动（.panel-scroll 本身不再滚） */
+  .panel-scroll:has(.library-panel) { overflow: hidden; }
+  .library-panel {
     display: flex;
-    gap: 6px;
-    padding: 0 var(--sp-x) 12px;
-    margin-bottom: 12px;
-    overflow-x: auto;
-    scrollbar-width: none;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+  .library-head {
+    flex: none;
     border-bottom: 1px solid hsl(var(--border));
   }
-  .library-categories::-webkit-scrollbar { display: none; }
-  .library-categories button {
-    flex: none;
+  .library-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-top: 12px;
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  .library-scroll .project-load-more { min-height: 40px; margin: 0 0 12px; font-size: var(--fs-meta); }
+  /* 分类：沿用管理页 CmsFilterBar（溢出渐隐、滚轮横滑），尺寸收成侧栏紧凑版 */
+  .cms-filter-bar.library-categories {
+    gap: 6px;
+    margin: 0 var(--sp-x) 10px;
+    padding-bottom: 0;
+    scrollbar-width: none;
+    scroll-padding-inline: 20px;
+  }
+  .cms-filter-bar.library-categories::-webkit-scrollbar { display: none; }
+  .cms-filter-bar.library-categories button {
     min-height: var(--ctl-sm);
     padding: 0 10px;
     font-size: var(--fs-control);
-    color: hsl(var(--muted-foreground));
-    border: 1px solid hsl(var(--border));
-    border-radius: 999px;
-    white-space: nowrap;
-    transition: background-color .15s ease, border-color .15s ease, color .15s ease;
-  }
-  .library-categories button.active {
-    color: hsl(var(--primary));
-    background: hsl(var(--accent));
-    border-color: hsl(var(--primary) / 0.35);
-    font-weight: 600;
-  }
-  .library-categories button:hover:not(.active) {
-    background: hsl(var(--secondary));
-    color: hsl(var(--foreground));
   }
   .library-subheading {
     display: flex;
@@ -1069,9 +1074,10 @@
   .north-presets button {
     padding-inline: 0;
   }
+  /* 缩放 / 比例尺：固定在画布左下角 */
   .canvas-zoom {
     position: absolute;
-    right: 20px;
+    left: 20px;
     bottom: 19px;
     display: flex;
     align-items: center;
@@ -1138,7 +1144,7 @@
     background: hsl(var(--accent));
     color: hsl(var(--primary));
   }
-  /* 画布竖条：家具 / AI 两个入口，默认贴右边缘垂直居中，顶部把手可拖动 */
+  /* 画布竖条：家具 / 成本 / AI 入口 + 底部收起；默认贴右边缘垂直居中，整条可拖动 */
   .canvas-rail {
     position: absolute;
     top: 0;
@@ -1150,40 +1156,37 @@
     padding: 5px;
     background: hsl(var(--card) / 0.97);
     border: 1px solid hsl(var(--border));
-    /* 上下整条收成圆形胶囊 */
+    /* 上下整条收成圆形胶囊；收起后就是一个圆 */
     border-radius: 999px;
     box-shadow: var(--shadow-panel);
     z-index: 6;
-  }
-  .canvas-rail-grip {
-    display: grid;
-    place-items: center;
-    width: 38px;
-    height: 22px;
-    border-radius: var(--ctl-radius-in);
-    color: hsl(var(--muted-foreground));
     cursor: grab;
     touch-action: none;
+    user-select: none;
   }
-  .canvas-rail-grip:hover { background: hsl(var(--secondary)); color: hsl(var(--foreground)); }
-  .canvas-rail-grip[data-dragging] { cursor: grabbing; }
-  .canvas-rail-grip:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
-  /* 竖条按钮：默认就有底色，悬停 / 打开时更亮 */
-  .canvas-rail-button {
+  .canvas-rail[data-dragging] { cursor: grabbing; }
+  /* 竖条按钮：默认无底色，悬停浅底，只有打开的那一项有主色底 */
+  .canvas-rail-button,
+  .canvas-rail-toggle {
     display: grid;
     place-items: center;
     width: 40px;
     height: 40px;
     border-radius: 999px;
-    background: hsl(var(--secondary));
+    background: transparent;
     color: hsl(var(--muted-foreground));
     transition: background-color .15s ease, color .15s ease;
   }
   .canvas-rail-button > svg { width: 20px; height: 20px; }
-  .canvas-rail-button:hover { background: hsl(var(--accent)); color: hsl(var(--primary)); }
+  .canvas-rail-toggle > svg { width: 18px; height: 18px; }
+  .canvas-rail-button:hover,
+  .canvas-rail-toggle:hover { background: hsl(var(--secondary)); color: hsl(var(--foreground)); }
   .canvas-rail-button[data-state="open"],
-  .canvas-rail-button.active { background: hsl(var(--primary) / 0.16); color: hsl(var(--primary)); }
-  .canvas-rail-button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
+  .canvas-rail-button.active { background: hsl(var(--primary) / 0.14); color: hsl(var(--primary)); }
+  .canvas-rail-button:focus-visible,
+  .canvas-rail-toggle:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
+  .canvas-rail-toggle { height: 32px; }
+  .canvas-rail.collapsed .canvas-rail-toggle { height: 40px; }
   .mode-hint-finish {
     flex: none;
     min-height: var(--ctl-sm);
@@ -2112,7 +2115,7 @@
     height: 60px;
   }
   .canvas-zoom {
-    right: 12px;
+    left: 12px;
     bottom: 20px;
     padding: 4px;
   }
@@ -2211,10 +2214,6 @@
   }
   .material-card small {
     font-size: 9px;
-  }
-  .library-categories button {
-    font-size: 12px;
-    padding: 10px 0;
   }
   .library-search input {
     font-size: var(--fs-input);
@@ -4248,7 +4247,9 @@ svg.material-thumb { display: block; }
   .overview-metrics { grid-template-columns:repeat(2, minmax(0, 1fr)); }
   .mode-hint-finish { min-height:34px; }
   /* 手机上竖条改成右下角横排、不可拖动（压掉拖动写入的内联位移），避开左下角缩放条 */
-  .canvas-rail { top:auto; left:auto; right:12px; bottom:16px; flex-direction:row; transform:none !important; }
-  .canvas-rail-grip { display:none; }
-  .canvas-rail-button { width:38px; height:38px; }
+  .canvas-rail { top:auto; left:auto; right:12px; bottom:16px; flex-direction:row; transform:none !important; cursor:default; touch-action:auto; }
+  .canvas-rail-button, .canvas-rail-toggle { width:38px; height:38px; }
+  .canvas-rail-toggle { height:38px; }
+  /* 横排时收起 / 展开图标跟着转 90° */
+  .canvas-rail-toggle > svg { transform:rotate(90deg); }
 }

@@ -81,6 +81,7 @@ describe('门窗 Visual editor 定位与可见性', () => {
 });
 
 const furniture = (id: string, cx: number, groupId?: string) => ({ id, type: 'chair', name: id, cx, cy: 1000, w: 400, d: 400, rot: 0, color: '#efe6d8', ...(groupId ? { groupId } : {}) });
+/** 与 furniture('a',1000) 相隔 1100mm 时两张椅子不重叠（各 400 宽，需 >200 才叠上），用于「没有重叠就不显示图层」。 */
 describe('家具组合与颜色', () => {
   const buttons = (element: ReactElement) => {
     const out: ReactElement<{ 'aria-label'?: string; onClick?: () => void }>[] = [];
@@ -199,13 +200,30 @@ describe('房间与家具的工具条', () => {
     expect(costs).toHaveBeenCalledOnce();
     expect(nodes.some(node => node.props['aria-label'] === '详细属性')).toBe(false);
   });
-  it('家具与多选家具都能开图层菜单，多选按整组调整', () => {
-    const design = { ...blankDesign(), furniture: [furniture('a', 1000), furniture('b', 2000)] };
-    const single = harness('door', false, { design, selection: { kind: 'furniture', id: 'a' } });
-    const group = harness('door', false, { design, selection: { kind: 'group', ids: ['a', 'b'] } });
+  it('家具互相压住时才显示图层菜单，多选按整组调整；没有重叠就没有入口', () => {
+    // 1100mm 间距：两张椅子不重叠 → 不需要调图层
+    const apart = { ...blankDesign(), furniture: [furniture('a', 1000), furniture('b', 2100)] };
+    // 200mm 间距：两张椅子明显压在一起 → 出现图层
+    const stacked = { ...blankDesign(), furniture: [furniture('a', 1000), furniture('b', 1200)] };
     const menu = (h: { element: ReactElement }) => elements(h.element).find(node => node.type === LayerMenu);
+    const single = harness('door', false, { design: stacked, selection: { kind: 'furniture', id: 'a' } });
+    const group = harness('door', false, { design: stacked, selection: { kind: 'group', ids: ['a', 'b'] } });
     expect(menu(single)?.props).toMatchObject({ ids: ['a'], variant: 'toolbar' });
     expect(menu(group)?.props).toMatchObject({ ids: ['a', 'b'], variant: 'toolbar' });
-    expect(menu(harness('door'))).toBeUndefined();
+    expect(menu(harness('door', false, { design: apart, selection: { kind: 'furniture', id: 'a' } }))).toBeUndefined();
+    expect(menu(harness('door', false, { design: apart, selection: { kind: 'group', ids: ['a', 'b'] } }))).toBeUndefined();
+    // 非家具选择本来就没有图层
+    expect(menu(harness('door', false, { design: stacked }))).toBeUndefined();
+  });
+  it('工具条尾部：金额在删除左边，删除是最后一个操作，取消选择收尾', () => {
+    const design = { ...blankDesign(), furniture: [furniture('a', 1000), furniture('b', 1200)] };
+    const h = harness('door', false, { design, selection: { kind: 'furniture', id: 'a' }, showCosts: true });
+    const labels = elements(h.element).filter(node => node.type === 'button').map(node => String(node.props['aria-label'] ?? ''));
+    const money = labels.findIndex(label => label.startsWith('调整单价'));
+    const remove = labels.indexOf('删除对象');
+    const close = labels.indexOf('取消选择');
+    expect(money).toBeGreaterThan(-1);
+    expect(remove).toBeGreaterThan(money);
+    expect(close).toBe(remove + 1);
   });
 });

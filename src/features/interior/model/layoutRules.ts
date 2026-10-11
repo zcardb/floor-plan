@@ -276,7 +276,8 @@ const allowedOverlap = (a: Furniture, b: Furniture) =>
   // 电视放在电视柜上、壁挂在柜子上方，平面投影重叠是正常的。
   (a.type === 'tv' || b.type === 'tv' || a.type === 'acwall' || b.type === 'acwall' || a.type === 'waterheater' || b.type === 'waterheater');
 
-function overlaps(a: Furniture, b: Furniture): boolean {
+/** 两件家具的平面投影是否可用「重叠」形容（超过 50mm 的实质性重叠，电视 / 壁挂空调类例外）。 */
+export function overlaps(a: Furniture, b: Furniture): boolean {
   if (allowedOverlap(a, b)) return false;
   const p = boxOf(a), q = boxOf(b);
   return Math.min(p[2], q[2]) - Math.max(p[0], q[0]) > 50 && Math.min(p[3], q[3]) - Math.max(p[1], q[1]) > 50;

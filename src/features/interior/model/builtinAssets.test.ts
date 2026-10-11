@@ -9,13 +9,15 @@ const placed = (extra: Partial<Furniture> = {}): Furniture => ({ ...builtin, id:
 const design = (furniture: Furniture[]): Design => ({ ...blankDesign(), furniture });
 const top = 'https://cdn.example.com/top.webp';
 
-describe('内置家具素材覆盖', () => {
-  it('只覆盖 2D / 3D 素材，名称与尺寸沿用内置值', () => {
+describe('内置家具账号覆盖', () => {
+  it('覆盖名称、尺寸、颜色与 2D / 3D 素材；没有覆盖时就是内置值', () => {
     const row = { ...overrideRow(builtin, { imageUrl: top }), name: '改名', w: 9999 };
     const merged = withBuiltinAssets(builtin, row);
-    expect(merged).toMatchObject({ name: builtin.name, w: builtin.w, imageUrl: top });
+    expect(merged).toMatchObject({ name: '改名', w: 9999, imageUrl: top });
+    // 分类与参考类型不参与覆盖，始终是内置值
+    expect(merged).toMatchObject({ category: builtin.category, type: builtin.type });
     expect(assetsAdjusted(builtin, row)).toBe(true);
-    expect(assetsAdjusted(builtin, overrideRow(builtin, {}))).toBe(false);
+    expect(assetsAdjusted(builtin, overrideRow(builtin, { imageUrl: builtin.imageUrl }))).toBe(false);
     expect(assetsAdjusted(builtin, undefined)).toBe(false);
   });
   it('素材库套用覆盖，其他内置家具不变', () => {
@@ -34,9 +36,17 @@ describe('内置家具素材覆盖', () => {
     const restored = syncBuiltinFurniture(adjusted, [overrideRow(builtin, { imageUrl: undefined })])!;
     expect('imageUrl' in restored.furniture[0]!).toBe(false);
   });
-  it('只改素材字段，项目里调过的尺寸、颜色保留', () => {
+  it('同步只改素材字段，项目里调过的尺寸、颜色保留', () => {
     const d = design([placed({ w: 1234, color: '#123456' })]);
     const next = syncBuiltinFurniture(d, [overrideRow(builtin, { imageUrl: top })])!;
     expect(next.furniture[0]).toMatchObject({ w: 1234, color: '#123456', imageUrl: top });
+  });
+  it('名称 / 尺寸 / 颜色的覆盖只体现在新放置的家具上', () => {
+    const row = overrideRow(builtin, { name: '我的橡木桌', w: 1500, color: '#123456' });
+    const list = libraryWithOverrides([row]);
+    expect(list.find(item => item.catalogId === builtin.catalogId)).toMatchObject({ name: '我的橡木桌', w: 1500, color: '#123456' });
+    // 已放置的同款家具：素材之外的字段不动，避免把项目里的调整抹掉
+    const d = design([placed()]);
+    expect(syncBuiltinFurniture(d, [row])).toBeNull();
   });
 });

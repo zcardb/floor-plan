@@ -44,12 +44,14 @@ export function AccountFurnitureLibrary({ catalog, floors = [], walls = [], open
   const [major, setMajor] = useState<MajorFilter>(ALL), [category, setCategory] = useState(ALL), [query, setQuery] = useState(''), [shown, setShown] = useState(PAGE_SIZE), [editing, setEditing] = useState<CostEntry | null>(null), [detail, setDetail] = useState<LibraryItem | null>(null);
   const commit = useAccountCostCommit({ settings: defaults, save: saveDefaults, onDirty });
   const design: Design = { ...referenceDesign(), customCatalog: catalog.items, customFloors: floors, customWalls: walls, customOpenings: openings, customRoofs: roofs, customCeilings: ceilings, costSettings: commit.settings };
-  /** 内置家具的素材覆盖行（账号库里与内置同 catalogId 的那一行）。 */
+  /** 内置家具的覆盖行（账号库里与内置同 catalogId 的那一行）：名称、尺寸、颜色与素材。 */
   const overrideById = new Map(catalog.overrides.map(item => [item.catalogId, item]));
-  // 内置家具套用账号里的素材覆盖：卡片缩略图、详情预览都用调整后的素材。
+  // 内置家具套用账号里的覆盖：卡片名称、尺寸、缩略图与详情预览都用调整后的值。
   const entries = accountCostEntries(catalog.items, commit.settings, floors, walls, openings, { roofs, ceilings }).map(entry => {
     const builtin = builtinOf(entry.furniture?.catalogId);
-    return builtin ? { ...entry, furniture: withBuiltinAssets(builtin, overrideById.get(builtin.catalogId)) } : entry;
+    if (!builtin) return entry;
+    const furniture = withBuiltinAssets(builtin, overrideById.get(builtin.catalogId));
+    return { ...entry, name: furniture.name, furniture };
   });
   const adjustedOf = (catalogId: string | undefined) => {
     const builtin = builtinOf(catalogId);
@@ -113,7 +115,7 @@ export function AccountFurnitureLibrary({ catalog, floors = [], walls = [], open
         const size = sizeOf(entry);
         return <EditorTooltip key={entry.group + ':' + entry.key} label={entry.name} disabled={locked}>
           <button type="button" className="cms-item-card cms-item-card--cost" aria-label={(entry.furniture ? '查看' : '编辑') + entry.name + (entry.furniture ? '' : '单价')} disabled={locked} onClick={() => open(entry)}>
-            <span className="cms-item-visual"><CostItemVisual entry={entry}/><span className={'cms-item-badge' + (entry.custom ? ' custom' : '')}>{entry.custom && source !== '账号默认' && source !== '未定价' ? '自定义' : source}</span>{adjustedOf(entry.furniture?.catalogId) && <span className="cms-item-badge adjusted">素材已调整</span>}</span>
+            <span className="cms-item-visual"><CostItemVisual entry={entry}/><span className={'cms-item-badge' + (entry.custom ? ' custom' : '')}>{entry.custom && source !== '账号默认' && source !== '未定价' ? '自定义' : source}</span>{adjustedOf(entry.furniture?.catalogId) && <span className="cms-item-badge adjusted">已调整</span>}</span>
             <b>{entry.name}</b>{size && <small>{size.replace(' · ', '')}</small>}
             <span className="cms-item-price">{price === null ? '未定价' : `¥${price.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`}<small> / {entry.unit}</small></span>
           </button>
@@ -128,7 +130,8 @@ export function AccountFurnitureLibrary({ catalog, floors = [], walls = [], open
       busy={busy} error={failure} retry={commit.pending ? () => void retry() : undefined} onSaved={kind => reloadMaterial?.(kind)} onClose={() => { if (!busy) setEditing(null); }}/>}
     {detail && <AccountFurnitureDialog key={detail.catalogId} item={{ ...detail, price: priceOf(design, 'furniturePrices', detail.catalogId!) }} isCustom={customIds.has(detail.catalogId!)} adjusted={adjustedOf(detail.catalogId)} referencePrice={priceOf(design, 'furniturePrices', detail.catalogId!)} commitBusy={commit.busy} commitError={commit.error} retryPrice={commit.pending ? commit.retry : undefined} saved={commit.saved}
       saveGeometry={customIds.has(detail.catalogId!) ? next => { const stored = catalog.items.find(item => item.catalogId === next.catalogId); if (!stored) return Promise.reject(new Error('家具数据尚未就绪，请重新加载后重试')); return catalog.save(furnitureGeometryPayload(next, stored)); } : undefined}
-      saveAssets={builtinOf(detail.catalogId) ? assets => catalog.saveOverride({ ...builtinOf(detail.catalogId)!, ...assets }) : undefined}
+      saveAssets={builtinOf(detail.catalogId) ? assets => catalog.saveOverride({ ...(catalog.overrides.find(row => row.catalogId === detail.catalogId) ?? builtinOf(detail.catalogId)!), ...assets }) : undefined}
+      saveFields={builtinOf(detail.catalogId) ? next => catalog.saveOverride({ ...next, price: priceOf(design, 'furniturePrices', next.catalogId!) }) : undefined}
       onOpenChange={v => { if (!v) setDetail(null); }} onChanged={next => { setDetail(next); void catalog.load(); }}
       applyDefaultPrice={price => commit.apply(current => ({ ...current, furniturePrices: { ...current.furniturePrices, [detail.catalogId!]: price } }))} remove={catalog.remove}/>}
   </>;

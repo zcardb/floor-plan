@@ -1,5 +1,5 @@
-import { useCallback, useLayoutEffect, useRef } from "react";
-import { Armchair, CircleDollarSign, GripVertical } from "lucide-react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { Armchair, ChevronsDownUp, ChevronsUpDown, CircleDollarSign } from "lucide-react";
 import { EditorTooltip } from "@/components/ui/editor-tooltip";
 import { AiIcon } from "./AiIcon";
 import { useEditorDrag } from "./useEditorDrag";
@@ -7,10 +7,13 @@ import type { PanelKind } from "./SidePanel";
 
 /** 竖条与画布右边缘、顶部 / 底部留出的间距。 */
 const RAIL_INSET = 16;
+/** 整条都能拖：移动超过这个距离才算拖动，否则按普通点击处理。 */
+const RAIL_DRAG_THRESHOLD = 4;
 
 /**
- * 画布上的竖向工具条：「家具」「成本」（登录后）「AI 模式」三个常驻入口。
- * 默认贴画布右边缘垂直居中，顶部把手可拖动（复用 useEditorDrag，位置限制在画布内，只存内存）；
+ * 画布上的竖向工具条：「家具」「成本」（登录后）「AI 模式」三个常驻入口 + 底部收起 / 展开。
+ * 默认贴画布右边缘垂直居中；整条可拖动（复用 useEditorDrag 的阈值模式，位置限制在画布内，只存内存）；
+ * 收起后只剩一个圆形展开按钮。按钮默认无底色，只有打开的那一项有底色。
  * 窄屏由 CSS 改成画布底部横排，并取消位移，所以窄屏不做拖动。
  */
 type RailKind = "library" | "cost" | "ai";
@@ -23,7 +26,8 @@ export function CanvasRail({ sidePanel, stage, showCosts = false, onToggle }: {
   onToggle: (kind: RailKind) => void;
 }) {
   const node = useRef<HTMLElement>(null);
-  const { place, handlers } = useEditorDrag(node, stage, () => {});
+  const [collapsed, setCollapsed] = useState(false);
+  const { place, handlers } = useEditorDrag(node, stage, () => {}, { threshold: RAIL_DRAG_THRESHOLD });
   const position = useCallback(() => {
     const rail = node.current, host = stage.current;
     if (!rail || !host) return;
@@ -32,13 +36,14 @@ export function CanvasRail({ sidePanel, stage, showCosts = false, onToggle }: {
       y: Math.max(0, (host.clientHeight - rail.offsetHeight) / 2),
     });
   }, [place, stage]);
-  // 默认位置依赖画布尺寸：画布变化时重新贴合右边缘，拖过的位置由 useEditorDrag 记住。
+  // 默认位置依赖画布与竖条尺寸（收起 / 展开会变高）：变化时重新贴合，拖过的位置由 useEditorDrag 记住。
   useLayoutEffect(() => {
     position();
-    const host = stage.current;
+    const host = stage.current, rail = node.current;
     if (!host || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(() => position());
     observer.observe(host);
+    if (rail) observer.observe(rail);
     return () => observer.disconnect();
   }, [position, stage]);
   const button = (kind: RailKind, label: string, children: React.ReactNode) => (
@@ -54,16 +59,26 @@ export function CanvasRail({ sidePanel, stage, showCosts = false, onToggle }: {
       </button>
     </EditorTooltip>
   );
+  const toggleLabel = collapsed ? "展开工具条" : "收起工具条";
   return (
-    <aside className="canvas-rail" ref={node} aria-label="画布工具条">
-      <EditorTooltip label="拖动工具条" side="left">
-        <button type="button" className="canvas-rail-grip" aria-label="拖动工具条" {...handlers}>
-          <GripVertical size={14} />
+    // 方向键留给按钮自身的焦点导航，竖条只接指针拖动
+    <aside className={"canvas-rail" + (collapsed ? " collapsed" : "")} ref={node} aria-label="画布工具条" {...handlers} onKeyDown={undefined}>
+      {!collapsed && <>
+        {button("library", "家具", <Armchair size={20} />)}
+        {showCosts && button("cost", "成本", <CircleDollarSign size={20} />)}
+        {button("ai", "AI 模式", <AiIcon size={20} />)}
+      </>}
+      <EditorTooltip label={toggleLabel} side="left">
+        <button
+          type="button"
+          className="canvas-rail-toggle"
+          aria-label={toggleLabel}
+          aria-expanded={!collapsed}
+          onClick={() => setCollapsed(!collapsed)}
+        >
+          {collapsed ? <ChevronsUpDown size={18} /> : <ChevronsDownUp size={18} />}
         </button>
       </EditorTooltip>
-      {button("library", "家具", <Armchair size={20} />)}
-      {showCosts && button("cost", "成本", <CircleDollarSign size={20} />)}
-      {button("ai", "AI 模式", <AiIcon size={20} />)}
     </aside>
   );
 }

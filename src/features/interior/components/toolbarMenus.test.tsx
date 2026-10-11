@@ -369,24 +369,45 @@ describe('统一侧栏与画布竖条', () => {
     expect(onClose).toHaveBeenCalledOnce();
     expect(nodes(SidePanel({ title: '成本', readOnly: true, onClose: vi.fn(), children: 'x' })).find(n => n.props.disabled === true)).toBeDefined();
   });
-  it('竖条是 家具 / 成本 / AI 模式（成本仅登录可见），没有选择 / 编辑按钮；打开项高亮', () => {
+  it('竖条是 家具 / 成本 / AI 模式（成本仅登录可见）+ 收起，没有选择 / 编辑按钮；打开项高亮', () => {
     const onToggle = vi.fn();
     const stage = { current: null };
     const tree = nodes(CanvasRail({ sidePanel: 'library', stage, showCosts: true, onToggle }));
     const labels = tree.filter(n => n.type === 'button' && typeof n.props['aria-label'] === 'string').map(n => n.props['aria-label']);
-    expect(labels).toEqual(['拖动工具条', '家具', '成本', 'AI 模式']);
+    expect(labels).toEqual(['家具', '成本', 'AI 模式', '收起工具条']);
     expect(labels).not.toContain('选择');
     const rail = tree.find(n => n.props.className === 'canvas-rail')!;
-    expect(nodes(rail).filter(n => n.type === 'button').map(n => n.props.className)).toEqual(['canvas-rail-grip', 'canvas-rail-button active', 'canvas-rail-button', 'canvas-rail-button']);
+    expect(nodes(rail).filter(n => n.type === 'button').map(n => n.props.className)).toEqual(['canvas-rail-button active', 'canvas-rail-button', 'canvas-rail-button', 'canvas-rail-toggle']);
     expect(nodes(rail).find(n => n.props['aria-label'] === '家具')!.props['aria-pressed']).toBe(true);
     const guest = CanvasRail({ sidePanel: 'cost', stage, onToggle });
-    expect(nodes(guest).filter(n => typeof n.props['aria-label'] === 'string').map(n => n.props['aria-label'])).toEqual(['画布工具条', '拖动工具条', '家具', 'AI 模式']);
+    expect(nodes(guest).filter(n => typeof n.props['aria-label'] === 'string').map(n => n.props['aria-label'])).toEqual(['画布工具条', '家具', 'AI 模式', '收起工具条']);
     (nodes(rail).find(n => n.props['aria-label'] === '成本')!.props.onClick as () => void)();
     expect(onToggle).toHaveBeenCalledWith('cost');
     (nodes(rail).find(n => n.props['aria-label'] === 'AI 模式')!.props.onClick as () => void)();
     expect(onToggle).toHaveBeenCalledWith('ai');
-    const grip = nodes(rail).find(n => n.props.className === 'canvas-rail-grip')!;
-    expect(typeof grip.props.onPointerDown).toBe('function');
-    expect(typeof grip.props.onKeyDown).toBe('function');
+    // 整条可拖：拖动能力挂在竖条本体上，不再有单独的把手
+    expect(tree.every(n => n.props.className !== 'canvas-rail-grip')).toBe(true);
+    expect(typeof rail.props.onPointerDown).toBe('function');
+    expect(typeof rail.props.onPointerMove).toBe('function');
+    expect(typeof rail.props.onClickCapture).toBe('function');
+    // 收起后只剩一个圆形展开按钮
+    const toggle = nodes(rail).find(n => n.props.className === 'canvas-rail-toggle')!;
+    expect(toggle.props['aria-expanded']).toBe(true);
+    const railProps = { sidePanel: null, stage, showCosts: true, onToggle } as Parameters<typeof CanvasRail>[0];
+    state.cursor = 0;
+    const folded = nodes(CanvasRail(railProps));
+    const foldButton = folded.find(n => n.props.className === 'canvas-rail-toggle')!;
+    (foldButton.props.onClick as () => void)();
+    state.cursor = 0;
+    const collapsed = nodes(CanvasRail(railProps));
+    expect(collapsed.map(n => n.props['aria-label']).filter(Boolean)).toEqual(['画布工具条', '展开工具条']);
+    const shell = collapsed.find(n => n.props['aria-label'] === '画布工具条')!;
+    expect(shell.props.className).toBe('canvas-rail collapsed');
+    expect(typeof shell.props.onPointerDown).toBe('function');
+    // 收起状态下点击重新展开
+    (collapsed.find(n => n.props['aria-label'] === '展开工具条')!.props.onClick as () => void)();
+    state.cursor = 0;
+    const expanded = nodes(CanvasRail(railProps));
+    expect(expanded.filter(n => typeof n.props['aria-label'] === 'string' && n.type === 'button').map(n => n.props['aria-label'])).toEqual(['家具', '成本', 'AI 模式', '收起工具条']);
   });
 });

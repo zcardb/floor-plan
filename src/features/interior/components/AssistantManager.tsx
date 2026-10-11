@@ -7,14 +7,19 @@ import { notify } from "@/lib/notify";
 import { CmsPageHeader } from "./CmsPageHeader";
 import { AssistantAvatarView } from "./AssistantAvatarView";
 import { AssistantDialog } from "./AssistantDialog";
+import { ProjectLoadMore } from "./ProjectLoadMore";
 import { modelName } from "../ai/models";
 import { useAssistants, type Assistant } from "../cloud/useAssistants";
 
-/** 管理端「小助手」：卡片列表 + 新建 / 编辑 / 删除。 */
+/** 滚动分页的批次：与项目管理、家具管理一致，每页 12 个。 */
+const PAGE_SIZE = 12;
+
+/** 管理端「小助手」：卡片列表（滚动分页）+ 新建 / 编辑 / 删除。 */
 export function AssistantManager() {
   const assistants = useAssistants();
   const confirm = useConfirm();
-  const [editing, setEditing] = useState<Assistant | "new" | null>(null);
+  const [editing, setEditing] = useState<Assistant | "new" | null>(null), [shown, setShown] = useState(PAGE_SIZE);
+  const refresh = () => { setShown(PAGE_SIZE); void assistants.load(); };
   const remove = async (a: Assistant) => {
     if (!await confirm({ title: `删除小助手「${a.name}」？`, description: "删除后无法恢复；正在使用它的 AI 输入框需要重新选择。", confirmText: "删除", tone: "destructive" })) return;
     try {
@@ -28,15 +33,15 @@ export function AssistantManager() {
   return <div className="assistant-manager">
     <CmsPageHeader title="小助手" description="把常用的设计偏好写成 Prompt，生成户型和布局时一键调用。" actions={<>
       <EditorTooltip label="刷新" disabled={loading}>
-        <Button variant="outline" className="cms-icon-button" aria-label="刷新" disabled={loading} onClick={() => void assistants.load()}><RefreshCw className={loading ? "animate-spin" : ""} /></Button>
+        <Button variant="outline" className="cms-icon-button" aria-label="刷新" disabled={loading} onClick={refresh}><RefreshCw className={loading ? "animate-spin" : ""} /></Button>
       </EditorTooltip>
       <Button onClick={() => setEditing("new")}><Plus />新建小助手</Button>
     </>} />
-    {error ? <div className="cms-empty" role="alert"><p>小助手读取失败：{error}</p><Button variant="outline" onClick={() => void assistants.load()}>重试</Button></div>
+    {error ? <div className="cms-empty" role="alert"><p>小助手读取失败：{error}</p><Button variant="outline" onClick={refresh}>重试</Button></div>
       : loading && !items.length ? <ul className="assistant-grid" aria-busy="true">{[0, 1, 2].map((i) => <li key={i} className="assistant-card is-skeleton" />)}</ul>
       : !items.length ? <div className="cms-empty"><Bot size={36} /><p>还没有小助手，新建一个，把你的设计习惯交给 AI。</p><Button onClick={() => setEditing("new")}><Plus />新建小助手</Button></div>
-      : <ul className="assistant-grid">
-        {items.map((a) => <li key={a.id} className="assistant-card">
+      : <><ul className="assistant-grid">
+        {items.slice(0, shown).map((a) => <li key={a.id} className="assistant-card">
           <div className="assistant-card-head">
             <AssistantAvatarView avatar={a.avatar} size={44} />
             <div className="assistant-card-title"><b>{a.name}</b><small>{modelName(a.model)}</small></div>
@@ -47,7 +52,8 @@ export function AssistantManager() {
           </div>
           <p className="assistant-card-prompt">{a.prompt.trim() || "未填写 Prompt"}</p>
         </li>)}
-      </ul>}
+      </ul>
+      <ProjectLoadMore shown={Math.min(shown, items.length)} total={items.length} hasMore={false} loading={loading} onReach={() => setShown(shown + PAGE_SIZE)} /></>}
     <AssistantDialog
       open={editing !== null}
       initial={editing && editing !== "new" ? editing : undefined}
