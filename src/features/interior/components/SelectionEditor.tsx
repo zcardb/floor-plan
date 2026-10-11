@@ -11,7 +11,6 @@ import {
   RotateCw,
   Trash2,
   X,
-  Settings2,
   Ruler,
   Palette,
   CircleDollarSign,
@@ -30,7 +29,7 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover";
-import { applyRoomFloor, floorMaterialOf, pickableFloors } from "../model/floorMaterials";
+import { applyRoomFloor, pickableFloors } from "../model/floorMaterials";
 import { WallOptionsMenu } from './WallOptionsMenu';
 import { BEARING_WALL_LOCKED, canDeleteWall, canResizeWall, wallKindName } from '../model/wallPolicy';
 import { length, bbox, inRoom } from "../model/geometry";
@@ -60,7 +59,6 @@ import { applyRoomWall, openingHeight, openingName, openingPriceKey, pickableOpe
 import { PriceField } from "./PriceField";
 import { ColorPicker } from "./ColorPicker";
 import { useCostDesign } from './CostDefaultsContext';
-import { MaterialProcurementEditor } from "./MaterialProcurementEditor";
 import { VisualSelectField } from './VisualSelectField';
 import { colorThumb, floorThumb } from './materialThumbs';
 import { RoomSurfaceFields } from './RoomSurfaceFields';
@@ -87,7 +85,7 @@ interface Props {
   toggleGroup?: () => void;
   remove: () => void;
   close: () => void;
-  details: () => void;
+  /** 打开右侧成本面板（房间为本间成本明细）。 */
   costs: () => void;
   hidden: boolean;
   showCosts: boolean;
@@ -269,13 +267,6 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         name: f.name,
         unit: "件",
       };
-    else if (r)
-      price = {
-        group: "floorPrices",
-        key: r.mat,
-        name: floorMaterialOf(p.design, r.mat).name,
-        unit: costDesign.costSettings?.procurement?.[r.mat]?.unit || "m²",
-      };
     else if (o)
       price = {
         group: "openingPrices",
@@ -296,7 +287,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
       costLabel =
         cost?.amount === null || cost === null
           ? "未定价"
-          : (r ? "本间 " : "") + yuan(cost.amount);
+          : yuan(cost.amount);
     return (
       <div
         ref={el}
@@ -415,8 +406,9 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
               align="start"
               collisionPadding={12}
             >
-              <h3>房间尺寸</h3>
+              <header className="visual-popover-head"><h3>房间尺寸</h3><span>{r.name}</span></header>
               <RoomMetrics room={r} />
+              <p className="visual-popover-section">各边长度</p>
               <RoomSidesEditor key={r.id} design={p.design} roomId={r.id} transaction={p.transaction} close={() => setOpen(null)} />
             </PopoverContent>
           </Popover>
@@ -426,17 +418,17 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             open={open === "material"}
             onOpenChange={(v) => setPanel(v, "material")}
           >
-            <EditorTooltip label="房间材质">
+            <EditorTooltip label="硬装：地面、墙面、屋面、吊顶">
               <PopoverTrigger asChild>
-                <button aria-label="房间材质">
+                <button aria-label="房间硬装">
                   <Palette size={15} />
-                  材质
+                  硬装
                   <ChevronDown size={12} />
                 </button>
               </PopoverTrigger>
             </EditorTooltip>
             <PopoverContent className="visual-editor-popover">
-              <h3>房间材质</h3>
+              <header className="visual-popover-head"><h3>硬装</h3><span>{r.name}</span></header>
               <VisualSelectField label="地面" value={r.mat}
                 options={pickableFloors(p.design, p.accountFloors || []).map(({ key, material, fromAccount }) => ({ value: key, label: material.name, visual: floorThumb(material), badge: fromAccount ? '账号库' : undefined }))}
                 onChange={value => p.change(d => applyRoomFloor(d, r.id, value, p.accountFloors || []))} />
@@ -449,10 +441,11 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         )}
         {/* 房间内家具：与家具选择同一个通用带图下拉（FurniturePicker），左侧为家具 2D 图，选中即切换到该家具。 */}
         {r && p.select && <FurniturePicker label="房间内家具" tooltip="房间内家具 · 点击选中" placeholder="搜索房间内家具…" grouped={false}
+          heading={{ title: "房间内家具", meta: `${roomFurniture} 件` }} compact
           items={roomItems.map(item => ({ id: item.id, label: item.name, group: '', hint: `${formatMeters(item.w)} × ${formatMeters(item.d)} m`, keywords: [item.type], visual: furnitureThumb(item) }))}
           onPick={item => p.select!({ kind: "furniture", id: item.id })}
           footer={roomFurniture ? undefined : '从左侧家具库为房间添加家具'}>
-          <button type="button" aria-label={`房间内家具 ${roomFurniture} 件`}><Armchair size={15} />{roomFurniture}<ChevronDown size={12} /></button>
+          <button type="button" aria-label={`房间内家具 ${roomFurniture} 件`}><Armchair size={15} />家具<span className="visual-trigger-count">{roomFurniture}</span><ChevronDown size={12} /></button>
         </FurniturePicker>}
         {f?.type === 'stairs' && <Popover open={open === 'stair'} onOpenChange={value => setPanel(value, 'stair')}>
           <EditorTooltip label="楼梯类别、梯段宽与踏步数">
@@ -475,14 +468,21 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           </EditorTooltip>
           <PopoverContent className="visual-editor-popover"><h3>门开向</h3><DoorOrientationControls door={o} onChange={patch => p.change(d => changeDoorOrientation(d, o.id, patch))} /></PopoverContent>
         </Popover>}
+        {/* 房间：金额按钮直接展开右侧本间成本面板（单价在面板里逐项调整），没有下拉。 */}
+        {p.showCosts && r && (
+          <EditorTooltip label="本间成本 · 点击查看明细">
+            <button type="button" className="visual-cost-trigger" aria-label={`本间成本 ${costLabel}，查看明细`} onClick={p.costs}>
+              <CircleDollarSign size={15} />
+              <span className={cost?.amount === null ? "is-unpriced" : ""}>{costLabel}</span>
+            </button>
+          </EditorTooltip>
+        )}
         {p.showCosts && price && (
           <Popover
             open={open === "price"}
             onOpenChange={(v) => setPanel(v, "price")}
           >
-            <EditorTooltip
-              label={r ? "本间成本 · 调整单价" : "调整单价"}
-            >
+            <EditorTooltip label="调整单价">
               <PopoverTrigger asChild>
                 <button
                   className="visual-cost-trigger"
@@ -507,15 +507,8 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
                 unit={price.unit}
                 change={p.change}
               />
-              {price.group === "floorPrices" && (
-                <MaterialProcurementEditor
-                  design={p.design}
-                  material={price.key}
-                  change={p.change}
-                />
-              )}
               <button className="visual-cost-link" onClick={p.costs}>
-                {r ? "查看本间成本明细" : "查看软装 / 硬装成本"}
+                查看软装 / 硬装成本
               </button>
             </PopoverContent>
           </Popover>
@@ -547,13 +540,6 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           <EditorTooltip label={grouped ? "解除组合" : "组合"} shortcut={grouped ? "Ctrl Shift G" : "Ctrl G"}>
             <button type="button" aria-label={grouped ? "解除组合" : "组合"} aria-pressed={grouped} onClick={p.toggleGroup}>
               {grouped ? <Ungroup size={15} /> : <Group size={15} />}
-            </button>
-          </EditorTooltip>
-        )}
-        {group.length < 2 && !separator && (
-          <EditorTooltip label="详细属性">
-            <button type="button" aria-label="详细属性" onClick={p.details}>
-              <Settings2 size={15} />
             </button>
           </EditorTooltip>
         )}

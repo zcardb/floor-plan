@@ -9,6 +9,8 @@
   --fs-title: 13px; --fs-group: 12px; --fs-control: 12px; --fs-label: 11px; --fs-meta: 11px;
   /* 仅用于菜单项第二行说明、角标（与 .wall-options-copy small 一致） */
   --fs-hint: 10px;
+  /* 仅用于指标卡里的数值（面积、长度、金额），文字不用 */
+  --fs-figure: 18px;
   /* 输入框字号：触屏设备至少 16px，否则 iOS 聚焦输入框时会自动放大页面 */
   --fs-input: var(--fs-control);
   --ctl-lg: 36px; --ctl-md: 32px; --ctl-sm: 28px;
@@ -2508,12 +2510,20 @@
 .layer-menu { min-width: 200px; padding: 6px; }
 .layer-menu [role="menuitem"] > svg { width: 14px; height: 14px; flex: none; }
 .layer-menu [role="menuitem"] > span:last-child { font-size: var(--fs-hint); letter-spacing: 0; }
-/* 房间尺寸弹层标题下的概要指标：小字只读信息，标签 --fs-label 灰色、数值 --fs-group 常规色。 */
-.room-metrics { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: -4px 0 12px; }
-.room-metrics > div { display: flex; align-items: baseline; gap: 4px; }
+/* 弹层头部：标题 + 右侧补充说明（对象名）。 */
+.visual-popover-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.visual-editor-popover .visual-popover-head h3 { margin: 0; }
+.visual-popover-head > span { overflow: hidden; color: hsl(var(--muted-foreground)); font-size: var(--fs-meta); text-overflow: ellipsis; white-space: nowrap; }
+/* 弹层内的分组小标题（与项目下拉的分组标题同一样式）。 */
+.visual-editor-popover .visual-popover-section { margin: 0 0 8px; line-height: 1.4; color: hsl(var(--muted-foreground)); font-size: var(--fs-label); font-weight: 500; }
+/* 房间概要指标：与右侧面板的指标卡同一语言（浅底圆角卡 + 大号数值），一行四张。 */
+.room-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-col); margin: 0 0 var(--sp-group); }
+.room-metrics > div { display: grid; gap: 4px; min-width: 0; padding: 10px; border-radius: var(--ctl-radius); background: hsl(var(--secondary) / 0.6); }
 .room-metrics dt { color: hsl(var(--muted-foreground)); font-size: var(--fs-label); }
-.room-metrics dd { margin: 0; color: hsl(var(--foreground)); font-size: var(--fs-group); font-weight: 500; font-variant-numeric: tabular-nums; }
-.room-metrics dd small { margin-left: 2px; color: hsl(var(--muted-foreground)); font-size: var(--fs-hint); font-weight: 400; }
+.room-metrics dd { margin: 0; color: hsl(var(--foreground)); font-size: var(--fs-figure); line-height: 1.15; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.room-metrics dd small { margin-left: 3px; color: hsl(var(--muted-foreground)); font-size: var(--fs-hint); font-weight: 400; }
+.room-metrics > div:first-child { background: hsl(var(--accent)); }
+.room-metrics > div:first-child dd { color: hsl(var(--primary)); }
 .visual-selection-editor > button,
 .visual-selection-editor > .visual-size-trigger,
 .visual-selection-editor .editor-tooltip-trigger > button,
@@ -3295,6 +3305,8 @@ button.room-cost-row:hover {
   font-variant-numeric: tabular-nums;
   margin-right: 4px;
 }
+/* 工具条按钮里的数量（例如「家具 10」）：辅助色，与标签区分。 */
+.visual-trigger-count { color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
 .visual-cost-trigger span {
   font-size: var(--fs-meta);
   font-variant-numeric: tabular-nums;
@@ -3904,51 +3916,23 @@ button.room-cost-row:hover {
 .project-menu-trigger[data-state="open"]>svg:last-child { transform:rotate(180deg); }
 .project-menu-trigger:hover,.project-menu-trigger[data-state="open"] { background:hsl(var(--secondary)); }
 .project-menu-trigger:focus-visible { outline:2px solid hsl(var(--ring)); outline-offset:1px; }
-.project-menu { width:min(360px,calc(100vw - 24px)); padding:6px; }
-.project-menu-heading { margin:6px 10px 4px; font-size:var(--fs-label); font-weight:500; color:hsl(var(--muted-foreground)); }
-/* 菜单条目统一尺度：父级菜单、新建子菜单、导出、账号共用一套行高与 14px 图标，避免 24px 与 16px 混用 */
-.project-menu [role="menuitem"]:not(.project-menu-option),
-.create-menu [role="menuitem"],
-.export-menu [role="menuitem"],
-.account-menu [role="menuitem"] { min-height:32px; gap:8px; padding:0 10px; border-radius:6px; font-size:13px; }
-.project-menu [role="menuitem"]:not(.project-menu-option)>svg,
-.create-menu [role="menuitem"]>svg,
-.export-menu [role="menuitem"]>svg,
-.account-menu [role="menuitem"]>svg { width:14px; height:14px; flex:none; }
-/* 新建方式：与 .wall-options-item 同一套「图标 + 标题 + 一行说明」刻度（见 UI_GUIDELINES.md 第 5 节）。
-   工作台下拉的「新建项目」入口、它的二级菜单、项目管理页新建菜单共用。 */
-.create-menu { width:260px; max-width:calc(100vw - 24px); padding:6px; }
-.create-menu [role="menuitem"].create-option,
-.project-menu [role="menuitem"].project-menu-create { min-height:48px; align-items:flex-start; gap:10px; padding:9px; border-radius:var(--ctl-radius-in); font-size:var(--fs-group); }
-.create-option-icon { display:grid; place-items:center; flex:none; width:16px; height:16px; margin-top:2px; }
-.create-option-icon>svg { width:16px; height:16px; stroke-width:1.75; }
-/* AI 入口统一用主色 AI 图标（AiIcon），不再单独用绿色。 */
-.ai-icon { flex: none; color: hsl(var(--primary)); }
-.create-option-text { display:grid; gap:3px; flex:1; min-width:0; }
-.create-option-text>b { font-size:var(--fs-group); line-height:17px; font-weight:500; color:hsl(var(--foreground)); }
-.create-option-text>small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--fs-hint); line-height:15px; color:hsl(var(--muted-foreground)); }
-/* 「新建项目」是下拉里唯一的主操作：只用浅主色底和主色图标区分，不加边框、不放实色图标块。 */
-.project-menu [role="menuitem"].project-menu-create { background:hsl(var(--primary) / 0.06); }
-.project-menu-create .create-option-icon { color:hsl(var(--primary)); }
-.project-menu-create>svg:last-child { flex:none; align-self:center; width:14px; height:14px; color:hsl(var(--muted-foreground)); }
-.project-menu [role="menuitem"].project-menu-create:focus,.project-menu [role="menuitem"].project-menu-create[data-state="open"] { background:hsl(var(--primary) / 0.12); }
-/* 新建菜单里的单行禁用项、项目下拉顶部的「返回项目管理」：图标列、左边距与两行项对齐。 */
-.create-menu [role="menuitem"].soon-item,
-.project-menu [role="menuitem"].project-menu-back { min-height:var(--ctl-md); gap:10px; padding:0 9px; font-size:var(--fs-group); }
-.create-menu [role="menuitem"].soon-item>svg,
-.project-menu [role="menuitem"].project-menu-back>svg { width:16px; height:16px; stroke-width:1.75; }
-.project-menu-list { max-height:min(360px,calc(var(--radix-dropdown-menu-content-available-height) - 60px)); overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }
-.project-menu-option { display:grid; grid-template-columns:minmax(0,1fr) auto 16px; gap:12px; min-height:32px; }
+/* 窄菜单：只有「返回项目管理 / 新建项目 / 切换项目」三项，后两项悬停展开二级菜单。 */
+.project-menu { width:min(232px,calc(100vw - 24px)); padding:6px; }
+.project-menu [role="menuitem"].project-menu-entry { min-height:var(--ctl-md); gap:10px; padding:0 9px; font-size:var(--fs-group); }
+.project-menu [role="menuitem"].project-menu-entry>svg { width:16px; height:16px; stroke-width:1.75; }
+.project-menu [role="menuitem"].project-menu-entry>svg:last-child { margin-left:auto; width:14px; height:14px; color:hsl(var(--muted-foreground)); }
+.project-menu [role="menuitem"].project-menu-entry[data-state="open"],
+.project-menu [role="menuitem"].project-menu-entry:focus { background:hsl(var(--accent)); }
+/* 切换项目二级菜单：名称 + 日期 + 当前勾选，项目本身的重命名 / 删除只留在项目管理页。 */
+.project-switch-menu { width:min(300px,calc(100vw - 24px)); padding:6px; }
+.project-menu-list { max-height:min(360px,calc(var(--radix-dropdown-menu-content-available-height) - 40px)); overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }
+.project-menu-option { display:grid; grid-template-columns:minmax(0,1fr) auto 16px; gap:12px; min-height:var(--ctl-md); }
 .project-menu-option[aria-current="true"] { font-weight:600; }
 .project-menu-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.project-menu-date { display:flex; align-items:center; font-size:11px; color:hsl(var(--muted-foreground)); font-variant-numeric:tabular-nums; }
+.project-menu-date { display:flex; align-items:center; font-size:var(--fs-meta); color:hsl(var(--muted-foreground)); font-variant-numeric:tabular-nums; }
 .project-menu-check { display:flex; color:hsl(var(--primary)); }
 .project-menu-sentinel { height:1px; }
 .project-menu-loading { display:flex; justify-content:center; padding:8px 0; color:hsl(var(--muted-foreground)); }
-/* 每行：左侧可点击切换，右侧复用项目管理的重命名/删除按钮 */
-.project-menu-row { display:flex; align-items:center; gap:2px; }
-.project-menu-row>.project-menu-option { flex:1; min-width:0; }
-.project-menu-actions { display:flex; flex:none; align-items:center; }
 .field-counter { justify-self:end; font-size:11px; color:hsl(var(--muted-foreground)); font-variant-numeric:tabular-nums; }
 /* 右侧：导出按钮与账号 */
 .export-button { height:32px; padding:0 10px 0 12px; gap:6px; font-size:12px; font-weight:600; border-color:hsl(var(--primary) / 0.5); color:hsl(var(--primary)); background:hsl(var(--card)); }
@@ -4211,13 +4195,20 @@ button.ai-candidate:hover { border-color: hsl(var(--primary) / 0.5); }
 .ai-dialog-actions > button { height: var(--ctl-md); font-size: var(--fs-control); }
 /* 统一家具选择器（AI 指定家具 / 新建家具的参考类型共用） */
 .furniture-picker { width: min(340px, calc(100vw - 24px)); padding: 0; }
+.furniture-picker.is-compact { width: min(240px, calc(100vw - 24px)); }
 .furniture-picker [cmdk-list] { max-height: min(320px, calc(var(--radix-popover-content-available-height, 400px) - 56px)); overscroll-behavior: contain; }
 .furniture-picker [cmdk-input] { font-size: var(--fs-input); height: var(--ctl-lg); }
 .furniture-picker [cmdk-group-heading] { padding: 6px 8px 4px; font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); }
-.furniture-picker [cmdk-item] { display: flex; align-items: center; gap: 8px; min-height: var(--ctl-md); font-size: var(--fs-control); }
+.furniture-picker [cmdk-item] { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 8px; border-radius: var(--ctl-radius-in); font-size: var(--fs-control); }
+.furniture-picker-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 12px 12px 8px; }
+.furniture-picker-head b { font-size: var(--fs-title); font-weight: 600; color: hsl(var(--foreground)); }
+.furniture-picker-head span { font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
+.furniture-picker-text { display: grid; gap: 2px; flex: 1; min-width: 0; }
 .furniture-picker [cmdk-empty] { font-size: var(--fs-control); color: hsl(var(--muted-foreground)); }
-.furniture-picker-visual { display: grid; place-items: center; flex: none; width: 24px; height: 24px; }
+/* 缩略图块：与左侧家具库卡片的图区同一底色，图形居中。 */
+.furniture-picker-visual { display: grid; place-items: center; flex: none; width: 32px; height: 32px; padding: 3px; border-radius: var(--ctl-radius-in); background: hsl(var(--canvas) / 0.55); }
 .furniture-picker-visual svg, .furniture-picker-visual img { max-width: 100%; max-height: 100%; }
+.furniture-picker [cmdk-item][data-selected="true"] .furniture-picker-visual { background: hsl(var(--card)); }
 /* 带图下拉的材料缩略图：与平面图同一套纹理 / 色块 / 门窗符号。 */
 .material-thumb { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 5px; border: 1px solid hsl(var(--foreground) / 0.12); overflow: hidden; }
 svg.material-thumb { display: block; }
@@ -4229,9 +4220,9 @@ svg.material-thumb { display: block; }
 .visual-select-visual:empty { display: none; }
 .visual-select-visual svg, .visual-select-visual img { max-width: 100%; max-height: 100%; }
 .visual-select-badge { flex: none; padding: 0 6px; border-radius: 999px; background: hsl(var(--accent)); color: hsl(var(--primary)); font-size: var(--fs-meta); }
-.furniture-picker-label { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.furniture-picker-label { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; font-size: var(--fs-group); font-weight: 500; line-height: 17px; text-overflow: ellipsis; white-space: nowrap; }
 .furniture-picker-label small { flex: none; padding: 0 6px; border-radius: 999px; background: hsl(var(--accent)); color: hsl(var(--primary)); font-size: var(--fs-meta); }
-.furniture-picker-hint { flex: none; font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
+.furniture-picker-hint { overflow: hidden; font-size: var(--fs-hint); line-height: 14px; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
 .picker-trigger { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; height: var(--ctl-lg); padding: 0 12px; border: 1px solid hsl(var(--input)); border-radius: var(--ctl-radius); background: hsl(var(--background)); color: hsl(var(--foreground)); font-size: var(--fs-control); text-align: left; }
 .picker-trigger > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .picker-trigger > svg { flex: none; color: hsl(var(--muted-foreground)); }

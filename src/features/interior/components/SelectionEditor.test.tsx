@@ -40,7 +40,7 @@ function harness(kind: Opening['kind'], hidden = false, extra: Partial<Props> = 
   const stage = { clientWidth: 800, clientHeight: 600, querySelectorAll: () => [] };
   const props: Props = { design, selection: { kind: 'opening', id: 'opening' }, stage: { current: stage as unknown as HTMLElement },
     hidden, showCosts: false, transaction: createSizeTransaction(() => design, vi.fn(), vi.fn()),
-    change: vi.fn(), rotate: vi.fn(), duplicate: vi.fn(), remove: vi.fn(), close: vi.fn(), details: vi.fn(), costs: vi.fn(), ...extra };
+    change: vi.fn(), rotate: vi.fn(), duplicate: vi.fn(), remove: vi.fn(), close: vi.fn(), costs: vi.fn(), ...extra };
   const component = SelectionEditor as unknown as { render: (props: Props, ref: null) => ReactElement };
   const element = component.render(props, null);
   return { node, element, update: state.handle.update };
@@ -182,6 +182,22 @@ describe('房间与家具的工具条', () => {
     picker.props.onPick({ id: 'a' });
     expect(select).toHaveBeenCalledWith({ kind: 'furniture', id: 'a' });
     expect(nodes.some(node => node.type === RoomMetrics)).toBe(true);
+  });
+  it('房间工具条：入口叫「硬装」「家具」；金额按钮无下拉，点击直接打开本间成本面板；不再有「详细属性」', () => {
+    const costs = vi.fn();
+    const h = harness('door', false, { design: room, selection: { kind: 'room', id: 'room' }, select: vi.fn(), showCosts: true, costs } as never);
+    const nodes = elements(h.element), text = collectText(h.element);
+    expect(text).toContain('硬装');
+    expect(text).not.toContain('材质');
+    const picker = nodes.find(node => node.type === FurniturePicker)!;
+    expect(collectText(picker.props.children as React.ReactNode)).toContain('家具');
+    expect(picker.props.heading).toEqual({ title: '房间内家具', meta: '0 件' });
+    const cost = nodes.find(node => node.props.className === 'visual-cost-trigger')!;
+    expect(cost.type).toBe('button');
+    expect(collectText(cost)).not.toContain('本间');
+    (cost.props.onClick as () => void)();
+    expect(costs).toHaveBeenCalledOnce();
+    expect(nodes.some(node => node.props['aria-label'] === '详细属性')).toBe(false);
   });
   it('家具与多选家具都能开图层菜单，多选按整组调整', () => {
     const design = { ...blankDesign(), furniture: [furniture('a', 1000), furniture('b', 2000)] };

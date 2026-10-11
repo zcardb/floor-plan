@@ -10,7 +10,7 @@
 
 | 场景 | 组件 | 说明 |
 |---|---|---|
-| 任何「从一组带图的选项里选一个」：家具、参考类型、地面 / 墙面 / 屋面 / 吊顶材料、门窗款式、房间内家具 | `FurniturePicker` + `pickerItems.tsx`（`PickerItem`） | 弹层里是搜索框和列表，左侧 2D 图，右侧辅助信息，当前项打勾。工具条入口用 `tooltip` 参数挂提示 |
+| 任何「从一组带图的选项里选一个」：家具、参考类型、地面 / 墙面 / 屋面 / 吊顶材料、门窗款式、房间内家具 | `FurniturePicker` + `pickerItems.tsx`（`PickerItem`） | 弹层里是搜索框和列表，左侧 32px 缩略图块，右侧是名称和一行说明，当前项打勾。工具条入口可以加 `tooltip`（悬浮提示）、`heading`（标题 + 数量），只列名称的用 `compact`（240px 窄弹层） |
 | 表单里的带图下拉（标签 + 触发按钮） | `VisualSelectField` | 内部就是 `FurniturePicker`，传 `options` 即可 |
 | 列表左侧的 2D 缩略图 | `materialThumbs.tsx` | `furnitureThumb`（家具俯视图或参考符号）、`floorThumb`、`colorThumb`、`openingThumb`、`outlineThumb`、`noneThumb` |
 | 颜色 | `ColorPicker` | `variant="swatch"` 用于工具条和面板（32px 按钮里放 18px 纯色圆点）；`variant="field"` 用于表单（色块 + HEX） |
@@ -36,7 +36,8 @@
 | 场景 | 组件 |
 |---|---|
 | AI 入口图标 | `AiIcon`（不要用 lucide 的 `Sparkles`） |
-| 房间指标（净使用面积、周长、开间、进深） | `RoomMetrics`；数值来自 `model/roomMetrics.ts` |
+| 房间指标（净使用面积、周长、开间、进深） | `RoomMetrics`（指标卡）；数值来自 `model/roomMetrics.ts` |
+| 弹层头部、分组小标题 | `.visual-popover-head`、`.visual-popover-section`（见 UI_GUIDELINES §5.4） |
 | 房间轮廓预览 | `RoomSidesDiagram` |
 | 地面纹理 | `FloorSwatch` |
 | 家具 2D 符号 | `FurnitureShape` |

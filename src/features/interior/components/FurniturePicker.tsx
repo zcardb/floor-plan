@@ -6,10 +6,11 @@ import { EditorTooltip } from "@/components/ui/editor-tooltip";
 import { filterPickerItems, groupPickerItems, type PickerItem } from "./pickerItems";
 
 /**
- * 统一的可搜索家具选择器：弹层 = 搜索框 + 分组列表。
+ * 统一的可搜索带图选择器：弹层 = （可选标题）+ 搜索框 + 分组列表。
+ * 每行与右侧面板的材料卡同一语言：左侧 32px 浅底缩略图块，右侧名称 + 一行辅助信息（尺寸 / 单价）。
  * 选中即回传并关闭；已经选过的条目不做标记、仍可再次选择（重复选择即表示多件）。
  */
-export function FurniturePicker({ items, onPick, children, label, placeholder = "搜索家具名称、分类…", disabled = false, align = "start", selectedId, grouped = true, footer, tooltip }: {
+export function FurniturePicker({ items, onPick, children, label, placeholder = "搜索家具名称、分类…", disabled = false, align = "start", selectedId, grouped = true, footer, tooltip, heading, compact = false }: {
   items: PickerItem[];
   onPick: (item: PickerItem) => void;
   /** 触发按钮（会作为 PopoverTrigger 的 asChild）。 */
@@ -26,20 +27,27 @@ export function FurniturePicker({ items, onPick, children, label, placeholder = 
   footer?: ReactNode | ((close: () => void) => ReactNode);
   /** 触发按钮的悬浮提示（工具条入口用）；提示挂在触发器上，不另加包裹层。 */
   tooltip?: string;
+  /** 弹层顶部标题与右侧补充（例如「房间内家具 · 10 件」）；表单内的下拉不需要。 */
+  heading?: { title: string; meta?: string };
+  /** 窄弹层（240px）：只列名称 + 尺寸、没有分组与徽标的场景用，例如房间内家具。 */
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false), [query, setQuery] = useState("");
   const shown = groupPickerItems(filterPickerItems(items, query));
   const renderItem = (item: PickerItem) => <CommandItem key={item.id} value={item.id} onSelect={() => { onPick(item); setOpen(false); setQuery(""); }}>
     {item.visual && <span className="furniture-picker-visual">{item.visual}</span>}
-    <span className="furniture-picker-label">{item.label}{item.badge && <small>{item.badge}</small>}</span>
-    {item.hint && <span className="furniture-picker-hint">{item.hint}</span>}
+    <span className="furniture-picker-text">
+      <span className="furniture-picker-label">{item.label}{item.badge && <small>{item.badge}</small>}</span>
+      {item.hint && <span className="furniture-picker-hint">{item.hint}</span>}
+    </span>
     {selectedId === item.id && <Check size={14} className="furniture-picker-check" aria-label="当前选择" />}
   </CommandItem>;
   const trigger = <PopoverTrigger asChild disabled={disabled}>{children}</PopoverTrigger>;
   // modal：弹层在弹窗里时接管滚动锁，否则鼠标滚轮会被外层弹窗挡住、列表滚不动。
   return <Popover modal open={open && !disabled} onOpenChange={(next) => { setOpen(next); if (!next) setQuery(""); }}>
     {tooltip ? <EditorTooltip label={tooltip}>{trigger}</EditorTooltip> : trigger}
-    <PopoverContent className="furniture-picker" align={align} collisionPadding={12} aria-label={label}>
+    <PopoverContent className={compact ? "furniture-picker is-compact" : "furniture-picker"} align={align} collisionPadding={12} aria-label={label}>
+      {heading && <header className="furniture-picker-head"><b>{heading.title}</b>{heading.meta && <span>{heading.meta}</span>}</header>}
       <Command shouldFilter={false}>
         <CommandInput value={query} onValueChange={setQuery} placeholder={placeholder} aria-label={placeholder} />
         <CommandList>

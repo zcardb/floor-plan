@@ -59,7 +59,7 @@ const actions = (tree: Node[]) => tree.filter(n => n.type === ProjectRowActions)
 beforeEach(() => { state.values = []; state.cursor = 0; state.refs = []; state.effects = []; });
 
 describe('ProjectMenu', () => {
-  it('触发器是 logo + 项目名，两者同一点击区；返回项目管理在最上面（新建项目之前），列表为名称 + 日期 + 当前勾选', () => {
+  it('触发器是 logo + 项目名；窄下拉只有三项：返回项目管理 → 新建项目 ▸ → 切换项目 ▸，项目列表在切换的二级菜单里', () => {
     const { props, tree } = menu({ onCreateProject: vi.fn(async () => true) });
     const trigger = tree.find(n => n.props.className === 'project-menu-trigger')!;
     expect(nodes(trigger).some(n => n.type === Logo)).toBe(true);
@@ -67,8 +67,11 @@ describe('ProjectMenu', () => {
     expect(text(nodes(trigger).find(n => n.props.className === 'project-menu-title')!.props.children as ReactNode)).toBe('三室两厅两卫');
     const all = items(tree), back = all[0]!, rows = options(tree);
     expect(text(back.props.children as ReactNode)).toBe('返回项目管理');
-    const backAt = tree.indexOf(back), createAt = tree.findIndex(n => n.props.className === 'project-menu-create');
-    expect(createAt).toBeGreaterThan(backAt);
+    const subs = tree.filter(n => n.type === DropdownMenuSubTrigger);
+    expect(subs.map(n => text(n.props.children as ReactNode))).toEqual(['新建项目', '切换项目']);
+    expect(tree.indexOf(subs[0]!)).toBeGreaterThan(tree.indexOf(back));
+    const switchMenu = tree.filter(n => n.type === DropdownMenuSubContent)[1]!;
+    expect(nodes(switchMenu.props.children as ReactNode).filter(n => n.props.className === 'project-menu-option')).toHaveLength(2);
     expect(rows).toHaveLength(2);
     expect(tree.some(n => n.type === AccountAvatar)).toBe(false);
     expect(rows[0].props['aria-current']).toBe('true');
@@ -108,21 +111,11 @@ describe('ProjectMenu', () => {
     expect(labels).not.toContain('返回项目管理');
     expect(actions(tree)).toHaveLength(0);
   });
-  it('每行复用项目管理的操作按钮（不含复制），点击后收起下拉并打开对应弹窗', () => {
-    const system = row('s', '默认方案', true);
-    const { tree } = menu({ projectList: [current, other, system] });
-    const rows = actions(tree);
-    expect(rows.map(n => n.props.row)).toEqual([current, other, system]);
-    expect(rows.every(n => n.props.onDuplicate === undefined)).toBe(true);
-    state.values[3] = true;
-    (rows[1].props.onRename as () => void)();
-    expect(state.values[1]).toBe(other);
-    expect(state.values[3]).toBe(false);
-    (rows[0].props.onDelete as () => void)();
-    expect(state.values[2]).toBe(current);
-    const after = menu().tree;
-    expect(after.find(n => n.type === ProjectRenameDialog)!.props.project).toBe(other);
-    expect(after.find(n => n.type === ProjectDeleteDialog)!.props).toMatchObject({ project: current, current: true });
+  it('项目行只有名称、日期与当前勾选，不再放重命名 / 删除（只在项目管理页操作）', () => {
+    const { tree } = menu({ projectList: [current, other, row('s', '默认方案', true)] });
+    expect(actions(tree)).toHaveLength(0);
+    expect(tree.some(n => n.type === ProjectRenameDialog || n.type === ProjectDeleteDialog)).toBe(false);
+    expect(options(tree)).toHaveLength(3);
   });
   it('系统默认方案在共享按钮里禁用重命名与删除，复制仅在传入时显示', () => {
     const buttons = (r: ProjectSummary, onDuplicate?: () => void) =>
@@ -130,17 +123,18 @@ describe('ProjectMenu', () => {
     expect(buttons(row('s', '默认方案', true)).map(n => n.props.disabled)).toEqual([true, true]);
     expect(buttons(other, vi.fn()).map(n => n.props['aria-label'])).toEqual(['重命名Home', '复制Home', '删除Home']);
   });
-  it('切换项目进行中时行内操作禁用', () => {
+  it('切换项目进行中时返回与新建入口禁用', () => {
     state.values[0] = 'b';
-    expect(actions(menu().tree).every(n => n.props.disabled === true)).toBe(true);
+    const tree = menu({ onCreateProject: vi.fn(async () => true) }).tree;
+    expect(items(tree)[0]!.props.disabled).toBe(true);
+    expect(tree.find(n => n.type === DropdownMenuSubTrigger)!.props.disabled).toBe(true);
   });
   it('新建项目为悬停子菜单，选项与项目管理页一致；点击选项才打开对应弹窗', () => {
-    expect(menu().tree.some(n => n.props.className === 'project-menu-create')).toBe(false);
+    const isCreate = (n: Node) => n.type === DropdownMenuSubTrigger && text(n.props.children as ReactNode) === '新建项目';
+    expect(menu().tree.some(isCreate)).toBe(false);
     const onCreateProject = vi.fn(async () => true);
     const { tree } = menu({ onCreateProject });
-    const trigger = tree.find(n => n.type === DropdownMenuSubTrigger)!;
-    expect(trigger.props.className).toBe('project-menu-create');
-    expect(text(trigger.props.children as ReactNode)).toContain('新建项目');
+    expect(tree.find(isCreate)!.props.className).toBe('project-menu-entry');
     const options = tree.find(n => n.type === DropdownMenuSubContent)!;
     const shared = nodes(options.props.children as ReactNode).find(n => n.type === CreateProjectMenuItems)!;
     const actions = shared.props.actions as CreateProjectActions;
@@ -149,7 +143,7 @@ describe('ProjectMenu', () => {
     actions.blank();
     expect(menu({ onCreateProject }).tree.find(n => n.type === NewProjectDialog)!.props.open).toBe(true);
     expect(menu({ onCreateProject }).tree.some(n => n.type === AiCreateProjectDialog)).toBe(true);
-    expect(menu({ onCreateProject, loggedIn: false }).tree.some(n => n.type === DropdownMenuSubTrigger)).toBe(false);
+    expect(menu({ onCreateProject, loggedIn: false }).tree.some(isCreate)).toBe(false);
   });
   it('共享的新建选项：手动创建、AI 创建（可选）、导入 DXF、其他软件 Coming soon', () => {
     const actions = { blank: vi.fn(), ai: vi.fn(), importFile: vi.fn() };

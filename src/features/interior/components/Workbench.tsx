@@ -1274,11 +1274,6 @@ export function Workbench(p: Props) {
           accountRoofs={accountRoofs} accountCeilings={accountCeilings}
           roomAi={aiEnabled && selection?.kind === "room" ? { tone: roomAi.toneOf(selection.id), open: () => roomAi.open(selection.id) } : undefined}
           hidden={readOnly || tool !== 'select' || !!drawer || (view === "3d" && sceneOptions.mode === "walk")}
-          details={() => {
-            setPanelMode("props");
-            if (matchMedia("(max-width:1100px)").matches) setDrawer("panel");
-            else setHidePanel(false);
-          }}
           costs={() => {
             setPanelMode("cost");
             if (matchMedia("(max-width:1100px)").matches) setDrawer("panel");

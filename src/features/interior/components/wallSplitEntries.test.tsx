@@ -34,7 +34,7 @@ describe('墙属性和浮动工具条分割按钮', () => {
     const splitWall = vi.fn(), noop = vi.fn();
     const props = { design: d, selection: { kind: 'wall' as const, id: 'outer-0' }, change: noop, rotate: noop, duplicate: noop, remove: noop, showCosts: false, transaction: createSizeTransaction(() => d, noop, noop), splitWall };
     const visual = SelectionEditor as unknown as { render: (p: React.ComponentProps<typeof SelectionEditor>, ref: null) => ReactElement };
-    const trees = [PropertyPanel({ ...props, select: noop, openCosts: noop }), visual.render({ ...props, stage: { current: null }, hidden: false, close: noop, details: noop, costs: noop }, null)];
+    const trees = [PropertyPanel({ ...props, select: noop, openCosts: noop }), visual.render({ ...props, stage: { current: null }, hidden: false, close: noop, costs: noop }, null)];
     for (const tree of trees) {
       const menu = nodes(tree).find(n => n.type === WallOptionsMenu)!;
       expect(menu).toBeDefined();
