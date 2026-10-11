@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Wallet } from "lucide-react";
+import { ArrowLeft, Wallet } from "lucide-react";
 import { calculateCosts, furnitureKey } from "../model/costs";
 import { costBreakdown } from "../model/costBreakdown";
 import { inRoom } from "../model/geometry";
@@ -21,12 +21,15 @@ export function CostPanel({
   change,
   back,
   select,
+  overview,
 }: {
   design: Design;
   selection: Selection;
   change: (fn: (d: Design) => Design) => void;
   back: () => void;
   select: (s: Selection) => void;
+  /** 全屋口径顶部的「返回方案总览」；不传则不显示。 */
+  overview?: () => void;
 }) {
   const effective = useCostDesign(design),
     c = useMemo(() => calculateCosts(effective), [effective]),
@@ -64,6 +67,12 @@ export function CostPanel({
         <span className="mini-label">{b.rooms.length} 个空间</span>
       </div>
       <section>
+        {overview && (
+          <button type="button" className="back-link" onClick={overview}>
+            <ArrowLeft size={14} />
+            返回方案总览
+          </button>
+        )}
         <CostHero
           eyebrow="全屋合计 · 硬装 + 软装"
           amount={b.total}
