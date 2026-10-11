@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowLeftRight, Check, ChevronDown, Loader2, Plus } from 'lucide-react';
+import { Check, ChevronDown, Loader2 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSub, DropdownMenuSubContent,
   DropdownMenuSubTrigger, DropdownMenuTrigger,
@@ -81,15 +81,15 @@ export function ProjectMenu(p: Props) {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="project-menu" onCloseAutoFocus={event => { if (creation.dialogOpen) event.preventDefault(); }}>
-        {p.loggedIn && <DropdownMenuItem className="project-menu-entry" disabled={busy} onSelect={p.onBack}><ArrowLeft />返回项目管理</DropdownMenuItem>}
+        {p.loggedIn && <DropdownMenuItem className="project-menu-entry" disabled={busy} onSelect={p.onBack}>返回项目管理</DropdownMenuItem>}
         {p.loggedIn && p.onCreateProject && <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="project-menu-entry" disabled={busy}><Plus />新建项目</DropdownMenuSubTrigger>
+          <DropdownMenuSubTrigger className="project-menu-entry" disabled={busy}>新建项目</DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="create-menu" sideOffset={6}>
             <CreateProjectMenuItems actions={creation.actions} />
           </DropdownMenuSubContent>
         </DropdownMenuSub>}
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="project-menu-entry"><ArrowLeftRight />{p.loggedIn ? '切换项目' : '切换户型'}</DropdownMenuSubTrigger>
+          <DropdownMenuSubTrigger className="project-menu-entry">{p.loggedIn ? '切换项目' : '切换户型'}</DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="project-switch-menu" sideOffset={6}>
             <div className="project-menu-list" role="group" aria-label={p.loggedIn ? '项目列表' : '内置模板'}>
               {p.projectList.map(row => {

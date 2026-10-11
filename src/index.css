@@ -3916,10 +3916,9 @@ button.room-cost-row:hover {
 .project-menu-trigger[data-state="open"]>svg:last-child { transform:rotate(180deg); }
 .project-menu-trigger:hover,.project-menu-trigger[data-state="open"] { background:hsl(var(--secondary)); }
 .project-menu-trigger:focus-visible { outline:2px solid hsl(var(--ring)); outline-offset:1px; }
-/* 窄菜单：只有「返回项目管理 / 新建项目 / 切换项目」三项，后两项悬停展开二级菜单。 */
-.project-menu { width:min(232px,calc(100vw - 24px)); padding:6px; }
-.project-menu [role="menuitem"].project-menu-entry { min-height:var(--ctl-md); gap:10px; padding:0 9px; font-size:var(--fs-group); }
-.project-menu [role="menuitem"].project-menu-entry>svg { width:16px; height:16px; stroke-width:1.75; }
+/* 窄菜单：只有「返回项目管理 / 新建项目 / 切换项目」三项纯文字入口，后两项悬停展开二级菜单。 */
+.project-menu { width:min(184px,calc(100vw - 24px)); padding:6px; }
+.project-menu [role="menuitem"].project-menu-entry { min-height:var(--ctl-md); padding:0 9px; font-size:var(--fs-group); }
 .project-menu [role="menuitem"].project-menu-entry>svg:last-child { margin-left:auto; width:14px; height:14px; color:hsl(var(--muted-foreground)); }
 .project-menu [role="menuitem"].project-menu-entry[data-state="open"],
 .project-menu [role="menuitem"].project-menu-entry:focus { background:hsl(var(--accent)); }
