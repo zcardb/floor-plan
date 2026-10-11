@@ -30,6 +30,7 @@ import { CustomFurnitureDialog } from './CustomFurnitureDialog';
 import { CustomFloorForm } from './CustomFloorForm';
 import { FurnitureFormFields } from './FurnitureFormFields';
 import { AccountCMS } from './AccountCMS';
+import { CmsSidebar } from './CmsLayout';
 import type { useFurnitureCatalog } from '../cloud/useFurnitureCatalog';
 import type { useProjects } from '../cloud/useProjects';
 import type { useAccountCosts } from '../cloud/useAccountCosts';
@@ -38,10 +39,11 @@ type Node = ReactElement<Record<string, unknown>>;
 function nodes(tree: ReactNode): Node[] {
   if (Array.isArray(tree)) return tree.flatMap(nodes);
   if (!isValidElement<Record<string, unknown>>(tree)) return [];
-  // 共用的家具表单项是无状态组件，展开后才能找到其中的字段
+  // 共用的家具表单项、管理端侧栏都是无状态组件，展开后才能找到其中的按钮
   if (tree.type === FurnitureFormFields) return [tree, ...nodes(FurnitureFormFields(tree.props as Parameters<typeof FurnitureFormFields>[0]))];
-  // 页头的主操作通过 actions 插槽传入，也要遍历到
-  return [tree, ...nodes(tree.props.children as ReactNode), ...nodes(tree.props.actions as ReactNode)];
+  if (tree.type === CmsSidebar) return [tree, ...nodes(CmsSidebar(tree.props as Parameters<typeof CmsSidebar>[0]))];
+  // 页头的主操作、搜索与侧栏都通过插槽传入，也要遍历到
+  return [tree, ...nodes(tree.props.children as ReactNode), ...nodes(tree.props.actions as ReactNode), ...nodes(tree.props.search as ReactNode), ...nodes(tree.props.sidebar as ReactNode), ...nodes(tree.props.after as ReactNode)];
 }
 function render<T>(callback: () => T): T { harness.cursor = 0; return callback(); }
 function fresh() { harness.slots = []; harness.cursor = 0; }

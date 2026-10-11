@@ -32,7 +32,8 @@ describe('管理端精简与加载分支', () => {
   it('家具管理骨架按家具库版式排布，而不是套用项目卡片网格', () => {
     const html = render(createElement(ManagementLoading, { heading: true, label: '加载家具', variant: 'library' }));
     expect(html).toContain('aria-busy="true"');
-    expect(html).toContain('cms-loading-panel');
+    expect(html).toContain('cms-loading-filter-rows');
+    expect(html).toContain('cms-skeleton-search-inline');
     expect(html).toContain('cms-loading-chips');
     expect(html).toContain('cms-loading-item-visual');
     expect(html).not.toContain('cms-loading-grid');
@@ -65,7 +66,7 @@ describe('管理端精简与加载分支', () => {
     // 页头与家具库同结构：标题 + 说明（不再有小标题），操作在页头而不在筛选面板
     expect(html).toContain('项目管理');
     expect(html).not.toContain('cms-page-eyebrow');
-    expect(html.indexOf('新建项目')).toBeLessThan(html.indexOf('cost-controls'));
+    expect(html.indexOf('新建项目')).toBeLessThan(html.indexOf('cms-filter-rows'));
     expect(html).toContain('我的项目');
     expect(html).not.toContain('正在读取');
     expect(html).not.toContain('cms-loading-placeholder');
@@ -122,7 +123,11 @@ describe('管理端精简与加载分支', () => {
     const html = render(createElement(ProjectManager, { projects: projects(false), opened: () => {} }));
     expect(html).toContain('aria-label="搜索项目"');
     expect(html).toContain('aria-label="项目分类"');
-    expect(html).toMatch(/cost-group-label"><svg[^]*?<span>来源<\/span><small>\d+ 项<\/small>/);
+    expect(html).toMatch(/cms-filter-group-label"><svg[^]*?<span>来源<\/span><small>\d+ 项<\/small>/);
+    // 搜索框与新建在页头同一行，筛选另起一行
+    const head = html.slice(0, html.indexOf('cms-filter-rows'));
+    expect(head).toContain('aria-label="搜索项目"');
+    expect(head).toContain('新建项目');
     for (const label of ['全部', '内置', '我的']) expect(html).toMatch(new RegExp('>' + label + '<b>\\d+</b>'));
     expect(html).toMatch(/aria-pressed="true"[^>]*>全部<b>/);
     expect(html).toContain('全部项目');
@@ -161,23 +166,26 @@ describe('管理端精简与加载分支', () => {
     expect(html).toContain('aria-label="软装分类"');
     for (const name of ['地面', '墙面', '门窗', '卧室', '客厅', '餐厨', '卫浴', '家电', '书房']) expect(html).toContain('>' + name + '<b>');
     expect(html).not.toMatch(/<button[^>]*>.{0,400}?<span>硬装<\/span>/);
-    const hard = html.slice(html.indexOf('cost-group--hard'), html.indexOf('cost-group--soft'));
-    const soft = html.slice(html.indexOf('cost-group--soft'), html.indexOf('cost-results-heading'));
+    // 硬装、软装各占一行：每行从自己的分类描述开始，到下一行（或结果标题）为止
+    const rows = html.slice(html.indexOf('cms-filter-rows'), html.indexOf('cost-results-heading')).split('cms-filter-group"').slice(1);
+    expect(rows).toHaveLength(2);
+    const [hard, soft] = rows;
+    expect(hard).toContain('<span>硬装</span>');
     expect(hard).toContain('aria-label="硬装分类"');
     expect(hard).not.toContain('aria-label="软装分类"');
+    expect(soft).toContain('<span>软装</span>');
     expect(soft).toContain('aria-label="软装分类"');
     expect(soft).not.toContain('aria-label="硬装分类"');
     for (const group of [hard, soft]) {
-      const title = group.slice(group.indexOf('cost-group-label'), group.indexOf('cms-filter-bar'));
+      const title = group.slice(group.indexOf('cms-filter-group-label'), group.indexOf('cms-filter-bar'));
       expect(title).not.toContain('<button');
       expect(title).not.toContain('tabindex');
       expect(title).not.toContain('aria-pressed');
     }
     expect(html).toContain('全部单价');
-    const toolbar = html.slice(html.indexOf('cost-toolbar'), html.indexOf('cost-group-columns'));
+    const toolbar = html.slice(html.indexOf('cms-heading-actions'), html.indexOf('cms-filter-rows'));
     expect(toolbar).toContain('搜索材料或家具');
-    expect(toolbar).not.toContain('新建家具');
-    expect(html.slice(0, html.indexOf('cost-controls'))).toContain('新建家具');
+    expect(toolbar).toContain('新建家具');
     // 保存状态空闲时不渲染
     expect(html).not.toContain('cms-sync-pill');
     expect(html).not.toContain('正在读取');

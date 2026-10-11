@@ -90,26 +90,26 @@
 
 ## Implementation checklist
 
-- [ ] 新增 `CmsLayout.tsx`：`CmsLayout` / `CmsSidebar` / `CmsPage`
-- [ ] `AccountCMS.tsx` 改用 `CmsLayout`，删掉内联的侧栏与 `account-cms` 外壳，props 与 aria-label 不变
-- [ ] 新增 `CmsFilterGroup.tsx`：图标 + 分类名 + `N 项` + `CmsFilterBar`
-- [ ] `ProjectManager.tsx`：搜索搬进页头操作行，筛选区改为 `.cms-filter-rows` + `CmsFilterGroup`
-- [ ] `AccountFurnitureLibrary.tsx`：搜索搬进页头操作行，硬装/软装改成两行 `CmsFilterGroup`，去掉 `account-cost-page`
-- [ ] `AssistantManager.tsx` 包进 `CmsPage`
-- [ ] `index.css`：删 1160px 上限、新增工具栏/筛选行样式、`.cms-filter-bar button` 改为 32px 圆角胶囊、删除废弃的 `cost-*` 规则
-- [ ] `ManagementLoading.tsx`：页头行加搜索骨架，筛选区改两行结构，去掉箱式面板与分隔线
-- [ ] `index.css` 骨架部分：`.cms-loading-filter-rows` / 胶囊尺寸 / 窄屏规则同步
-- [ ] `UI_GUIDELINES.md` 新增管理端页面一节
-- [ ] `managementUi.test.tsx` 断言更新到新类名与结构
+- [x] 新增 `CmsLayout.tsx`：`CmsLayout` / `CmsSidebar` / `CmsPage`
+- [x] `AccountCMS.tsx` 改用 `CmsLayout`，删掉内联的侧栏与 `account-cms` 外壳，props 与 aria-label 不变
+- [x] 新增 `CmsFilterGroup.tsx`：图标 + 分类名 + `N 项` + `CmsFilterBar`
+- [x] `ProjectManager.tsx`：搜索搬进页头操作行，筛选区改为 `.cms-filter-rows` + `CmsFilterGroup`
+- [x] `AccountFurnitureLibrary.tsx`：搜索搬进页头操作行，硬装/软装改成两行 `CmsFilterGroup`，去掉 `account-cost-page`
+- [x] 小助手页面不再自带宽度样式：`CmsLayout` 统一包 `.cms-page`，三页铺满同一内边距
+- [x] `index.css`：删 1160px 上限、新增工具栏/筛选行样式、`.cms-filter-bar button` 改为 32px 圆角胶囊、删除废弃的 `cost-*` 规则
+- [x] `ManagementLoading.tsx`：页头行加搜索骨架，筛选区改两行结构，去掉箱式面板与分隔线
+- [x] `index.css` 骨架部分：`.cms-loading-filter-rows` / 胶囊尺寸 / 窄屏规则同步
+- [x] `UI_GUIDELINES.md` 新增管理端页面一节
+- [x] `managementUi.test.tsx` 断言更新到新类名与结构
 
 ## Verification checklist
 
-- [ ] `pnpm exec tsc -p tsconfig.app.json --noEmit` 无新增错误（`wallFaces.ts` 既有 `side0` 报错除外）
-- [ ] `pnpm exec vitest run src/features/interior/components` 通过
-- [ ] `pnpm run lint`、`pnpm run build` 通过
-- [ ] 项目管理：搜索与刷新 / 新建项目同行，来源胶囊在下一行，`aria-label="项目分类"` 与默认 `全部` 保持
-- [ ] 家具管理：`aria-label="硬装分类"` / `"软装分类"` 仍各在一行，左侧标签为「硬装」「软装」加数量
-- [ ] 三个页面在 1280 宽下内容左右边界一致（无居中窄栏）
-- [ ] 390 宽下搜索框换行占满、胶囊可横向滚动、页面无横向滚动条
-- [ ] `ManagementLoading` 的 `projects` / `library` 变体与真实版式逐行对齐（页头行含搜索骨架、筛选两行、结果行、卡片网格），且不含 `<button`
-- [ ] 刷新项目列表时（`refreshing`）骨架仍整页替换，不残留旧列表
+- [x] `pnpm exec tsc -p tsconfig.app.json --noEmit` 无新增错误（`wallFaces.ts` 既有 `side0` 报错除外）
+- [x] `pnpm exec vitest run src/features/interior/components` 通过
+- [x] `pnpm run lint`、`pnpm run build` 通过
+- [x] 项目管理：搜索与刷新 / 新建项目同行（由服务端渲染断言覆盖），来源胶囊在下一行，`aria-label="项目分类"` 与默认 `全部` 保持
+- [x] 家具管理：`aria-label="硬装分类"` / `"软装分类"` 仍各在一行（由服务端渲染断言覆盖），左侧标签为「硬装」「软装」加数量
+- [ ] 三个页面在 1280 宽下内容左右边界一致（无居中窄栏）——**未在预览中验证**（管理端需要登录）
+- [ ] 390 宽下搜索框换行占满、胶囊可横向滚动、页面无横向滚动条——**未在预览中验证**
+- [x] `ManagementLoading` 的 `projects` / `library` 变体与真实版式逐行对齐（页头行含搜索骨架、筛选两行、结果行、卡片网格），且不含 `<button`
+- [x] 刷新项目列表时（`refreshing`）骨架仍整页替换，不残留旧列表
