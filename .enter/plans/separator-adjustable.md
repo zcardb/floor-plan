@@ -13,6 +13,8 @@
 
 目标是让画布成为主角：进入编辑器时只有一块干净画布 + 一条竖向工具条，需要什么再从侧栏打开，所有侧栏共用一个组件。
 
+同一轮顺带收拾管理端（§9）：账号家具库的筛选从「两行」收成「一行下拉 + 胶囊」，加「自定义」筛选，卡片不再按分类分段；项目管理去掉「来源」。
+
 ## 目标布局
 
 ```
@@ -176,6 +178,45 @@ export type PanelKind = 'library' | 'ai' | 'settings' | 'overview' | 'cost';
 - **功能先不接**：`onSend` 不调用任何生成逻辑，发送按钮靠 `AiComposer` 自身的校验（无描述时禁用）；有描述时发送仅保留在输入框里，不清空、不报错。`hint` 写「对话功能即将接入」。
 - 游客：消息区显示「登录后可使用 AI 模式」+「登录」按钮，不渲染输入框。
 
+### 9. 管理端（账号家具库 / 项目管理，图 367–369）
+
+#### 9.1 硬装 / 软装改成左侧下拉联动（图 369 顶部两行）
+
+现在硬装、软装各占一整行（88px 描述列 + 一长条胶囊）。改成**一行**：
+
+```
+[ 硬装 32 ▾ ]  全部 32  地面 10  墙面 3  门窗 3  屋面 8  吊顶 3  楼梯 5
+```
+
+- 左侧下拉沿用现有 `DropdownMenu`（和页头、侧栏同一套）：两项「硬装 32 项」「软装 64 项」，当前项打勾；切换后右侧胶囊整条换成该大类的分类，`category` 重置为「全部」。
+- `AccountFurnitureLibrary` 的状态由单个 `category` 变成 `major: CostMajor`（默认硬装）+ `category`（默认全部）。
+- `CmsFilterGroup`（`components/CmsFilterGroup.tsx`）的 `icon` / `label` / `count` 改为可选：给了就渲染下拉触发器（`lead`），不给就只渲染胶囊条（项目管理用）。
+- 每条胶囊最前面补一个「全部 32」胶囊：现在「全部」靠标题行表达，标题行删掉后需要它，点击回到全部（现有 `pick` 再点一次即回全部的行为保留）。
+- 新建家具的初始分类仍走现有 `newFurnitureCategory(category)`：当前是「全部」或「自定义」时回落到「客厅」。
+
+#### 9.2 每个大类都有「自定义」（图 369）
+
+- 两条胶囊列表末尾都加「自定义」胶囊。卡片角标现在已经在显示「自定义」（`entry.custom`），但没法按它筛。
+- 复用 `filterCostEntries`（`model/accountCostEntries.ts`）：把已经存在的 `major` 参数用上，并把「自定义」作为保留分类 id —— `entry.custom === true`；「全部」不筛分类，其余按 `entry.category`。
+- 搜索仍在当前大类内生效；空状态与「清空筛选」不变。
+
+#### 9.3 卡片连成一整片（图 369）
+
+- 按分类分段的 `<section className="cms-category-block">`（「地面 10 项」「墙面 3 项」…）连同小标题整段去掉，改成**一个** `.cms-item-grid` 直接铺当前筛选结果。
+- 分类已由胶囊表达，卡片副行不再重复分类名，只留尺寸；价格行不变。
+- 卡片本身（`cms-item-card--cost`）与角标（账号默认 / 内置参考 / 自定义 / 素材已调整）不动。
+
+#### 9.4 删掉「全部单价」标题行（图 367）
+
+- 删掉 `.cost-results-heading` 这一行（「全部单价 96 项 · 按需设置，无需全部填写」）连同「查看全部」按钮。
+- 清筛选由两处承担：点当前胶囊取消（现有 `pick` 再点一次回「全部」），以及空状态里的「清空筛选」。
+- 这一行在**项目管理里保留**（图 368 没圈它）。
+
+#### 9.5 项目管理：去掉「来源」（图 368）
+
+- `ProjectManager` 里的 `CmsFilterGroup` 不再传 `icon` / `label` / `count`，只留 `全部 13 / 内置 6 / 我的 7` 三个胶囊、占满整行。
+- 「全部项目 13 项」标题行与项目卡片网格不动。
+
 ## 方案总览放哪里（第 1 个问题的回答）
 
 **放在「集合」菜单最后一组（方案总览 + 成本），打开统一侧栏的 `overview` 内容。**
@@ -204,6 +245,7 @@ export type PanelKind = 'library' | 'ai' | 'settings' | 'overview' | 'cost';
 - **新增**：`components/SidePanel.tsx`、`components/CanvasRail.tsx`（复用 `useEditorDrag`）、`components/CollectionMenu.tsx`、`components/AiChatPanel.tsx`、`components/OverviewPanel.tsx`、`components/HouseSettingsPanel.tsx`
 - **改写**：`components/Workbench.tsx`（布局与状态收敛）、`components/Library.tsx`（头部简化）、`components/ExportMenu.tsx`（主按钮 + 保存状态）
 - **小改**：`components/useEditorDrag.ts`（事件类型放宽）、`components/ProjectMenu.tsx`（底部登录区）、`components/CostPanel.tsx`（返回到总览）、`components/SelectionEditor.tsx`（金额按钮打开 `cost`，接口不变）
+- **管理端**：`components/AccountFurnitureLibrary.tsx`（硬装 / 软装下拉 + 自定义筛选 + 卡片连成一片 + 删标题行）、`components/CmsFilterGroup.tsx`（`lead` 下拉、描述列可选）、`components/ProjectManager.tsx`（去掉「来源」）、`model/accountCostEntries.ts`（`filterCostEntries` 支持「自定义」）
 - **删除**：`components/PropertyPanel.tsx`（内容拆进 `OverviewPanel` / `HouseSettingsPanel`）、`components/PanelModeTabs.tsx`
 - **样式**：`src/index.css` 新增 `.side-panel` / `.canvas-rail` / `.collection-*` / 保存按钮状态 / 胶囊分类；删除 `.status-bar` / `.scale-bar` / `.stage-topline` / `.canvas-context` / `.stage-pane-buttons` / `.mobile-library` / `.hide-*` / `.library-panel` / `.panel-mode-tabs` / `.library-tip`
 - **文档**：`UI_GUIDELINES.md` 新增「编辑器分区」一节（顶栏 / 集合 / 竖条 / 侧栏的位置、刻度、保存按钮状态表、游客规则）；`AGENTS.md` 通用组件表加入 `SidePanel` / `CanvasRail` / `CollectionMenu` / `AiChatPanel`
@@ -230,6 +272,12 @@ export type PanelKind = 'library' | 'ai' | 'settings' | 'overview' | 'cost';
 - [ ] 画布：删除比例尺、状态条、`stage-pane-buttons`、`mobile-library`、左上角 `canvas-context` 文案（连同 `stage-topline`）；绘墙模式显示 `mode-hint` 并含「完成绘墙」
 - [ ] 缩放条移左下，适应窗口图标换 `Scan`
 - [ ] 删除 `PropertyPanel.tsx`、`PanelModeTabs.tsx` 及无用 CSS
+- [ ] `CmsFilterGroup`：`icon` / `label` / `count` 可选，给值时渲染下拉（`lead`），不给值只渲染胶囊条
+- [ ] `AccountFurnitureLibrary`：`major` + `category` 两个状态；下拉切硬装 / 软装并重置分类；两条胶囊各自末尾加「自定义」
+- [ ] `AccountFurnitureLibrary`：删掉「全部单价 96 项 / 按需设置，无需全部填写」标题行与「查看全部」按钮
+- [ ] `AccountFurnitureLibrary`：去掉按分类分段的 `cms-category-block` 与小标题，改成一个 `.cms-item-grid`；卡片副行不再重复分类名
+- [ ] `filterCostEntries`：接入 `major`，「自定义」按 `entry.custom` 筛；补单测
+- [ ] `ProjectManager`：`CmsFilterGroup` 去掉「来源」描述列，只留三个胶囊
 - [ ] 更新 `UI_GUIDELINES.md`、`AGENTS.md`
 
 ## Verification checklist
@@ -245,7 +293,17 @@ export type PanelKind = 'library' | 'ai' | 'settings' | 'overview' | 'cost';
   - [ ] 方案总览成本摘要点击后切到 `cost`；`CostPanel` 返回回到 `overview`
   - [ ] 绘墙模式下 `mode-hint` 含「完成绘墙」，点击回到选择工具
   - [ ] 页面中不再渲染 `.status-bar`、`.scale-bar`、`.canvas-context`（「平面布置图 / 自定义户型」）、全屏按钮、`AccountMenu` 触发器
+- [ ] 管理端用例（`components/managementUi.test.tsx`、`components/newFurnitureCategory.test.tsx`、`model/accountCostEntries.test.ts`）更新并通过：
+  - [ ] 账号家具库只剩**一行**筛选：一个下拉 + 一条胶囊条，不再有两行 `.cms-filter-group`
+  - [ ] 下拉显示「硬装 32 项」「软装 64 项」，当前项打勾；切到软装后胶囊变成卧室 / 客厅 / 餐厨 / 卫浴 / 家电 / 书房 / 自定义，且 `category` 回到「全部」
+  - [ ] 胶囊条首项是「全部」且默认选中；点选中的胶囊回到「全部」
+  - [ ] 选「自定义」只留下 `custom === true` 的条目；再选「全部」恢复该大类全部条目
+  - [ ] 卡片结果区渲染成**一个** `.cms-item-grid`，页面上不再有 `.cms-category-block`；账号家具库页面上不再出现 `.cost-results-heading` 与「查看全部」
+  - [ ] 项目管理：页面上不再出现「来源」文字与 `.cms-filter-group-label`，`全部 / 内置 / 我的` 三个胶囊仍在且默认「全部」
+  - [ ] `newFurnitureCategory('自定义')` 与 `newFurnitureCategory('全部')` 都回落到「客厅」，硬装 / 软装分类原样保留
 - [ ] `pnpm run lint` 无新增警告
 - [ ] `pnpm run build` 通过
 - [ ] 截图核对 `desktop_1280`：顶栏右侧只有集合 + 保存；画布右侧竖条；左下缩放条；无底部状态条；画布左上角无文案
 - [ ] 截图核对 `mobile_390`：竖条横排底部、侧栏以抽屉出现、顶栏不溢出
+- [ ] 截图核对 `/furniture`（`desktop_1280` 与 `mobile_390`）：一行「下拉 + 胶囊」，没有「全部单价」行，卡片连成一片、没有分类小标题
+- [ ] 截图核对项目管理页（`desktop_1280`）：胶囊行左侧没有「来源」
