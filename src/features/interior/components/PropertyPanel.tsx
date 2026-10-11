@@ -27,7 +27,7 @@ import { DimensionSettings } from './DimensionSettings';
 import { NorthSettings } from './NorthSettings';
 import { DragStepSettings } from './DragStepSettings';
 import type { SizeTransaction } from '../model/sizeTransaction';
-import { BLANK_FRAME_CHANGED, area, bbox, blankFrameIntact, inRoom, length, perim, resizeBlank } from "../model/geometry";
+import { BLANK_FRAME_CHANGED, area, blankFrameIntact, inRoom, length, resizeBlank } from "../model/geometry";
 import type { CustomFloor, CustomOpening, CustomWall, Design, Selection } from "../model/types";
 import { openingHeight, openingKindLabel, openingName, openingPriceKey } from "../model/hardMaterials";
 import { openingIcon } from "./openingIcon";
@@ -39,6 +39,7 @@ import { cardPrice } from "../model/priceLabel";
 import { syncStairsToHeight } from "../model/stairs";
 import { ColorPicker } from "./ColorPicker";
 import { LayerMenu } from "./LayerMenu";
+import { roomMetrics } from "../model/roomMetrics";
 import { floorThumb } from "./materialThumbs";
 import { PanelHint, ShortcutList } from "./PanelHint";
 import { BackingNote } from "./BackingNote";
@@ -279,7 +280,7 @@ export function PropertyPanel({
       </>
     );
   if (r) {
-    const b = bbox(r.rings[0]),
+    const metrics = roomMetrics(r),
       inside = d.furniture.filter((f) => inRoom([f.cx, f.cy], r));
     return (
       <>
@@ -303,34 +304,8 @@ export function PropertyPanel({
           <h4 className="property-subtitle">房间尺寸 <small>单位 m</small></h4>
           <RoomSidesDiagram sides={roomSides(d, r.id)} labels="length" className="is-summary" />
           <div className="stat-grid">
-            <div>
-              <small>净使用面积</small>
-              <b>
-                {area(r).toFixed(2)}
-                <em>m²</em>
-              </b>
-            </div>
-            <div>
-              <small>房间周长</small>
-              <b>
-                {perim(r).toFixed(1)}
-                <em>m</em>
-              </b>
-            </div>
-            <div>
-              <small>开间</small>
-              <b>
-                {formatMeters(b.x2 - b.x)}
-                <em>m</em>
-              </b>
-            </div>
-            <div>
-              <small>进深</small>
-              <b>
-                {formatMeters(b.y2 - b.y)}
-                <em>m</em>
-              </b>
-            </div>
+            {[["净使用面积", metrics.area.toFixed(2), "m²"], ["房间周长", metrics.perimeter.toFixed(1), "m"], ["开间", formatMeters(metrics.width), "m"], ["进深", formatMeters(metrics.depth), "m"]].map(([label, value, unit]) =>
+              <div key={label}><small>{label}</small><b>{value}<em>{unit}</em></b></div>)}
           </div>
         </section>
         <section>

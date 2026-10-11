@@ -2505,14 +2505,15 @@
 .visual-object-name.is-editable:hover { background: hsl(var(--accent)); }
 .visual-object-name.is-editable:focus { max-width: 160px; background: hsl(var(--background)); border-color: hsl(var(--primary)); }
 /* 图层下拉、房间内家具下拉：单行菜单刻度（UI_GUIDELINES §5.2），快捷键用说明字号。 */
-.layer-menu, .room-furniture-menu { min-width: 200px; padding: 6px; }
-.room-furniture-menu { max-height: 280px; overflow-y: auto; }
+.layer-menu { min-width: 200px; padding: 6px; }
 .layer-menu [role="menuitem"] > svg { width: 14px; height: 14px; flex: none; }
 .layer-menu [role="menuitem"] > span:last-child { font-size: var(--fs-hint); letter-spacing: 0; }
-.room-furniture-menu [role="menuitem"] { justify-content: space-between; }
-.room-furniture-menu [role="menuitem"] > svg { width: 14px; height: 14px; flex: none; color: hsl(var(--muted-foreground)); }
-.room-furniture-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.room-furniture-empty { margin: 0; padding: 8px 9px; color: hsl(var(--muted-foreground)); font-size: var(--fs-meta); }
+/* 房间尺寸弹层标题下的概要指标：小字只读信息，标签 --fs-label 灰色、数值 --fs-group 常规色。 */
+.room-metrics { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: -4px 0 12px; }
+.room-metrics > div { display: flex; align-items: baseline; gap: 4px; }
+.room-metrics dt { color: hsl(var(--muted-foreground)); font-size: var(--fs-label); }
+.room-metrics dd { margin: 0; color: hsl(var(--foreground)); font-size: var(--fs-group); font-weight: 500; font-variant-numeric: tabular-nums; }
+.room-metrics dd small { margin-left: 2px; color: hsl(var(--muted-foreground)); font-size: var(--fs-hint); font-weight: 400; }
 .visual-selection-editor > button,
 .visual-selection-editor > .visual-size-trigger,
 .visual-selection-editor .editor-tooltip-trigger > button,

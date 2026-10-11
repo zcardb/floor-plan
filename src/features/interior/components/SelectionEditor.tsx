@@ -24,7 +24,6 @@ import {
   Ungroup,
   Shapes,
   Armchair,
-  ChevronRight,
 } from "lucide-react";
 import {
   Popover,
@@ -44,7 +43,9 @@ import { AiIcon } from './AiIcon';
 import { EditorNameInput } from './EditorNameInput';
 import { LayerMenu } from './LayerMenu';
 import { OpeningVariantSelect } from './OpeningVariantSelect';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { FurniturePicker } from './FurniturePicker';
+import { RoomMetrics } from './RoomMetrics';
+import { furnitureThumb } from './materialThumbs';
 
 import type { SizeTransaction } from '../model/sizeTransaction';
 import {
@@ -415,6 +416,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
               collisionPadding={12}
             >
               <h3>房间尺寸</h3>
+              <RoomMetrics room={r} />
               <RoomSidesEditor key={r.id} design={p.design} roomId={r.id} transaction={p.transaction} close={() => setOpen(null)} />
             </PopoverContent>
           </Popover>
@@ -445,18 +447,13 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </PopoverContent>
           </Popover>
         )}
-        {r && p.select && <DropdownMenu>
-          <EditorTooltip label="房间内家具 · 点击选中">
-            <DropdownMenuTrigger asChild><button type="button" aria-label={`房间内家具 ${roomFurniture} 件`}><Armchair size={15} />{roomFurniture}<ChevronDown size={12} /></button></DropdownMenuTrigger>
-          </EditorTooltip>
-          <DropdownMenuContent align="start" sideOffset={8} collisionPadding={12} className="room-furniture-menu">
-            <DropdownMenuLabel className="wall-options-section">房间内家具 · {roomFurniture} 件</DropdownMenuLabel>
-            {roomItems.map(item => <DropdownMenuItem key={item.id} onSelect={() => p.select!({ kind: "furniture", id: item.id })}>
-              <span className="room-furniture-name">{item.name}</span><ChevronRight size={14} />
-            </DropdownMenuItem>)}
-            {!roomFurniture && <p className="room-furniture-empty">从左侧家具库为房间添加家具</p>}
-          </DropdownMenuContent>
-        </DropdownMenu>}
+        {/* 房间内家具：与家具选择同一个通用带图下拉（FurniturePicker），左侧为家具 2D 图，选中即切换到该家具。 */}
+        {r && p.select && <FurniturePicker label="房间内家具" tooltip="房间内家具 · 点击选中" placeholder="搜索房间内家具…" grouped={false}
+          items={roomItems.map(item => ({ id: item.id, label: item.name, group: '', hint: `${formatMeters(item.w)} × ${formatMeters(item.d)} m`, keywords: [item.type], visual: furnitureThumb(item) }))}
+          onPick={item => p.select!({ kind: "furniture", id: item.id })}
+          footer={roomFurniture ? undefined : '从左侧家具库为房间添加家具'}>
+          <button type="button" aria-label={`房间内家具 ${roomFurniture} 件`}><Armchair size={15} />{roomFurniture}<ChevronDown size={12} /></button>
+        </FurniturePicker>}
         {f?.type === 'stairs' && <Popover open={open === 'stair'} onOpenChange={value => setPanel(value, 'stair')}>
           <EditorTooltip label="楼梯类别、梯段宽与踏步数">
             <PopoverTrigger asChild><button type="button" aria-label="编辑楼梯参数"><Footprints size={15} />楼梯<ChevronDown size={12} /></button></PopoverTrigger>

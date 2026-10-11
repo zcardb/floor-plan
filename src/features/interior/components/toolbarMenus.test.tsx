@@ -26,7 +26,7 @@ import { ExportMenu } from './ExportMenu';
 import { SoftwareSoonItem } from './SoftwareSoonItem';
 import { Button } from '@/components/ui/button';
 import { EditorTooltip } from '@/components/ui/editor-tooltip';
-import { DropdownMenuItem, DropdownMenuSubContent, DropdownMenuSubTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuSubTrigger } from '@/components/ui/dropdown-menu';
 import type { ProjectSummary } from '../cloud/useProjects';
 
 type Node = ReactElement<Record<string, unknown>>;
@@ -225,7 +225,7 @@ describe('AccountMenu', () => {
 });
 
 describe('ExportMenu 与 Coming soon', () => {
-  it('导出按钮为 outline，按格式导出 5 项并回调对应格式', () => {
+  it('导出按钮为 outline，一级菜单：「按格式导出」标题下直接列 5 项并回调对应格式，分隔线下为其他软件', () => {
     const onExport = vi.fn(), tree = nodes(ExportMenu({ view: '2d', pending: false, onExport }));
     const button = tree.find(n => n.type === Button)!;
     expect(button.props.variant).toBe('outline');
@@ -235,7 +235,13 @@ describe('ExportMenu 与 Coming soon', () => {
     formats.forEach(n => (n.props.onSelect as () => void)());
     expect(onExport.mock.calls.map(c => c[0])).toEqual(['png', 'pdf', 'svg', 'dxf', 'json']);
     expect(tree.some(n => n.type === SoftwareSoonItem && n.props.label === '导出到其他软件')).toBe(true);
-    expect(tree.some(n => n.type === DropdownMenuSubTrigger && text(n.props.children as ReactNode) === '导出到其他软件')).toBe(false);
+    expect(tree.some(n => n.type === DropdownMenuSubTrigger)).toBe(false);
+    const headingAt = tree.findIndex(n => n.props.className === 'project-menu-heading' && n.props.children === '按格式导出');
+    const separatorAt = tree.findIndex(n => n.type === DropdownMenuSeparator), softwareAt = tree.findIndex(n => n.type === SoftwareSoonItem);
+    expect(headingAt).toBeGreaterThan(-1);
+    expect(tree.indexOf(formats[0]!)).toBeGreaterThan(headingAt);
+    expect(separatorAt).toBeGreaterThan(tree.indexOf(formats[4]!));
+    expect(softwareAt).toBeGreaterThan(separatorAt);
     expect(text(nodes(ExportMenu({ view: '3d', pending: false, onExport })).filter(n => n.type === DropdownMenuItem)[0].props.children as ReactNode)).toBe('PNG 当前视角');
   });
   it('其他软件入口直接禁用、不展开子菜单，悬停提示 Coming soon', () => {

@@ -29,6 +29,8 @@ import { Button } from '@/components/ui/button';
 import { ColorPicker } from './ColorPicker';
 import { EditorNameInput } from './EditorNameInput';
 import { LayerMenu } from './LayerMenu';
+import { FurniturePicker } from './FurniturePicker';
+import { RoomMetrics } from './RoomMetrics';
 
 type Props = React.ComponentProps<typeof SelectionEditor>;
 function harness(kind: Opening['kind'], hidden = false, extra: Partial<Props> = {}) {
@@ -168,6 +170,18 @@ describe('房间与家具的工具条', () => {
     expect(change).toHaveBeenCalledOnce();
     const updater = change.mock.calls[0]![0] as (d: typeof room) => typeof room;
     expect(updater(room).rooms[0]!.name).toBe('正厅');
+  });
+  it('房间内家具用通用带图下拉，左侧为家具 2D 图，选中即切换到该家具；尺寸弹层带概要指标', () => {
+    const design = { ...room, furniture: [furniture('a', 1000), furniture('b', 9000)] };
+    const select = vi.fn();
+    const h = harness('door', false, { design, selection: { kind: 'room', id: 'room' }, select } as never);
+    const nodes = elements(h.element);
+    const picker = nodes.find(node => node.type === FurniturePicker) as ReactElement<{ items: { id: string; visual?: unknown }[]; onPick: (item: { id: string }) => void }>;
+    expect(picker.props.items.map(item => item.id)).toEqual(['a']);
+    expect(picker.props.items[0]!.visual).toBeTruthy();
+    picker.props.onPick({ id: 'a' });
+    expect(select).toHaveBeenCalledWith({ kind: 'furniture', id: 'a' });
+    expect(nodes.some(node => node.type === RoomMetrics)).toBe(true);
   });
   it('家具与多选家具都能开图层菜单，多选按整组调整', () => {
     const design = { ...blankDesign(), furniture: [furniture('a', 1000), furniture('b', 2000)] };
