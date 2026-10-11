@@ -83,6 +83,11 @@ export function ProjectMenu(p: Props) {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="project-menu" onCloseAutoFocus={event => { if (renaming || deleting || creation.dialogOpen) event.preventDefault(); }}>
+        {/* 返回项目管理是最常用的出口，放在最上面。 */}
+        {p.loggedIn && <>
+          <DropdownMenuItem className="project-menu-back" disabled={busy} onSelect={p.onBack}><ArrowLeft />返回项目管理</DropdownMenuItem>
+          <DropdownMenuSeparator />
+        </>}
         {p.loggedIn && p.onCreateProject && <>
           {/* 主操作：浅主色底 + 主色图标，悬停展开二级菜单，说明行写清有哪几种新建方式。 */}
           <DropdownMenuSub>
@@ -118,10 +123,6 @@ export function ProjectMenu(p: Props) {
           {p.loggedIn && p.hasMore && <LoadMoreSentinel disabled={p.listLoading} onVisible={p.onLoadMore} />}
           {p.loggedIn && p.listLoading && <div className="project-menu-loading" role="status" aria-label="加载更多项目"><Loader2 className="animate-spin" size={15} /></div>}
         </div>
-        {p.loggedIn && <>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem disabled={busy} onSelect={p.onBack}><ArrowLeft />返回项目管理</DropdownMenuItem>
-        </>}
       </DropdownMenuContent>
     </DropdownMenu>
     <ProjectRenameDialog project={renaming} onClose={() => setRenaming(null)} onSubmit={p.onRename} />

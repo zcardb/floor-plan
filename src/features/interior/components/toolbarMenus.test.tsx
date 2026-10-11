@@ -59,14 +59,16 @@ const actions = (tree: Node[]) => tree.filter(n => n.type === ProjectRowActions)
 beforeEach(() => { state.values = []; state.cursor = 0; state.refs = []; state.effects = []; });
 
 describe('ProjectMenu', () => {
-  it('触发器是 logo + 项目名，两者同一点击区；列表为名称 + 日期 + 当前勾选，底部为返回项目管理', () => {
-    const { props, tree } = menu();
+  it('触发器是 logo + 项目名，两者同一点击区；返回项目管理在最上面（新建项目之前），列表为名称 + 日期 + 当前勾选', () => {
+    const { props, tree } = menu({ onCreateProject: vi.fn(async () => true) });
     const trigger = tree.find(n => n.props.className === 'project-menu-trigger')!;
     expect(nodes(trigger).some(n => n.type === Logo)).toBe(true);
     expect(trigger.props['aria-label']).toBe('项目：三室两厅两卫');
     expect(text(nodes(trigger).find(n => n.props.className === 'project-menu-title')!.props.children as ReactNode)).toBe('三室两厅两卫');
-    const all = items(tree), back = all[all.length - 1]!, rows = options(tree);
+    const all = items(tree), back = all[0]!, rows = options(tree);
     expect(text(back.props.children as ReactNode)).toBe('返回项目管理');
+    const backAt = tree.indexOf(back), createAt = tree.findIndex(n => n.props.className === 'project-menu-create');
+    expect(createAt).toBeGreaterThan(backAt);
     expect(rows).toHaveLength(2);
     expect(tree.some(n => n.type === AccountAvatar)).toBe(false);
     expect(rows[0].props['aria-current']).toBe('true');
