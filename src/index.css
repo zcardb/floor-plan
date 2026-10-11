@@ -4101,6 +4101,19 @@ button.room-cost-row:hover {
 .ai-echo-meta > button { display: block; border-radius: 4px; cursor: zoom-in; }
 .ai-echo-meta > button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
 .ai-progress-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+/* 落地校正说明：一行汇总，展开后按方案列出已微调与待手动处理的项。 */
+.ai-layout-notes { display: grid; gap: 8px; min-width: 0; }
+.ai-layout-notes-toggle { display: inline-flex; align-items: center; gap: 6px; justify-self: start; font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); }
+.ai-layout-notes-toggle:hover { color: hsl(var(--foreground)); }
+.ai-layout-notes-toggle:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; border-radius: 4px; }
+.ai-layout-notes-toggle > svg:last-child { transition: transform 0.2s; }
+.ai-layout-notes-toggle > svg.is-open { transform: rotate(180deg); }
+.ai-layout-notes-body { display: grid; gap: 10px; padding: 10px 12px; border-radius: var(--ctl-radius); background: hsl(var(--muted)); }
+.ai-layout-notes-body h4 { font-size: var(--fs-meta); font-weight: 600; color: hsl(var(--foreground)); margin-bottom: 4px; }
+.ai-layout-notes-body ul { display: grid; gap: 4px; }
+.ai-layout-notes-body li { display: flex; align-items: flex-start; gap: 6px; font-size: var(--fs-meta); line-height: 1.5; color: hsl(var(--muted-foreground)); overflow-wrap: anywhere; }
+.ai-layout-notes-body li > svg { flex: none; margin-top: 3px; color: hsl(var(--primary)); }
+.ai-layout-notes-body li.is-warning > svg { color: hsl(var(--destructive)); }
 .ai-regenerate { display: inline-flex; align-items: center; gap: 5px; flex: none; height: var(--ctl-sm); padding: 0 10px; border-radius: 999px; border: 1px solid hsl(var(--border)); font-size: var(--fs-control); color: hsl(var(--foreground)); }
 .ai-regenerate:hover { background: hsl(var(--accent)); border-color: hsl(var(--primary) / 0.4); color: hsl(var(--primary)); }
 .ai-regenerate:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }

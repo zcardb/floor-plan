@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { AlertCircle, Check, Loader2, Maximize2, RefreshCw, RotateCw } from "lucide-react";
 import { ImagePreview, MediaPreview } from "./ImagePreview";
+import { AiLayoutNotes } from "./AiLayoutNotes";
 import type { AiCandidate, AiSlot } from "../ai/types";
 
 /** 请求回显：描述、参考图，以及一行补充信息（指定家具、长宽等）。 */
@@ -34,7 +35,6 @@ export function AiResults<T>({ echo, slots, selected, onSelect, preview, zoomPre
   const ready = slots.filter((slot) => slot.status === "ready").length;
   const failed = slots.filter((slot): slot is Extract<AiSlot<T>, { status: "failed" }> => slot.status === "failed");
   const running = done < slots.length;
-  const warnings = slots.reduce((sum, slot) => sum + (slot.status === "ready" ? slot.candidate.warnings ?? 0 : 0), 0);
   const [zoomed, setZoomed] = useState<number | null>(null), [enlarged, setEnlarged] = useState<number | null>(null);
   const big = enlarged === null ? undefined : slots[enlarged];
   const bigCandidate = big?.status === "ready" ? big.candidate : null;
@@ -55,9 +55,9 @@ export function AiResults<T>({ echo, slots, selected, onSelect, preview, zoomPre
           {running && <Loader2 size={13} className="animate-spin" />}
           {running ? `正在生成 ${slots.length} 个方案 · 已完成 ${done} / ${slots.length}` : `已生成 ${ready} 个方案${failed.length ? `，${failed.length} 个失败` : ""} · 选择一个应用`}
         </p>}
-      {!running && warnings > 0 && <span className="ai-note">其中 {warnings} 处尺寸或间距可能需要微调</span>}
       {onRegenerate && !running && <button type="button" className="ai-regenerate" onClick={onRegenerate}><RefreshCw size={13} />重新生成</button>}
     </div>
+    {!running && <AiLayoutNotes slots={slots} />}
     <div className="ai-candidate-grid" role="radiogroup" aria-label="候选方案">
       {slots.map((slot, i) => {
         if (slot.status === "pending") return <div key={i} className="ai-candidate is-pending" aria-busy="true"><div className="ai-candidate-preview"><Loader2 size={15} className="animate-spin" /></div><span>方案 {i + 1} · 生成中</span></div>;

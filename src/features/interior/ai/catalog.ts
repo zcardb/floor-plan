@@ -1,4 +1,5 @@
 import { categories, library } from "../data/catalog";
+import { furnitureHeight } from "../model/layoutRules";
 import type { LibraryItem } from "../model/types";
 import type { AiCatalog, AiCatalogEntry } from "./types";
 
@@ -39,7 +40,7 @@ export function buildAiCatalog({ project = [], account = [] }: { project?: Libra
     const code = `F${i + 1}`;
     byCode.set(code, item);
     codes.set(item.catalogId!, code);
-    return { code, catalogId: item.catalogId!, name: item.name, category: item.category, type: item.type, w: item.w, d: item.d };
+    return { code, catalogId: item.catalogId!, name: item.name, category: item.category, type: item.type, w: item.w, d: item.d, height: furnitureHeight(item) };
   });
   return { entries, byCode, byId: unique, codeOf: (catalogId) => codes.get(catalogId) };
 }

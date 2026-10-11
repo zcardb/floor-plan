@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { notify } from "@/lib/notify";
 import type { FurnitureSpec } from "../data/floorplanBuilder";
 import type { Design } from "../model/types";
+import { reportCount } from "../model/layoutRules";
 import { applyRoomLayout, layoutRoom } from "./apply";
 import { generateRoomCandidate, markCandidateApplied } from "./client";
 import { furnitureInRoom, planSnapshot, roomContext, roomZone } from "./context";
@@ -108,10 +109,10 @@ export function useRoomAi({ design, catalog, projectId, change }: {
         generationId, index, description, images, files, catalog: aiCatalog.entries, projectId, room: context, plan, existing, required, examples, ...engine,
       });
       const items = sanitizeRoomItems(candidate!.result, { zone: roomZone(room), catalog: aiCatalog, required });
-      // 家具只摆在目标房间内：放不下的不摆（不会落到别的房间），计入需微调提示。
+      // 家具只摆在目标房间内并避开门窗、背靠实墙：自动校正与仍需手动处理的都计入提示。
       const laid = layoutRoom(source, room.id, items, aiCatalog);
-      const warnings = (candidate!.warnings ?? 0) + laid.dropped || undefined;
-      return { id: candidate!.candidateId, index, summary: candidate!.summary, warnings, result: { items, preview: laid.design } };
+      const notes = reportCount(laid.notes) ? laid.notes : undefined;
+      return { id: candidate!.candidateId, index, summary: candidate!.summary, notes, result: { items, preview: laid.design } };
     });
     relaunch.current = launch;
     launch();

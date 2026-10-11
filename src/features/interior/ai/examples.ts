@@ -175,7 +175,7 @@ export function roomExamples(catalog: AiCatalog, target: Pick<AiRoomContext, "na
     })
     .sort((a, b) => a.distance - b.distance)
     .flatMap(({ r, w, d }) => {
-      const example: AiRoomExample = { room: { name: r.name, width: w, depth: d, openings: r.context.openings }, output: { items: zoneItems(r.zone, catalog) } };
+      const example: AiRoomExample = { room: { name: r.name, width: w, depth: d, openings: r.context.openings, edges: r.context.edges }, output: { items: zoneItems(r.zone, catalog) } };
       const key = JSON.stringify(example);
       if (!example.output.items.length || seen.has(key)) return [];
       seen.add(key);

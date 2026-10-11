@@ -1,5 +1,7 @@
 import { openingRoomIds } from "../model/costs";
 import { area, bbox, inRoom, length } from "../model/geometry";
+import { openingSill } from "../model/hardMaterials";
+import { aiRoomGeometry, roomLayout } from "../model/layoutRules";
 import type { Design, Furniture, Point, Room } from "../model/types";
 import type { AiEdge, AiPlanSnapshot, AiRoomContext } from "./types";
 
@@ -56,7 +58,7 @@ export function planSnapshot(d: Design, targetRoomId?: string): AiPlanSnapshot {
   };
 }
 
-/** 目标房间：摆放分区 + 落在房间边界上的门窗（换算成「哪条边 + 沿边位置」）。 */
+/** 目标房间：摆放分区 + 落在房间边界上的门窗（换算成「哪条边 + 沿边位置」）+ 每条边背后的构造与保留区。 */
 export function roomContext(d: Design, room: Room): AiRoomContext {
   const zone = roomZone(room);
   const [x1, y1, x2, y2] = zone;
@@ -72,7 +74,8 @@ export function roomContext(d: Design, room: Room): AiRoomContext {
     ];
     const edge = distance.sort((a, b) => a[1] - b[1])[0][0];
     const along = edge === "up" || edge === "down" ? at[0] - x1 : at[1] - y1;
-    return [{ kind: o.kind, edge, along: round(along), width: round(o.width) }];
+    return [{ kind: o.kind, edge, along: round(along), width: round(o.width), ...(o.kind === "window" ? { sill: round(openingSill(o)) } : {}) }];
   });
-  return { roomId: room.id, name: room.name, area: Number(area(room).toFixed(2)), zone, openings };
+  const geometry = aiRoomGeometry(roomLayout(d, room), [x1, y1]);
+  return { roomId: room.id, name: room.name, area: Number(area(room).toFixed(2)), zone, openings, ...geometry };
 }

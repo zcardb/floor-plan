@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { AiComposer, type AiComposerValue } from "./AiComposer";
 import { AiResults } from "./AiResults";
 import { PlanThumbnail } from "./PlanThumbnail";
-import { planToDesign } from "../ai/apply";
+import { planLayout } from "../ai/apply";
 import { generatePlanCandidate, markCandidateApplied } from "../ai/client";
 import { planExamples } from "../ai/examples";
 import { readyFiles, readyImageUrls } from "../ai/referenceImages";
@@ -18,6 +18,7 @@ import { DEFAULT_AI_COUNT } from "../ai/useRoomAi";
 import { DEFAULT_AI_ENGINE, engineFields } from "../ai/models";
 import { AI_TEMPLATE_ID } from "../data/templates";
 import { area } from "../model/geometry";
+import { reportCount } from "../model/layoutRules";
 import type { Design } from "../model/types";
 import type { NewProjectInput } from "./NewProjectDialog";
 
@@ -64,7 +65,8 @@ export function AiCreateProjectForm({ pending, onClose, onSubmit }: { pending: b
         generationId, index, description, images: request.images, files, catalog: aiCatalog.entries, examples, ...engine,
       });
       const spec = sanitizePlan(candidate!.result, { catalog: aiCatalog });
-      return { id: candidate!.candidateId, index, summary: candidate!.summary, warnings: candidate!.warnings, result: { design: planToDesign(spec, aiCatalog) } };
+      const { design, notes } = planLayout(spec, aiCatalog);
+      return { id: candidate!.candidateId, index, summary: candidate!.summary, notes: reportCount(notes) ? notes : undefined, result: { design } };
     });
     relaunch.current = launch;
     launch();

@@ -1,4 +1,5 @@
 import type { Side } from "../data/floorplanBuilder";
+import type { KeepOutKind, SpanKind } from "../model/layoutRules";
 import type { LibraryItem, OpeningKind } from "../model/types";
 
 /** 发给模型的目录条目：模型只引用 code；catalogId 只给后端落库用，不进提示词。 */
@@ -10,6 +11,8 @@ export interface AiCatalogEntry {
   type: string;
   w: number;
   d: number;
+  /** 高度（mm）：目录没给时按类型取典型值，用于判断是否遮挡窗洞。 */
+  height: number;
 }
 
 /** 本次请求的家具目录：条目 + 代号 → 素材的映射。 */
@@ -38,13 +41,33 @@ export interface AiPlanSnapshot {
 
 export type AiEdge = Side;
 
-/** 目标房间：摆放分区 zone 为房间净空外接矩形（绝对坐标 mm）。 */
+/** 房间轮廓的一条边及其背后的构造（相对 zone 左上角）：家具 back = side 时背靠这条边。 */
+export interface AiRoomEdge {
+  side: AiEdge;
+  at: number;
+  from: number;
+  to: number;
+  spans: { from: number; to: number; kind: SpanKind }[];
+}
+
+/**
+ * 目标房间：摆放分区 zone 为房间净空外接矩形（绝对坐标 mm）；
+ * ring / edges / keepOuts / doors 都相对 zone 左上角，与 along / gap 同一坐标基准。
+ */
 export interface AiRoomContext {
   roomId: string;
   name: string;
   area: number;
   zone: [number, number, number, number];
-  openings: { kind: OpeningKind; edge: AiEdge; along: number; width: number }[];
+  openings: { kind: OpeningKind; edge: AiEdge; along: number; width: number; sill?: number }[];
+  /** 房间净空轮廓（L 形等不规则房间不等于 zone）。 */
+  ring: [number, number][];
+  /** 每条边背后是实墙、矮墙、窗、门洞还是开敞。 */
+  edges: AiRoomEdge[];
+  /** 门前通行区、门扇开启范围、窗前区。 */
+  keepOuts: { kind: KeepOutKind; poly: [number, number][] }[];
+  /** 门口内侧的落脚点，过道连通检查的起点。 */
+  doors: [number, number][];
 }
 
 /** 模型输出的家具（房间布局与整户家具共用）。 */
@@ -71,8 +94,14 @@ export interface AiPlanExample {
 
 /** 单房间范例：房间净空尺寸与门窗（与真实请求同一格式）+ 标准答案。 */
 export interface AiRoomExample {
-  room: { name: string; width: number; depth: number; openings: AiRoomContext["openings"] };
+  room: { name: string; width: number; depth: number; openings: AiRoomContext["openings"]; edges: AiRoomContext["edges"] };
   output: { items: AiPlacedItem[] };
+}
+
+/** 候选落地时的校正说明：已自动微调的、仍需手动处理的。 */
+export interface AiLayoutNotes {
+  adjusted: string[];
+  unresolved: string[];
 }
 
 export interface AiCandidate<T> {
@@ -80,8 +109,8 @@ export interface AiCandidate<T> {
   index: number;
   summary: string;
   result: T;
-  /** 方案能落地但有需要微调的地方（尺寸或间距）。 */
-  warnings?: number;
+  /** 落地时的校正说明；没有任何调整时省略。 */
+  notes?: AiLayoutNotes;
 }
 
 /** 单个候选的生成状态：先完成的先出现。 */

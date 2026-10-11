@@ -1,125 +1,101 @@
-# 房间分隔线：可调长度与位置 + 墙体工具下拉收敛
+# 画布交互合并 · 家具组合 · 单色块取色 · 带图下拉 · 项目切换 · 内置家具素材可调
 
 ## Context
+画布有「选择 / 框选」两个模式，拖空白处要么平移、要么框选，用户要先想好再切模式（希克定律）。框选出来的一组家具只是一次性选择，没法保持成组。工具条上的颜色一排铺开占地方。房间材质、门窗款式这些下拉只有文字，看不出材质长什么样。项目切换只有名字能点，Logo 点了没反应，「新建项目」那一行也不好看。内置家具的 2D / 3D 素材目前也改不了。
+这次统一成一套交互，并沿用现有的设计系统：`index.css` 里的组件类、`FurniturePicker` 弹层、`visual-editor-popover` 弹层。
 
-房间分隔线（Revit 的 Room Separation Line）目前只能画、选中、删除：画完后端点不可拖动，线身不可平移，工具条上的「1.24 m」只是只读提示，所以用户想让它精准落在墙左端 / 右端、或缩短一点时只能删除重画。同时顶部「墙 ▾」下拉里每项的图标按 lucide 默认 24px 渲染、说明文字也偏大，弹层显得臃肿。
+## 1. 选择与框选合并为一个「选择」模式（`PlanCanvas.tsx`、`Workbench.tsx`）
+- 去掉「框选」按钮、`marquee` 状态、M 快捷键和对应提示；`PlanCanvas` 的 `marquee` 属性一并删除。
+- 选择模式下：
+  - 点击：和现在一样，选中房间、家具、墙、门窗或分隔线，点空白处取消选择。
+  - 在房间或空白处按住拖动：画选框（原来的 `kind:'marquee'` 分支），不再平移。
+  - 在家具、墙、门窗、分隔线上拖动：和现在一样移动对象。
+  - 光标：画布空白处和房间上显示十字，家具上显示移动光标（复用现有 `.marquee-on` 的样式，改为选择模式默认生效）。
+- 平移改到两指上：
+  - 触控板双指滑动（`wheel` 事件，没按 ctrl）：只平移画布。
+  - 触控板双指捏合（`wheel` 加 `ctrlKey`）：缩放。
+  - 触屏双指：保留现有的捏合逻辑（平移加缩放）。
+  - 普通鼠标滚轮：仍然缩放。新增纯函数 `model/wheelIntent.ts`，按 `deltaMode`、整数步长、有无 `deltaX` 判断一次滚动来自鼠标还是触控板，并在连续滚动中沿用第一次的判断，避免手势中途来回切换。
+  - 鼠标用户另外可以按住中键拖动，或按住空格拖动来平移。
+- 只读预览（内置模板）里拖动空白处不画选框，仍然平移。
 
-本次要做三件事：
+## 2. 家具组合 / 解除组合（`types.ts`、`furnitureGroup.ts`、`validation.ts`、`SelectionEditor.tsx`、`Workbench.tsx`、`PlanCanvas.tsx`）
+- `Furniture` 新增可选字段 `groupId?: string`。旧数据没有这个字段，所以不受影响。`validateDesign` 校验这个字段必须是字符串，`normalizeFurniture` 会保留它。
+- `furnitureGroup.ts` 新增几个纯函数：
+  - `groupFurniture(d, ids)`：给这些家具写入同一个新的 `groupId`（如果其中已有组，就合并成一个组）。
+  - `ungroupFurniture(d, ids)`：清除这些家具的 `groupId`。
+  - `expandToGroups(d, ids)`：框到组里任意一件，就补全整组。
+  - `persistentGroupOf(d, id)`：找出某件家具所在组的全部成员。
+- 画布：
+  - 点中已组合的家具，会选中整组（`{kind:'group', ids}`）；拖动时整组移动（复用 `groupmove` 和 `dragUnit`）。
+  - 框选结果先经过 `expandToGroups` 再转成选择。
+- 工具条（`group` 选择时）：
+  - 未组合的多选显示「组合」（`Group` 图标，快捷键 Ctrl G）。
+  - 选中的正好是一个已有组时显示「解除组合」（`Ungroup` 图标，快捷键 Ctrl Shift G）。
+  - 每次组合或解除都会弹出提示，并可以撤销。整组旋转和删除沿用现有逻辑。
 
-1. 选中分隔线后，两端出现可拖动的圆点（贴墙 / 贴线吸附、沿分隔线方向正交），拖动即改长度。
-2. 整条线可沿自身法向平移，端点自动跟着贴到新墙面，用来对齐墙的左端 / 右端。
-3. 工具条上的长度值改成可点开的弹层：长度输入 + 固定哪一端（另一端自动伸缩）。
-4. 「墙 ▾」下拉收紧：图标 16px、标题 13px、说明 11.5px 并换行收窄，文案缩短。
+## 3. 颜色：默认只显示一个色块（新增 `ColorMenu.tsx`、`SelectionEditor.tsx`、`PropertyPanel.tsx`）
+- 把 `ColorPickerField` 弹层里的内容（常用色网格加自定义取色）抽成共享的 `ColorPalette` 组件。
+- 新增 `ColorMenu`：工具条上只有一个当前颜色的圆形色块按钮，点开后是 `visual-editor-popover`，里面放 `ColorPalette`。选常用色会立即生效并关闭弹层；自定义色在取色器确认时提交一次，只记一步撤销。
+- 用 `ColorMenu` 替换工具条和属性面板里原来平铺的 `ColorSwatches`，然后删除 `ColorSwatches.tsx`。`ColorPickerField` 改为复用 `ColorPalette`，外观不变。
 
-调整完成后房间自动按「墙 + 分隔线」重算（`deriveRooms`），名称、材质按重叠沿用，选中该房间时布局随之更新 —— 这条链路已存在，本次只是把新的编辑入口接到它上面。
+## 4. 带缩略图的下拉（新增 `VisualSelectField.tsx`、`materialThumbs.tsx`）
+- 统一采用「新建家具」弹窗里「参考类型」那个下拉的样式（`FurniturePicker`：搜索框、分组、左侧图像、当前项打勾）。新增 `VisualSelectField`：标签 + 带缩略图的触发按钮（样式和 `editor-control` 一致）+ `FurniturePicker`（传入 `selectedId`）。
+- 新增缩略图工具 `materialThumbs.tsx`：
+  - 地面：`FloorSwatch` 铺贴纹理。
+  - 墙面、屋面、吊顶：材料颜色的圆角色块。
+  - 门窗：`openingIcon` 符号。
+  - 「无屋面」「原顶」：Ban 图标。
+  - 「账号库」改为角标显示，不再拼在名称里。
+- 逐一替换的位置：
+  - 工具条「房间材质」里的地面、墙面（`SelectionEditor`）。
+  - 屋面、吊顶（`RoomSurfaceFields`）。
+  - 门窗款式（`OpeningVariantSelect`）。
+  - 属性面板里对应的入口（`PropertyPanel`、`RoomSurfacePanel`），如果其中已经是带图列表就保持原样。
+  - 新建或编辑家具时的「外形」（参考原形、方形、圆形，配外形缩略图）。
+- 不改的下拉：家具和参考类型本来就是带图的 `FurniturePicker`；「分类」「计价单位」「铰链侧」等不是素材，保持文字下拉。
 
-## 涉及文件
+## 5. 项目切换（`ProjectMenu.tsx`、`Workbench.tsx`、`CreateProjectMenuItems.tsx`、`index.css`）
+- Logo 移进 `ProjectMenu` 的触发按钮，Logo、项目名和箭头是同一个点击区，悬停时整块高亮。
+- 重新设计「新建项目」：
+  - 它是下拉顶部的一张主色浅底卡片：左边是方形图标块（Plus），中间是「新建项目」和副标题「手动 · AI · 导入图纸」，右边是箭头。
+  - 悬停时展开二级菜单，二级菜单每一项也改成「图标块 + 标题 + 一行说明」，样式和项目管理页的新建菜单一致。
+  - 「返回项目管理」降为普通行，放在列表下面，和新建分开。
 
-- `src/features/interior/model/separators.ts`：新增 `moveSeparator` / `resizeSeparator`，复用已有 `MIN_LENGTH`、`separatorLength`。
-- `src/features/interior/components/PlanSeparators.tsx`：选中时渲染端点手柄与命中区，拖动时在线上画长度。
-- `src/features/interior/components/PlanCanvas.tsx`：新增 `sepmove` / `sependpoint` 两种拖动，复用 `resolveWallPoint`（正交约束）、`stepDelta`、`snapToDragStep`、`setView`/`showGuides` 同级的预览与提交路径；提交走 `deriveRooms` 并沿用「房间数变化 → notify.info」的提示。
-- `src/features/interior/components/SeparatorLengthFields.tsx`（新建）：长度 + 固定端的输入面板。
-- `src/features/interior/components/SelectionEditor.tsx`：`separator` 分支的只读 span 改成 `Popover`（复用现有 `visual-editor-popover`、`SizeFields` 用到的 `transaction` 事务）。
-- `src/features/interior/components/wallTools.ts`：缩短分隔线说明文案。
-- `src/features/interior/components/WallToolMenu.tsx` + `src/index.css`（`.wall-tool-menu` 段）：图标尺寸与字号、行距、内边距。
-- 测试：`src/features/interior/model/separators.test.ts`、`src/features/interior/components/Workbench.test.tsx`（可选中分隔线、工具条出现长度弹层）。
+## 6. 内置家具的 2D / 3D 素材可调（`AccountFurnitureDialog.tsx`、`AccountFurnitureLibrary.tsx`、`accountCostEntries.ts`、`Workbench.tsx`、`furnitureSync.ts`）
+- 内置家具在详情里也显示「AI 调整」。结果作为账号覆盖保存：在账号家具表里存一行同 `catalogId` 的记录，只覆盖 `imageUrl` / `model3d`，名称、尺寸等仍然只读。这个表已经支持这样存，不需要改表。
+- 只有调整过的内置家具，在详情里显示「恢复默认素材」，作用是删除这条覆盖。卡片角标显示「已调整」。
+- 素材库和画布：
+  - 内置家具有覆盖时，左侧家具列表和 AI 目录都换成覆盖后的版本，不会出现两份。
+  - 新放进画布的家具使用新素材。
+  - 已经放进项目的同款家具，在 `syncAccountFurniture` 里扩展同步：只更新仍是默认值的 `imageUrl` / `model3d`，项目里单独改过的保留。
+- 判断方式：`isBuiltinItem` 为真且账号库里有同 id 记录，就是「已调整的内置家具」，不再被误当成可删除的自定义家具。
 
-## 实施要点
+## Implementation checklist
+- [ ] `Workbench.tsx`：删除 `marquee` 状态、「框选」按钮、M 快捷键和框选提示；V 仍然切换到选择
+- [ ] `PlanCanvas.tsx`：选择模式下在空白处或房间上拖动改为 `marquee`；在家具、墙、门窗、分隔线上拖动的行为不变；只读时仍然平移
+- [ ] `PlanCanvas.tsx`：wheel 事件按 `wheelIntent` 区分，触控板双指平移、ctrl 加 wheel 缩放、鼠标滚轮缩放；中键拖动或空格加拖动平移
+- [ ] `model/wheelIntent.ts`：纯函数加连续滚动粘滞判断
+- [ ] `index.css`：选择模式下空白处显示十字光标，家具上显示移动光标
+- [ ] `types.ts` 新增 `Furniture.groupId`；`validation.ts` 和 `costs.normalizeFurniture` 校验并保留这个字段
+- [ ] `furnitureGroup.ts`：新增 `groupFurniture` / `ungroupFurniture` / `expandToGroups` / `persistentGroupOf`
+- [ ] `PlanCanvas.tsx`：点击或拖动已组合的家具时选中并移动整组；框选结果补全为整组
+- [ ] `SelectionEditor.tsx` 和 `Workbench.tsx`：「组合 / 解除组合」按钮、Ctrl G / Ctrl Shift G、提示和撤销
+- [ ] 抽出 `ColorPalette`，新增 `ColorMenu`；工具条和属性面板改用 `ColorMenu`；删除 `ColorSwatches.tsx`
+- [ ] 新增 `VisualSelectField.tsx` 和 `materialThumbs.tsx`
+- [ ] 地面、墙面、屋面、吊顶、门窗款式、外形改用带图下拉（`SelectionEditor`、`RoomSurfaceFields`、`OpeningVariantSelect`、`PropertyPanel`、`RoomSurfacePanel`、`FurnitureFormFields`）
+- [ ] `ProjectMenu.tsx`：Logo 并入触发按钮；`Workbench.tsx` 去掉单独的 Logo
+- [ ] 「新建项目」卡片和二级菜单改版（`ProjectMenu`、`CreateProjectMenuItems`、`index.css`）
+- [ ] `AccountFurnitureDialog`：内置家具开放「AI 调整」，只保存 `imageUrl` / `model3d`，并提供「恢复默认素材」
+- [ ] `accountCostEntries` 和 `AccountFurnitureLibrary`：区分已调整的内置家具和自定义家具，角标显示「已调整」
+- [ ] `Workbench.tsx`：素材库里有覆盖的内置家具用覆盖版本替换；`furnitureSync.ts` 同步已放置的内置家具素材
 
-### 1. 模型层（separators.ts）
-
-```ts
-/** 移动 / 缩短端点：线性插值到新端点，重算房间。 */
-export function moveSeparator(d: Design, id: string, end: 'a' | 'b', to: Point): Design
-/** 整线沿法向平移，两端同量位移。 */
-export function moveSeparatorBy(d: Design, id: string, delta: Point): Design
-/** 以某一端为锚点改长度（另一端落在原方向上）。 */
-export function resizeSeparator(d: Design, id: string, length: number, anchor: 'a' | 'b'): Design
-```
-
-共用的校验放进一个 `placeSeparator(d, id, a, b)`：长度 < `MIN_LENGTH`（20 mm）抛「分隔线太短」；与另一条分隔线共线且沿自身方向有重叠时抛「分隔线不能重叠」；通过则 `deriveRooms({...d, separators: 替换后的数组})`。找不到 id 抛「分隔线不存在，请重新选择」（与 `removeSeparator` 一致）。
-
-不要把分隔线改动接进 `syncRooms`：`followSeparators` 是给「墙动了、分隔线跟着走」用的，本次是分隔线自身在动，直接 `deriveRooms` 即可，也不会误删家具（`dropOrphanFurniture` 只在墙被删的场景需要）。
-
-### 2. 画布拖动（PlanSeparators.tsx + PlanCanvas.tsx）
-
-- `PlanSeparators` 在 `selected` 时于 `s.a` / `s.b` 画两个手柄：`data-handle="sepa" | "sepb"`、半径 `10 / scale`、`fill: var(--plan-porcelain)`、`stroke: var(--plan-selection)`；命中区比视觉半径大一圈（约 `18 / scale` 的透明圆），满足 Fitts 定律——手柄小、可点区域不小。
-- 选中的那条线的透明命中线加 `className="plan-separator-hit"`，`cursor: move`（css），表示可整条拖动。
-- `PlanCanvas` 的 `onPointerDown` 里，在现有 `sid` 分支之前读取 `data-handle`：命中 `sepa` / `sepb` → `base.kind = 'sependpoint'`、`base.id = sid`、`base.room = end`；否则若 `sid` 且工具为 `select` → 选中并以 `base.kind = 'sepmove'` 起拖。
-- `onPointerMove`：
-  - `sependpoint`：`resolveWallPoint(p, before, view.s, layers.snap, 另一端)` 拿到正交吸附点（贴墙 / 贴洞口 / 贴另一条线的端点），没有吸附命中的则按 `snapToDragStep` 对位移取步进；模型抛错（太短 / 重叠）时本帧不预览，线停在最后一次有效位置，松手即提交该位置。
-  - `sepmove`：只取沿自身法向的位移 `dot(p - start, normal)`，按 `dragStep` 取整后两端同量平移 —— 「只沿法向」保证端点始终留在墙面上。
-  - 两者都 `preview(…)`（房间填充、面积、名称实时重算，符合「拖动中就能看到布局变化」）；拖动中在线旁用 `MeasureLine` 显示当前长度。
-- `onPointerUp` → 现有 `finish()`：`dr.moved` 时 `commit(d, dr.before)`；`next.rooms.length !== before.rooms.length` 时沿用现有提示「房间划分已更新，请检查名称与地面材质」。撤销仍是一步。
-- 端点拖动中把 `data-editor-keep-visible="handle"` 也加到手柄上，保持与墙端点手柄一致的可见性行为。
-
-### 3. 工具条弹层（SelectionEditor.tsx + SeparatorLengthFields.tsx）
-
-- 现在 `{separator && <span className="visual-size-trigger">…}` 保留外观（`Ruler` + 长度），但换成 `PopoverTrigger asChild` 的 `<button>`，点开 `visual-editor-popover`。
-- 面板内容 `SeparatorLengthFields`：
-  - 「长度 / m」数字输入（`step=0.01`，复用 `meterDraft` / `sizeDraftToModel` 的输入即生效模式）；
-  - 「固定端」两个互斥选项，按方向命名（横向线：左端 / 右端；纵向线：上端 / 下端），默认取已经贴在墙面 / 另一条分隔线上的那一端，都没贴则取 `a`；
-  - 输入过程走 `transaction.begin(selection)` + `transaction.updateWith(token, before => resizeSeparator(...))`，失焦 / 关闭时 `apply`，非法输入 `cancel` —— 与 `SizeFields` 完全相同的事务语义，保证一步撤销。
-- 弹层里补一行说明：「拖动两端圆点或整条线也能直接调整」，把两个入口关联起来（手势与数值两条路径都可见）。
-
-### 4. 「墙 ▾」下拉收敛（WallToolMenu.tsx + wallTools.ts + index.css）
-
-- `WallToolMenu.tsx`：菜单项图标显式 `<t.icon size={16} />`（当前无 `size`，lucide 默认 24px 偏大）。
-- `wallTools.ts` 缩短说明，减少一行文字占宽：
-  - 墙：「点击起点与转角连续绘墙」
-  - 垭口：「无门扇的落地洞口」
-  - 房间分隔线：「不砌墙也能划分房间，不计价」
-- `src/index.css` 的 `.wall-tool-menu` 段：
-  - `[role="menuitem"]`：`gap: 8px`、`padding: 6px 8px`、`min-height: 40px`，图标 `margin-top: 2px` 与标题基线对齐；
-  - `.wall-tool-item`：`gap: 1px`，`max-width: 200px`；
-  - `.wall-tool-item strong`：`font-size: 13px; line-height: 18px; font-weight: 500`；
-  - `.wall-tool-item small`：`font-size: 11.5px; line-height: 16px; color: hsl(var(--muted-foreground))`；
-  - `min-width: 240px` 保持，避免文案换行后弹层跳动。
-
-## 实施清单
-
-- [x] `sep`：`placeSeparator` 校验（太短 / 共线重叠 / 不存在）+ `moveSeparator`、`moveSeparatorBy`、`resizeSeparator` 三个导出函数落在 `separators.ts`
-- [x] `sep`：三个函数都返回 `deriveRooms` 后的新设计，且无改动时返回原对象
-- [x] `sep`：`PlanSeparators` 选中时渲染两端手柄（`data-handle="sepa"/"sepb"`、含放大的透明命中圆）
-- [x] `sep`：`PlanCanvas` 命中手柄 → `sependpoint` 拖动，走 `resolveWallPoint` 正交吸附
-- [x] `sep`：`PlanCanvas` 命中线身 → `sepmove` 拖动，位移只投影到自身法向
-- [x] `sep`：拖动中 `preview` 实时刷新房间填充与面积；模型抛错的帧跳过，停在最后有效位置
-- [x] `sep`：`finish()` 提交时房间数变化给出既有提示；一步撤销可回到拖动前
-- [x] `sep`：拖动中沿分隔线显示长度标注
-- [x] `ui`：`SelectionEditor` 的长度 span 换成按钮 + `Popover`，键盘可打开
-- [x] `ui`：`SeparatorLengthFields` 长度输入即改即生效、非法输入回滚
-- [x] `ui`：固定端默认取贴墙的一端，切换后长度不变、另一端正对墙面伸缩
-- [x] `ui`：`WallToolMenu` 菜单项图标 16px；`wallTools.ts` 三条 hint 缩短
-- [x] `ui`：`.wall-tool-menu` 字号 / 行距 / 内边距按上文调整，文字无溢出
-
-## 验证清单
-
-正向
-
-- [ ] 选中一条分隔线 → 两端出现圆点；拖动圆点，长度改变、房间面积与名称随之更新
-- [ ] 端点拖到墙端 / 墙面附近 → 吸附到墙端或墙面（正交不歪斜）
-- [ ] 拖动线身 → 只沿垂直方向移动，端点仍贴墙，房间划分照旧
-- [ ] 打开长度弹层输入 2.5 → 线长为 2.5 m，选「固定右端」时右端不动、左端伸缩
-- [ ] 打开「墙 ▾」下拉：三项图标约 16px，标题与说明不再溢出弹层
-
-负向 / 默认
-
-- [ ] 把端点拖过另一端（长度 < 20 mm）→ 线停在最后一次有效长度，不会翻转或消失；撤销一步回到拖动前
-- [ ] 弹层输入 0 或空值 → 显示「分隔线太短」/「尺寸不能为空」，失焦后回显原长度，图纸不变
-- [ ] 拖到与另一条分隔线共线重叠 → 停在重叠前的位置，不产生重叠线
-- [ ] 未选中分隔线时，画布行为不变（点击仍然选中、拖动空白仍然平移画布）
-- [ ] 分隔线删除 / 撤销（Esc 与 Delete）行为不变；3D 视图与成本面板仍不包含分隔线
-
-边界
-
-- [ ] 分隔线端点同时贴在墙面与另一条分隔线上时不报错，房间仍能重算
-- [ ] 缩放（0.012 ~ 1）后手柄大小与命中区域保持恒定屏幕尺寸
-- [ ] 两端都悬空（未贴墙）的分隔线拖动法向平移后仍可正常划分房间
-- [ ] 房间数变化（合并 / 拆分）时名称与地面材质按重叠沿用，未出现重复名
-
-构建与测试范围
-
-- [x] `pnpm exec vitest run src/features/interior/model/separators.test.ts src/features/interior/model/roomDerive.test.ts src/features/interior/components/Workbench.test.tsx`
-- [x] `pnpm run lint`
-- [x] `pnpm run build`
-- [ ] 预览中人工复核一次：图片 306 那张图里的分隔线选中后能拖端点与线身，工具条能改长度
+## Verification checklist
+- [ ] 单元测试 `wheelIntent`：鼠标滚轮判为缩放，触控板小增量或带 `deltaX` 判为平移，ctrl 判为缩放，连续滚动不会中途切换
+- [ ] 单元测试 `furnitureGroup`：组合会合并旧组；解除组合会清除；框到组内一件会补全整组；没有 `groupId` 的旧数据结果不变
+- [ ] `validation`：`groupId` 不是字符串时报错；合法时保存后再读取不丢失
+- [ ] 单元测试 `furnitureSync`：已调整的内置家具，只同步未在项目里改过的 `imageUrl` / `model3d`
+- [ ] 更新 `Workbench.test.tsx`：工具按钮只剩「选择」「门」「窗」
+- [ ] 更新 `SelectionEditor.test.tsx`：工具条只有一个色块；多选显示「组合」，选中已有组显示「解除组合」
+- [ ] 截图检查（desktop_1280）：工具条色块、带图下拉、项目切换弹层
+- [ ] 运行 `pnpm exec tsc -p tsconfig.app.json --noEmit`（`wallFaces.ts` 原有的那个错误除外）、`pnpm exec vitest run src`、`pnpm run lint` 和 `pnpm run build`

@@ -34,7 +34,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const finite = (v: unknown, min = -1e6, max = 1e6): v is number => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
 const str = (v: unknown, max: number): v is string => typeof v === 'string' && v.trim().length > 0 && v.length <= max;
 
-interface Entry { code: string; catalogId: string; name: string; category: string; type: string; w: number; d: number }
+interface Entry { code: string; catalogId: string; name: string; category: string; type: string; w: number; d: number; height?: number }
 interface Placed { code: string; back: Side; along?: number; gap?: number }
 
 /** 用户上传的家装素材：只接受本项目素材桶里的公开文件。 */
@@ -83,7 +83,7 @@ interface Body {
   files?: Material[];
   catalog: Entry[];
   projectId?: string;
-  room?: { roomId: string; name: string; area: number; zone: [number, number, number, number]; openings: unknown[] };
+  room?: { roomId: string; name: string; area: number; zone: [number, number, number, number]; openings: unknown[]; ring?: unknown; edges?: unknown; keepOuts?: unknown; doors?: unknown };
   plan?: unknown;
   existing?: { name: string; w: number; d: number }[];
   required?: { code: string; count: number }[];
@@ -106,7 +106,7 @@ function guard(raw: unknown): Body | string {
   if (b.files !== undefined && (!Array.isArray(b.files) || b.files.length > 6 || !b.files.every(validMaterial))) return '素材附件无效（最多 6 个）';
   if (!Array.isArray(b.catalog) || !b.catalog.length || b.catalog.length > 800) return '家具目录无效';
   for (const e of b.catalog)
-    if (!e || !/^F\d{1,4}$/.test(e.code) || !str(e.catalogId, 250) || !str(e.name, 100) || typeof e.category !== 'string' || e.category.length > 30 || !str(e.type, 40) || !finite(e.w, 10, 30000) || !finite(e.d, 10, 30000)) return '家具目录条目无效';
+    if (!e || !/^F\d{1,4}$/.test(e.code) || !str(e.catalogId, 250) || !str(e.name, 100) || typeof e.category !== 'string' || e.category.length > 30 || !str(e.type, 40) || !finite(e.w, 10, 30000) || !finite(e.d, 10, 30000) || (e.height !== undefined && !finite(e.height, 0, 6000))) return '家具目录条目无效';
   if (b.projectId !== undefined && (typeof b.projectId !== 'string' || !UUID.test(b.projectId))) return '项目编号无效';
   if (b.model !== undefined && (typeof b.model !== 'string' || !MODELS[b.model])) return '不支持的模型';
   if (b.assistantId !== undefined && (typeof b.assistantId !== 'string' || !UUID.test(b.assistantId))) return '小助手编号无效';
@@ -118,6 +118,7 @@ function guard(raw: unknown): Body | string {
   if (b.mode === 'room') {
     const r = b.room;
     if (!r || !str(r.roomId, 100) || !str(r.name, 100) || !Array.isArray(r.zone) || r.zone.length !== 4 || !r.zone.every((n) => finite(n)) || !Array.isArray(r.openings)) return '房间信息无效';
+    if (JSON.stringify(r).length > 80_000) return '房间信息过大';
     if (!b.plan || typeof b.plan !== 'object' || JSON.stringify(b.plan).length > 200_000) return '户型快照无效或过大';
     if (!Array.isArray(b.existing) || b.existing.length > 80) return '现有家具清单无效';
     const codes = new Set(b.catalog.map((e) => e.code));
@@ -127,7 +128,7 @@ function guard(raw: unknown): Body | string {
 }
 
 const catalogText = (catalog: Entry[]) =>
-  catalog.map((e) => `${e.code} ${e.name} | ${e.category || '其他'} | ${e.type} | ${Math.round(e.w)}×${Math.round(e.d)}`).join(NL);
+  catalog.map((e) => `${e.code} ${e.name} | ${e.category || '其他'} | ${e.type} | ${Math.round(e.w)}×${Math.round(e.d)}×${Math.round(e.height ?? 700)}`).join(NL);
 
 const DIRECTIONS = ['常规舒适：优先动线与使用习惯', '收纳优先：尽量多布置收纳', '开阔通透：留出更多活动空间', '功能分区：明确划分功能区域'];
 
@@ -160,6 +161,7 @@ const PLANNING_RULES = `你是住宅户型与家具布局规划助手，只处�
 - 家具之间不能实体穿插，不得靠绘图层级隐藏碰撞；旋转家具后按旋转后的实际占地检查，不能沿用旋转前的长宽。
 - 不得通过缩小家具、修改已知尺寸或忽略突出部件来制造「放得下」；已知尺寸一律不得改动，家具尺寸固定取目录值。
 - 桌面物品必须落在对应承托面上，壁挂物品必须有明确安装面，落地家具必须有地面支撑。
+- 背靠面必须真实存在：衣柜、书柜、鞋柜、餐边柜 / 储物柜、电视柜、电视、冰箱、蒸烤箱高柜、空调、热水器，背面必须紧贴连续的实墙（贴墙 gap 为 0），实墙至少覆盖背面宽度的 70%。房间的边不一定都是墙：通向阳台的开间、垭口、门洞、窗洞、矮墙 / 栏板、房间分隔线（开放式空间的分界）背后都没有可依靠的墙，不能当作背靠面。
 
 五、允许的正常重叠（不要误判为碰撞）
 - 地毯可以位于床、沙发、桌椅下方；椅子可以部分收进桌下（同时检查桌腿、扶手与实际容纳空间）；桌面物品可以落在桌面范围内；柜门、抽屉与其上方吊柜按支撑关系与垂直净空判断。
@@ -226,7 +228,7 @@ const PLANNING_RULES = `你是住宅户型与家具布局规划助手，只处�
 const LIVING_SENSE = `生活常识（必须遵守，优先级仅次于门窗与用户硬性要求）：
 - 家具放在符合用途的房间：床只在卧室，马桶、淋浴、洗手台只在卫生间，灶台、水槽、冰箱在厨房或紧邻厨房，鞋柜在玄关，洗衣机在阳台或卫生间。
 - 卧室：床头靠实墙，不贴窗、不正对房门；床头柜紧挨床头两侧；衣柜前留 600mm 以上开门空间。
-- 客厅：沙发与电视柜面对面，间距约 2500–4000mm；茶几放在沙发正前方，离沙发 300–450mm；电视不对着窗，避免逆光和反光。
+- 客厅：沙发与电视柜面对面，间距约 2500–4000mm；茶几放在沙发正前方，离沙发 300–450mm；电视不对着窗，避免逆光和反光；电视柜与电视必须背靠一面完整的实墙，不能放在通向阳台的开间、垭口、落地窗或矮墙一侧（那一侧背后没有墙）。
 - 餐区：餐桌靠近厨房，餐椅围绕餐桌，桌边留 600mm 以上拉椅子的空间。
 - 厨房：按「冰箱 → 水槽 → 灶台」顺序连续布置，三者之间走动距离合适；灶台不贴窗、不正对厨房门。
 - 卫生间：马桶不正对卫生间门；干湿尽量分开，淋浴区在里侧，洗手台靠近门口。
@@ -242,8 +244,14 @@ const ROOM_CONTRACT = `你是资深室内设计师，为一套户型中的「目
 - back：家具背面朝哪条边，取 up / down / left / right。
 - along：家具中心沿这条边的位置；back 为 up/down 时从 zone 左边 x1 量起，back 为 left/right 时从 zone 上边 y1 量起。
 - gap：家具背面到这条边的净距；贴墙为 0，放在房间中部的家具（床尾凳、茶几、餐桌、地毯、岛台）用较大的 gap。
-- 家具宽 w 沿背靠边方向，深 d 垂直于背靠边，尺寸固定取目录值，不能改。
+- 家具宽 w 沿背靠边方向，深 d 垂直于背靠边，尺寸固定取目录值，不能改；目录里的高（第三个数）用来判断是否会遮挡窗洞。
 家具只能使用目录里的代号 code，禁止编造代号。
+
+目标房间数据里另有四项真实测量（全部相对 zone 左上角，与 along / gap 同一坐标）：
+- ring：房间净空轮廓。L 形等不规则房间的轮廓小于 zone，家具占地必须整块落在 ring 内。
+- edges：轮廓的每条边。side 是家具背靠这条边时的 back 取值；at 是边线坐标（side 为 up/down 时是 y，left/right 时是 x）；from / to 是沿边范围；spans 逐段标出这条边背后的构造：wall 实墙、low 矮墙或栏板、window 窗洞、door 门洞或垭口、open 开敞（没有墙，例如通向阳台的开间、与其他空间的分界线）。只有 wall 段能作为柜类、电视柜、电视、冰箱、空调、热水器的背靠面。不规则房间里贴着内凹那段墙摆放时，gap 要加上这条边 at 与 zone 边线之间的距离。
+- keepOuts：保留区多边形。doorway 为门口通行区，任何家具都不能占；doorSweep 为门扇开启范围，除地毯外都不能占；window 为窗前区，高度 ≥ 1200 的家具不能占。
+- doors：各门口内侧的位置，从每个门口都要能走进房间，门与门之间要留出至少 600 mm 宽的连续通道。
 
 输出格式：
 {"summary":"一句话方案说明，20 字以内","items":[{"code":"F3","back":"up","along":1800,"gap":0}]}
@@ -281,6 +289,7 @@ const PLAN_CONTRACT = `你是住宅空间规划与户型设计助手。根据用
 3. 用户指定的门窗（文字描述、参考图或附件户型图中出现的）位置、宽度、开向严格还原，优先级最高，不得擅自修改；只有用户没有指定的门窗才由你决定，且要避开其他门和主通道。
 4. 窗只开在外墙上。卧室、客厅、厨房要有窗，卫生间尽量有窗（用户已指定的窗以用户为准，不要为凑规则另加或挪动）。
 5. 门上不放家具、窗前不放高柜：按上面的规划原则执行，放不下时调整家具，不要挪门窗。
+6. 柜类与电视柜要靠实墙：房间之间没有墙（开放式客餐厅、客厅与阳台连通的开间）的那一侧，不能当作背靠面。
 
 四、用家具验证房间
 - 卧室：床、衣柜，以及上下床和开柜门的空间。
@@ -399,11 +408,11 @@ function roomPrompt(b: Body) {
     : '无（由你从目录中挑选）';
   return [
     `目标房间：${JSON.stringify(b.room)}`,
-    `目标房间净空：宽 ${Math.round(b.room!.zone[2] - b.room!.zone[0])}（x 方向）× 深 ${Math.round(b.room!.zone[3] - b.room!.zone[1])}（y 方向）mm。back 为 up/down 时 along 取值 [w/2, 宽 − w/2]、gap ≤ 深 − d；back 为 left/right 时 along 取值 [w/2, 深 − w/2]、gap ≤ 宽 − d。输出前请逐件核对占地范围不越界、彼此不重叠；空间实在不够时，宁可让家具贴墙紧凑排布，也不要越界。`,
+    `目标房间净空：宽 ${Math.round(b.room!.zone[2] - b.room!.zone[0])}（x 方向）× 深 ${Math.round(b.room!.zone[3] - b.room!.zone[1])}（y 方向）mm。back 为 up/down 时 along 取值 [w/2, 宽 − w/2]、gap ≤ 深 − d；back 为 left/right 时 along 取值 [w/2, 深 − w/2]、gap ≤ 宽 − d。输出前请逐件核对：占地落在 ring 内、彼此不重叠、不压 keepOuts、柜类与电视柜背靠 edges 里的 wall 段；空间实在不够时，宁可让家具贴墙紧凑排布，也不要越界或背靠开敞边。`,
     `目标房间现有家具：${b.existing!.length ? JSON.stringify(b.existing) : '无'}`,
     `指定家具：${required}`,
     `整套户型（墙 a→b、门窗中心 at 与连通房间 rooms、房间轮廓 ring、其他房间家具）：${JSON.stringify(b.plan)}`,
-    `家具目录（代号 名称 | 分类 | 类型 | 宽×深 mm）：${NL}${catalogText(b.catalog)}`,
+    `家具目录（代号 名称 | 分类 | 类型 | 宽×深×高 mm）：${NL}${catalogText(b.catalog)}`,
     examplesText(b),
     `用户需求：${b.description.trim()}`,
     b.images.length ? '附有参考图，请参考其中的风格与布局意图，但家具仍只能来自目录。' : '',
@@ -418,7 +427,7 @@ const SIZE_LINE = '室内净尺寸未固定：若用户需求里给出了长宽�
 function planPrompt(b: Body) {
   return [
     SIZE_LINE,
-    `家具目录（代号 名称 | 分类 | 类型 | 宽×深 mm）：${NL}${catalogText(b.catalog)}`,
+    `家具目录（代号 名称 | 分类 | 类型 | 宽×深×高 mm）：${NL}${catalogText(b.catalog)}`,
     examplesText(b),
     `用户需求：${b.description.trim()}`,
     b.images.length ? '附有参考图（可能是户型图或风格图），请参考其中的布局与风格意图。' : '',
@@ -479,12 +488,198 @@ function insetOnCounter(typeA: string, boxA: ReturnType<typeof footprint>, typeB
   return inset.x1 >= counter.x1 - t && inset.y1 >= counter.y1 - t && inset.x2 <= counter.x2 + t && inset.y2 <= counter.y2 + t;
 }
 
-/** 一组家具的结构 + 几何校验：代号、方向（hard），是否出界、是否互相重叠（soft）。 */
-function checkItems(items: unknown, zone: [number, number, number, number], byCode: Map<string, Entry>, label: string, found: Issues): Placed[] {
+/*
+ * ———— 布局几何校验 ————
+ * 同步点：src/features/interior/model/layoutRules.ts 里的 BACK_REQUIRED_TYPES、clipArea、backingOf、
+ * passageBlocker 与这里是同一套定义（后端无法 import src/），改动时两边一起改。
+ * 房间模式的 ring / edges / keepOuts / doors 由前端按真实户型算好随请求发来；
+ * 整户模式由 planGeometry 按模型输出的墙、房间、门窗现算。
+ */
+type Pt = [number, number];
+type Ring = Pt[];
+type Box = ReturnType<typeof footprint>;
+type SpanKind = 'wall' | 'low' | 'window' | 'door' | 'open';
+interface Edge { side: Side; at: number; from: number; to: number; spans: { from: number; to: number; kind: SpanKind }[] }
+interface KeepOut { kind: 'doorway' | 'doorSweep' | 'window'; poly: Ring }
+interface Geometry { ring: Ring | null; edges: Edge[]; keepOuts: KeepOut[]; doors: Pt[] }
+
+const BACK_REQUIRED = new Set(['wardrobe', 'bookshelf', 'shoecab', 'cabinet', 'tvstand', 'fridge', 'ovencol', 'tv', 'acwall', 'waterheater', 'aircon']);
+const BACK_RATIO = 0.7, BACK_GAP = 100, BACK_TOLERANCE = 30, KEEP_OUT_AREA = 5000, TALL = 1200;
+const SPAN_KINDS: SpanKind[] = ['wall', 'low', 'window', 'door', 'open'];
+const SPAN_TEXT: Record<SpanKind | 'none', string> = { wall: '实墙', low: '矮墙 / 栏板', window: '窗洞', door: '门洞 / 垭口', open: '开敞边界（没有墙）', none: '空处（背面没有贴着任何边）' };
+const KEEP_TEXT: Record<KeepOut['kind'], string> = { doorway: '门口通行区', doorSweep: '门扇开启范围', window: '窗前区' };
+
+const point = (v: unknown): v is Pt => Array.isArray(v) && v.length === 2 && finite(v[0]) && finite(v[1]);
+const polygon = (v: unknown, min: number, max: number): Ring | null =>
+  Array.isArray(v) && v.length >= min && v.length <= max && v.every(point) ? (v as Ring) : null;
+
+function inRing(p: Pt, ring: Ring) {
+  let yes = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i], b = ring[j];
+    if (a[1] > p[1] !== b[1] > p[1] && p[0] < ((b[0] - a[0]) * (p[1] - a[1])) / (b[1] - a[1]) + a[0]) yes = !yes;
+  }
+  return yes;
+}
+
+const ringArea = (ring: Ring) => Math.abs(ring.reduce((s, a, i) => { const c = ring[(i + 1) % ring.length]; return s + a[0] * c[1] - c[0] * a[1]; }, 0)) / 2;
+const area = ringArea;
+
+/** 多边形被轴对齐矩形裁剪后的面积（Sutherland–Hodgman）。 */
+function clipArea(poly: Ring, box: Box): number {
+  let out = poly;
+  const cut = (inside: (p: Pt) => boolean, axis: 0 | 1, value: number) => {
+    const next: Ring = [];
+    out.forEach((a, i) => {
+      const b = out[(i + 1) % out.length];
+      const ain = inside(a), bin = inside(b);
+      if (ain) next.push(a);
+      if (ain !== bin) {
+        const k = (value - a[axis]) / (b[axis] - a[axis]);
+        next.push(axis === 0 ? [value, a[1] + (b[1] - a[1]) * k] : [a[0] + (b[0] - a[0]) * k, value]);
+      }
+    });
+    out = next;
+  };
+  cut((p) => p[0] >= box.x1, 0, box.x1);
+  cut((p) => p[0] <= box.x2, 0, box.x2);
+  cut((p) => p[1] >= box.y1, 1, box.y1);
+  cut((p) => p[1] <= box.y2, 1, box.y2);
+  return out.length < 3 ? 0 : ringArea(out);
+}
+
+/** 房间模式：前端发来的测量数据，逐项做形状与规模校验，不合法的项直接忽略（退回只按 zone 检查）。 */
+function roomGeometry(room: Body['room']): Geometry {
+  const ring = polygon(room?.ring, 3, 60);
+  const edges = Array.isArray(room?.edges) ? (room!.edges as unknown[]).slice(0, 80).flatMap((raw) => {
+    const e = raw as Partial<Edge>;
+    if (!e || !SIDES.includes(e.side as Side) || !finite(e.at) || !finite(e.from) || !finite(e.to) || !Array.isArray(e.spans)) return [];
+    const spans = e.spans.slice(0, 400).filter((s) => s && finite(s.from) && finite(s.to) && SPAN_KINDS.includes(s.kind));
+    return [{ side: e.side as Side, at: e.at, from: e.from, to: e.to, spans }];
+  }) : [];
+  const keepOuts = Array.isArray(room?.keepOuts) ? (room!.keepOuts as unknown[]).slice(0, 40).flatMap((raw) => {
+    const k = raw as { kind?: unknown; poly?: unknown };
+    const poly = polygon(k?.poly, 3, 20);
+    return poly && (k.kind === 'doorway' || k.kind === 'doorSweep' || k.kind === 'window') ? [{ kind: k.kind, poly }] : [];
+  }) : [];
+  const doors = Array.isArray(room?.doors) ? (room!.doors as unknown[]).slice(0, 20).filter(point) : [];
+  return { ring, edges, keepOuts, doors };
+}
+
+/** 背靠面：背面线段所在的边、是否紧贴，以及实墙覆盖比例。 */
+function backingOf(edges: Edge[], back: Side, box: Box): { ratio: number; other: SpanKind | 'none' } {
+  const [at, from, to] = back === 'up' ? [box.y1, box.x1, box.x2] : back === 'down' ? [box.y2, box.x1, box.x2] : back === 'left' ? [box.x1, box.y1, box.y2] : [box.x2, box.y1, box.y2];
+  const gapTo = (edge: number) => (back === 'up' || back === 'left' ? at - edge : edge - at);
+  const n = Math.max(2, Math.ceil((to - from) / 50));
+  const counts = new Map<SpanKind | 'none', number>();
+  let wall = 0;
+  for (let k = 0; k < n; k++) {
+    const t = from + ((k + 0.5) * (to - from)) / n;
+    let best: Edge | undefined, bestGap = Infinity;
+    for (const e of edges) {
+      if (e.side !== back || t < e.from || t > e.to) continue;
+      const gap = gapTo(e.at);
+      if (gap < -BACK_TOLERANCE || gap > BACK_GAP || gap >= bestGap) continue;
+      best = e;
+      bestGap = gap;
+    }
+    const kind = best?.spans.find((s) => t >= s.from && t <= s.to)?.kind ?? 'none';
+    if (kind === 'wall') wall++;
+    else counts.set(kind, (counts.get(kind) ?? 0) + 1);
+  }
+  return { ratio: wall / n, other: [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'wall' };
+}
+
+/**
+ * 过道连通：100 mm 栅格，家具之外 5×5 格（约 600 mm 见方）全空才算能走人。
+ * 门口本来就走不进去（过窄的房间）不算家具的问题；返回挡路家具的下标。
+ */
+function passageBlocker(boxes: { type: string; box: Box }[], geo: Geometry, W: number, H: number): number | null {
+  const ring = geo.ring;
+  if (!ring || !geo.doors.length) return null;
+  const G = 100, R = 2;
+  const cols = Math.ceil(W / G), rows = Math.ceil(H / G);
+  if (!cols || !rows || cols * rows > 250_000) return null;
+  const at = (c: number, r: number): Pt => [(c + 0.5) * G, (r + 0.5) * G];
+  const inside = new Uint8Array(cols * rows), taken = new Uint8Array(cols * rows);
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) inside[r * cols + c] = inRing(at(c, r), ring) ? 1 : 0;
+  const blockers = boxes.map((b, i) => ({ ...b, i })).filter((b) => b.type !== 'rug');
+  for (const { box } of blockers)
+    for (let r = Math.max(0, Math.floor(box.y1 / G)); r <= Math.min(rows - 1, Math.floor(box.y2 / G)); r++)
+      for (let c = Math.max(0, Math.floor(box.x1 / G)); c <= Math.min(cols - 1, Math.floor(box.x2 / G)); c++) {
+        const [px, py] = at(c, r);
+        if (px > box.x1 && px < box.x2 && py > box.y1 && py < box.y2) taken[r * cols + c] = 1;
+      }
+  const walkable = (withFurniture: boolean) => {
+    const out = new Uint8Array(cols * rows);
+    for (let r = R; r < rows - R; r++) for (let c = R; c < cols - R; c++) {
+      let ok = true;
+      for (let dr = -R; dr <= R && ok; dr++) for (let dc = -R; dc <= R && ok; dc++) {
+        const id = (r + dr) * cols + c + dc;
+        if (!inside[id] || (withFurniture && taken[id])) ok = false;
+      }
+      out[r * cols + c] = ok ? 1 : 0;
+    }
+    return out;
+  };
+  const empty = walkable(false), real = walkable(true);
+  const seedOf = (grid: Uint8Array, p: Pt) => {
+    let best = -1, bestDist = Infinity;
+    const c0 = Math.floor(p[0] / G), r0 = Math.floor(p[1] / G);
+    for (let r = r0 - 7; r <= r0 + 7; r++) for (let c = c0 - 7; c <= c0 + 7; c++) {
+      if (r < 0 || c < 0 || r >= rows || c >= cols || !grid[r * cols + c]) continue;
+      const [x, y] = at(c, r), dist = Math.hypot(x - p[0], y - p[1]);
+      if (dist <= 700 && dist < bestDist) { best = r * cols + c; bestDist = dist; }
+    }
+    return best;
+  };
+  const nearest = (p: Pt) => blockers.reduce<{ i: number | null; dist: number }>((m, { box, i }) => {
+    const dist = Math.hypot(Math.max(box.x1 - p[0], 0, p[0] - box.x2), Math.max(box.y1 - p[1], 0, p[1] - box.y2));
+    return dist < m.dist ? { i, dist } : m;
+  }, { i: null, dist: Infinity }).i;
+  const doors = geo.doors.filter((p) => seedOf(empty, p) >= 0);
+  const seeds: number[] = [];
+  for (const p of doors) {
+    const seed = seedOf(real, p);
+    if (seed < 0) return nearest(p);
+    seeds.push(seed);
+  }
+  if (seeds.length < 2) return null;
+  const seen = new Uint8Array(cols * rows), queue = [seeds[0]];
+  seen[seeds[0]] = 1;
+  for (let head = 0; head < queue.length; head++) {
+    const id = queue[head], c = id % cols, r = (id - c) / cols;
+    for (const [nc, nr] of [[c + 1, r], [c - 1, r], [c, r + 1], [c, r - 1]]) {
+      if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue;
+      const next = nr * cols + nc;
+      if (seen[next] || !real[next]) continue;
+      seen[next] = 1;
+      queue.push(next);
+    }
+  }
+  const cut = seeds.findIndex((s) => !seen[s]);
+  if (cut < 0) return null;
+  const a = doors[0], z = doors[cut];
+  return nearest([(a[0] + z[0]) / 2, (a[1] + z[1]) / 2]);
+}
+
+/** 占地是否整块落在轮廓内：四角（内收容差）都在轮廓里，且轮廓顶点没有戳进占地。 */
+function insideRing(box: Box, ring: Ring, tolerance: number) {
+  const x1 = box.x1 + tolerance, y1 = box.y1 + tolerance, x2 = box.x2 - tolerance, y2 = box.y2 - tolerance;
+  if (x2 <= x1 || y2 <= y1) return true;
+  if (![[x1, y1], [x2, y1], [x2, y2], [x1, y2]].every((p) => inRing(p as Pt, ring))) return false;
+  return !ring.some(([x, y]) => x > x1 && x < x2 && y > y1 && y < y2);
+}
+
+/**
+ * 一组家具的结构 + 几何校验：代号、方向（hard）；出界 / 出轮廓、互相重叠、压保留区、
+ * 背靠面没有实墙、堵住门口通道（soft，回灌给模型修，修不掉由前端确定性校正兜底）。
+ */
+function checkItems(items: unknown, zone: [number, number, number, number], byCode: Map<string, Entry>, label: string, found: Issues, geo?: Geometry): Placed[] {
   const errors = found.hard;
   if (!Array.isArray(items) || !items.length) { errors.push(`${label}：items 必须是非空数组`); return []; }
   const placed: Placed[] = [];
-  const boxes: { name: string; type: string; box: ReturnType<typeof footprint> }[] = [];
+  const boxes: { code: string; name: string; type: string; box: Box }[] = [];
   items.forEach((raw, i) => {
     const p = raw as Placed;
     const e = byCode.get(p?.code);
@@ -493,8 +688,11 @@ function checkItems(items: unknown, zone: [number, number, number, number], byCo
     if ((p.along !== undefined && !finite(p.along)) || (p.gap !== undefined && !finite(p.gap, 0))) { errors.push(`${label} ${p.code}：along / gap 必须是数字且 gap ≥ 0`); return; }
     const box = footprint(p, e, zone);
     const tolerance = 30;
+    const who = `${label} ${p.code}（${e.name}）`;
     if (box.x1 < zone[0] - tolerance || box.y1 < zone[1] - tolerance || box.x2 > zone[2] + tolerance || box.y2 > zone[3] + tolerance)
-      found.soft.push(`${label} ${p.code}（${e.name}）超出了房间范围（占地 x ${Math.round(box.x1)}–${Math.round(box.x2)}、y ${Math.round(box.y1)}–${Math.round(box.y2)}，房间 0–${Math.round(zone[2])} × 0–${Math.round(zone[3])}），请调整 along / gap`);
+      found.soft.push(`${who}超出了房间范围（占地 x ${Math.round(box.x1)}–${Math.round(box.x2)}、y ${Math.round(box.y1)}–${Math.round(box.y2)}，房间 0–${Math.round(zone[2])} × 0–${Math.round(zone[3])}），请调整 along / gap`);
+    else if (geo?.ring && !insideRing(box, geo.ring, tolerance))
+      found.soft.push(`${who}越出了房间轮廓 ring（占地 x ${Math.round(box.x1)}–${Math.round(box.x2)}、y ${Math.round(box.y1)}–${Math.round(box.y2)}，跨到了不规则房间的缺口或隔壁房间），请调整 along / gap`);
     for (const other of boxes) {
       if (e.type === 'rug' || other.type === 'rug') continue;
       const overlap = Math.min(box.x2, other.box.x2) - Math.max(box.x1, other.box.x1);
@@ -502,11 +700,31 @@ function checkItems(items: unknown, zone: [number, number, number, number], byCo
       if (overlap <= 50 || overlapY <= 50) continue;
       if (tuckedSeat(e.type, box, other.type, other.box)) continue;
       if (insetOnCounter(e.type, box, other.type, other.box)) continue;
-      found.soft.push(`${label} ${p.code}（${e.name}）与 ${other.name} 重叠 ${Math.round(overlap)}×${Math.round(overlapY)} mm`);
+      found.soft.push(`${who}与 ${other.name} 重叠 ${Math.round(overlap)}×${Math.round(overlapY)} mm`);
     }
-    boxes.push({ name: e.name, type: e.type, box });
+    if (geo) {
+      const tall = (e.height ?? 700) >= TALL;
+      const hit = new Set<KeepOut['kind']>();
+      for (const keep of geo.keepOuts) {
+        if (hit.has(keep.kind) || (keep.kind === 'window' && !tall) || (keep.kind === 'doorSweep' && e.type === 'rug')) continue;
+        const overlap = clipArea(keep.poly, box);
+        if (overlap < KEEP_OUT_AREA) continue;
+        hit.add(keep.kind);
+        found.soft.push(`${who}压在了${KEEP_TEXT[keep.kind]}上（重叠约 ${(overlap / 1e6).toFixed(2)} m²${keep.kind === 'window' ? `，家具高 ${Math.round(e.height ?? 0)} mm 会挡住窗` : ''}），请沿边挪开或换到别的边`);
+      }
+      if (BACK_REQUIRED.has(e.type) && geo.edges.length) {
+        const { ratio, other } = backingOf(geo.edges, p.back, box);
+        if (ratio < BACK_RATIO)
+          found.soft.push(`${who} back=${p.back}，背面后方是${SPAN_TEXT[other]}，实墙只覆盖背面的 ${Math.round(ratio * 100)}%；柜类与电视柜、电视、冰箱、空调、热水器必须紧贴 edges 里 kind=wall 的实墙段（gap 为 0），请换到有足够长 wall 段的边，或调整 along`);
+      }
+    }
+    boxes.push({ code: p.code, name: e.name, type: e.type, box });
     placed.push({ code: p.code, back: p.back, ...(p.along !== undefined ? { along: p.along } : {}), ...(p.gap !== undefined ? { gap: p.gap } : {}) });
   });
+  if (geo) {
+    const blocker = passageBlocker(boxes, geo, zone[2] - zone[0], zone[3] - zone[1]);
+    if (blocker !== null) found.soft.push(`${label}：${boxes[blocker].code}（${boxes[blocker].name}）挡住了门口到房间里的通道（门口内侧位置见 doors），请挪开，门口与门口之间要留出至少 600 mm 宽的连续通道`);
+  }
   return placed;
 }
 
@@ -516,7 +734,7 @@ function validateRoom(value: unknown, b: Body): Issues {
   const v = value as { items?: unknown; summary?: unknown };
   const r = b.room!;
   const zone: [number, number, number, number] = [0, 0, r.zone[2] - r.zone[0], r.zone[3] - r.zone[1]];
-  const placed = checkItems(v?.items, zone, byCode, '家具', found);
+  const placed = checkItems(v?.items, zone, byCode, '家具', found, roomGeometry(r));
   if (b.required!.length) {
     const counts = new Map<string, number>();
     for (const p of placed) counts.set(p.code, (counts.get(p.code) ?? 0) + 1);
@@ -527,8 +745,66 @@ function validateRoom(value: unknown, b: Body): Issues {
   return found;
 }
 
-type Ring = [number, number][];
-const area = (ring: Ring) => Math.abs(ring.reduce((s, a, i) => { const c = ring[(i + 1) % ring.length]; return s + a[0] * c[1] - c[0] * a[1]; }, 0)) / 2;
+type Line = { key: string; dir: 'h' | 'v'; at: number; from: number; to: number };
+type PlanOpening = { wall: string; kind: 'door' | 'window'; at: number; width: number; into?: Side; hinge?: 'start' | 'end' };
+
+/**
+ * 整户模式：按模型输出的墙（中心线）、房间轮廓与门窗现算每个房间的测量数据，
+ * 坐标相对房间外接矩形左上角（与 checkItems 的分区一致）。墙线与房间边相距 30 mm 内视为贴合。
+ */
+function planGeometry(ring: Ring, lines: Line[], openings: PlanOpening[]): Geometry {
+  const ox = Math.min(...ring.map((p) => p[0])), oy = Math.min(...ring.map((p) => p[1]));
+  const edges: Edge[] = [], keepOuts: KeepOut[] = [], doors: Pt[] = [];
+  const local = ([x, y]: Pt): Pt => [x - ox, y - oy];
+  ring.forEach((a, i) => {
+    const b = ring[(i + 1) % ring.length];
+    const horizontal = Math.abs(a[1] - b[1]) < 0.5, vertical = Math.abs(a[0] - b[0]) < 0.5;
+    if (horizontal === vertical) return;
+    const dir: 'h' | 'v' = horizontal ? 'h' : 'v';
+    const at = horizontal ? a[1] : a[0];
+    const from = Math.min(horizontal ? a[0] : a[1], horizontal ? b[0] : b[1]), to = Math.max(horizontal ? a[0] : a[1], horizontal ? b[0] : b[1]);
+    if (to - from < 1) return;
+    const mid = (from + to) / 2;
+    const plus = inRing(horizontal ? [mid, at + 2] : [at + 2, mid], ring);
+    const side: Side = horizontal ? (plus ? 'up' : 'down') : (plus ? 'left' : 'right');
+    const sign = plus ? 1 : -1;
+    const on = lines.filter((l) => l.dir === dir && Math.abs(l.at - at) <= 30);
+    const n = Math.max(1, Math.ceil((to - from) / 50)), cell = (to - from) / n;
+    const spans: Edge['spans'] = [];
+    for (let k = 0; k < n; k++) {
+      const t = from + (k + 0.5) * cell;
+      const line = on.find((l) => t >= l.from - 1 && t <= l.to + 1);
+      const hole = line && openings.find((o) => o.wall === line.key && Math.abs(t - o.at) < o.width / 2);
+      const kind: SpanKind = !line ? 'open' : hole ? (hole.kind === 'window' ? 'window' : 'door') : 'wall';
+      const last = spans[spans.length - 1];
+      if (last && last.kind === kind) last.to = from + (k + 1) * cell;
+      else spans.push({ from: from + k * cell, to: from + (k + 1) * cell, kind });
+    }
+    const shift = horizontal ? ox : oy, across = horizontal ? oy : ox;
+    edges.push({ side, at: at - across, from: from - shift, to: to - shift, spans: spans.map((s) => ({ ...s, from: s.from - shift, to: s.to - shift })) });
+    // 本条边上的门窗 → 室内一侧的保留区（墙中心线起算，先跨过半个内墙厚 60）。
+    const inward: Side = side === 'up' ? 'down' : side === 'down' ? 'up' : side === 'left' ? 'right' : 'left';
+    for (const o of openings) {
+      const line = on.find((l) => l.key === o.wall);
+      if (!line || o.at < from || o.at > to) continue;
+      const half = o.width / 2;
+      const pt = (along: number, depth: number): Pt => local(horizontal ? [along, at + sign * depth] : [at + sign * depth, along]);
+      const band = (depth: number): Ring => [pt(o.at - half, 0), pt(o.at + half, 0), pt(o.at + half, 60 + depth), pt(o.at - half, 60 + depth)];
+      if (o.kind === 'window') { keepOuts.push({ kind: 'window', poly: band(600) }); continue; }
+      keepOuts.push({ kind: 'doorway', poly: band(300) });
+      doors.push(pt(o.at, 60 + 150));
+      if (o.into !== inward) continue;
+      const hinge = o.hinge === 'end' ? o.at + half : o.at - half, u = o.hinge === 'end' ? -1 : 1;
+      const sweep: Ring = [pt(hinge, 0)];
+      for (let k = 0; k <= 12; k++) {
+        const angle = (k * Math.PI) / 24;
+        sweep.push(pt(hinge + u * o.width * Math.cos(angle), o.width * Math.sin(angle)));
+      }
+      keepOuts.push({ kind: 'doorSweep', poly: sweep });
+    }
+  });
+  return { ring: ring.map(local), edges, keepOuts, doors };
+}
 
 function validatePlan(value: unknown, b: Body): Issues {
   const found = issues(), errors = found.hard;
@@ -550,16 +826,16 @@ function validatePlan(value: unknown, b: Body): Issues {
       if (Math.abs(q[0] - p[0]) + Math.abs(q[1] - p[1]) < 600) { found.soft.push(`outline 第 ${i + 1} 条边短于 600，请合并或去掉`); outline = null; break; }
     }
   }
-  const outerEdges = new Map<string, { dir: 'h' | 'v'; from: number; to: number }>(outline
+  const outerEdges = new Map<string, { dir: 'h' | 'v'; at: number; from: number; to: number }>(outline
     ? outline.map((p, i) => {
         const q = outline![(i + 1) % outline!.length];
         const dir: 'h' | 'v' = p[1] === q[1] ? 'h' : 'v';
         const [a, z] = dir === 'h' ? [p[0], q[0]] : [p[1], q[1]];
-        return [`e${i + 1}`, { dir, from: Math.min(a, z), to: Math.max(a, z) }];
+        return [`e${i + 1}`, { dir, at: dir === 'h' ? p[1] : p[0], from: Math.min(a, z), to: Math.max(a, z) }];
       })
-    : [['top', { dir: 'h' as const, from: 0, to: W }], ['bottom', { dir: 'h' as const, from: 0, to: W }], ['left', { dir: 'v' as const, from: 0, to: D }], ['right', { dir: 'v' as const, from: 0, to: D }]]);
+    : [['top', { dir: 'h' as const, at: 0, from: 0, to: W }], ['bottom', { dir: 'h' as const, at: D, from: 0, to: W }], ['left', { dir: 'v' as const, at: 0, from: 0, to: D }], ['right', { dir: 'v' as const, at: W, from: 0, to: D }]]);
   const isOuter = (name: string) => outerEdges.has(name);
-  const walls = new Map<string, { dir: string; at: number; from: number; to: number }>();
+  const walls = new Map<string, { dir: 'h' | 'v'; at: number; from: number; to: number }>();
   if (!Array.isArray(v?.walls)) errors.push('walls 必须是数组');
   else v.walls.forEach((raw, i) => {
     const w = raw as { key?: unknown; dir?: unknown; at?: unknown; from?: unknown; to?: unknown };
@@ -570,7 +846,7 @@ function validatePlan(value: unknown, b: Body): Issues {
     if (!finite(w.at, 0, across) || !finite(w.from, 0, along) || !finite(w.to, 0, along) || w.to - w.from < 600) { found.soft.push(`内墙 ${key}：at/from/to 超出范围或长度不足 600`); return; }
     walls.set(key, { dir: w.dir, at: w.at, from: w.from, to: w.to });
   });
-  const rooms = new Map<string, [number, number, number, number]>();
+  const rooms = new Map<string, { box: [number, number, number, number]; ring: Ring }>();
   if (!Array.isArray(v?.rooms) || v.rooms.length < 2) errors.push('rooms 至少需要 2 个房间');
   else v.rooms.forEach((raw, i) => {
     const r = raw as { id?: unknown; name?: unknown; box?: unknown; poly?: unknown };
@@ -587,13 +863,14 @@ function validatePlan(value: unknown, b: Body): Issues {
     if (Math.min(...xs) < -1 || Math.min(...ys) < -1 || Math.max(...xs) > W + 1 || Math.max(...ys) > D + 1) found.soft.push(`房间 ${id}：轮廓超出了 ${W}×${D} 的外轮廓`);
     const a = area(ring);
     if (a < 1.5e6) found.soft.push(`房间 ${id}：面积不足 1.5 m²`);
-    rooms.set(id, [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]);
+    rooms.set(id, { box: [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)], ring });
   });
   // 房间不必铺满整个平面（留白交给模型按原户型关系决定），也不在这里按面积和反推重叠：L 形轮廓会误判。
   let entrance = false;
+  const planOpenings: PlanOpening[] = [];
   if (!Array.isArray(v?.openings)) errors.push('openings 必须是数组');
   else v.openings.forEach((raw, i) => {
-    const o = raw as { wall?: unknown; kind?: unknown; at?: unknown; width?: unknown };
+    const o = raw as { wall?: unknown; kind?: unknown; at?: unknown; width?: unknown; into?: unknown; hinge?: unknown };
     const wall = typeof o?.wall === 'string' ? o.wall : '';
     const outer = isOuter(wall);
     if (!outer && !walls.has(wall)) { found.soft.push(`第 ${i + 1} 个门窗：wall=${wall} 既不是外墙名（${[...outerEdges.keys()].join(' / ')}）也不是内墙 key`); return; }
@@ -603,14 +880,24 @@ function validatePlan(value: unknown, b: Body): Issues {
     const { from, to } = outer ? outerEdges.get(wall)! : walls.get(wall)!;
     if (o.at - o.width / 2 < from || o.at + o.width / 2 > to) found.soft.push(`第 ${i + 1} 个门窗：洞口超出了墙 ${wall} 的范围`);
     if (o.kind === 'door' && outer) entrance = true;
+    planOpenings.push({
+      wall, kind: o.kind, at: o.at, width: o.width,
+      ...(SIDES.includes(o.into as Side) ? { into: o.into as Side } : {}),
+      ...(o.hinge === 'start' || o.hinge === 'end' ? { hinge: o.hinge } : {}),
+    });
   });
+  const lines: Line[] = [
+    ...[...outerEdges].map(([key, e]) => ({ key, ...e })),
+    ...[...walls].map(([key, w]) => ({ key, ...w })),
+  ];
   if (Array.isArray(v?.openings) && !entrance) found.soft.push('缺少开在外墙上的入户门');
   if (!Array.isArray(v?.furniture) || !v.furniture.length) errors.push('furniture 至少要为主要房间布置家具');
   else v.furniture.forEach((raw, i) => {
     const g = raw as { room?: unknown; items?: unknown };
-    const box = typeof g?.room === 'string' ? rooms.get(g.room) : undefined;
-    if (!box) { found.soft.push(`第 ${i + 1} 组家具：room 必须引用房间 id`); return; }
-    checkItems(g.items, [0, 0, box[2] - box[0], box[3] - box[1]], byCode, `房间 ${g.room} 的家具`, found);
+    const room = typeof g?.room === 'string' ? rooms.get(g.room) : undefined;
+    if (!room) { found.soft.push(`第 ${i + 1} 组家具：room 必须引用房间 id`); return; }
+    const [x1, y1, x2, y2] = room.box;
+    checkItems(g.items, [0, 0, x2 - x1, y2 - y1], byCode, `房间 ${g.room} 的家具`, found, planGeometry(room.ring, lines, planOpenings));
   });
   return found;
 }
