@@ -37,20 +37,27 @@
 - 工作区里现有未提交的成本模块改动（`CostHero.tsx` 已删除、`CostPricing.tsx` / `CostSummary.tsx` 新增）目前会让构建报错，这些不属于本次范围，我不会动；如果最后构建仍因它们失败，我会单独告诉你。
 
 ## Implementation checklist
-- [ ] `Workbench.tsx`：3D 预加载改为「window load → 空闲」后才调用 `loadScene()`，卸载时清理监听 / idle 回调
-- [ ] `Workbench.tsx`：3D 按钮 `onPointerEnter` / `onFocus` 触发 `loadScene()` 预取
-- [ ] `Index.tsx`：`AccountCMS` 改 lazy + `Suspense`（兜底 `ManagementLoading`）
-- [ ] `Index.tsx`：`AuthDialog` 改 lazy，首次打开后才挂载
-- [ ] `Workbench.tsx`：`AiChatPanel`、`WallSplitDialog`、`DimensionEditDialog`、`CustomFurnitureDialog`、`AiRoomDialog` 改 lazy 且仅在打开时渲染
-- [ ] 新建 `AssistantMarkdown.tsx`，`AssistantDialog.tsx` lazy 引入，主包不再包含 react-markdown / remark-gfm
-- [ ] 新建 `model/externalDxf/readDxf.ts` 承载 `readDxfSource` + `dxf-parser`；`designImport.ts` 动态导入；主包不再包含 dxf-parser
-- [ ] `vite.config.ts`：加 `manualChunks`（vendor-react / vendor-supabase / vendor-ui），three 不进首屏分包
-- [ ] 同步更新受影响的测试（如有对上述组件同步渲染的断言，改为 `findBy*` 等待 lazy 加载）
+- [x] `Workbench.tsx`：3D 预加载改为「window load → 空闲」后才调用 `loadScene()`，卸载时清理监听 / idle 回调
+- [x] `Workbench.tsx`：3D 按钮 `onPointerEnter` / `onFocus` 触发 `loadScene()` 预取
+- [x] `Index.tsx`：`AccountCMS` 改 lazy + `Suspense`（兜底 `ManagementLoading`）
+- [x] `Index.tsx`：`AuthDialog` 改 lazy，首次打开后才挂载
+- [x] `Workbench.tsx`：`AiChatPanel`、`WallSplitDialog`、`DimensionEditDialog`、`CustomFurnitureDialog`、`AiRoomDialog` 改 lazy 且仅在打开时渲染
+- [x] 新建 `AssistantMarkdown.tsx`，`AssistantDialog.tsx` lazy 引入，主包不再包含 react-markdown / remark-gfm
+- [x] 新建 `model/externalDxf/readDxf.ts` 承载 `readDxfSource` + `dxf-parser`；`designImport.ts` 动态导入；主包不再包含 dxf-parser
+- [x] `vite.config.ts`：加 `manualChunks`（vendor-react / vendor-supabase / vendor-ui），three 不进首屏分包
+- [x] 同步更新受影响的测试（如有对上述组件同步渲染的断言，改为 `findBy*` 等待 lazy 加载）
 
 ## Verification checklist
-- [ ] 生产构建对比：主入口 JS 体积明显小于当前的 1,557 KB（gzip 500 KB），记录前后数字
-- [ ] 构建产物里 react-markdown、dxf-parser、AccountCMS、three 都不在首屏入口及其静态依赖中（看 `dist/.vite/manifest.json` 的入口 imports）
-- [ ] 首屏（游客 + 已登录）打开后，网络面板在页面 load 之前没有请求 `three` / `Scene3D` 分包；load 并空闲后才出现
+- [x] 生产构建对比：主入口 JS 体积明显小于当前的 1,557 KB（gzip 500 KB），记录前后数字
+- [x] 构建产物里 react-markdown、dxf-parser、AccountCMS、three 都不在首屏入口及其静态依赖中（看 `dist/.vite/manifest.json` 的入口 imports）
+- [ ] 首屏（游客 + 已登录）打开后，网络面板在页面 load 之前没有请求 `three` / `Scene3D` 分包；load 并空闲后才出现（未在真实浏览器网络面板中验证，由代码逻辑保证）
 - [ ] 首屏后立刻点「3D」：正常显示加载遮罩并进入 3D；断网时仍提示「3D 引擎加载失败」并留在 2D
 - [ ] 打开：项目管理 / 家具管理 / 小助手页、登录弹窗、AI 侧栏、拆墙 / 尺寸 / 自定义家具 / AI 房间弹窗、小助手 Markdown 预览、导入 DXF —— 均能正常打开和使用
-- [ ] `pnpm exec tsc -p tsconfig.app.json --noEmit`、`pnpm exec vitest run src`、`pnpm run lint`、`pnpm run build` 全部通过（成本模块的已有问题除外，单独说明）
+- [x] `pnpm exec tsc -p tsconfig.app.json --noEmit`、`pnpm exec vitest run src`、`pnpm run lint`、`pnpm run build` 全部通过（成本模块的已有问题除外，单独说明）
+
+
+## 结果
+- 首屏静态 JS（生产构建）：1,558 KB / gzip 500 KB → 1,430 KB / gzip 457 KB（入口 + vendor-react / vendor-ui / vendor-supabase）。
+- 已拆出按需加载：AccountCMS、AuthDialog、AiChatPanel、AiRoomDialog、AiCreateProjectDialog、CustomFurnitureDialog、WallSplitDialog、DimensionEditDialog、Markdown 预览、dxf-parser。
+- DxfImportDialog 未拆：它依赖的识别模块首屏已在用，拆分收益很小。
+- tsc / vitest（884 项）/ lint（0 error）/ build 全部通过。
