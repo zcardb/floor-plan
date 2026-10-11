@@ -149,16 +149,14 @@ export function roomKeepOuts(d: Design, room: Room): { keepOuts: KeepOut[]; door
     // 室内侧：贴着墙面往里探一点，落在房间轮廓里的一侧才是室内。
     const s = inRing(toWorld([0, t + 10]), ring) ? 1 : inRing(toWorld([0, -(t + 10)]), ring) ? -1 : 0;
     if (!s) continue;
-    const band = (depth: number): Point[] => {
-      const outer = Math.min(t, Math.max(10, depth / 2));
-      return [toWorld([-half, s * outer]), toWorld([half, s * outer]), toWorld([half, s * depth]), toWorld([-half, s * depth])];
-    };
+    // 保留区从墙面（中心线外 t）起向室内延伸 depth。
+    const band = (depth: number): Point[] => [toWorld([-half, s * t]), toWorld([half, s * t]), toWorld([half, s * (t + depth)]), toWorld([-half, s * (t + depth)])];
     if (o.kind === 'window') {
       if (openingSill(o) < HIGH_SILL) keepOuts.push({ kind: 'window', poly: band(WINDOW_DEPTH) });
       continue;
     }
     keepOuts.push({ kind: 'doorway', poly: band(DOORWAY_DEPTH) });
-    doors.push(toWorld([0, s * Math.min(t + DOORWAY_DEPTH / 2, DOORWAY_DEPTH / 2)]));
+    doors.push(toWorld([0, s * (t + DOORWAY_DEPTH / 2)]));
     if (o.kind !== 'door') continue;
     const hinge = toWorld([(o.hinge ?? 'start') === 'start' ? -half : half, 0]);
     const sweep = [hinge, ...doorSwingPoints(o).map(toWorld)];
