@@ -1086,42 +1086,50 @@
   .north-presets button {
     padding-inline: 0;
   }
-  /* 缩放 / 比例尺：固定在画布左下角 */
+  /* 视图设置 + 缩放 / 比例尺：紧凑胶囊，固定在画布左下角 */
   .canvas-zoom {
     position: absolute;
-    left: 20px;
-    bottom: 19px;
+    left: 16px;
+    bottom: 16px;
     display: flex;
     align-items: center;
-    gap: 3px;
-    padding: 4px;
+    gap: 2px;
+    padding: 3px;
     background: hsl(var(--card) / 0.97);
     border: 1px solid hsl(var(--border));
-    border-radius: 7px;
+    border-radius: 10px;
     box-shadow: var(--shadow-float);
-    font-size: 10px;
+    font-size: 11px;
   }
   .canvas-zoom button {
     display: grid;
     place-items: center;
-    width: var(--ctl-sm);
-    height: var(--ctl-sm);
+    width: 26px;
+    height: 26px;
     border-radius: var(--ctl-radius-in);
     color: hsl(var(--muted-foreground));
+    transition: background-color .15s ease, color .15s ease;
   }
-  .canvas-zoom button:hover {
+  .canvas-zoom button:hover,
+  .canvas-zoom button[data-state="open"] {
     background: hsl(var(--accent));
+    color: hsl(var(--primary));
+  }
+  .canvas-zoom button:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 1px;
   }
   .canvas-zoom > span {
-    min-width: 42px;
+    min-width: 36px;
     text-align: center;
+    color: hsl(var(--foreground));
     font-variant-numeric: tabular-nums;
   }
   .canvas-zoom i {
     width: 1px;
-    height: 16px;
+    height: 14px;
     background: hsl(var(--border));
-    margin: 0 3px;
+    margin: 0 2px;
   }
   .selection-toolbar {
     position: absolute;
@@ -2131,11 +2139,10 @@
   .canvas-zoom {
     left: 12px;
     bottom: 20px;
-    padding: 4px;
   }
   .canvas-zoom button {
-    width: 29px;
-    height: 29px;
+    width: 28px;
+    height: 28px;
   }
   .selection-toolbar {
     bottom: 74px;
@@ -3622,12 +3629,6 @@ button.room-cost-row:hover {
 .save-menu-status .save-button-mark { width:6px; height:6px; }
 .save-menu-status.is-error .save-button-mark { background:hsl(var(--destructive)); }
 /* 顶栏「视图」：文字 + 下拉箭头，与游客态「保存」副按钮同一刻度（32px 高、12/600、14px 箭头、浅底），一行不换行 */
-.view-menu-trigger { display:inline-flex; flex:none; align-items:center; gap:6px; height:var(--ctl-md); padding:0 8px 0 12px; border-radius:var(--ctl-radius-in); background:hsl(var(--secondary)); font-size:var(--fs-control); font-weight:600; line-height:1; white-space:nowrap; color:hsl(var(--foreground)); transition:background-color .15s ease, color .15s ease; }
-.view-menu-trigger .view-menu-caret { flex:none; width:14px; height:14px; opacity:.6; transition:transform .15s ease; }
-.view-menu-trigger:hover { background:hsl(var(--accent)); color:hsl(var(--primary)); }
-.view-menu-trigger[data-state="open"] { background:hsl(var(--accent)); color:hsl(var(--primary)); }
-.view-menu-trigger[data-state="open"] .view-menu-caret { transform:rotate(180deg); }
-.view-menu-trigger:focus-visible { outline:2px solid hsl(var(--ring)); outline-offset:1px; }
 .view-menu { width:min(208px,calc(100vw - 24px)); }
 .view-menu .layer-checkbox { width:16px; height:16px; border-radius:4px; }
 .project-menu-email { padding:6px 9px 4px; font-size:var(--fs-meta); color:hsl(var(--muted-foreground)); font-weight:400; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -3651,11 +3652,9 @@ button.room-cost-row:hover {
   .project-menu-trigger { max-width:132px; gap:6px; padding:0 4px; margin-left:-4px; font-size:12px; }
   .save-button { padding:0 10px; }
   .toolbar-right>.save-button { margin:0 2px; }
-  /* 窄屏顶栏挤：登录按钮只留文字；视图 / 保存去掉下拉箭头，三个按钮收紧到一屏内 */
+  /* 窄屏顶栏挤：登录按钮只留文字；保存去掉下拉箭头，按钮收紧到一屏内 */
   .toolbar-login { padding:0 10px; }
   .toolbar-login > svg { display:none; }
-  .view-menu-trigger { padding:0 10px; }
-  .view-menu-trigger .view-menu-caret,
   .save-button .save-button-caret { display:none; }
   .toolbar-right { gap:4px; }
 }

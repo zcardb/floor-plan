@@ -936,15 +936,6 @@ export function Workbench(p: Props) {
           </ToolButton>
         </div>
         <div className="toolbar-right">
-          <ViewMenu
-            layers={layers}
-            view={view}
-            onToggleLayer={(key) => {
-              if (key === "dims") change(d => ({ ...d, dimensionSettings: { ...d.dimensionSettings, visible: !(d.dimensionSettings?.visible ?? true) } }));
-              else setLayers((l) => ({ ...l, [key]: !l[key] }));
-            }}
-            onRatio={(ratio) => canvas.current?.ratio(ratio)}
-          />
           <ExportMenu
             view={view}
             pending={exportAction.pending}
@@ -1066,6 +1057,16 @@ export function Workbench(p: Props) {
         )}
         {view === "2d" && <CompassRose angle={northAngle(d)} />}
         <div className="canvas-zoom">
+          <ViewMenu
+            layers={layers}
+            view={view}
+            onToggleLayer={(key) => {
+              if (key === "dims") change(d => ({ ...d, dimensionSettings: { ...d.dimensionSettings, visible: !(d.dimensionSettings?.visible ?? true) } }));
+              else setLayers((l) => ({ ...l, [key]: !l[key] }));
+            }}
+            onRatio={(ratio) => canvas.current?.ratio(ratio)}
+          />
+          <i />
           <EditorTooltip label="缩小" side="top">
             <button
               aria-label="缩小"

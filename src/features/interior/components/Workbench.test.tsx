@@ -273,14 +273,16 @@ describe('账号家具库并入左侧家具库', () => {
   });
 });
 describe('单行顶部工具栏', () => {
-  it('只有一行工具栏：品牌 logo 在最左，右侧只有视图设置与保存', () => {
+  it('只有一行工具栏：品牌 logo 在最左，右侧只有保存', () => {
     const tree = render();
     expect(tree.some(n => typeof n.props.className === 'string' && (n.props.className as string).includes('main-header'))).toBe(false);
     const toolbar = tree.find(n => n.props.className === 'main-toolbar')!;
     const inside = nodes(toolbar);
     const order = [ProjectMenu, ViewMenu, ExportMenu].map(type => inside.findIndex(n => n.type === type));
-    expect(order.every(i => i >= 0)).toBe(true);
-    expect(order).toEqual([...order].sort((a, b) => a - b));
+    // 视图设置已移到底部缩放条，不再占据顶栏
+    expect(order[1]).toBe(-1);
+    expect(order[0]).toBeGreaterThanOrEqual(0);
+    expect(order[2]).toBeGreaterThan(order[0]);
     // 品牌 logo 现在在项目菜单的触发按钮里，两者是同一个点击区。
     expect(nodes((toolbar.props.children as ReactNode[])[0])[0].type).toBe(ProjectMenu);
     expect(inside.some(n => n.type === Logo)).toBe(false);
@@ -397,7 +399,9 @@ describe('编辑器分区：侧栏、竖条与画布', () => {
     expect(panel(tree)!.props.title).toBe('家具列表');
     expect(nodes(panel(tree)!).find(n => n.type === Library)).toBeDefined();
     expect(rail(tree).props.sidePanel).toBe('library');
-    expect(tree.some(n => n.type === ViewMenu)).toBe(true);
+    // 视图设置现在是左下角缩放条里的第一个图标
+    const zoom = tree.find(n => n.props.className === 'canvas-zoom')!;
+    expect(nodes(zoom)[1].type).toBe(ViewMenu);
   });
   it('竖条点「家具」关闭默认打开的侧栏，再点重新打开；AI 侧栏入口隐藏但功能保留', () => {
     const tree = render();

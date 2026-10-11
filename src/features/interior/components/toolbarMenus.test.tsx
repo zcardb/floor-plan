@@ -32,7 +32,7 @@ import { CanvasRail } from './CanvasRail';
 import { Button } from '@/components/ui/button';
 import { EditorTooltip } from '@/components/ui/editor-tooltip';
 import { DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuSubTrigger } from '@/components/ui/dropdown-menu';
-import { LogIn } from 'lucide-react';
+import { Layers3, LogIn } from 'lucide-react';
 import type { ProjectSummary } from '../cloud/useProjects';
 
 type Node = ReactElement<Record<string, unknown>>;
@@ -315,13 +315,14 @@ describe('视图设置 ViewMenu', () => {
     };
     return { props, tree: nodes(ViewMenu(props)) };
   };
-  it('顶栏右侧是「视图」文字 + 下拉箭头（不再是图标）；下拉统一 toolbar-menu 样式，不再有侧栏入口和二级菜单', () => {
+  it('触发器是图层图标（带提示），下拉向上弹出、统一 toolbar-menu 样式，不再有侧栏入口和二级菜单', () => {
     const { tree } = render();
     const trigger = tree.find(n => n.props['aria-label'] === '视图设置')!;
     expect(trigger.props.className).toBe('view-menu-trigger');
-    expect(text(trigger.props.children as ReactNode)).toContain('视图');
-    expect(nodes(trigger).some(n => n.props.className === 'view-menu-caret')).toBe(true);
-    expect(tree.find(n => n.props.className === 'toolbar-menu view-menu')).toBeDefined();
+    expect(nodes(trigger).some(n => n.type === Layers3)).toBe(true);
+    expect(tree.some(n => n.type === EditorTooltip && n.props.label === '视图设置')).toBe(true);
+    const content = tree.find(n => n.props.className === 'toolbar-menu view-menu')!;
+    expect(content.props.side).toBe('top');
     expect(tree.some(n => n.type === DropdownMenuSubTrigger || n.type === DropdownMenuSubContent)).toBe(false);
     const all = text(tree.map(n => n.props.children as ReactNode));
     for (const gone of ['方案总览', '户型设置', '家具库', '成本管理', 'AI 模式']) expect(all).not.toContain(gone);
