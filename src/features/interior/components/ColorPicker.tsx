@@ -21,7 +21,9 @@ export function ColorPicker({ label, value, onChange, variant = 'field', disable
 }) {
   const [open, setOpen] = useState(false);
   const trigger = variant === 'swatch'
-    ? <button type="button" className="color-picker-swatch" style={{ background: value || undefined }} disabled={disabled} aria-label={`${label}：${value || '未设置'}，点击选择颜色`} />
+    ? <button type="button" className="color-picker-swatch" disabled={disabled} aria-label={`${label}：${value || '未设置'}，点击选择颜色`}>
+      <span className="color-picker-dot" style={{ background: value || undefined }} aria-hidden="true" />
+    </button>
     : <button type="button" id={triggerId} className="color-picker-field" disabled={disabled} aria-label={label}>
       <span className="color-picker-chip" style={{ background: value || undefined }} aria-hidden="true" />
       <span>{value ? value.toUpperCase() : '未设置'}</span>

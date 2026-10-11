@@ -2507,22 +2507,25 @@
   background: hsl(var(--accent));
 }
 /* 颜色选择（全项目唯一一套，见 ColorPicker.tsx）：触发器只有一个色块，弹层 = 常用色 + 自定义取色。 */
-.color-picker-swatch {
+/* 触发器 = 和工具条图标按钮同尺寸的 32×32 透明按钮，里面一个 18px 纯色圆点（无边框、无描边）。
+   必须带上 .visual-selection-editor > 前缀：工具条通用的 `> button` 规则会加 padding 0 8px，把它撑宽。 */
+.color-picker-swatch,
+.visual-selection-editor > .color-picker-swatch {
+  display: grid;
+  place-items: center;
   flex: none;
-  width: 22px;
-  height: 22px;
+  width: var(--ctl-md);
+  height: var(--ctl-md);
   min-height: 0;
   padding: 0;
-  margin: 0 4px;
   border: 0;
-  border-radius: 50%;
-  transition: transform .15s ease;
+  border-radius: var(--ctl-radius-in);
+  background: transparent;
 }
-/* 工具条按钮的 min-height / padding 规则选择器更具体，这里必须写全才能压住，否则色块会被撑成椭圆。 */
-.visual-selection-editor .editor-tooltip-trigger > .color-picker-swatch { min-height: 0; padding: 0; }
-.color-picker-swatch:hover { transform: scale(1.08); }
-/* 打开状态不加圈：色块本身就是圆的，外面再套一圈会显得脏。键盘聚焦（focus-visible）时才给主色 outline。 */
-.color-picker-swatch:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 2px; }
+.color-picker-swatch:hover,
+.color-picker-swatch[data-state="open"] { background: hsl(var(--accent)); }
+.color-picker-dot { width: 18px; height: 18px; border-radius: 50%; background: hsl(var(--muted)); }
+.color-picker-swatch:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 1px; }
 .color-picker-field {
   display: flex;
   align-items: center;

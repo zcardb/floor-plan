@@ -88,7 +88,8 @@ padding `--sp-x`（16px），圆角 10px，标题 `--fs-title` 600，标题下�
 
 ### 5.5 颜色色块
 
-- 工具条和属性面板里的颜色触发器（`ColorPicker variant="swatch"`）是 22px 的**纯圆形**，没有边框，也没有内圈描边，打开状态下也不加圈。只有键盘聚焦（`:focus-visible`）时显示 2px 主色 outline。
+- 工具条和属性面板里的颜色触发器（`ColorPicker variant="swatch"`）是一个和图标按钮同尺寸的 32×32 透明按钮，里面放 18px 的**纯色圆点**。圆点没有边框，也没有描边。悬停和打开时跟其它工具条按钮一样，只是按钮底色变成 `--accent`；键盘聚焦时显示 2px 主色 outline。
+- 不要把色块直接当按钮本身。工具条通用的 `> button` 规则会给它加上 min-height 32px 和 padding `0 8px`，结果被撑成竖长胶囊。
 - 表单里的「色块 + HEX」触发器（`variant="field"`）高度 `--ctl-lg`，字号 `--fs-control`。
 
 ## 6. 画布光标
