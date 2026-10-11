@@ -38,7 +38,6 @@ import {
   LayoutTemplate,
   Loader2,
   Minus,
-  LogIn,
   Moon,
   Plus,
   Redo2,
@@ -127,7 +126,7 @@ const loadScene = () =>
   }));
 /** 窄屏（≤1100px）侧栏以抽屉形式覆盖画布：放置家具、点画布、Esc 后自动收起。 */
 const isDrawerLayout = () => typeof matchMedia !== "undefined" && matchMedia("(max-width:1100px)").matches;
-const PANEL_TITLES: Record<PanelKind, string> = { library: "家具库", ai: "AI 模式", settings: "户型设置", overview: "方案总览", cost: "成本管理" };
+const PANEL_TITLES: Record<PanelKind, string> = { library: "家具设计", ai: "AI 设计", settings: "户型设计", overview: "方案总览", cost: "成本设计" };
 interface Props {
   project: Project;
   projectNavigation: ProjectNavigation;
@@ -963,7 +962,7 @@ export function Workbench(p: Props) {
           {/* 游客：右上角固定一个主按钮「登录」，保存降为副按钮；登录后不显示 */}
           {!p.loggedIn && (
             <Button size="sm" className="toolbar-login" onClick={p.login}>
-              <LogIn />登录
+              <UserRound />登录
             </Button>
           )}
         </div>
@@ -1158,17 +1157,17 @@ export function Workbench(p: Props) {
           remove={remove}
           select={select}
           close={() => setSelection(null)}
-          transaction={sizeTransaction} showCosts={p.loggedIn}
+          transaction={sizeTransaction} showCosts
           accountFloors={accountFloors} accountWalls={accountWalls} accountOpenings={accountOpenings}
           accountRoofs={accountRoofs} accountCeilings={accountCeilings}
           roomAi={aiEnabled && selection?.kind === "room" ? { tone: roomAi.toneOf(selection.id), open: () => roomAi.open(selection.id) } : undefined}
           hidden={readOnly || tool !== 'select' || (!!sidePanel && isDrawerLayout()) || (view === "3d" && sceneOptions.mode === "walk")}
           costs={() => openPanel("cost")}
         />
-        <CanvasRail sidePanel={sidePanel} stage={stage} loggedIn={p.loggedIn} onToggle={togglePanel} />
+        <CanvasRail sidePanel={sidePanel} stage={stage} onToggle={togglePanel} />
       </main>
       {sidePanel && (
-        <SidePanel title={PANEL_TITLES[sidePanel]} readOnly={readOnly && sidePanel !== "library"} onClose={() => { sizeTransaction.flush(); setSidePanel(null); }}>
+        <SidePanel title={PANEL_TITLES[sidePanel]} readOnly={readOnly && sidePanel !== "library"}>
           {sidePanel === "library" ? (
             <Library
               add={(it) => add(it)}
@@ -1194,10 +1193,9 @@ export function Workbench(p: Props) {
               change={change}
               select={select}
               back={() => select(null)}
-              overview={() => openPanel("overview")}
             />
           ) : (
-            <OverviewPanel design={d} change={change} select={select} onCosts={p.loggedIn ? () => openPanel("cost") : undefined} />
+            <OverviewPanel design={d} change={change} select={select} onCosts={() => openPanel("cost")} />
           )}
         </SidePanel>
       )}

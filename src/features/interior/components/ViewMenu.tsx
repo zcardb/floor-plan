@@ -1,5 +1,4 @@
-import { Layers3, Ruler, Check } from 'lucide-react';
-import { EditorTooltip } from '@/components/ui/editor-tooltip';
+import { ChevronDown, Ruler, Check } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -16,7 +15,7 @@ export const LAYER_ITEMS: [keyof Layers, string][] = [
 ];
 
 /**
- * 顶栏右侧「视图设置」：图层图标按钮，下拉里是图层开关（勾选不关菜单）+ 显示比例。
+ * 顶栏右侧「视图」：文字按钮 + 下拉箭头（不用图标，意思更直白），下拉里是图层开关（勾选不关菜单）+ 显示比例。
  * 方案总览 / 户型设置 / 家具库 / 成本 / AI 等侧栏入口都在画布竖条上，这里不再放。
  */
 export function ViewMenu({ layers, view, onToggleLayer, onRatio }: {
@@ -27,13 +26,12 @@ export function ViewMenu({ layers, view, onToggleLayer, onRatio }: {
 }) {
   return (
     <DropdownMenu>
-      <EditorTooltip label="视图设置">
-        <DropdownMenuTrigger asChild>
-          <button type="button" className="toolbar-icon view-menu-trigger" aria-label="视图设置">
-            <Layers3 size={18} />
-          </button>
-        </DropdownMenuTrigger>
-      </EditorTooltip>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className="view-menu-trigger" aria-label="视图设置">
+          视图
+          <ChevronDown className="view-menu-caret" />
+        </button>
+      </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="toolbar-menu view-menu">
         <p className="project-menu-heading">视图设置</p>
         {LAYER_ITEMS.map(([key, label]) => (

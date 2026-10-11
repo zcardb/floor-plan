@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { ArrowLeft } from "lucide-react";
 import { calculateCosts, furnitureKey } from "../model/costs";
 import { costBreakdown } from "../model/costBreakdown";
 import { inRoom } from "../model/geometry";
@@ -7,13 +6,15 @@ import { yuan } from "../model/money";
 import type { Design, Selection } from "../model/types";
 import { useCostDesign } from "./CostDefaultsContext";
 import { CostCategoryList } from "./CostCategoryList";
-import { CostHero } from "./CostHero";
+import { CostPricing } from "./CostPricing";
+import { CostSummary } from "./CostSummary";
 import { RoomCostDetail } from "./RoomCostDetail";
 import { RoomCostList } from "./RoomCostList";
 
 /**
- * 成本页：口径跟随选中对象——选中房间（或房内家具）时看本间，
- * 否则看全屋。
+ * 成本页：口径跟随选中对象——选中房间（或房内家具）时看本间，否则看全屋。
+ * 全屋口径自上而下是「合计 → 明细 → 按房间 → 计算口径细则」：
+ * 先给一个金额结果，再展开细节，最后才是计算规则说明。
  */
 export function CostPanel({
   design,
@@ -21,15 +22,12 @@ export function CostPanel({
   change,
   back,
   select,
-  overview,
 }: {
   design: Design;
   selection: Selection;
   change: (fn: (d: Design) => Design) => void;
   back: () => void;
   select: (s: Selection) => void;
-  /** 全屋口径顶部的「返回方案总览」；不传则不显示。 */
-  overview?: () => void;
 }) {
   const effective = useCostDesign(design),
     c = useMemo(() => calculateCosts(effective), [effective]),
@@ -59,48 +57,31 @@ export function CostPanel({
   const drift = Math.abs(b.roomTotal + b.sharedTotal - b.total);
   return (
     <>
-      {/* 顶部：可选的返回入口 + 口径标题行（标题左、空间数右），与房间口径同一结构 */}
-      <div className="panel-heading">
-        {overview && (
-          <button type="button" className="back-link" onClick={overview}>
-            <ArrowLeft size={14} />
-            返回方案总览
-          </button>
-        )}
-        <div className="panel-heading-row">
-          <h3>全屋成本</h3>
-          <span className="mini-label">{b.rooms.length} 个空间</span>
-        </div>
-      </div>
       <section>
-        <CostHero
-          eyebrow="全屋合计 · 硬装 + 软装"
+        {/* 合计：一个焦点数字 + 硬装 / 软装 */}
+        <CostSummary
           amount={b.total}
           hard={b.hardTotal}
           soft={b.softTotal}
           softUnpriced={c.soft.filter((r) => r.price === null).length}
+        />
+        {/* 定价：进度 + 未定价提示 + 只看未定价 */}
+        <CostPricing
           priced={b.pricedCount}
           total={b.priceableCount}
+          unpricedGroups={b.unpriced}
           onlyUnpriced={onlyUnpriced}
           onToggleUnpriced={() => setOnlyUnpriced((v) => !v)}
         />
-        {b.unpriced > 0 && (
-          <p className="cost-warning">
-            {b.unpriced} 类项目未定价，当前合计不是完整报价。
-          </p>
-        )}
         {drift > 1 && (
           <p className="cost-warning" role="alert">
             房间分摊与总额存在 {yuan(drift)} 的取整差额。
           </p>
         )}
-        <p className="footnote">
-          地面含损耗与采购取整；墙面扣除对应门窗；门窗按相邻房间平分；拆改、新建与人工为全屋公共项。
-        </p>
       </section>
       <section>
         <h3 className="section-title">
-          费用明细 <small>点击类别展开</small>
+          明细 <small>点击类别展开</small>
         </h3>
         <CostCategoryList
           design={design}
@@ -121,6 +102,10 @@ export function CostPanel({
           <span>+ 公共项</span>
           <b>{yuan(b.sharedTotal)}</b>
         </div>
+      </section>
+      <section>
+        <h3 className="section-title">计算口径</h3>
+        <p className="footnote">地面含损耗与采购取整；墙面扣除对应门窗；门窗按相邻房间平分；拆改、新建与人工为全屋公共项，不计入单个房间。</p>
       </section>
     </>
   );

@@ -679,34 +679,6 @@
     border-left: 1px solid hsl(var(--border));
     background: hsl(var(--card));
   }
-  /* 侧栏标题行：标题 + 关闭；内容区沿用 .panel-scroll */
-  .side-panel-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    flex: none;
-    padding: 14px var(--sp-x) 10px;
-    border-bottom: 1px solid hsl(var(--border));
-  }
-  .side-panel-head h2 {
-    margin: 0;
-    font-size: var(--fs-title);
-    font-weight: 600;
-    color: hsl(var(--foreground));
-  }
-  .side-panel-close {
-    display: grid;
-    place-items: center;
-    flex: none;
-    width: var(--ctl-sm);
-    height: var(--ctl-sm);
-    border-radius: var(--ctl-radius-in);
-    color: hsl(var(--muted-foreground));
-    transition: background-color .15s ease, color .15s ease;
-  }
-  .side-panel-close:hover { background: hsl(var(--secondary)); color: hsl(var(--foreground)); }
-  .side-panel-close:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
   .panel-scroll {
     flex: 1;
     min-height: 0;
@@ -769,11 +741,11 @@
   .library-new:hover { background: hsl(var(--accent)); border-color: hsl(var(--primary) / 0.35); }
   .library-new:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
   /* 家具库：头部固定，只有 .library-scroll 滚动（.panel-scroll 本身不再滚） */
-  .panel-scroll:has(.library-panel) { overflow: hidden; }
+  .panel-scroll:has(.library-panel) { display: flex; flex-direction: column; overflow: hidden; }
   .library-panel {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    flex: 1;
     min-height: 0;
   }
   .library-head {
@@ -789,7 +761,8 @@
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--border)) transparent;
   }
-  .library-scroll .project-load-more { min-height: 40px; margin: 0 0 12px; font-size: var(--fs-meta); }
+  .library-scroll .project-load-more { min-height: 36px; margin: 0 0 12px; font-size: var(--fs-meta); }
+  .library-scroll .project-load-more.is-done { min-height: 28px; }
   /* 分类：沿用管理页 CmsFilterBar（溢出渐隐、滚轮横滑），尺寸收成侧栏紧凑版 */
   .cms-filter-bar.library-categories {
     gap: 6px;
@@ -2722,36 +2695,6 @@
   border-top: 1px solid hsl(var(--border));
 }
 .visual-cost-link:hover { text-decoration: underline; }
-/* 右侧面板模式标签：成本金额常驻，弱透出 */
-.cost-hero {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.cost-hero-top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-.cost-hero-top small {
-  font-size: 10px;
-  color: hsl(var(--muted-foreground));
-}
-.cost-share {
-  font-size: 9px;
-  padding: 3px 7px;
-  border-radius: 999px;
-  background: hsl(var(--accent));
-  color: hsl(var(--accent-foreground));
-}
-.cost-hero > strong {
-  font-size: 30px;
-  font-weight: 550;
-  letter-spacing: -0.8px;
-  color: hsl(var(--primary));
-  font-variant-numeric: tabular-nums;
-}
 .cost-split {
   display: flex;
   height: 7px;
@@ -2764,66 +2707,9 @@
   background: hsl(var(--primary));
   transition: width 0.25s ease;
 }
-.cost-split-legend {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 10px;
-  color: hsl(var(--muted-foreground));
-}
-.cost-split-legend > span {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.cost-split-legend i {
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-  background: hsl(var(--primary));
-}
-.cost-split-legend i.is-soft {
-  background: hsl(var(--accent));
-  border: 1px solid hsl(var(--primary) / 0.25);
-}
-.cost-split-legend b {
-  color: hsl(var(--foreground));
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-}
-.cost-split-legend b.is-muted {
-  color: hsl(var(--muted-foreground));
-  font-weight: 400;
-}
-.cost-progress {
-  margin-top: 4px;
-  padding-top: 10px;
-  border-top: 1px dashed hsl(var(--border));
-}
-.cost-progress-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 10px;
-  color: hsl(var(--muted-foreground));
-  margin-bottom: 7px;
-}
-.cost-progress-head b {
-  color: hsl(var(--foreground));
-  font-variant-numeric: tabular-nums;
-}
-.cost-progress-head button {
-  font-size: 10px;
-  color: hsl(var(--primary));
-  padding: 4px 8px;
-  border-radius: 5px;
-  background: hsl(var(--accent) / 0.7);
-}
-.cost-progress-head button.active {
-  background: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-}
+/* 硬装 / 软装色点：硬装主色实心，软装浅底描边 */
+.cost-summary-parts i.is-hard { background: hsl(var(--primary)); }
+.cost-summary-parts i.is-soft { background: hsl(var(--accent)); border: 1px solid hsl(var(--primary) / 0.25); }
 .cost-progress-bar {
   height: 5px;
   border-radius: 999px;
@@ -3058,10 +2944,7 @@ button.room-cost-row:hover {
   .cost-category-head > span {
     font-size: 12px;
   }
-  .cost-category-head small,
-  .cost-hero-top small,
-  .cost-split-legend,
-  .cost-progress-head {
+  .cost-category-head small {
     font-size: 11px;
   }
   .room-cost-row {
@@ -3836,23 +3719,26 @@ button.room-cost-row:hover {
 .side-panel .room-cost-link:hover { border-color: hsl(var(--primary) / 0.4); background: hsl(var(--accent) / 0.5); }
 .side-panel .room-cost-link b { font-size: var(--fs-group); font-weight: 600; color: hsl(var(--primary)); font-variant-numeric: tabular-nums; }
 .side-panel .room-cost-link > svg { color: hsl(var(--muted-foreground)); }
-/* 成本主卡：金额 → 硬软装比例 → 定价进度，一张卡片 */
-.side-panel .cost-hero { display: grid; gap: 10px; padding: 14px; border: 1px solid hsl(var(--border)); border-radius: var(--ctl-radius); background: hsl(var(--card)); }
-.side-panel .cost-hero-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; }
-.side-panel .cost-hero-top small { font-size: var(--fs-meta); font-weight: 500; color: hsl(var(--muted-foreground)); }
-.side-panel .cost-share { padding: 2px 8px; border-radius: 999px; background: hsl(var(--accent)); font-size: var(--fs-meta); font-weight: 500; color: hsl(var(--primary)); }
-.side-panel .cost-hero > strong { display: block; margin: -2px 0 2px; font-size: 24px; line-height: 1.15; font-weight: 600; letter-spacing: -0.3px; color: hsl(var(--primary)); font-variant-numeric: tabular-nums; }
+/* 成本合计：一个焦点数字 + 硬装 / 软装，不放口径文字 */
+.side-panel .cost-summary { display: grid; gap: 12px; }
+.side-panel .cost-summary-amount { display: flex; align-items: baseline; gap: 10px; }
+.side-panel .cost-summary-amount > strong { font-size: 26px; line-height: 1.1; font-weight: 600; letter-spacing: -0.4px; color: hsl(var(--primary)); font-variant-numeric: tabular-nums; }
+.side-panel .cost-share { margin-left: auto; padding: 2px 8px; border-radius: 999px; background: hsl(var(--accent)); font-size: var(--fs-meta); font-weight: 500; color: hsl(var(--primary)); white-space: nowrap; }
 .side-panel .cost-split { height: 6px; margin: 0; border-radius: 999px; }
-.side-panel .cost-split-legend { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; margin: 0; font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); }
-.side-panel .cost-split-legend > span { display: inline-flex; align-items: center; gap: 6px; }
-.side-panel .cost-split-legend b { font-size: var(--fs-meta); font-weight: 600; color: hsl(var(--foreground)); font-variant-numeric: tabular-nums; }
-.side-panel .cost-split-legend i { width: 8px; height: 8px; border-radius: 2px; }
-.side-panel .cost-progress { display: grid; gap: 8px; margin: 2px 0 0; padding-top: 12px; border-top: 1px dashed hsl(var(--border)); }
-.side-panel .cost-progress-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); }
-.side-panel .cost-progress-head b { font-weight: 600; color: hsl(var(--foreground)); }
-.side-panel .cost-progress-head button { height: 24px; padding: 0 10px; border: 1px solid hsl(var(--border)); border-radius: 999px; background: hsl(var(--card)); font-size: var(--fs-meta); font-weight: 500; color: hsl(var(--foreground)); transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
-.side-panel .cost-progress-head button:hover { border-color: hsl(var(--primary) / 0.4); color: hsl(var(--primary)); }
-.side-panel .cost-progress-head button.active { border-color: hsl(var(--primary) / 0.45); background: hsl(var(--accent)); color: hsl(var(--primary)); }
+/* 硬装 / 软装两项金额：两列，色点 + 名称在上、金额在下 */
+.side-panel .cost-summary-parts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.side-panel .cost-summary-parts > div { display: grid; gap: 2px; min-width: 0; padding: 8px 10px; border-radius: var(--ctl-radius); background: hsl(var(--secondary) / 0.6); }
+.side-panel .cost-summary-parts dt { display: flex; align-items: center; gap: 6px; font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); }
+.side-panel .cost-summary-parts dt > i { width: 8px; height: 8px; border-radius: 2px; }
+.side-panel .cost-summary-parts dd { margin: 0; overflow: hidden; font-size: var(--fs-group); font-weight: 600; color: hsl(var(--foreground)); font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.side-panel .cost-summary-parts dd.is-muted { font-size: var(--fs-meta); font-weight: 500; color: hsl(var(--muted-foreground)); }
+/* 定价：进度条 + 未定价提示 +「只看未定价」 */
+.side-panel .cost-pricing { display: grid; gap: 10px; margin-top: var(--rp-row); padding-top: var(--rp-row); border-top: 1px dashed hsl(var(--border)); }
+.side-panel .cost-pricing-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.side-panel .cost-pricing-row p { margin: 0; font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); }
+.side-panel .cost-pricing-row button { flex: none; height: var(--ctl-sm); padding: 0 10px; border: 1px solid hsl(var(--border)); border-radius: 999px; background: hsl(var(--card)); font-size: var(--fs-meta); font-weight: 500; color: hsl(var(--foreground)); transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
+.side-panel .cost-pricing-row button:hover { border-color: hsl(var(--primary) / 0.4); color: hsl(var(--primary)); }
+.side-panel .cost-pricing-row button.active { border-color: hsl(var(--primary) / 0.45); background: hsl(var(--accent)); color: hsl(var(--primary)); }
 .side-panel .cost-progress-bar { height: 4px; margin: 0; border-radius: 999px; }
 .side-panel .cost-warning { display: block; margin: var(--rp-row) 0 0; padding: 8px 10px; border: 0; border-radius: var(--ctl-radius-in); background: hsl(var(--primary) / 0.08); font-size: var(--fs-meta); line-height: 1.5; color: hsl(var(--foreground)); }
 /* 费用明细：一类一张可展开卡片 */

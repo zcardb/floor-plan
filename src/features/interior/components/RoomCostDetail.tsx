@@ -3,7 +3,7 @@ import { EditorTooltip } from "@/components/ui/editor-tooltip";
 import type { CostPart, RoomCost } from "../model/costBreakdown";
 import { yuan } from "../model/money";
 import type { Design } from "../model/types";
-import { CostHero } from "./CostHero";
+import { CostSummary } from "./CostSummary";
 import { PriceField } from "./PriceField";
 
 /** 同款/同材质的房间内碎片合并成一行，便于改价。 */
@@ -75,23 +75,16 @@ export function RoomCostDetail({
             全屋成本
           </button>
         </EditorTooltip>
-        <div className="panel-heading-row">
-          <h3>{target?.name || "房间"}</h3>
-          <span className="mini-label">房间口径</span>
-        </div>
+        <h3>{target?.name || "房间"}</h3>
       </div>
       <section>
-        <CostHero
-          eyebrow="本间合计 · 硬装 + 软装"
+        <CostSummary
           amount={room.total}
           hard={room.hardTotal}
           soft={room.softTotal}
           softUnpriced={soft.filter((p) => p.price === null).length}
           share={share}
         />
-        <p className="footnote">
-          地面按面积占比分摊，屋面按坡度换算斜面面积、吊顶按本间面积计入，共墙上的门窗在相邻房间之间平分；拆改、新建与人工属于全屋公共项，不计入本间。
-        </p>
       </section>
       <section>
         <h3 className="section-title">

@@ -132,8 +132,7 @@ export function Library({
         </div>
         {items.length > LIBRARY_PAGE_SIZE && (
           <ProjectLoadMore shown={page.length} total={items.length} hasMore={false} loading={false} onReach={() => setShown(shown + LIBRARY_PAGE_SIZE)} />
-        )}
-        {!items.length && (
+        )}        {!items.length && (
           <div className="empty-small">没有找到家具，试试其他关键词。</div>
         )}
       </div>
