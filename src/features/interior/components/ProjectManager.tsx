@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ManagementLoading, ProjectCardsSkeleton } from './ManagementLoading';
 import { LoadError } from './LoadError';
-import { Plus, LayoutTemplate, LayoutGrid, RefreshCw, Loader2, ChevronDown, Search, X } from 'lucide-react';
+import { Plus, LayoutTemplate, RefreshCw, Loader2, ChevronDown, Search } from 'lucide-react';
 import { CmsPageHeader } from './CmsPageHeader';
 import { CmsSearchField } from './CmsSearchField';
 import { Button } from '@/components/ui/button';
@@ -24,7 +24,6 @@ import type { useProjects, ProjectSummary } from '../cloud/useProjects';
 type Projects = ReturnType<typeof useProjects>;
 /** 滚动加载的批次：先展示 12 条，滚到底部再补下一批。 */
 const PAGE_SIZE = 12;
-const SCOPE_TITLE: Record<ProjectScope, string> = { all: '全部项目', builtin: '内置模板', mine: '我的项目' };
 type RowKind = 'open' | 'duplicate' | 'remove' | 'copyTemplate';
 const BUSY_LABEL: Record<RowKind, string> = { open: '正在打开…', duplicate: '正在复制…', remove: '正在删除…', copyTemplate: '正在复制…' };
 
@@ -49,7 +48,6 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
     mine: list.length + (projects.hasMore ? '+' : ''),
   };
   const searching = query.trim() !== '';
-  const filtered = searching || scope !== 'all';
   /**
    * 滚到底部：先补一批已加载的项目；窗口已经盖住当前数据时才向云端要下一批。
    * 云端失败或仍在请求时不自动续加载，交给「重试」处理，避免反复无效请求。
@@ -114,13 +112,7 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
       ? <ManagementLoading variant="projects" label="刷新项目列表" />
       : <>
         <div className="cms-filter-rows">
-          <CmsFilterGroup icon={LayoutGrid} label="来源" count={counts.all} ariaLabel="项目分类" value={scope} onChange={id => setScope(id as ProjectScope)} chips={PROJECT_SCOPES.map(s => ({ id: s.id, label: s.label, meta: counts[s.id] }))} />
-        </div>
-        <div className="cost-results-heading">
-          <h2>{SCOPE_TITLE[scope]}<span>{entries.length} 项{more ? ' · 向下滚动加载更多' : ''}</span></h2>
-          {filtered
-            ? <EditorTooltip label="查看全部"><button type="button" className="cost-clear-filter" onClick={resetFilter}><X size={14} />查看全部</button></EditorTooltip>
-            : <span>按修改时间排序</span>}
+          <CmsFilterGroup ariaLabel="项目分类" value={scope} onChange={id => setScope(id as ProjectScope)} chips={PROJECT_SCOPES.map(s => ({ id: s.id, label: s.label, meta: counts[s.id] }))} />
         </div>
         {scope !== 'builtin' && projects.listError && <LoadError title="云端项目读取失败" message={projects.listError} retrying={projects.loading} onRetry={() => void refresh()} />}
         {scope !== 'builtin' && !searching && projects.loading && !list.length && <div className="cms-loading-placeholder" role="status" aria-label="加载项目" aria-busy="true"><ProjectCardsSkeleton count={4} /></div>}

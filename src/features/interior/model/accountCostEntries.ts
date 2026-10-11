@@ -29,9 +29,12 @@ export function accountCostEntries(items: LibraryItem[], settings: AccountCostSe
       ...(isStairs(item) ? { category: STAIR_CATEGORY, major: '硬装' as const } : { category: item.category, major: '软装' as const }) })),
   ];
 }
+/** 分类筛选保留 id：「全部」不筛分类，「自定义」只留账号里自建的条目。 */
+export const CUSTOM_CATEGORY = '自定义';
 export function filterCostEntries(entries: CostEntry[], category: string, query: string, major?: CostMajor) {
   const keyword = query.trim().toLocaleLowerCase();
-  return entries.filter(entry => (!major || entry.major === major) && (category === '全部' || entry.category === category) && entry.name.toLocaleLowerCase().includes(keyword));
+  const inCategory = (entry: CostEntry) => category === '全部' || (category === CUSTOM_CATEGORY ? !!entry.custom : entry.category === category);
+  return entries.filter(entry => (!major || entry.major === major) && inCategory(entry) && entry.name.toLocaleLowerCase().includes(keyword));
 }
 export function accountCostSource(design: Design, entry: Pick<CostEntry, 'group' | 'key'>) {
   if (priceOf(design, entry.group, entry.key) === null) return '未定价';

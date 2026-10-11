@@ -357,10 +357,8 @@
   .cms-progress-track>b { display:block; height:100%; width:var(--cms-progress,0%); border-radius:999px; background:hsl(var(--primary)); transition:width .3s ease; }
   .cms-progress-note { padding:5px 11px; border-radius:999px; background:hsl(var(--secondary)); }
   .cms-status { font-size:12px; color:hsl(var(--muted-foreground)); }
-  .cms-category-block { margin-bottom:32px; }
-  .cms-category-block h2 { display:flex; align-items:baseline; gap:10px; font-size:15px; font-weight:600; margin-bottom:15px; }
-  .cms-category-block h2 span { font-size:11px; font-weight:400; color:hsl(var(--muted-foreground)); }
-  .cms-item-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; }
+  /* 卡片连成一整片：筛选之后直接铺网格，不再按分类分段加小标题。 */
+  .cms-item-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; margin-top:28px; }
   .cms-item-card { display:grid; gap:5px; text-align:left; padding:12px; border:1px solid hsl(var(--border)); border-radius:12px; background:hsl(var(--card)); transition:border-color .15s,transform .15s,box-shadow .15s; }
   .cms-item-card:hover { border-color:hsl(var(--primary)/0.45); transform:translateY(-2px); box-shadow:var(--shadow-float); }
   .cms-item-visual { position:relative; display:flex; align-items:center; justify-content:center; height:124px; margin-bottom:6px; border-radius:10px; background:hsl(var(--canvas)); overflow:hidden; }
@@ -415,9 +413,21 @@
   @media(hover:none) { .cms-search-kbd { display:none; } }
   /* 管理端筛选区：页头操作行下方，一行一组（左侧分类描述 + 右侧胶囊），行间用间距而不是分隔线或箱式面板。 */
   .cms-filter-rows { display:grid; gap:10px; margin:20px 0 0; }
-  .cms-filter-group { display:grid; grid-template-columns:88px minmax(0,1fr); align-items:center; gap:12px; min-width:0; }
-  .cms-filter-group-label { display:flex; align-items:center; gap:6px; font-size:11px; font-weight:600; letter-spacing:.08em; color:hsl(var(--muted-foreground)); cursor:default; user-select:none; }
-  .cms-filter-group-label small { font-weight:400; letter-spacing:0; color:hsl(var(--muted-foreground)/.8); }
+  .cms-filter-group { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:12px; min-width:0; }
+  /* 没有左侧切换器时（如项目管理）取消左侧列，胶囊从行首开始平铺、占满整行。 */
+  .cms-filter-group--bare { grid-template-columns:minmax(0,1fr); gap:0; }
+  /* 左侧大类切换（家具管理的硬装 / 软装）：与胶囊同高，实底区分「切大类」与「筛分类」，两者之间只留间距。 */
+  .cms-filter-switch { display:flex; align-items:center; gap:6px; min-height:var(--ctl-md); padding:0 10px 0 12px; border:1px solid hsl(var(--border)); border-radius:var(--ctl-radius-in); background:hsl(var(--card)); color:hsl(var(--foreground)); font-size:var(--fs-group); font-weight:600; white-space:nowrap; transition:border-color .15s,background .15s; }
+  .cms-filter-switch:hover, .cms-filter-switch[data-state="open"] { border-color:hsl(var(--foreground)/.2); background:hsl(var(--secondary)); }
+  .cms-filter-switch:focus-visible { outline:2px solid hsl(var(--ring)); outline-offset:2px; }
+  .cms-filter-switch small { font-size:var(--fs-label); font-weight:500; font-variant-numeric:tabular-nums; color:hsl(var(--muted-foreground)); }
+  .cms-filter-switch>svg { color:hsl(var(--muted-foreground)); transition:transform .15s; }
+  .cms-filter-switch[data-state="open"]>svg { transform:rotate(180deg); }
+  /* 切换器与胶囊之间只用间距分隔，不加竖分隔线。 */
+  .cms-filter-group:not(.cms-filter-group--bare) { gap:18px; }
+  .cms-filter-switch-menu { min-width:168px; padding:6px; }
+  .cms-filter-switch-menu [role="menuitemradio"] { justify-content:space-between; gap:12px; font-size:var(--fs-group); }
+  .cms-filter-switch-menu [role="menuitemradio"] small { font-size:var(--fs-label); color:hsl(var(--muted-foreground)); font-variant-numeric:tabular-nums; }
   .cost-clear-filter { display:flex; align-items:center; gap:4px; min-height:28px; padding:0 8px; border-radius:6px; font-size:12px; color:hsl(var(--primary)); }
   .cost-clear-filter:hover { background:hsl(var(--accent)); }
   .cost-material-visual { position:relative; display:grid; place-items:center; width:100%; height:100%; color:hsl(var(--foreground)/.7); }
@@ -448,7 +458,7 @@
   .cost-edit-fields { border:0; padding:0; margin:0; min-width:0; }
   @media(max-width:700px) {
     .cost-search>button { width:32px; height:32px; }
-    .cms-filter-rows { margin-top:16px; } .cms-filter-group { grid-template-columns:72px minmax(0,1fr); gap:8px; } .cms-filter-group .cms-filter-bar { width:100%; }
+    .cms-filter-rows { margin-top:16px; } .cms-filter-group { gap:8px; } .cms-filter-group:not(.cms-filter-group--bare) { gap:12px; } .cms-filter-group .cms-filter-bar { width:100%; }
     .cost-results-heading { margin-top:22px; flex-wrap:wrap; gap:6px; }
     .cost-save-error { align-items:flex-start; } .cost-save-error>button { flex-shrink:0; }
   }
@@ -531,20 +541,16 @@
   .cms-skeleton-action { flex:0 0 112px; width:112px; height:36px; border-radius:8px; }
   /* 筛选区骨架对齐 .cms-filter-rows：一行一组，无箱式面板与分隔线。 */
   .cms-loading-filter-rows { display:grid; gap:10px; margin:20px 0 0; }
-  .cms-loading-group { display:grid; grid-template-columns:88px minmax(0,1fr); align-items:center; gap:12px; min-width:0; }
-  .cms-skeleton-group-label { width:56px; height:12px; }
+  .cms-loading-group { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:12px; min-width:0; }
+  .cms-skeleton-filter-switch { width:96px; height:var(--ctl-md); border-radius:var(--ctl-radius-in); }
   .cms-loading-chips { display:flex; gap:8px; min-width:0; overflow:hidden; }
   .cms-loading-chips .cms-skeleton { flex:0 0 auto; width:74px; height:var(--ctl-md); border-radius:var(--ctl-radius-in); }
   .cms-loading-chips .cms-skeleton:nth-child(2n) { width:92px; }
   .cms-loading-chips .cms-skeleton:nth-child(3n) { width:64px; }
-  .cms-loading-results { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:28px 0 14px; }
-  .cms-skeleton-subtitle { width:120px; height:16px; }
-  .cms-skeleton-note { width:96px; height:11px; }
+  .cms-loading-items--flat { margin-top:28px; }
   .cms-loading-project { display:flex; flex-direction:column; gap:10px; min-width:0; }
   .cms-loading-project-thumb { width:100%; aspect-ratio:4/3; border-radius:12px; }
   .cms-loading-project .cms-skeleton-item-name { width:58%; margin-left:2px; }
-  .cms-loading-block { display:grid; gap:15px; margin-bottom:32px; }
-  .cms-skeleton-block-title { width:96px; height:15px; }
   .cms-loading-items { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; }
   .cms-loading-item { display:grid; gap:8px; padding:12px; border:1px solid hsl(var(--border)); border-radius:12px; background:hsl(var(--card)); }
   .cms-loading-item-visual { width:100%; height:124px; margin-bottom:4px; border-radius:10px; }
@@ -565,7 +571,7 @@
     .cms-loading-actions { flex:1 1 100%; margin-left:0; }
     .cms-skeleton-search-inline { flex:1 1 100%; width:auto; height:38px; }
     .cms-loading-filter-rows { margin-top:16px; }
-    .cms-loading-group { grid-template-columns:72px minmax(0,1fr); gap:8px; }
+    .cms-loading-group { gap:8px; }
     .cms-loading-chips .cms-skeleton { height:44px; }
     .cms-loading-items { grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; }
     .cms-loading-item-visual { height:104px; }

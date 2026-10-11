@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { categories, library } from '../data/catalog';
 import { blankDesign, referenceDesign } from '../data/templates';
-import { accountCostEntries, accountCostSource, costCategories, filterCostEntries } from './accountCostEntries';
+import { accountCostEntries, accountCostSource, costCategories, CUSTOM_CATEGORY, filterCostEntries } from './accountCostEntries';
 import { setPrice, priceOf } from './costs';
 
 const entries = accountCostEntries([], {});
@@ -33,6 +33,20 @@ describe('账号成本分类与清单', () => {
     expect(filterCostEntries(entries, '全部', '', '软装')).toHaveLength(library.length - stairCount);
     expect(filterCostEntries(entries, '全部', '地板', '软装')).toHaveLength(0);
     expect(filterCostEntries(entries, '卧室', '床', '软装').every(entry => entry.category === '卧室')).toBe(true);
+  });
+  it('「自定义」只留账号里自建的条目，且限定在当前大类', () => {
+    const custom = [{ catalogId: 'custom-sofa', category: '客厅', type: 'sofa', name: '我的沙发', w: 2000, d: 900, color: '#ddd' }];
+    const merged = accountCostEntries(custom, {});
+    const customEntries = filterCostEntries(merged, CUSTOM_CATEGORY, '', '软装');
+    expect(customEntries).toHaveLength(1);
+    expect(customEntries[0].key).toBe('custom-sofa');
+    // 硬装里的自定义地面只出现在硬装
+    const floors = [{ key: 'my-floor', name: '我的地面', color: '#eee', custom: true } as never];
+    const withFloor = accountCostEntries([], {}, floors);
+    expect(filterCostEntries(withFloor, CUSTOM_CATEGORY, '', '硬装').map(entry => entry.name)).toContain('我的地面');
+    expect(filterCostEntries(withFloor, CUSTOM_CATEGORY, '', '软装').some(entry => entry.name === '我的地面')).toBe(false);
+    // 「全部」不受自定义标记影响
+    expect(filterCostEntries(merged, '全部', '', '软装')).toHaveLength(library.length - stairCount + 1);
   });
   it('采购计价单位保留', () => {
     expect(accountCostEntries([], { procurement: { wood: { unit: '箱', waste: 5 } } }).find(entry => entry.key === 'wood')?.unit).toBe('箱');

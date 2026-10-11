@@ -123,14 +123,18 @@ describe('管理端精简与加载分支', () => {
     const html = render(createElement(ProjectManager, { projects: projects(false), opened: () => {} }));
     expect(html).toContain('aria-label="搜索项目"');
     expect(html).toContain('aria-label="项目分类"');
-    expect(html).toMatch(/cms-filter-group-label"><svg[^]*?<span>来源<\/span><small>\d+ 项<\/small>/);
+    // 项目管理没有左侧切换器：胶囊所在行是 bare 单列，从行首平铺，不被压进左侧固定列
+    expect(html).toContain('class="cms-filter-group cms-filter-group--bare"');
+    expect(html).not.toContain('cms-filter-group-label');
     // 搜索框与新建在页头同一行，筛选另起一行
     const head = html.slice(0, html.indexOf('cms-filter-rows'));
     expect(head).toContain('aria-label="搜索项目"');
     expect(head).toContain('新建项目');
     for (const label of ['全部', '内置', '我的']) expect(html).toMatch(new RegExp('>' + label + '<b>\\d+</b>'));
     expect(html).toMatch(/aria-pressed="true"[^>]*>全部<b>/);
-    expect(html).toContain('全部项目');
+    // 不再有「全部项目 N 项 / 按修改时间排序」结果标题行
+    expect(html).not.toContain('cost-results-heading');
+    expect(html).not.toContain('按修改时间排序');
     expect(html).toContain('aria-label="打开项目 我的项目"');
     // 我的项目按修改时间排在内置模板之前
     expect(html.indexOf('打开项目 我的项目')).toBeLessThan(html.indexOf('预览模板 '));
@@ -154,7 +158,7 @@ describe('管理端精简与加载分支', () => {
     expect(failed).toContain('重试');
     expect(failed).not.toContain('还没有设计项目');
   });
-  it('家具管理采用成本版式：搜索框原位反馈、硬装软装两行与价格卡片', () => {
+  it('家具管理采用成本版式：页头刷新、硬装软装切换与价格卡片', () => {
     const catalog = { items: [], overrides: [], count: 0, counts: {}, loading: true, error: '', hasMore: false } as unknown as ReturnType<typeof useFurnitureCatalog>;
     const html = render(createElement(AccountFurnitureLibrary, { catalog, defaults: {}, saveDefaults: async () => true, onDirty: () => {}, onNew: () => {} }));
     expect(html).toContain('aria-busy="true"');
@@ -162,30 +166,30 @@ describe('管理端精简与加载分支', () => {
     expect(html).not.toContain('cost-list-row');
     expect(html).not.toContain('cost-policy');
     expect(html).not.toContain('修改后自动保存');
+    // 一行筛选：左侧硬装 / 软装切换器，右侧当前大类的胶囊
+    expect(html).toContain('aria-label="硬装软装：硬装"');
     expect(html).toContain('aria-label="硬装分类"');
-    expect(html).toContain('aria-label="软装分类"');
-    for (const name of ['地面', '墙面', '门窗', '卧室', '客厅', '餐厨', '卫浴', '家电', '书房']) expect(html).toContain('>' + name + '<b>');
-    expect(html).not.toMatch(/<button[^>]*>.{0,400}?<span>硬装<\/span>/);
-    // 硬装、软装各占一行：每行从自己的分类描述开始，到下一行（或结果标题）为止
-    const rows = html.slice(html.indexOf('cms-filter-rows'), html.indexOf('cost-results-heading')).split('cms-filter-group"').slice(1);
-    expect(rows).toHaveLength(2);
-    const [hard, soft] = rows;
-    expect(hard).toContain('<span>硬装</span>');
-    expect(hard).toContain('aria-label="硬装分类"');
-    expect(hard).not.toContain('aria-label="软装分类"');
-    expect(soft).toContain('<span>软装</span>');
-    expect(soft).toContain('aria-label="软装分类"');
-    expect(soft).not.toContain('aria-label="硬装分类"');
-    for (const group of [hard, soft]) {
-      const title = group.slice(group.indexOf('cms-filter-group-label'), group.indexOf('cms-filter-bar'));
-      expect(title).not.toContain('<button');
-      expect(title).not.toContain('tabindex');
-      expect(title).not.toContain('aria-pressed');
-    }
-    expect(html).toContain('全部单价');
+    expect(html).toContain('class="cms-filter-group"');
+    // 默认硬装：只列硬装胶囊，软装胶囊切换后才出现
+    for (const name of ['地面', '墙面', '门窗', '屋面', '吊顶', '楼梯']) expect(html).toContain('>' + name + '<b>');
+    expect(html).not.toContain('>卧室<b>');
+    expect(html.match(/class="cms-filter-group/g)).toHaveLength(1);
+    // 胶囊首项「全部」默认选中，末尾是「自定义」
+    expect(html).toMatch(/aria-pressed="true"[^>]*>全部<b>\d+<\/b>/);
+    expect(html).toMatch(/>自定义<b>\d+<\/b>/);
+    expect(html.indexOf('>全部<b>')).toBeLessThan(html.indexOf('>地面<b>'));
+    expect(html.indexOf('>楼梯<b>')).toBeLessThan(html.indexOf('>自定义<b>'));
+    // 卡片连成一整片：没有「全部单价」标题行，也没有按分类分段的小标题
+    expect(html).not.toContain('cost-results-heading');
+    expect(html).not.toContain('全部单价');
+    expect(html).not.toContain('按需设置，无需全部填写');
+    expect(html).not.toContain('cms-category-block');
+    expect(html.match(/class="cms-item-grid"/g)).toHaveLength(1);
     const toolbar = html.slice(html.indexOf('cms-heading-actions'), html.indexOf('cms-filter-rows'));
     expect(toolbar).toContain('搜索材料或家具');
-    expect(toolbar).toContain('新建家具');
+    // 刷新与项目管理 / 小助手同一套：图标按钮在新建左侧，加载中转圈并禁用
+    expect(toolbar).toMatch(/cms-refresh-button cms-icon-button" disabled="" aria-busy="true" aria-label="刷新"><svg[^>]*animate-spin/);
+    expect(toolbar.indexOf('aria-label="刷新"')).toBeLessThan(toolbar.indexOf('新建家具'));
     // 保存状态空闲时不渲染
     expect(html).not.toContain('cms-sync-pill');
     expect(html).not.toContain('正在读取');

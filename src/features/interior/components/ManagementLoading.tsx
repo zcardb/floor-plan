@@ -1,5 +1,5 @@
 // 首屏骨架按目标页面真实版式对齐：
-// projects 为项目管理（页头含搜索+来源胶囊+结果标题+4:3 项目卡片），library 为账号家具库（页头含搜索+硬装/软装两行胶囊+分类价格卡片），
+// projects 为项目管理（页头含搜索+胶囊+4:3 项目卡片，无结果标题行），library 为账号家具库（页头含搜索+刷新+大类下拉与一排胶囊+连续价格卡片网格），
 // cards 为通用占位（恢复工作室）。
 type Variant = 'cards' | 'projects' | 'library';
 const keys = (n: number) => Array.from({ length: n }, (_, i) => i);
@@ -14,20 +14,16 @@ function Heading({ actions }: { actions: ('search' | 'icon' | 'button')[] }) {
   </div>;
 }
 
-/** 筛选区骨架：与 `.cms-filter-rows` 同版式，每组一行「分类描述 + 胶囊」。 */
-function FilterPanel({ groups }: { groups: number[] }) {
-  return <>
-    <div className="cms-loading-filter-rows" aria-hidden="true">
-      {groups.map((chips, group) => <div className="cms-loading-group" key={group}>
-        <span className="cms-skeleton cms-skeleton-group-label" />
-        <div className="cms-loading-chips">{keys(chips).map(chip => <span className="cms-skeleton" key={chip} />)}</div>
-      </div>)}
+/** 筛选区骨架：与 `.cms-filter-rows` 同版式，一行「左侧大类切换（可选）+ 一排胶囊」。 */
+function FilterPanel({ chips, withSwitch = false }: { chips: number; withSwitch?: boolean }) {
+  return <div className="cms-loading-filter-rows cms-loading-filter-rows--single" aria-hidden="true">
+    <div className="cms-loading-group">
+      {withSwitch
+        ? <span className="cms-skeleton cms-skeleton-filter-switch" />
+        : null}
+      <div className="cms-loading-chips">{keys(chips).map(chip => <span className="cms-skeleton" key={chip} />)}</div>
     </div>
-    <div className="cms-loading-results" aria-hidden="true">
-      <span className="cms-skeleton cms-skeleton-subtitle" />
-      <span className="cms-skeleton cms-skeleton-note" />
-    </div>
-  </>;
+  </div>;
 }
 
 /** 项目卡片网格骨架：与 ProjectCard 一致，4:3 缩略图 + 单行标题。 */
@@ -38,29 +34,27 @@ export function ProjectCardsSkeleton({ count = 8 }: { count?: number }) {
   </div>)}</div>;
 }
 
-function LibraryBlocks() {
-  return <>{[4, 6].map((count, block) => <div className="cms-loading-block" aria-hidden="true" key={block}>
-    <span className="cms-skeleton cms-skeleton-block-title" />
-    <div className="cms-loading-items">{keys(count).map(key => <div className="cms-loading-item" key={key}>
-      <span className="cms-skeleton cms-loading-item-visual" />
-      <span className="cms-skeleton cms-skeleton-item-name" />
-      <span className="cms-skeleton cms-skeleton-item-meta" />
-      <span className="cms-skeleton cms-skeleton-item-price" />
-    </div>)}</div>
-  </div>)}</>;
+/** 家具库卡片骨架：卡片连成一整片，没有分类小标题。 */
+function LibraryItems() {
+  return <div className="cms-loading-items cms-loading-items--flat" aria-hidden="true">{keys(8).map(key => <div className="cms-loading-item" key={key}>
+    <span className="cms-skeleton cms-loading-item-visual" />
+    <span className="cms-skeleton cms-skeleton-item-name" />
+    <span className="cms-skeleton cms-skeleton-item-meta" />
+    <span className="cms-skeleton cms-skeleton-item-price" />
+  </div>)}</div>;
 }
 
 export function ManagementLoading({ heading = false, label = '加载内容', variant = 'cards' }: { heading?: boolean; label?: string; variant?: Variant }) {
   const status = { className: 'cms-loading-placeholder', role: 'status', 'aria-label': label, 'aria-busy': true } as const;
   if (variant === 'projects') return <div {...status}>
     {heading && <Heading actions={['search', 'icon', 'button']} />}
-    <FilterPanel groups={[3]} />
+    <FilterPanel chips={3} />
     <ProjectCardsSkeleton />
   </div>;
   if (variant === 'library') return <div {...status}>
     {heading && <Heading actions={['search', 'button']} />}
-    <FilterPanel groups={[3, 6]} />
-    <LibraryBlocks />
+    <FilterPanel chips={7} withSwitch />
+    <LibraryItems />
   </div>;
   return <div {...status}>
     {heading && <div className="cms-loading-heading" aria-hidden="true"><span className="cms-skeleton cms-skeleton-title" /><span className="cms-skeleton cms-skeleton-description" /></div>}
