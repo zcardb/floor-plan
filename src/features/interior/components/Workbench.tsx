@@ -125,7 +125,7 @@ const loadScene = () =>
 const preloadScene = () => void loadScene().catch(() => undefined);
 /** 窄屏（≤1100px）侧栏以抽屉形式覆盖画布：放置家具、点画布、Esc 后自动收起。 */
 const isDrawerLayout = () => typeof matchMedia !== "undefined" && matchMedia("(max-width:1100px)").matches;
-const PANEL_TITLES: Record<PanelKind, string> = { library: "家具设计", ai: "AI 设计", settings: "户型设计", overview: "方案总览", cost: "成本设计" };
+const PANEL_TITLES: Record<PanelKind, string> = { library: "家具列表", ai: "AI 设计", settings: "户型设置", overview: "方案总览", cost: "成本核算" };
 interface Props {
   project: Project;
   projectNavigation: ProjectNavigation;

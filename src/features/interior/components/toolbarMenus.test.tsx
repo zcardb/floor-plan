@@ -346,32 +346,32 @@ describe('视图设置 ViewMenu', () => {
 describe('统一侧栏与画布竖条', () => {
   it('侧栏保留轻量标题行（标题 + 关闭），内容包在可滚动区里；只读时整体禁用', () => {
     const onClose = vi.fn();
-    const tree = nodes(SidePanel({ title: '家具设计', onClose, children: '内容' }));
+    const tree = nodes(SidePanel({ title: '家具列表', onClose, children: '内容' }));
     const panel = tree.find(n => String(n.props.className).startsWith('side-panel '))!;
-    expect(panel.props['aria-label']).toBe('家具设计');
-    expect(text(nodes(panel).find(n => n.props.className === 'side-panel-head')!.props.children as ReactNode)).toContain('家具设计');
+    expect(panel.props['aria-label']).toBe('家具列表');
+    expect(text(nodes(panel).find(n => n.props.className === 'side-panel-head')!.props.children as ReactNode)).toContain('家具列表');
     expect(nodes(panel).find(n => n.props.className === 'panel-scroll')).toBeDefined();
     expect(nodes(panel).find(n => n.props.disabled === false)).toBeDefined();
     (tree.find(n => n.props['aria-label'] === '关闭侧栏')!.props.onClick as () => void)();
     expect(onClose).toHaveBeenCalledOnce();
     expect(nodes(SidePanel({ title: '成本', readOnly: true, onClose: vi.fn(), children: 'x' })).find(n => n.props.disabled === true)).toBeDefined();
   });
-  it('竖条顺序：方案总览 / 家具设计 / 成本设计 / 户型设计 + 收起，游客与登录一致；AI 设计暂时隐藏；打开项高亮', () => {
+  it('竖条顺序：方案总览 / 家具列表 / 成本核算 / 户型设置 + 收起，游客与登录一致；AI 设计暂时隐藏；打开项高亮', () => {
     const onToggle = vi.fn();
     const stage = { current: null };
     const tree = nodes(CanvasRail({ sidePanel: 'library', stage, onToggle }));
     const labels = tree.filter(n => n.type === 'button' && typeof n.props['aria-label'] === 'string').map(n => n.props['aria-label']);
-    expect(labels).toEqual(['方案总览', '家具设计', '成本设计', '户型设计', '收起工具条']);
+    expect(labels).toEqual(['方案总览', '家具列表', '成本核算', '户型设置', '收起工具条']);
     expect(labels).not.toContain('选择');
     expect(labels).not.toContain('AI 设计');
     const rail = tree.find(n => n.props.className === 'canvas-rail')!;
     expect(nodes(rail).filter(n => n.type === 'button').map(n => n.props.className)).toEqual(['canvas-rail-button', 'canvas-rail-button active', 'canvas-rail-button', 'canvas-rail-button', 'canvas-rail-toggle']);
-    expect(nodes(rail).find(n => n.props['aria-label'] === '家具设计')!.props['aria-pressed']).toBe(true);
+    expect(nodes(rail).find(n => n.props['aria-label'] === '家具列表')!.props['aria-pressed']).toBe(true);
     (nodes(rail).find(n => n.props['aria-label'] === '方案总览')!.props.onClick as () => void)();
     expect(onToggle).toHaveBeenCalledWith('overview');
-    (nodes(rail).find(n => n.props['aria-label'] === '户型设计')!.props.onClick as () => void)();
+    (nodes(rail).find(n => n.props['aria-label'] === '户型设置')!.props.onClick as () => void)();
     expect(onToggle).toHaveBeenCalledWith('settings');
-    (nodes(rail).find(n => n.props['aria-label'] === '成本设计')!.props.onClick as () => void)();
+    (nodes(rail).find(n => n.props['aria-label'] === '成本核算')!.props.onClick as () => void)();
     expect(onToggle).toHaveBeenCalledWith('cost');
     // 整条可拖：拖动能力挂在竖条本体上，不再有单独的把手
     expect(tree.every(n => n.props.className !== 'canvas-rail-grip')).toBe(true);
@@ -396,6 +396,6 @@ describe('统一侧栏与画布竖条', () => {
     (collapsed.find(n => n.props['aria-label'] === '展开工具条')!.props.onClick as () => void)();
     state.cursor = 0;
     const expanded = nodes(CanvasRail(railProps));
-    expect(expanded.filter(n => typeof n.props['aria-label'] === 'string' && n.type === 'button').map(n => n.props['aria-label'])).toEqual(['方案总览', '家具设计', '成本设计', '户型设计', '收起工具条']);
+    expect(expanded.filter(n => typeof n.props['aria-label'] === 'string' && n.type === 'button').map(n => n.props['aria-label'])).toEqual(['方案总览', '家具列表', '成本核算', '户型设置', '收起工具条']);
   });
 });

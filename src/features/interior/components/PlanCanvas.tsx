@@ -53,7 +53,8 @@ import { perimeterDimensions, planDrawingBounds, type DimensionSegment } from '.
 import type { DimensionBinding } from '../model/dimensionBinding';
 import { PerimeterDimensions } from './PerimeterDimensions';
 import { doorOrientation } from '../model/doorOrientation';
-import { defaultOpeningSize } from '../model/hardMaterials';
+import { openingKindLabel } from '../model/hardMaterials';
+import { placeOpening } from '../model/openingPlacement';
 import { dragOpening } from '../model/openingDrag';
 import { isCompletionClick, supportsPointerCompletion } from '../model/toolCompletion';
 import { createWheelIntent } from '../model/wheelIntent';
@@ -537,26 +538,14 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
             notify.fail("承重墙不可新增开口");
             return;
           }
-          const width = defaultOpeningSize(tool).width,
-            L = length(wall);
-          if (width > L) {
-            notify.fail("此墙段长度不足");
+          // 默认宽度放不下时，门 / 窗自动缩到点击处空档的最大宽度
+          const placed = placeOpening(design, wall, tool, nearestOnWall(p, wall).offset);
+          if ('reason' in placed) {
+            notify.fail(placed.reason);
             return;
           }
-          const offset = Math.min(
-            L - width / 2,
-            Math.max(width / 2, nearestOnWall(p, wall).offset),
-          );
-          if (
-            design.openings.some(
-              (o) =>
-                o.wallId === wid &&
-                Math.abs(o.offset - offset) < (o.width + width) / 2,
-            )
-          ) {
-            notify.fail("门窗不能重叠");
-            return;
-          }
+          const { offset, width } = placed;
+          if (placed.fitted) notify.info(`空间不足，${openingKindLabel(tool)}宽已自动调整为 ${formatMeters(width)} m`);
           const o = {
             id: uid(),
             wallId: wid,

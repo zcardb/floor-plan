@@ -394,7 +394,7 @@ describe('编辑器分区：侧栏、竖条与画布', () => {
   const panel = (tree: Node[]) => tree.find(n => n.type === SidePanel);
   it('默认打开家具库侧栏，竖条「家具」高亮', () => {
     const tree = render();
-    expect(panel(tree)!.props.title).toBe('家具设计');
+    expect(panel(tree)!.props.title).toBe('家具列表');
     expect(nodes(panel(tree)!).find(n => n.type === Library)).toBeDefined();
     expect(rail(tree).props.sidePanel).toBe('library');
     expect(tree.some(n => n.type === ViewMenu)).toBe(true);
@@ -415,10 +415,10 @@ describe('编辑器分区：侧栏、竖条与画布', () => {
       return render();
     };
     const settings = panel(open('settings'))!;
-    expect(settings.props.title).toBe('户型设计');
+    expect(settings.props.title).toBe('户型设置');
     expect(nodes(settings).find(n => n.type === HouseSettingsPanel)).toBeDefined();
     expect(nodes(panel(open('overview'))!).find(n => n.type === OverviewPanel)).toBeDefined();
-    expect(panel(open('cost'))!.props.title).toBe('成本设计');
+    expect(panel(open('cost'))!.props.title).toBe('成本核算');
     // 成本、总览与账号无关：游客（默认 loggedIn: false）也能打开，总览里有成本入口，成本页没有「返回方案总览」
     expect(nodes(panel(open('overview'))!).find(n => n.type === OverviewPanel)!.props.onCosts).toBeTypeOf('function');
     expect(nodes(panel(open('cost'))!).find(n => n.type === CostPanel)!.props.overview).toBeUndefined();
