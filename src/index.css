@@ -2486,6 +2486,33 @@
   font-weight: 600;
   padding: 0 6px;
 }
+/* 房间 / 家具名称：平时看起来就是粗体文字，悬停出底色提示可点，聚焦后是输入框。宽度随内容。 */
+.visual-object-name.is-editable {
+  field-sizing: content;
+  min-width: 2em;
+  height: var(--ctl-sm);
+  border: 1px solid transparent;
+  border-radius: var(--ctl-radius-in);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  outline: none;
+  cursor: text;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+.visual-object-name.is-editable:hover { background: hsl(var(--accent)); }
+.visual-object-name.is-editable:focus { max-width: 160px; background: hsl(var(--background)); border-color: hsl(var(--primary)); }
+/* 图层下拉、房间内家具下拉：单行菜单刻度（UI_GUIDELINES §5.2），快捷键用说明字号。 */
+.layer-menu, .room-furniture-menu { min-width: 200px; padding: 6px; }
+.room-furniture-menu { max-height: 280px; overflow-y: auto; }
+.layer-menu [role="menuitem"] > svg { width: 14px; height: 14px; flex: none; }
+.layer-menu [role="menuitem"] > span:last-child { font-size: var(--fs-hint); letter-spacing: 0; }
+.room-furniture-menu [role="menuitem"] { justify-content: space-between; }
+.room-furniture-menu [role="menuitem"] > svg { width: 14px; height: 14px; flex: none; color: hsl(var(--muted-foreground)); }
+.room-furniture-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-furniture-empty { margin: 0; padding: 8px 9px; color: hsl(var(--muted-foreground)); font-size: var(--fs-meta); }
 .visual-selection-editor > button,
 .visual-selection-editor > .visual-size-trigger,
 .visual-selection-editor .editor-tooltip-trigger > button,
@@ -3894,7 +3921,8 @@ button.room-cost-row:hover {
 .project-menu [role="menuitem"].project-menu-create { min-height:48px; align-items:flex-start; gap:10px; padding:9px; border-radius:var(--ctl-radius-in); font-size:var(--fs-group); }
 .create-option-icon { display:grid; place-items:center; flex:none; width:16px; height:16px; margin-top:2px; }
 .create-option-icon>svg { width:16px; height:16px; stroke-width:1.75; }
-.create-option[data-tone="ai"] .create-option-icon { color:hsl(var(--success)); }
+/* AI 入口统一用主色 AI 图标（AiIcon），不再单独用绿色。 */
+.ai-icon { flex: none; color: hsl(var(--primary)); }
 .create-option-text { display:grid; gap:3px; flex:1; min-width:0; }
 .create-option-text>b { font-size:var(--fs-group); line-height:17px; font-weight:500; color:hsl(var(--foreground)); }
 .create-option-text>small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--fs-hint); line-height:15px; color:hsl(var(--muted-foreground)); }

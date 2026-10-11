@@ -1,4 +1,6 @@
-import { CopyPlus, FilePlus2, FileUp, Sparkles, type LucideIcon } from 'lucide-react';
+import { CopyPlus, FilePlus2, FileUp, type LucideIcon } from 'lucide-react';
+import type { ComponentType } from 'react';
+import { AiIcon } from './AiIcon';
 import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { SoftwareSoonItem } from './SoftwareSoonItem';
 
@@ -12,7 +14,7 @@ export interface CreateProjectActions {
 }
 
 /** 新建方式：16px 图标 + 标题 + 一行说明（与墙体选项菜单同一套两行刻度）。 */
-function CreateOption({ icon: Icon, title, hint, onSelect, tone }: { icon: LucideIcon; title: string; hint: string; onSelect: () => void; tone?: 'ai' }) {
+function CreateOption({ icon: Icon, title, hint, onSelect, tone }: { icon: LucideIcon | ComponentType<{ size?: number }>; title: string; hint: string; onSelect: () => void; tone?: 'ai' }) {
   return <DropdownMenuItem className="create-option" data-tone={tone} onSelect={onSelect}>
     <span className="create-option-icon" aria-hidden="true"><Icon /></span>
     <span className="create-option-text"><b>{title}</b><small>{hint}</small></span>
@@ -24,7 +26,7 @@ export function CreateProjectMenuItems({ actions }: { actions: CreateProjectActi
   return <>
     <CreateOption icon={FilePlus2} title="手动创建" hint="从空白户型或模板开始" onSelect={actions.blank} />
     {actions.duplicate && <CreateOption icon={CopyPlus} title="复刻当前项目" hint="复制户型、家具与报价" onSelect={actions.duplicate} />}
-    {actions.ai && <CreateOption icon={Sparkles} title="AI 创建…" hint="描述需求，自动生成户型" tone="ai" onSelect={actions.ai} />}
+    {actions.ai && <CreateOption icon={AiIcon} title="AI 创建…" hint="描述需求，自动生成户型" tone="ai" onSelect={actions.ai} />}
     <DropdownMenuSeparator />
     <CreateOption icon={FileUp} title="导入 DXF 图纸…" hint="识别墙体、门窗与房间" onSelect={actions.importFile} />
     <SoftwareSoonItem label="从其他软件导入" />

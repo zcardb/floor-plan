@@ -6,8 +6,6 @@ import { changeDoorOrientation } from '../model/doorOrientation';
 import { DoorOrientationControls } from './DoorOrientationControls';
 import {
   ArrowLeft,
-  ArrowUpToLine,
-  ArrowDownToLine,
   BrickWall,
   Copy,
   Trash2,
@@ -40,6 +38,7 @@ import { roomSides } from "../model/roomSides";
 import { cardPrice } from "../model/priceLabel";
 import { syncStairsToHeight } from "../model/stairs";
 import { ColorPicker } from "./ColorPicker";
+import { LayerMenu } from "./LayerMenu";
 import { floorThumb } from "./materialThumbs";
 import { PanelHint, ShortcutList } from "./PanelHint";
 import { BackingNote } from "./BackingNote";
@@ -270,36 +269,7 @@ export function PropertyPanel({
                 删除
               </Button>
             </EditorTooltip>
-            <EditorTooltip label="平面图中显示在最上层">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() =>
-                  change((d) => ({
-                    ...d,
-                    furniture: [...d.furniture.filter((g) => g.id !== f.id), f],
-                  }))
-                }
-              >
-                <ArrowUpToLine />
-                置顶
-              </Button>
-            </EditorTooltip>
-            <EditorTooltip label="平面图中显示在最下层">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() =>
-                  change((d) => ({
-                    ...d,
-                    furniture: [f, ...d.furniture.filter((g) => g.id !== f.id)],
-                  }))
-                }
-              >
-                <ArrowDownToLine />
-                置底
-              </Button>
-            </EditorTooltip>
+            <LayerMenu design={design} ids={[f.id]} change={change} variant="panel" />
           </div>
         </section>
         <PanelHint id="furniture-drag">

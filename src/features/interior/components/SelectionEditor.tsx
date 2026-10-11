@@ -18,11 +18,13 @@ import {
   LockKeyhole,
   GripVertical,
   DoorOpen,
-  Sparkles,
   Loader2,
   Footprints,
   Group,
   Ungroup,
+  Shapes,
+  Armchair,
+  ChevronRight,
 } from "lucide-react";
 import {
   Popover,
@@ -38,6 +40,11 @@ import { RoomDeleteMenu } from './RoomDeleteMenu';
 import { SizeFields } from './SizeFields';
 import { SeparatorLengthFields } from './SeparatorLengthFields';
 import { RoomSidesEditor } from './RoomSidesEditor';
+import { AiIcon } from './AiIcon';
+import { EditorNameInput } from './EditorNameInput';
+import { LayerMenu } from './LayerMenu';
+import { OpeningVariantSelect } from './OpeningVariantSelect';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 import type { SizeTransaction } from '../model/sizeTransaction';
 import {
@@ -48,7 +55,7 @@ import { placeEditor, type ScreenRect } from "../model/selectionAnchor";
 import { selectionCost } from "../model/costBreakdown";
 import { yuan } from "../model/money";
 import type { CustomFloor, CustomOpening, CustomWall, Design, Selection } from "../model/types";
-import { applyRoomWall, openingHeight, openingName, openingPriceKey, pickableWalls } from "../model/hardMaterials";
+import { applyRoomWall, openingHeight, openingName, openingPriceKey, pickableOpenings, pickableWalls } from "../model/hardMaterials";
 import { PriceField } from "./PriceField";
 import { ColorPicker } from "./ColorPicker";
 import { useCostDesign } from './CostDefaultsContext';
@@ -98,6 +105,8 @@ interface Props {
   removeWall?: (wallId: string) => void;
   /** 删除房间（拆本房间独立墙）；不传时下拉里的「删除房间」不可用。 */
   removeRoom?: (roomId: string) => void;
+  /** 切换选中对象（房间内家具列表点选）；不传时不显示该列表。 */
+  select?: (s: Selection) => void;
   /** 房间「AI 布局」入口；未登录或只读时不传，入口不显示。 */
   roomAi?: { tone: AiEntryTone; open: () => void };
 }
@@ -189,7 +198,10 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           : null,
       group = groupIds(p.design, sel);
     const grouped = isPersistentGroup(p.design, group);
-    const roomFurniture = r ? p.design.furniture.filter(f => inRoom([f.cx, f.cy], r)).length : 0;
+    const roomItems = r ? p.design.furniture.filter(f => inRoom([f.cx, f.cy], r)) : [];
+    const roomFurniture = roomItems.length;
+    // 门窗款式：只有标准款且未换过款式时没有可切换项，不显示入口（与属性面板一致）。
+    const hasVariants = !!o && (!!o.variant || pickableOpenings(p.design, p.accountOpenings || [], o.kind).length > 0);
     const deletableWall = w && canDeleteWall(w);
     const resizableWall = w && canResizeWall(p.design, w);
     const fields = f
@@ -238,6 +250,10 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             g.id === w.id ? { ...g, color: value } : g,
           ),
         }));
+    };
+    const rename = (name: string) => {
+      if (f) p.change(d => ({ ...d, furniture: d.furniture.map(g => g.id === f.id ? { ...g, name } : g) }));
+      if (r) p.change(d => ({ ...d, rooms: d.rooms.map(g => g.id === r.id ? { ...g, name } : g) }));
     };
     let price: {
       group: PriceGroup;
@@ -292,12 +308,23 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
         <EditorTooltip label="拖动工具条">
           <Button type="button" variant="ghost" size="icon" className="visual-editor-drag-handle" aria-label="拖动编辑工具条" {...editorDrag.handlers}><GripVertical size={15} /></Button>
         </EditorTooltip>
-        <span className="visual-object-name">
-          {group.length > 1 && (grouped ? `已组合 ${group.length} 件家具` : `已选中 ${group.length} 件家具`)}
-          {f?.name ||
-            r?.name ||
-            (w ? wallKindName(w) : o ? openingName(p.design, o) : separator ? "房间分隔线" : "")}
-        </span>
+        {/* 房间、家具的名称可直接在工具条里改；其它对象名称由类型决定，只显示。 */}
+        {f || r
+          ? <EditorNameInput value={(f ?? r)!.name} label={f ? "家具名称" : "房间名称"} onRename={rename} />
+          : <span className="visual-object-name">
+            {group.length > 1 ? (grouped ? `已组合 ${group.length} 件家具` : `已选中 ${group.length} 件家具`)
+              : w ? wallKindName(w) : o ? openingName(p.design, o) : separator ? "房间分隔线" : ""}
+          </span>}
+        {/* AI 布局是房间的主操作，紧跟在名称后面。 */}
+        {r && p.roomAi && (
+          <EditorTooltip label={p.roomAi.tone === "running" ? "AI 布局生成中 · 点击查看进度" : p.roomAi.tone === "unseen" ? "AI 布局已生成 · 点击查看" : "AI 布局"}>
+            <button type="button" className="visual-ai-trigger" data-tone={p.roomAi.tone} aria-label={p.roomAi.tone === "running" ? "AI 布局生成中" : p.roomAi.tone === "unseen" ? "AI 布局已生成，未查看" : "AI 布局"} aria-busy={p.roomAi.tone === "running" || undefined} onClick={p.roomAi.open}>
+              {p.roomAi.tone === "running" ? <Loader2 size={15} className="animate-spin" /> : <AiIcon size={15} />}
+              AI 布局
+              {p.roomAi.tone === "unseen" && <span className="visual-ai-dot" aria-hidden="true" />}
+            </button>
+          </EditorTooltip>
+        )}
         {separator && (
           <Popover
             open={open === "separator"}
@@ -392,15 +419,6 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </PopoverContent>
           </Popover>
         )}
-        {r && p.roomAi && (
-          <EditorTooltip label={p.roomAi.tone === "running" ? "AI 布局生成中 · 点击查看进度" : p.roomAi.tone === "unseen" ? "AI 布局已生成 · 点击查看" : "AI 布局"}>
-            <button type="button" className="visual-ai-trigger" data-tone={p.roomAi.tone} aria-label={p.roomAi.tone === "running" ? "AI 布局生成中" : p.roomAi.tone === "unseen" ? "AI 布局已生成，未查看" : "AI 布局"} aria-busy={p.roomAi.tone === "running" || undefined} onClick={p.roomAi.open}>
-              {p.roomAi.tone === "running" ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
-              AI 布局
-              {p.roomAi.tone === "unseen" && <span className="visual-ai-dot" aria-hidden="true" />}
-            </button>
-          </EditorTooltip>
-        )}
         {r && (
           <Popover
             open={open === "material"}
@@ -427,6 +445,18 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </PopoverContent>
           </Popover>
         )}
+        {r && p.select && <DropdownMenu>
+          <EditorTooltip label="房间内家具 · 点击选中">
+            <DropdownMenuTrigger asChild><button type="button" aria-label={`房间内家具 ${roomFurniture} 件`}><Armchair size={15} />{roomFurniture}<ChevronDown size={12} /></button></DropdownMenuTrigger>
+          </EditorTooltip>
+          <DropdownMenuContent align="start" sideOffset={8} collisionPadding={12} className="room-furniture-menu">
+            <DropdownMenuLabel className="wall-options-section">房间内家具 · {roomFurniture} 件</DropdownMenuLabel>
+            {roomItems.map(item => <DropdownMenuItem key={item.id} onSelect={() => p.select!({ kind: "furniture", id: item.id })}>
+              <span className="room-furniture-name">{item.name}</span><ChevronRight size={14} />
+            </DropdownMenuItem>)}
+            {!roomFurniture && <p className="room-furniture-empty">从左侧家具库为房间添加家具</p>}
+          </DropdownMenuContent>
+        </DropdownMenu>}
         {f?.type === 'stairs' && <Popover open={open === 'stair'} onOpenChange={value => setPanel(value, 'stair')}>
           <EditorTooltip label="楼梯类别、梯段宽与踏步数">
             <PopoverTrigger asChild><button type="button" aria-label="编辑楼梯参数"><Footprints size={15} />楼梯<ChevronDown size={12} /></button></PopoverTrigger>
@@ -435,6 +465,12 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             <h3>楼梯</h3>
             <StairEditor design={p.design} furniture={f} change={p.change} />
           </PopoverContent>
+        </Popover>}
+        {o && hasVariants && <Popover open={open === 'variant'} onOpenChange={value => setPanel(value, 'variant')}>
+          <EditorTooltip label="门窗款式">
+            <PopoverTrigger asChild><button type="button" aria-label="切换门窗款式"><Shapes size={15} />款式<ChevronDown size={12} /></button></PopoverTrigger>
+          </EditorTooltip>
+          <PopoverContent className="visual-editor-popover"><h3>{openingName(p.design, o)}款式</h3><OpeningVariantSelect design={p.design} opening={o} accountOpenings={p.accountOpenings} change={p.change} /></PopoverContent>
         </Popover>}
         {o?.kind === 'door' && <Popover open={open === 'direction'} onOpenChange={value => setPanel(value, 'direction')}>
           <EditorTooltip label="门开向">
@@ -501,6 +537,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </button>
           </EditorTooltip>
         )}
+        {(f || group.length > 1) && <LayerMenu design={p.design} ids={f ? [f.id] : group} change={p.change} variant="toolbar" />}
         {(f || o || deletableWall || separator || group.length > 1) && (
           <EditorTooltip label={group.length > 1 ? "删除选中家具" : "删除对象"} shortcut="Delete">
             <button type="button" aria-label={group.length > 1 ? "删除选中家具" : "删除对象"} onClick={p.remove}>

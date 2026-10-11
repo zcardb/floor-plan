@@ -16,6 +16,7 @@ import { removeWall as removeWallModel } from '../model/wallRemoval';
 import { clearRoomFurniture } from '../model/roomFurniture';
 import { removeRoom as removeRoomModel, type RoomRemoval } from '../model/roomRemoval';
 import { expandToGroups, groupFurniture, groupIds, isPersistentGroup, moveGroup, removeGroup, ungroupFurniture } from '../model/furnitureGroup';
+import { reorderFurniture } from '../model/furnitureLayer';
 import { rotateUnit } from '../model/movableUnit';
 import { deriveRooms } from '../model/roomDerive';
 import { isStairs, resizeStair } from '../model/stairs';
@@ -588,6 +589,11 @@ export function Workbench(p: Props) {
       } else if (mod && k === "g") {
         e.preventDefault();
         if (selection?.kind === "group" && isPersistentGroup(d, groupIds(d, selection)) === e.shiftKey) toggleGroup();
+      } else if (mod && (e.code === "BracketRight" || e.code === "BracketLeft") && (selection?.kind === "furniture" || selection?.kind === "group")) {
+        // 图层顺序：Ctrl ] 上移一层、Ctrl [ 下移一层，加 Shift 为置顶 / 置底（与图层下拉一致）。
+        e.preventDefault();
+        const up = e.code === "BracketRight", ids = selection.kind === "group" ? groupIds(d, selection) : [selection.id];
+        change((d) => reorderFurniture(d, ids, up ? (e.shiftKey ? "front" : "forward") : (e.shiftKey ? "back" : "backward")));
       } else if (mod && k === "d") {
         e.preventDefault();
         duplicate();
@@ -1261,6 +1267,7 @@ export function Workbench(p: Props) {
           duplicate={duplicate}
           toggleGroup={toggleGroup}
           remove={remove}
+          select={select}
           close={() => setSelection(null)}
           transaction={sizeTransaction} showCosts={p.loggedIn}
           accountFloors={accountFloors} accountWalls={accountWalls} accountOpenings={accountOpenings}

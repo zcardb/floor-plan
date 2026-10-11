@@ -1,5 +1,6 @@
 import { useState, type MutableRefObject } from 'react';
-import { Box, Sparkles, Square } from 'lucide-react';
+import { Box, Square } from 'lucide-react';
+import { AiIcon } from './AiIcon';
 import { Button } from '@/components/ui/button';
 import { HARD_CATEGORIES } from '../model/hardMaterials';
 import type { LibraryItem } from '../model/types';
@@ -38,7 +39,7 @@ export function FurnitureVisual({ item, view, onView, onAdjust, snapshotRef }: {
       </button>)}
     </div>}
     {onAdjust && <Button type="button" size="sm" variant="secondary" className="furniture-visual-ai" onClick={onAdjust}>
-      <Sparkles size={14} />AI 调整
+      <AiIcon size={14} />AI 调整
     </Button>}
     {live3d && <FurnitureModelPreview item={item} snapshotRef={snapshotRef} onFail={() => setModelFailed(true)} />}
     {!live3d && <div className="furniture-visual-stage">
@@ -49,7 +50,7 @@ export function FurnitureVisual({ item, view, onView, onAdjust, snapshotRef }: {
           : <div className="furniture-visual-empty">
             <Box size={28} />
             <p>当前设备无法显示 3D 模型</p>
-            {onAdjust && <Button type="button" size="sm" onClick={onAdjust}><Sparkles size={14} />AI 生成</Button>}
+            {onAdjust && <Button type="button" size="sm" onClick={onAdjust}><AiIcon size={14} />AI 生成</Button>}
           </div>}
     </div>}
   </div>;

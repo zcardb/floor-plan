@@ -24,6 +24,6 @@ export function PanelHint({ id, children }: { id: string; children: ReactNode })
 
 /** 键盘快捷键说明。 */
 export function ShortcutList() {
-  const keys: [string, string][] = [['V', '选择 / 移动'], ['R', '旋转家具 90°'], ['Ctrl Z', '撤销更改'], ['Ctrl D', '复制家具'], ['T', '2D / 3D 切换'], ['F', '适应窗口']];
+  const keys: [string, string][] = [['V', '选择 / 移动'], ['R', '旋转家具 90°'], ['Ctrl Z', '撤销更改'], ['Ctrl D', '复制家具'], ['Ctrl ] / [', '家具上移 / 下移一层（加 Shift 置顶 / 置底）'], ['T', '2D / 3D 切换'], ['F', '适应窗口']];
   return <div className="shortcut-list">{keys.map(([key, label]) => <span key={key} className="contents"><kbd>{key}</kbd><span>{label}</span></span>)}</div>;
 }

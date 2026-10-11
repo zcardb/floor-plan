@@ -27,6 +27,8 @@ import { SelectionEditor } from './SelectionEditor';
 import { EditorTooltip } from '@/components/ui/editor-tooltip';
 import { Button } from '@/components/ui/button';
 import { ColorPicker } from './ColorPicker';
+import { EditorNameInput } from './EditorNameInput';
+import { LayerMenu } from './LayerMenu';
 
 type Props = React.ComponentProps<typeof SelectionEditor>;
 function harness(kind: Opening['kind'], hidden = false, extra: Partial<Props> = {}) {
@@ -133,7 +135,7 @@ describe('Visual editor 悬浮提示覆盖', () => {
     if (!tree || typeof tree !== 'object' || !('props' in tree)) return [];
     const node = tree as ReactElement<{ children?: React.ReactNode; 'aria-label'?: string }>;
     const covered = insideTooltip || node.type === EditorTooltip;
-    const self = node.type === 'button' || node.type === Button
+    const self = node.type === 'button' || node.type === Button || node.type === 'input'
       ? [{ label: node.props['aria-label'], covered }]
       : [];
     return [...self, ...walk(node.props.children, covered)];
@@ -145,5 +147,35 @@ describe('Visual editor 悬浮提示覆盖', () => {
       expect(button.covered).toBe(true);
       expect(button.label).toBeTruthy();
     }
+  });
+});
+describe('房间与家具的工具条', () => {
+  const room = { ...blankDesign(), rooms: [{ id: 'room', name: '堂屋', mat: 'wood', rings: [[[0, 0], [4000, 0], [4000, 4000], [0, 4000]]] }] };
+  it('房间名称可直接改：输入框提交后写回房间名，AI 布局紧跟在名称后面', () => {
+    const change = vi.fn();
+    const open = vi.fn();
+    const h = harness('door', false, {
+      design: room, selection: { kind: 'room', id: 'room' }, change, roomAi: { tone: 'idle', open },
+    } as never);
+    const nodes = elements(h.element);
+    const nameAt = nodes.findIndex(node => node.type === EditorNameInput), name = nodes[nameAt] as ReactElement<{ value: string; label: string; onRename: (v: string) => void }>;
+    expect(name.props).toMatchObject({ value: '堂屋', label: '房间名称' });
+    const aiAt = nodes.findIndex(node => node.props.className === 'visual-ai-trigger');
+    const sizeAt = nodes.findIndex(node => node.props['aria-label'] === '调整房间各边长度');
+    expect(aiAt).toBeGreaterThan(nameAt);
+    expect(aiAt).toBeLessThan(sizeAt);
+    name.props.onRename('正厅');
+    expect(change).toHaveBeenCalledOnce();
+    const updater = change.mock.calls[0]![0] as (d: typeof room) => typeof room;
+    expect(updater(room).rooms[0]!.name).toBe('正厅');
+  });
+  it('家具与多选家具都能开图层菜单，多选按整组调整', () => {
+    const design = { ...blankDesign(), furniture: [furniture('a', 1000), furniture('b', 2000)] };
+    const single = harness('door', false, { design, selection: { kind: 'furniture', id: 'a' } });
+    const group = harness('door', false, { design, selection: { kind: 'group', ids: ['a', 'b'] } });
+    const menu = (h: { element: ReactElement }) => elements(h.element).find(node => node.type === LayerMenu);
+    expect(menu(single)?.props).toMatchObject({ ids: ['a'], variant: 'toolbar' });
+    expect(menu(group)?.props).toMatchObject({ ids: ['a', 'b'], variant: 'toolbar' });
+    expect(menu(harness('door'))).toBeUndefined();
   });
 });
