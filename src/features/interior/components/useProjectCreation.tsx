@@ -1,11 +1,11 @@
-import { useRef, useState } from 'react';
+import { Suspense, useRef, useState } from 'react';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { notify } from '@/lib/notify';
 import { createProject } from '../data/templates';
 import { IMPORT_ACCEPT } from '../model/designImport';
 import type { Project } from '../model/types';
 import { NewProjectDialog, type NewProjectInput } from './NewProjectDialog';
-import { AiCreateProjectDialog } from './AiCreateProjectDialog';
+import { AiCreateProjectDialog } from './lazyDialogs';
 import { DxfImportDialog } from './DxfImportDialog';
 import { useProjectImport } from './useProjectImport';
 import type { CreateProjectActions } from './CreateProjectMenuItems';
@@ -22,7 +22,9 @@ export function useProjectCreation({ create, opened, ai, duplicate }: {
   /** 复刻当前项目；项目管理页没有「当前项目」概念，故只有工作台传入。 */
   duplicate?: () => void;
 }) {
-  const [creating, setCreating] = useState(false), [aiCreating, setAiCreating] = useState(false);
+  const [creating, setCreating] = useState(false), [aiCreating, setAiCreating] = useState(false),
+    // AI 创建弹窗按需下载：第一次打开后才挂载，之后保持挂载以保留关闭动画。
+    [aiMounted, setAiMounted] = useState(false);
   const submit = useAsyncAction(async ({ template, name, size, design }: NewProjectInput) => {
     const project = createProject(template, name, size, design);
     if (await create(project)) { setCreating(false); setAiCreating(false); notify.success('已创建项目「' + project.name + '」'); opened(); }
@@ -32,7 +34,7 @@ export function useProjectCreation({ create, opened, ai, duplicate }: {
   const actions: CreateProjectActions = {
     blank: () => setCreating(true),
     duplicate,
-    ai: ai ? () => setAiCreating(true) : undefined,
+    ai: ai ? () => { setAiMounted(true); setAiCreating(true); } : undefined,
     importFile: () => file.current?.click(),
   };
   return {
@@ -49,7 +51,7 @@ export function useProjectCreation({ create, opened, ai, duplicate }: {
         if (selected) imports.importFile(selected);
       }} />
       <NewProjectDialog open={creating} pending={submit.pending} onClose={() => setCreating(false)} onSubmit={input => void submit.run(input)} />
-      {ai && <AiCreateProjectDialog open={aiCreating} pending={submit.pending} onClose={() => setAiCreating(false)} onSubmit={input => void submit.run(input)} />}
+      {ai && aiMounted && <Suspense fallback={null}><AiCreateProjectDialog open={aiCreating} pending={submit.pending} onClose={() => setAiCreating(false)} onSubmit={input => void submit.run(input)} /></Suspense>}
       {imports.drawing && <DxfImportDialog source={imports.drawing.source} defaultName={imports.drawing.name} pending={imports.saving}
         onImport={imports.confirmDrawing} onClose={imports.closeDrawing} />}
     </>,

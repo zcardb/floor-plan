@@ -16,7 +16,6 @@ vi.mock('react', async original => ({
 }));
 vi.mock('@/components/ui/confirm-dialog', () => ({ useConfirm: () => state.confirm }));
 vi.mock('../cloud/useProjects', () => ({ isSaveProblem: () => false }));
-vi.mock('./CustomFurnitureDialog', () => ({ CustomFurnitureDialog: () => null }));
 vi.mock('../cloud/useFloorCatalog', () => ({ useFloorCatalog: () => ({ items: [], loading: false, error: '', load: async () => {}, save: async () => {} }) }));
 vi.mock('../cloud/useWallCatalog', () => ({ useWallCatalog: () => ({ items: [], loading: false, error: '', load: async () => {}, save: async () => {} }) }));
 vi.mock('../cloud/useOpeningCatalog', () => ({ useOpeningCatalog: () => ({ items: [], loading: false, error: '', load: async () => {}, save: async () => {} }) }));
@@ -34,14 +33,13 @@ import { blankDesign, referenceDesign } from '../data/templates';
 import { PlanCanvas } from './PlanCanvas';
 import { Library } from './Library';
 import { WallToolMenu } from './WallToolMenu';
-import { DimensionEditDialog } from './DimensionEditDialog';
-import { WallSplitDialog } from './WallSplitDialog';
+import { AiChatPanel, DimensionEditDialog, WallSplitDialog } from './lazyDialogs';
 import { SidePanel } from './SidePanel';
 import { CanvasRail } from './CanvasRail';
 import { ViewMenu } from './ViewMenu';
-import { AiChatPanel } from './AiChatPanel';
 import { OverviewPanel } from './OverviewPanel';
 import { HouseSettingsPanel } from './HouseSettingsPanel';
+import { CostPanel } from './CostPanel';
 import { SelectionEditor } from './SelectionEditor';
 import { ProjectMenu } from './ProjectMenu';
 import { Logo } from './Logo';
@@ -396,18 +394,18 @@ describe('编辑器分区：侧栏、竖条与画布', () => {
   const panel = (tree: Node[]) => tree.find(n => n.type === SidePanel);
   it('默认打开家具库侧栏，竖条「家具」高亮', () => {
     const tree = render();
-    expect(panel(tree)!.props.title).toBe('家具库');
+    expect(panel(tree)!.props.title).toBe('家具设计');
     expect(nodes(panel(tree)!).find(n => n.type === Library)).toBeDefined();
     expect(rail(tree).props.sidePanel).toBe('library');
     expect(tree.some(n => n.type === ViewMenu)).toBe(true);
   });
-  it('竖条点「家具」关闭默认打开的侧栏，再点重新打开；「AI 模式」切到 AI 侧栏', () => {
+  it('竖条点「家具」关闭默认打开的侧栏，再点重新打开；AI 侧栏入口隐藏但功能保留', () => {
     const tree = render();
     (rail(tree).props.onToggle as (kind: string) => void)('library');
     expect(panel(render())).toBeUndefined();
     const reopened = render();
     (rail(reopened).props.onToggle as (kind: string) => void)('ai');
-    expect(panel(render())!.props.title).toBe('AI 模式');
+    expect(panel(render())!.props.title).toBe('AI 设计');
     expect(nodes(panel(render())!).find(n => n.type === AiChatPanel)).toBeDefined();
   });
   it('竖条打开对应侧栏，方案总览与户型设置各有自己的面板', () => {
@@ -417,10 +415,14 @@ describe('编辑器分区：侧栏、竖条与画布', () => {
       return render();
     };
     const settings = panel(open('settings'))!;
-    expect(settings.props.title).toBe('户型设置');
+    expect(settings.props.title).toBe('户型设计');
     expect(nodes(settings).find(n => n.type === HouseSettingsPanel)).toBeDefined();
     expect(nodes(panel(open('overview'))!).find(n => n.type === OverviewPanel)).toBeDefined();
-    expect(panel(open('cost'))!.props.title).toBe('成本管理');
+    expect(panel(open('cost'))!.props.title).toBe('成本设计');
+    // 成本、总览与账号无关：游客（默认 loggedIn: false）也能打开，总览里有成本入口，成本页没有「返回方案总览」
+    expect(nodes(panel(open('overview'))!).find(n => n.type === OverviewPanel)!.props.onCosts).toBeTypeOf('function');
+    expect(nodes(panel(open('cost'))!).find(n => n.type === CostPanel)!.props.overview).toBeUndefined();
+    expect(render().find(n => n.type === SelectionEditor)!.props.showCosts).toBe(true);
   });
   it('绘墙模式显示「完成绘墙」提示并能回到选择工具，画布上不再渲染状态条 / 比例尺 / 左上角文案', () => {
     const tree = render();

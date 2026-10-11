@@ -1,6 +1,4 @@
-import { useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { lazy, Suspense, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -15,6 +13,8 @@ import type { PickerItem } from "./pickerItems";
 import { ASSISTANT_AVATARS, DEFAULT_ASSISTANT_AVATAR, avatarOf } from "../ai/assistantAvatars";
 import { AI_MODELS, DEFAULT_AI_MODEL, modelName, modelOf } from "../ai/models";
 import { ASSISTANT_LIMITS, type Assistant, type AssistantInput } from "../cloud/useAssistants";
+/** Markdown 解析库只在打开预览时下载。 */
+const AssistantMarkdown = lazy(() => import("./AssistantMarkdown"));
 
 /** 模型平铺成一列（不分组），靠搜索定位；厂商名仍可搜到。 */
 const MODEL_ITEMS: PickerItem[] = AI_MODELS.map((m) => ({
@@ -95,7 +95,7 @@ function AssistantForm({ initial, onClose, onSave }: { initial?: Assistant; onCl
         </TabsContent>
         <TabsContent value="preview">
           <div className="assistant-markdown">
-            {prompt.trim() ? <ReactMarkdown remarkPlugins={[remarkGfm]}>{prompt}</ReactMarkdown> : <p className="assistant-markdown-empty">还没有内容</p>}
+            {prompt.trim() ? <Suspense fallback={<p>{prompt}</p>}><AssistantMarkdown>{prompt}</AssistantMarkdown></Suspense> : <p className="assistant-markdown-empty">还没有内容</p>}
           </div>
         </TabsContent>
       </Tabs>

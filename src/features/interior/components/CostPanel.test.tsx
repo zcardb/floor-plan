@@ -18,13 +18,18 @@ const html = (design: Design, selection: Selection = null) =>
     />,
   );
 describe("成本页口径", () => {
-  it("未选中时显示全屋口径：合计主数字、明细分组与按房间列表", () => {
+  it("未选中时显示全屋口径：合计 → 定价 → 明细 → 按房间 → 计算口径，不再有口径标题与返回", () => {
     const d = setPrice(referenceDesign(), "floorPrices", "wood", 200),
       b = costBreakdown(d),
       out = html(d);
-    expect(out).toContain("全屋成本");
-    expect(out).toContain("全屋合计");
-    expect(out).toContain(yuan(b.total));
+    // 顶部只有一个焦点数字 + 硬装 / 软装，不再有「全屋成本 · N 个空间」「全屋合计 · 硬装 + 软装」
+    for (const gone of ["全屋成本", "全屋合计", "个空间", "返回方案总览", "panel-heading"]) expect(out).not.toContain(gone);
+    expect(out.indexOf("cost-summary")).toBeLessThan(out.indexOf("cost-pricing"));
+    expect(out.indexOf("cost-pricing")).toBeLessThan(out.indexOf("明细"));
+    expect(out.indexOf("明细")).toBeLessThan(out.indexOf("按房间"));
+    expect(out.indexOf("按房间")).toBeLessThan(out.indexOf("计算口径"));
+    expect(out).toContain(`<strong>${yuan(b.total)}</strong>`);
+    expect(out).toContain(`硬装</dt><dd>${yuan(b.hardTotal)}</dd>`);
     expect(out).toContain("按房间");
     expect(out).toContain("全屋公共项");
     for (const room of d.rooms) expect(out).toContain(room.name);
@@ -33,7 +38,7 @@ describe("成本页口径", () => {
     const d = referenceDesign();
     expect(d.furniture.length).toBeGreaterThan(0);
     const out = html(d);
-    expect(out).toMatch(/软装 <b class="is-muted">未定价 \d+ 项<\/b>/);
+    expect(out).toMatch(/软装<\/dt><dd class="is-muted">未定价 \d+ 项<\/dd>/);
     expect(out).toContain("只看未定价");
   });
   it("选中房间时切到房间口径，只列本间项目", () => {
@@ -41,8 +46,8 @@ describe("成本页口径", () => {
       room = d.rooms[0],
       other = d.rooms.find((r) => r.id !== room.id)!,
       out = html(d, { kind: "room", id: room.id });
-    expect(out).toContain("房间口径");
-    expect(out).toContain(room.name);
+    expect(out).toMatch(/class="back-link"[^>]*>.*全屋成本<\/button>/);
+    expect(out).toContain(`<h3>${room.name}</h3>`);
     expect(out).toContain("占全屋");
     expect(out).not.toContain("按房间");
     expect(out).not.toContain(">" + other.name + "<");
@@ -51,7 +56,7 @@ describe("成本页口径", () => {
     const d = referenceDesign(),
       f = d.furniture[0],
       out = html(d, { kind: "furniture", id: f.id });
-    expect(out).toContain("房间口径");
+    expect(out).toMatch(/class="back-link"[^>]*>.*全屋成本<\/button>/);
     expect(out).toContain("is-highlight");
   });
   it("空项目打开成本页不报错，显示空状态", () => {
@@ -59,17 +64,16 @@ describe("成本页口径", () => {
     d.rooms = [];
     d.furniture = [];
     const out = html(d);
-    expect(out).toContain("全屋成本");
-    expect(out).toContain(yuan(0));
+    expect(out).toContain(`<strong>${yuan(0)}</strong>`);
   });
 });
-describe("成本页返回方案总览", () => {
-  it("传入 overview 时全屋口径顶部有「返回方案总览」，不传则没有", () => {
-    const d = referenceDesign();
-    const withBack = renderToStaticMarkup(
-      <CostPanel design={d} selection={null} change={vi.fn()} back={vi.fn()} select={vi.fn()} overview={vi.fn()} />,
-    );
-    expect(withBack).toContain("返回方案总览");
-    expect(html(d)).not.toContain("返回方案总览");
+describe("成本页定价分组", () => {
+  it("全部定价后只剩进度与完成提示，不再显示「只看未定价」", () => {
+    const d = blankDesign();
+    d.rooms = [];
+    d.furniture = [];
+    const out = html(d);
+    expect(out).toContain("全部项目已定价");
+    expect(out).not.toContain("只看未定价");
   });
 });

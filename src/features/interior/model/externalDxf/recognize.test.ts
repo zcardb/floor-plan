@@ -3,7 +3,8 @@ import { blankDesign, referenceDesign } from '../../data/templates';
 import { createExportDocument } from '../drawingDocument';
 import { serializeDxf } from '../dxfExport';
 import { area, length } from '../geometry';
-import { readDxfSource, type DxfSegment } from './dxfSource';
+import type { DxfSegment } from './dxfSource';
+import { readDxfSource } from './readDxf';
 import { guessRoles, recognizeDxf } from './recognize';
 import type { Point } from '../types';
 

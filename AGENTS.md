@@ -47,11 +47,12 @@
 
 | 场景 | 组件 | 说明 |
 |---|---|---|
-| 右侧侧栏（家具库 / 方案总览 / 成本 / 户型 / AI 共用） | `SidePanel`（`PanelKind`） | 标题 + 关闭 + 滚动区，宽 340px；≤1100px 变抽屉。内容按 UI_GUIDELINES §10 的刻度写 |
-| 侧栏入口 | `CanvasRail` | 画布右侧竖条：方案总览 → 家具设计 → 成本设计 → 户型设计 → AI 设计 + 收起；整条可拖动 |
-| 顶栏视图设置 | `ViewMenu`（`LAYER_ITEMS`） | 图层开关 + 显示比例 |
+| 右侧侧栏（家具库 / 方案总览 / 成本 / 户型 / AI 共用） | `SidePanel`（`PanelKind`） | 轻量标题行（13px 常规灰字 + 关闭，无分割线）+ 滚动区，宽 340px；≤1100px 变抽屉。内容按 UI_GUIDELINES §10 的刻度写 |
+| 侧栏入口 | `CanvasRail` | 画布右侧竖条：方案总览 → 家具设计 → 成本设计 → 户型设计 + 收起（AI 设计暂时隐藏）；游客与登录一致；整条可拖动 |
+| 顶栏视图设置 | `ViewMenu`（`LAYER_ITEMS`） | 「视图」文字按钮 + 下拉箭头；图层开关 + 显示比例 |
+| 成本合计 / 定价 | `CostSummary` / `CostPricing` | 全屋与房间口径共用 |
 | 顶栏保存与导出 | `ExportMenu`（`saveState`） | 登录后主按钮；游客为副按钮，右侧另有主按钮「登录」 |
-| AI 对话侧栏 | `AiChatPanel` | 复用 `AiComposer` |
+| AI 对话侧栏 | `AiChatPanel` | 复用 `AiComposer`；竖条入口暂时隐藏 |
 | 侧栏里的 2–4 个互斥选项 | `PanelSegmented` | 与「2D 平面 / 3D 场景」同一外观 |
 | 单行分类胶囊（溢出渐隐、滚轮横滑） | `CmsFilterBar` | 管理页与家具库侧栏共用；侧栏传 `className="library-categories"` 变紧凑 |
 | 滚动自动加载（12 条一页） | `ProjectLoadMore` | 家具管理、家具库侧栏共用 |

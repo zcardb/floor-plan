@@ -18,7 +18,7 @@ vi.mock('react', async original => ({
 import { ProjectMenu, LoadMoreSentinel } from './ProjectMenu';
 import { ProjectDeleteDialog, ProjectRenameDialog } from './ProjectDialogs';
 import { NewProjectDialog } from './NewProjectDialog';
-import { AiCreateProjectDialog } from './AiCreateProjectDialog';
+import { AiCreateProjectDialog } from './lazyDialogs';
 import { CreateProjectMenuItems, type CreateProjectActions } from './CreateProjectMenuItems';
 import { Logo } from './Logo';
 import { ProjectRowActions } from './ProjectRowActions';
@@ -163,7 +163,10 @@ describe('ProjectMenu', () => {
     expect(menu({ onCreateProject }).tree.find(n => n.type === NewProjectDialog)!.props.open).toBe(false);
     actions.blank();
     expect(menu({ onCreateProject }).tree.find(n => n.type === NewProjectDialog)!.props.open).toBe(true);
-    expect(menu({ onCreateProject }).tree.some(n => n.type === AiCreateProjectDialog)).toBe(true);
+    // AI 创建弹窗按需加载：第一次点「AI 创建」后才挂载
+    expect(menu({ onCreateProject }).tree.some(n => n.type === AiCreateProjectDialog)).toBe(false);
+    actions.ai!();
+    expect(menu({ onCreateProject }).tree.find(n => n.type === AiCreateProjectDialog)!.props.open).toBe(true);
     expect(menu({ onCreateProject, loggedIn: false }).tree.some(isCreate)).toBe(false);
   });
   it('共享的新建选项：手动创建、AI 创建（可选）、导入 DXF、其他软件 Coming soon', () => {
@@ -312,9 +315,12 @@ describe('视图设置 ViewMenu', () => {
     };
     return { props, tree: nodes(ViewMenu(props)) };
   };
-  it('顶栏右侧只剩图层图标按钮；下拉统一 toolbar-menu 样式，不再有侧栏入口和二级菜单', () => {
+  it('顶栏右侧是「视图」文字 + 下拉箭头（不再是图标）；下拉统一 toolbar-menu 样式，不再有侧栏入口和二级菜单', () => {
     const { tree } = render();
-    expect(tree.find(n => n.props['aria-label'] === '视图设置')!.props.className).toContain('view-menu-trigger');
+    const trigger = tree.find(n => n.props['aria-label'] === '视图设置')!;
+    expect(trigger.props.className).toBe('view-menu-trigger');
+    expect(text(trigger.props.children as ReactNode)).toContain('视图');
+    expect(nodes(trigger).some(n => n.props.className === 'view-menu-caret')).toBe(true);
     expect(tree.find(n => n.props.className === 'toolbar-menu view-menu')).toBeDefined();
     expect(tree.some(n => n.type === DropdownMenuSubTrigger || n.type === DropdownMenuSubContent)).toBe(false);
     const all = text(tree.map(n => n.props.children as ReactNode));
@@ -338,37 +344,35 @@ describe('视图设置 ViewMenu', () => {
 });
 
 describe('统一侧栏与画布竖条', () => {
-  it('侧栏有标题与关闭按钮，内容包在可滚动区里；只读时整体禁用', () => {
+  it('侧栏保留轻量标题行（标题 + 关闭），内容包在可滚动区里；只读时整体禁用', () => {
     const onClose = vi.fn();
-    const tree = nodes(SidePanel({ title: '家具库', onClose, children: '内容' }));
+    const tree = nodes(SidePanel({ title: '家具设计', onClose, children: '内容' }));
     const panel = tree.find(n => String(n.props.className).startsWith('side-panel '))!;
-    expect(text(nodes(panel).find(n => n.props.className === 'side-panel-head')!.props.children as ReactNode)).toContain('家具库');
+    expect(panel.props['aria-label']).toBe('家具设计');
+    expect(text(nodes(panel).find(n => n.props.className === 'side-panel-head')!.props.children as ReactNode)).toContain('家具设计');
     expect(nodes(panel).find(n => n.props.className === 'panel-scroll')).toBeDefined();
     expect(nodes(panel).find(n => n.props.disabled === false)).toBeDefined();
     (tree.find(n => n.props['aria-label'] === '关闭侧栏')!.props.onClick as () => void)();
     expect(onClose).toHaveBeenCalledOnce();
     expect(nodes(SidePanel({ title: '成本', readOnly: true, onClose: vi.fn(), children: 'x' })).find(n => n.props.disabled === true)).toBeDefined();
   });
-  it('竖条顺序：方案总览 / 家具设计 / 成本设计 / 户型设计 / AI 设计（总览、成本、户型登录后可见）+ 收起，没有选择 / 编辑按钮；打开项高亮', () => {
+  it('竖条顺序：方案总览 / 家具设计 / 成本设计 / 户型设计 + 收起，游客与登录一致；AI 设计暂时隐藏；打开项高亮', () => {
     const onToggle = vi.fn();
     const stage = { current: null };
-    const tree = nodes(CanvasRail({ sidePanel: 'library', stage, loggedIn: true, onToggle }));
+    const tree = nodes(CanvasRail({ sidePanel: 'library', stage, onToggle }));
     const labels = tree.filter(n => n.type === 'button' && typeof n.props['aria-label'] === 'string').map(n => n.props['aria-label']);
-    expect(labels).toEqual(['方案总览', '家具设计', '成本设计', '户型设计', 'AI 设计', '收起工具条']);
+    expect(labels).toEqual(['方案总览', '家具设计', '成本设计', '户型设计', '收起工具条']);
     expect(labels).not.toContain('选择');
+    expect(labels).not.toContain('AI 设计');
     const rail = tree.find(n => n.props.className === 'canvas-rail')!;
-    expect(nodes(rail).filter(n => n.type === 'button').map(n => n.props.className)).toEqual(['canvas-rail-button', 'canvas-rail-button active', 'canvas-rail-button', 'canvas-rail-button', 'canvas-rail-button', 'canvas-rail-toggle']);
+    expect(nodes(rail).filter(n => n.type === 'button').map(n => n.props.className)).toEqual(['canvas-rail-button', 'canvas-rail-button active', 'canvas-rail-button', 'canvas-rail-button', 'canvas-rail-toggle']);
     expect(nodes(rail).find(n => n.props['aria-label'] === '家具设计')!.props['aria-pressed']).toBe(true);
-    const guest = CanvasRail({ sidePanel: 'cost', stage, onToggle });
-    expect(nodes(guest).filter(n => typeof n.props['aria-label'] === 'string').map(n => n.props['aria-label'])).toEqual(['画布工具条', '家具设计', 'AI 设计', '收起工具条']);
     (nodes(rail).find(n => n.props['aria-label'] === '方案总览')!.props.onClick as () => void)();
     expect(onToggle).toHaveBeenCalledWith('overview');
     (nodes(rail).find(n => n.props['aria-label'] === '户型设计')!.props.onClick as () => void)();
     expect(onToggle).toHaveBeenCalledWith('settings');
     (nodes(rail).find(n => n.props['aria-label'] === '成本设计')!.props.onClick as () => void)();
     expect(onToggle).toHaveBeenCalledWith('cost');
-    (nodes(rail).find(n => n.props['aria-label'] === 'AI 设计')!.props.onClick as () => void)();
-    expect(onToggle).toHaveBeenCalledWith('ai');
     // 整条可拖：拖动能力挂在竖条本体上，不再有单独的把手
     expect(tree.every(n => n.props.className !== 'canvas-rail-grip')).toBe(true);
     expect(typeof rail.props.onPointerDown).toBe('function');
@@ -377,7 +381,7 @@ describe('统一侧栏与画布竖条', () => {
     // 收起后只剩一个圆形展开按钮
     const toggle = nodes(rail).find(n => n.props.className === 'canvas-rail-toggle')!;
     expect(toggle.props['aria-expanded']).toBe(true);
-    const railProps = { sidePanel: null, stage, loggedIn: true, onToggle } as Parameters<typeof CanvasRail>[0];
+    const railProps = { sidePanel: null, stage, onToggle } as Parameters<typeof CanvasRail>[0];
     state.cursor = 0;
     const folded = nodes(CanvasRail(railProps));
     const foldButton = folded.find(n => n.props.className === 'canvas-rail-toggle')!;
@@ -392,6 +396,6 @@ describe('统一侧栏与画布竖条', () => {
     (collapsed.find(n => n.props['aria-label'] === '展开工具条')!.props.onClick as () => void)();
     state.cursor = 0;
     const expanded = nodes(CanvasRail(railProps));
-    expect(expanded.filter(n => typeof n.props['aria-label'] === 'string' && n.type === 'button').map(n => n.props['aria-label'])).toEqual(['方案总览', '家具设计', '成本设计', '户型设计', 'AI 设计', '收起工具条']);
+    expect(expanded.filter(n => typeof n.props['aria-label'] === 'string' && n.type === 'button').map(n => n.props['aria-label'])).toEqual(['方案总览', '家具设计', '成本设计', '户型设计', '收起工具条']);
   });
 });

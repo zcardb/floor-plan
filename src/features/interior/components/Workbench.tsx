@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { canDeleteWall } from '../model/wallPolicy';
 import { ExportMenu, type ExportFormat } from './ExportMenu';
 import { ProjectMenu, type ProjectNavigation } from './ProjectMenu';
 import { WorkbenchBanner } from './WorkbenchBanner';
-import { DimensionEditDialog } from './DimensionEditDialog';
-import { WallSplitDialog } from './WallSplitDialog';
+import { AiChatPanel, AiRoomDialog, CustomFurnitureDialog, DimensionEditDialog, WallSplitDialog } from './lazyDialogs';
 import { CompassRose } from './CompassRose';
 import { northAngle } from '../model/northAngle';
 import { syncAccountFurniture, syncAccountMaterials } from '../model/furnitureSync';
@@ -53,6 +52,7 @@ import {
   X,
 } from "lucide-react";
 import { notify } from "@/lib/notify";
+import { afterFirstScreen } from "@/lib/afterFirstScreen";
 import { onPageHide, saveFile } from "@/lib/platform";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { SaveFileDialog, type PendingFile } from "./SaveFileDialog";
@@ -89,7 +89,6 @@ import { blankDesign, designForTemplate, isAiDesign } from "../data/templates";
 import { openingKindLabel } from "../model/hardMaterials";
 import { useRoomAi } from "../ai/useRoomAi";
 import { useAiCatalog } from "../ai/useAiCatalog";
-import { AiRoomDialog } from "./AiRoomDialog";
 import { library } from "../data/catalog";
 import { Library } from "./Library";
 import { WallToolMenu } from './WallToolMenu';
@@ -97,10 +96,8 @@ import { CostPanel } from "./CostPanel";
 import { SidePanel, type PanelKind } from "./SidePanel";
 import { CanvasRail } from "./CanvasRail";
 import { ViewMenu } from "./ViewMenu";
-import { AiChatPanel } from "./AiChatPanel";
 import { OverviewPanel } from "./OverviewPanel";
 import { HouseSettingsPanel } from "./HouseSettingsPanel";
-import { CustomFurnitureDialog } from "./CustomFurnitureDialog";
 import { useFloorCatalog } from "../cloud/useFloorCatalog";
 import { useWallCatalog } from "../cloud/useWallCatalog";
 import { useOpeningCatalog } from "../cloud/useOpeningCatalog";
@@ -115,7 +112,7 @@ import type { SaveStatus } from "../cloud/useProjects";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { DXF_TEMPLATE_ID } from "../model/externalDxf/recognize";
 type SceneComponent = typeof Scene3D;
-/** 3D 模块只下载一次：空闲时预加载，点击时复用同一个 promise。 */
+/** 3D 模块只下载一次：首屏（2D 页面与数据）完成后空闲时预加载，悬停 / 点击 3D 时复用同一个 promise。 */
 let scenePromise: Promise<typeof import("../scene/Scene3D")> | null = null;
 /** 未登录时没有素材覆盖：固定引用，同步副作用不会因为新数组反复触发。 */
 const emptyOverrides: LibraryItem[] = [];
@@ -124,6 +121,8 @@ const loadScene = () =>
     scenePromise = null;
     throw e;
   }));
+/** 预加载失败不提示：真正点 3D 时会重新下载并走失败提示。 */
+const preloadScene = () => void loadScene().catch(() => undefined);
 /** 窄屏（≤1100px）侧栏以抽屉形式覆盖画布：放置家具、点画布、Esc 后自动收起。 */
 const isDrawerLayout = () => typeof matchMedia !== "undefined" && matchMedia("(max-width:1100px)").matches;
 const PANEL_TITLES: Record<PanelKind, string> = { library: "家具设计", ai: "AI 设计", settings: "户型设计", overview: "方案总览", cost: "成本设计" };
@@ -256,7 +255,10 @@ export function Workbench(p: Props) {
       notify.success('已取消分割，连续墙段已合并');
     } catch (e) { notify.fail(e instanceof Error ? e.message : '取消分割失败'); }
   };
-  const [customOpen, setCustomOpen] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false),
+    // 自定义家具弹窗按需下载：第一次打开后才挂载，之后保持挂载以保留关闭动画。
+    [customMounted, setCustomMounted] = useState(false);
+  const openCustom = () => { setCustomMounted(true); setCustomOpen(true); };
   const floorCatalog = useFloorCatalog(), loadAccountFloors = floorCatalog.load;
   const wallCatalog = useWallCatalog(), loadAccountWalls = wallCatalog.load;
   const openingCatalog = useOpeningCatalog(), loadAccountOpenings = openingCatalog.load;
@@ -349,18 +351,11 @@ export function Workbench(p: Props) {
     mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
-    const preload = () => void loadScene().catch(() => undefined);
-    if ("requestIdleCallback" in window) {
-      const id = requestIdleCallback(preload, { timeout: 4000 });
-      return () => {
-        mounted.current = false;
-        cancelIdleCallback(id);
-      };
-    }
-    const id = setTimeout(preload, 1500);
+    // 默认是 2D：3D 引擎不和首屏抢带宽，等页面与数据加载完、浏览器空闲时再静默预加载。
+    const cancel = afterFirstScreen(preloadScene);
     return () => {
       mounted.current = false;
-      clearTimeout(id);
+      cancel();
     };
   }, []);
   const select = useCallback((s: Selection) => {
@@ -813,6 +808,8 @@ export function Workbench(p: Props) {
             <button
               className={view === "3d" ? "active" : ""}
               onClick={() => void toggleView("3d")}
+              onPointerEnter={preloadScene}
+              onFocus={preloadScene}
               disabled={sceneLoading}
             >
               {sceneLoading ? (
@@ -1117,7 +1114,7 @@ export function Workbench(p: Props) {
             </button>
           </EditorTooltip>
         </div>
-        {dimensionValid && <DimensionEditDialog design={dimensionEdit.before} binding={dimensionEdit.binding}
+        {dimensionValid && <Suspense fallback={null}><DimensionEditDialog design={dimensionEdit.before} binding={dimensionEdit.binding}
           onClose={() => setDimensionEdit(null)} onApply={(millimeters, fixed) => {
             const current = model.current.current;
             if (current !== dimensionEdit.before) throw new Error('设计已变化，请重新选择标注');
@@ -1130,8 +1127,8 @@ export function Workbench(p: Props) {
               return !old || old.a[0] !== w.a[0] || old.a[1] !== w.a[1] || old.b[0] !== w.b[0] || old.b[1] !== w.b[1];
             }).map(w => w.id);
             commit(splitAtJunctionsOf(followWallFurniture(current, edited), changed), current);
-          }} />}
-        {splitValid && <WallSplitDialog design={wallSplit.before} wallId={wallSplit.wallId}
+          }} /></Suspense>}
+        {splitValid && <Suspense fallback={null}><WallSplitDialog design={wallSplit.before} wallId={wallSplit.wallId}
           onClose={() => setWallSplit(null)} onApply={(cuts, selectedSegment) => {
             const current = model.current.current;
             if (current !== wallSplit.before) throw new Error('设计已变化，请重新选择墙体');
@@ -1139,7 +1136,7 @@ export function Workbench(p: Props) {
             commit(result.design, current);
             setWallSplit(null);
             setSelection({ kind: 'wall', id: result.selectedId });
-          }} />}
+          }} /></Suspense>}
         <SelectionEditor
           splitWall={view === '2d' ? openWallSplit : undefined}
           mergeWall={view === '2d' ? id => void cancelWallSplit(id) : undefined}
@@ -1167,7 +1164,7 @@ export function Workbench(p: Props) {
         <CanvasRail sidePanel={sidePanel} stage={stage} onToggle={togglePanel} />
       </main>
       {sidePanel && (
-        <SidePanel title={PANEL_TITLES[sidePanel]} readOnly={readOnly && sidePanel !== "library"}>
+        <SidePanel title={PANEL_TITLES[sidePanel]} readOnly={readOnly && sidePanel !== "library"} onClose={() => { sizeTransaction.flush(); setSidePanel(null); }}>
           {sidePanel === "library" ? (
             <Library
               add={(it) => add(it)}
@@ -1179,11 +1176,11 @@ export function Workbench(p: Props) {
               structureTools={structureTools}
               customItems={[...projectCatalog, ...accountFurniture]}
               builtinItems={builtinLibrary}
-              onNew={p.loggedIn && !readOnly ? () => setCustomOpen(true) : undefined}
+              onNew={p.loggedIn && !readOnly ? openCustom : undefined}
               readOnly={readOnly}
             />
           ) : sidePanel === "ai" ? (
-            <AiChatPanel loggedIn={p.loggedIn} login={p.login} />
+            <Suspense fallback={null}><AiChatPanel loggedIn={p.loggedIn} login={p.login} /></Suspense>
           ) : sidePanel === "settings" ? (
             <HouseSettingsPanel design={d} change={change} />
           ) : sidePanel === "cost" ? (
@@ -1206,7 +1203,7 @@ export function Workbench(p: Props) {
           onClick={() => setSidePanel(null)}
         />
       )}
-      {p.loggedIn && <CustomFurnitureDialog
+      {p.loggedIn && customMounted && <Suspense fallback={null}><CustomFurnitureDialog
         open={customOpen}
         onOpenChange={setCustomOpen}
         loggedIn={p.loggedIn}
@@ -1217,8 +1214,8 @@ export function Workbench(p: Props) {
         onCreateFloor={saveCustomFloor}
         onCreateWall={saveCustomWall}
         onCreateOpening={saveCustomOpening}
-      />}
-      {aiEnabled && <AiRoomDialog ai={roomAi} furniture={aiCatalog.items} />}
+      /></Suspense>}
+      {aiEnabled && roomAi.room && <Suspense fallback={null}><AiRoomDialog ai={roomAi} furniture={aiCatalog.items} /></Suspense>}
       <SaveFileDialog file={pendingFile} onClose={() => setPendingFile(null)} />
     </div>
     </div>

@@ -679,6 +679,36 @@
     border-left: 1px solid hsl(var(--border));
     background: hsl(var(--card));
   }
+  /* 侧栏标题行：轻量——13px 常规字重灰字 + 14px 灰色关闭，下方不加分割线，标题不和内容抢层级 */
+  .side-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex: none;
+    min-height: 44px;
+    padding: 8px 10px 0 var(--sp-x);
+  }
+  .side-panel-head h2 {
+    margin: 0;
+    font-size: var(--fs-title);
+    font-weight: 400;
+    line-height: 1;
+    color: hsl(var(--muted-foreground));
+  }
+  .side-panel-close {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: var(--ctl-sm);
+    height: var(--ctl-sm);
+    border-radius: var(--ctl-radius-in);
+    color: hsl(var(--muted-foreground));
+    transition: background-color .15s ease, color .15s ease;
+  }
+  .side-panel-close > svg { width: 14px; height: 14px; }
+  .side-panel-close:hover { background: hsl(var(--secondary)); color: hsl(var(--foreground)); }
+  .side-panel-close:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
   .panel-scroll {
     flex: 1;
     min-height: 0;
@@ -724,7 +754,8 @@
     display: flex;
     align-items: center;
     gap: var(--sp-col);
-    padding: 12px var(--sp-x) 10px;
+    /* 标题行下方 8px 起搜索行，行与行之间统一 14px */
+    padding: 8px var(--sp-x) 14px;
   }
   .library-new {
     display: grid;
@@ -757,7 +788,7 @@
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    padding-top: 12px;
+    padding-top: var(--sp-section);
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--border)) transparent;
   }
@@ -765,16 +796,16 @@
   .library-scroll .project-load-more.is-done { min-height: 28px; }
   /* 分类：沿用管理页 CmsFilterBar（溢出渐隐、滚轮横滑），尺寸收成侧栏紧凑版 */
   .cms-filter-bar.library-categories {
-    gap: 6px;
-    margin: 0 var(--sp-x) 10px;
+    gap: 8px;
+    margin: 0 var(--sp-x) 14px;
     padding-bottom: 0;
     scrollbar-width: none;
     scroll-padding-inline: 20px;
   }
   .cms-filter-bar.library-categories::-webkit-scrollbar { display: none; }
   .cms-filter-bar.library-categories button {
-    min-height: var(--ctl-sm);
-    padding: 0 10px;
+    min-height: 30px;
+    padding: 0 12px;
     font-size: var(--fs-control);
   }
   .library-subheading {
@@ -782,7 +813,7 @@
     align-items: baseline;
     justify-content: space-between;
     gap: 8px;
-    padding: 0 var(--sp-x) 10px;
+    padding: 0 var(--sp-x) 14px;
     font-size: var(--fs-group);
     font-weight: 600;
   }
@@ -3579,8 +3610,6 @@ button.room-cost-row:hover {
 .save-button-mark[data-tone="busy"] { background:hsl(var(--primary-foreground) / 0.75); }
 .save-button-mark[data-tone="ok"] { background:hsl(var(--teal)); }
 .toolbar-right>.save-button { margin:0; }
-/* 顶栏既有 32px 的单行按钮，也有 32px 的方图标按钮：两者的图标统一 16px。 */
-.view-menu-trigger>svg { width:16px; height:16px; }
 /* 游客：保存降为副按钮（浅底前景色），主按钮让给「登录」 */
 .save-button.is-secondary { background:hsl(var(--secondary)); color:hsl(var(--foreground)); }
 .save-button.is-secondary:hover,.save-button.is-secondary[data-state="open"] { background:hsl(var(--accent)); color:hsl(var(--primary)); }
@@ -3592,12 +3621,13 @@ button.room-cost-row:hover {
 .save-menu-status.is-error { color:hsl(var(--destructive)); }
 .save-menu-status .save-button-mark { width:6px; height:6px; }
 .save-menu-status.is-error .save-button-mark { background:hsl(var(--destructive)); }
-/* 顶栏「集合」：立方体图标按钮，与项目下拉同一刻度 */
-/* 集合按钮：默认就有底色，悬停 / 打开时更亮，图标略大 */
-/* 顶栏「视图设置」：图层图标按钮，默认有浅底，悬停 / 打开时更亮 */
-.view-menu-trigger { width:var(--ctl-md); height:var(--ctl-md); background:hsl(var(--secondary)); color:hsl(var(--foreground)); }
+/* 顶栏「视图」：文字 + 下拉箭头，与游客态「保存」副按钮同一刻度（32px 高、12/600、14px 箭头、浅底），一行不换行 */
+.view-menu-trigger { display:inline-flex; flex:none; align-items:center; gap:6px; height:var(--ctl-md); padding:0 8px 0 12px; border-radius:var(--ctl-radius-in); background:hsl(var(--secondary)); font-size:var(--fs-control); font-weight:600; line-height:1; white-space:nowrap; color:hsl(var(--foreground)); transition:background-color .15s ease, color .15s ease; }
+.view-menu-trigger .view-menu-caret { flex:none; width:14px; height:14px; opacity:.6; transition:transform .15s ease; }
 .view-menu-trigger:hover { background:hsl(var(--accent)); color:hsl(var(--primary)); }
-.view-menu-trigger[data-state="open"] { background:hsl(var(--primary) / 0.16); color:hsl(var(--primary)); }
+.view-menu-trigger[data-state="open"] { background:hsl(var(--accent)); color:hsl(var(--primary)); }
+.view-menu-trigger[data-state="open"] .view-menu-caret { transform:rotate(180deg); }
+.view-menu-trigger:focus-visible { outline:2px solid hsl(var(--ring)); outline-offset:1px; }
 .view-menu { width:min(208px,calc(100vw - 24px)); }
 .view-menu .layer-checkbox { width:16px; height:16px; border-radius:4px; }
 .project-menu-email { padding:6px 9px 4px; font-size:var(--fs-meta); color:hsl(var(--muted-foreground)); font-weight:400; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -3621,9 +3651,13 @@ button.room-cost-row:hover {
   .project-menu-trigger { max-width:132px; gap:6px; padding:0 4px; margin-left:-4px; font-size:12px; }
   .save-button { padding:0 10px; }
   .toolbar-right>.save-button { margin:0 2px; }
-  /* 窄屏顶栏挤：登录按钮只留文字 */
+  /* 窄屏顶栏挤：登录按钮只留文字；视图 / 保存去掉下拉箭头，三个按钮收紧到一屏内 */
   .toolbar-login { padding:0 10px; }
   .toolbar-login > svg { display:none; }
+  .view-menu-trigger { padding:0 10px; }
+  .view-menu-trigger .view-menu-caret,
+  .save-button .save-button-caret { display:none; }
+  .toolbar-right { gap:4px; }
 }
 
 /* 工作台顶部提示条（游客改模版 / 内置模板只读预览共用 WorkbenchBanner）：放在工作台栅格之外，避免打乱 .workbench 的三行布局 */
@@ -3659,6 +3693,9 @@ button.room-cost-row:hover {
 /* 分组：统一内边距 + 组间分隔线 */
 .side-panel section { padding: var(--rp-section) var(--rp-x); border-bottom: 1px solid hsl(var(--border)); }
 .side-panel section:last-child { border-bottom: 0; }
+/* 标题行之后的第一组：顶部 8px，与家具库搜索行对齐 */
+.side-panel fieldset > section:first-child,
+.side-panel fieldset > .panel-heading:first-child { padding-top: 8px; }
 /* 组标题：文字靠左，计量 / 金额 / 提示靠右 */
 .side-panel .section-title { display: flex; align-items: baseline; justify-content: flex-start; gap: 6px; margin: 0 0 var(--rp-title); font-size: var(--fs-group); font-weight: 600; line-height: 18px; color: hsl(var(--foreground)); }
 .side-panel .section-title > svg { display: none; }
@@ -3667,8 +3704,7 @@ button.room-cost-row:hover {
 .side-panel .section-title > span { font-weight: 600; color: hsl(var(--foreground)); }
 /* 面板顶部的口径标题行（成本）：可选返回 + 标题左 / 计量右 */
 .side-panel .panel-heading { display: grid; gap: 8px; padding: var(--rp-section) var(--rp-x) 0; font-size: var(--fs-group); }
-.side-panel .panel-heading-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
-.side-panel .panel-heading-row > h3 { margin: 0; overflow: hidden; font-size: var(--fs-title); font-weight: 600; color: hsl(var(--foreground)); text-overflow: ellipsis; white-space: nowrap; }
+.side-panel .panel-heading > h3 { margin: 0; overflow: hidden; font-size: var(--fs-title); font-weight: 600; color: hsl(var(--foreground)); text-overflow: ellipsis; white-space: nowrap; }
 .side-panel .panel-heading + section { padding-top: var(--rp-row); }
 .side-panel .mini-label { font-size: var(--fs-meta); font-weight: 400; color: hsl(var(--muted-foreground)); white-space: nowrap; }
 .side-panel .back-link { display: inline-flex; align-items: center; justify-self: start; gap: 4px; height: var(--ctl-sm); margin: 0 0 0 -8px; padding: 0 8px; border-radius: var(--ctl-radius-in); font-size: var(--fs-control); font-weight: 500; color: hsl(var(--muted-foreground)); transition: background-color .15s ease, color .15s ease; }
@@ -4299,8 +4335,8 @@ svg.material-thumb { display: block; }
 @media (max-width: 600px) {
   .overview-metrics { grid-template-columns:repeat(2, minmax(0, 1fr)); }
   .mode-hint-finish { min-height:34px; }
-  /* 手机上竖条改成右下角横排、不可拖动（压掉拖动写入的内联位移），避开左下角缩放条 */
-  .canvas-rail { top:auto; left:auto; right:12px; bottom:16px; flex-direction:row; transform:none !important; cursor:default; touch-action:auto; }
+  /* 手机上竖条改成右下角横排、不可拖动（压掉拖动写入的内联位移），抬到左下角缩放条上方，两者不重叠 */
+  .canvas-rail { top:auto; left:auto; right:12px; bottom:76px; flex-direction:row; transform:none !important; cursor:default; touch-action:auto; }
   .canvas-rail-button, .canvas-rail-toggle { width:38px; height:38px; }
   .canvas-rail-toggle { height:38px; }
   /* 横排时收起 / 展开图标跟着转 90° */

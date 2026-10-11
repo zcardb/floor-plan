@@ -36,6 +36,19 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
       manifest: true,
+      rollupOptions: {
+        output: {
+          // 首屏必需的第三方库拆成几个稳定分包：并行下载，业务代码更新时仍可命中缓存。
+          // three 不在此列，随 3D 场景按需加载。
+          manualChunks(id: string) {
+            if (!id.includes('node_modules')) return undefined;
+            if (/[\\/]node_modules[\\/](\.pnpm[\\/])?(react|react-dom|scheduler|react-router|react-router-dom)[@\\/]/.test(id)) return 'vendor-react';
+            if (/[\\/]node_modules[\\/](\.pnpm[\\/])?@supabase[+\\/]/.test(id)) return 'vendor-supabase';
+            if (/[\\/]node_modules[\\/](\.pnpm[\\/])?@(radix-ui|floating-ui)[+\\/]/.test(id)) return 'vendor-ui';
+            return undefined;
+          },
+        },
+      },
     }
   };
 });

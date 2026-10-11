@@ -1,6 +1,6 @@
 import { PAYLOAD_MARKER, decodePayload } from './designPayload';
 import { validateDesign } from './validation';
-import { readDxfSource, type DxfSource } from './externalDxf/dxfSource';
+import type { DxfSource } from './externalDxf/dxfSource';
 import type { Design } from './types';
 
 /** 导入入口只开放 DXF；JSON / SVG 的解析保留给本应用导出文件的回读。 */
@@ -55,7 +55,10 @@ export async function parseDesignFile(file: ImportFile): Promise<ImportedFile> {
   }
   if (extension === 'dxf') {
     const payload = dxfPayload(text);
-    return payload ? embedded(payload, fallbackName) : { kind: 'dxf', source: readDxfSource(text), name: fallbackName };
+    if (payload) return embedded(payload, fallbackName);
+    // 外部图纸才需要 dxf-parser：按需下载，不进首屏包。
+    const { readDxfSource } = await import('./externalDxf/readDxf');
+    return { kind: 'dxf', source: readDxfSource(text), name: fallbackName };
   }
   let raw: { name?: unknown; state?: unknown };
   try { raw = JSON.parse(text); } catch { throw new Error('方案文件格式不正确'); }
