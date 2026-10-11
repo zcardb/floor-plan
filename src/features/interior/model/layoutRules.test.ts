@@ -134,32 +134,48 @@ describe("落库前的确定性校正", () => {
 });
 
 describe("过道连通：门口被挡住要报出来", () => {
-  it("两个门口的通道被大衣柜堵死时报出这件家具", () => {
+  /** 4000×3000 的过道式房间，左右各一扇门；家具上下贯通才算真的堵死。 */
+  const throughway = () => {
     const spec: PlanSpec = {
       id: "passage",
-      width: 6000,
-      depth: 5000,
+      width: 4000,
+      depth: 3000,
       walls: [],
-      rooms: [{ id: "hall", name: "客厅", mat: "wood", poly: [[0, 0], [6000, 0], [6000, 5000], [0, 5000]] }],
+      rooms: [{ id: "hall", name: "过道", mat: "wood", poly: [[0, 0], [4000, 0], [4000, 3000], [0, 3000]] }],
       openings: [
-        { wall: "left", kind: "door", at: 1000, width: 900, into: "right", hinge: "start" },
-        { wall: "right", kind: "door", at: 1000, width: 900, into: "left", hinge: "start" },
+        { wall: "left", kind: "door", at: 1500, width: 900, into: "right", hinge: "start" },
+        { wall: "right", kind: "door", at: 1500, width: 900, into: "left", hinge: "start" },
       ],
       furniture: [],
     };
     const d = buildPlan(spec, libraryResolver);
-    const room = roomOf(d, "客厅");
-    const layout = roomLayout(d, room);
-    expect(layout.doors.length).toBe(2);
-    // 房间中间竖着一整排衣柜（上下贯通），两个门之间走不通。
-    const wallOfFurniture = item("wardrobe", "一排衣柜", 3000, 2500, 5000, 600, 90, 2000);
-    expect(passageBlocker([wallOfFurniture], layout)?.name).toBe("一排衣柜");
-    // 只在下端留 500 宽的缝：不够一个人通过，仍然报。
-    const almost = item("wardrobe", "几乎一堵墙", 3000, 2250, 4500, 600, 90, 2000);
-    expect(passageBlocker([almost], layout)?.name).toBe("几乎一堵墙");
-    // 留出 800 宽的通道后不再报。
-    const passable = item("wardrobe", "留了过道", 3000, 2100, 4200, 600, 90, 2000);
-    expect(passageBlocker([passable], layout)).toBeNull();
+    return roomLayout(d, roomOf(d, "过道"));
+  };
+
+  it("上下贯通的一排衣柜把两个门隔开时报出这件家具", () => {
+    const layout = throughway();
+    expect(layout.doors).toHaveLength(2);
+    const divider = item("wardrobe", "一排衣柜", 2000, 1500, 3000, 600, 90, 2000);
+    expect(passageBlocker([divider], layout)?.name).toBe("一排衣柜");
+  });
+
+  it("家具整块盖住门口内侧时，门口走不进去也要报出来", () => {
+    const layout = throughway();
+    // 衣柜横在左门内侧 1.5 m 处，左门附近整片区域都被占满。
+    const covering = item("wardrobe", "堵住左门的衣柜", 750, 1500, 1500, 600, 0, 2000);
+    expect(passageBlocker([covering], layout)?.name).toBe("堵住左门的衣柜");
+  });
+
+  it("只挡住一侧、两个门仍能互通的家具不算堵路", () => {
+    const layout = throughway();
+    const edge = item("wardrobe", "靠墙衣柜", 2000, 2700, 3000, 600, 0, 2000);
+    expect(passageBlocker([edge], layout)).toBeNull();
+  });
+
+  it("地毯不参与通行判断（不算挡路）", () => {
+    const layout = throughway();
+    const rug = item("rug", "地毯", 2000, 1500, 3000, 600, 90, 2000);
+    expect(passageBlocker([rug], layout)).toBeNull();
   });
 });
 

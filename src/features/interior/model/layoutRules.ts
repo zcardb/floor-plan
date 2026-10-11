@@ -377,16 +377,28 @@ export function passageBlocker(furniture: Furniture[], layout: RoomLayout): Furn
     return out;
   };
   const empty = walkable(false), real = walkable(true);
-  /** 门口附近（约 700 mm 内）最近的可走格子。 */
+  /** 从门口直线走过去不碰家具（地毯除外）。 */
+  const clearLine = (p: Point, q: Point, withFurniture: boolean) => {
+    if (!withFurniture) return true;
+    const steps = Math.max(1, Math.ceil(Math.hypot(q[0] - p[0], q[1] - p[1]) / 50));
+    for (let k = 0; k <= steps; k++) {
+      const x = p[0] + ((q[0] - p[0]) * k) / steps, y = p[1] + ((q[1] - p[1]) * k) / steps;
+      const c = Math.floor((x - b.x) / GRID), r = Math.floor((y - b.y) / GRID);
+      if (c >= 0 && r >= 0 && c < cols && r < rows && taken[r * cols + c]) return false;
+    }
+    return true;
+  };
+  /** 门口附近（约 700 mm 内）、能直线走到的最近可走格子。 */
   const seedOf = (grid: Uint8Array, p: Point) => {
-    let best = -1, bestDist = Infinity;
+    const found: { id: number; dist: number; at: Point }[] = [];
     const c0 = Math.floor((p[0] - b.x) / GRID), r0 = Math.floor((p[1] - b.y) / GRID);
     for (let r = r0 - 7; r <= r0 + 7; r++) for (let c = c0 - 7; c <= c0 + 7; c++) {
       if (r < 0 || c < 0 || r >= rows || c >= cols || !grid[r * cols + c]) continue;
-      const [x, y] = at(c, r), dist = Math.hypot(x - p[0], y - p[1]);
-      if (dist <= 700 && dist < bestDist) { best = r * cols + c; bestDist = dist; }
+      const q = at(c, r), dist = Math.hypot(q[0] - p[0], q[1] - p[1]);
+      if (dist <= 700) found.push({ id: r * cols + c, dist, at: q });
     }
-    return best;
+    found.sort((m, n) => m.dist - n.dist);
+    return found.find((f) => clearLine(p, f.at, grid === real))?.id ?? -1;
   };
   const nearest = (p: Point) => blockers.reduce<{ f: Furniture | null; dist: number }>((m, f) => {
     const [x1, y1, x2, y2] = boxOf(f);

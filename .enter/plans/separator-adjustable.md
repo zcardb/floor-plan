@@ -34,10 +34,20 @@
   - 选中的正好是一个已有组时显示「解除组合」（`Ungroup` 图标，快捷键 Ctrl Shift G）。
   - 每次组合或解除都会弹出提示，并可以撤销。整组旋转和删除沿用现有逻辑。
 
-## 3. 颜色：默认只显示一个色块（新增 `ColorMenu.tsx`、`SelectionEditor.tsx`、`PropertyPanel.tsx`）
-- 把 `ColorPickerField` 弹层里的内容（常用色网格加自定义取色）抽成共享的 `ColorPalette` 组件。
-- 新增 `ColorMenu`：工具条上只有一个当前颜色的圆形色块按钮，点开后是 `visual-editor-popover`，里面放 `ColorPalette`。选常用色会立即生效并关闭弹层；自定义色在取色器确认时提交一次，只记一步撤销。
-- 用 `ColorMenu` 替换工具条和属性面板里原来平铺的 `ColorSwatches`，然后删除 `ColorSwatches.tsx`。`ColorPickerField` 改为复用 `ColorPalette`，外观不变。
+## 3. 颜色：全项目统一成一个通用组件 `ColorPicker`（新增 `components/ColorPicker.tsx`）
+- 走查结果，目前一共有两套颜色选择，用在 5 个地方：
+  - `ColorSwatches`（色块平铺 + 调色盘图标）：画布工具条（家具、墙体）、属性面板（家具颜色）。
+  - `ColorPickerField`（按钮 + 弹层）：新建或编辑家具的「模型颜色」、自定义地面的「地面颜色」、自定义墙面、屋面、吊顶的「颜色」。
+- 统一成一个 `ColorPicker`，交互只有一种：
+  - 默认只显示一个当前颜色的色块。
+  - 点开是同一个弹层：上面是常用色网格（`FURNITURE_COLORS`，当前色打勾），下面是「自定义颜色」（系统取色器，旁边显示 HEX）。
+  - 选常用色立即生效并关闭；自定义色在取色器确认时提交一次，只记一步撤销。
+  - 唯一的差别是触发器形态，用一个参数控制：工具条里是纯圆形色块（`variant="swatch"`）；表单和属性面板里是「色块 + HEX」的输入框样式（`variant="field"`，带标签），弹层完全相同。
+- 5 个使用处全部换成 `ColorPicker`：`SelectionEditor`、`PropertyPanel`、`FurnitureFormFields`、`CustomFloorForm`、`CustomColorMaterialForm`。
+- 清理不再使用的代码：
+  - 删除 `ColorSwatches.tsx`、`ColorPickerField.tsx`。
+  - 删除 `index.css` 里的 `.visual-colors*`、`.visual-custom-color*`、`.custom-color-field`、`.furniture-color-*`，以及没有地方用到的 `.property-field input[type="color"]` 规则和对应的移动端、属性面板覆盖样式。
+  - 新样式统一放在 `.color-picker-*` 下，只使用设计系统 token。
 
 ## 4. 带缩略图的下拉（新增 `VisualSelectField.tsx`、`materialThumbs.tsx`）
 - 统一采用「新建家具」弹窗里「参考类型」那个下拉的样式（`FurniturePicker`：搜索框、分组、左侧图像、当前项打勾）。新增 `VisualSelectField`：标签 + 带缩略图的触发按钮（样式和 `editor-control` 一致）+ `FurniturePicker`（传入 `selectedId`）。
@@ -81,7 +91,9 @@
 - [ ] `furnitureGroup.ts`：新增 `groupFurniture` / `ungroupFurniture` / `expandToGroups` / `persistentGroupOf`
 - [ ] `PlanCanvas.tsx`：点击或拖动已组合的家具时选中并移动整组；框选结果补全为整组
 - [ ] `SelectionEditor.tsx` 和 `Workbench.tsx`：「组合 / 解除组合」按钮、Ctrl G / Ctrl Shift G、提示和撤销
-- [ ] 抽出 `ColorPalette`，新增 `ColorMenu`；工具条和属性面板改用 `ColorMenu`；删除 `ColorSwatches.tsx`
+- [ ] 新增 `ColorPicker.tsx`（`swatch` / `field` 两种触发器，共用一个弹层：常用色 + 自定义取色）
+- [ ] `SelectionEditor`、`PropertyPanel`、`FurnitureFormFields`、`CustomFloorForm`、`CustomColorMaterialForm` 全部改用 `ColorPicker`
+- [ ] 删除 `ColorSwatches.tsx`、`ColorPickerField.tsx`，以及 `index.css` 里旧颜色样式和没用到的 `input[type="color"]` 规则；之后全局搜索确认没有残留引用
 - [ ] 新增 `VisualSelectField.tsx` 和 `materialThumbs.tsx`
 - [ ] 地面、墙面、屋面、吊顶、门窗款式、外形改用带图下拉（`SelectionEditor`、`RoomSurfaceFields`、`OpeningVariantSelect`、`PropertyPanel`、`RoomSurfacePanel`、`FurnitureFormFields`）
 - [ ] `ProjectMenu.tsx`：Logo 并入触发按钮；`Workbench.tsx` 去掉单独的 Logo
@@ -97,5 +109,6 @@
 - [ ] 单元测试 `furnitureSync`：已调整的内置家具，只同步未在项目里改过的 `imageUrl` / `model3d`
 - [ ] 更新 `Workbench.test.tsx`：工具按钮只剩「选择」「门」「窗」
 - [ ] 更新 `SelectionEditor.test.tsx`：工具条只有一个色块；多选显示「组合」，选中已有组显示「解除组合」
+- [ ] 新增 `ColorPicker` 测试：点常用色只调用一次 `onChange` 并关闭；自定义色在 change 时提交；两种触发器打开的是同一个弹层
 - [ ] 截图检查（desktop_1280）：工具条色块、带图下拉、项目切换弹层
 - [ ] 运行 `pnpm exec tsc -p tsconfig.app.json --noEmit`（`wallFaces.ts` 原有的那个错误除外）、`pnpm exec vitest run src`、`pnpm run lint` 和 `pnpm run build`
