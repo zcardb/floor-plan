@@ -41,6 +41,7 @@ import { cardPrice } from "../model/priceLabel";
 import { syncStairsToHeight } from "../model/stairs";
 import { ColorSwatches } from "./ColorSwatches";
 import { PanelHint, ShortcutList } from "./PanelHint";
+import { BackingNote } from "./BackingNote";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 interface Props {
@@ -303,6 +304,7 @@ export function PropertyPanel({
         <PanelHint id="furniture-drag">
           <p>拖动家具移动；顶部圆点旋转，右下方块改变尺寸。</p>
         </PanelHint>
+        <BackingNote design={design} furniture={f} />
       </>
     );
   if (r) {

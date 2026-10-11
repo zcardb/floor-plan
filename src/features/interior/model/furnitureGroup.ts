@@ -53,6 +53,45 @@ export function moveGroup(d: Design, ids: string[], delta: Point): Design {
   return { ...d, furniture: d.furniture.map(f => set.has(f.id) ? { ...f, cx: f.cx + delta[0], cy: f.cy + delta[1] } : f) };
 }
 
+/** 某件家具所在的持久组合成员（按图纸顺序）；未组合时只有它自己。 */
+export function persistentGroupOf(d: Design, id: string): string[] {
+  const groupId = d.furniture.find(f => f.id === id)?.groupId;
+  return groupId ? d.furniture.filter(f => f.groupId === groupId).map(f => f.id) : [id];
+}
+
+/** 框到组合里任意一件即补全整组（按图纸顺序）。 */
+export function expandToGroups(d: Design, ids: string[]): string[] {
+  const set = new Set(ids), groups = new Set(d.furniture.filter(f => set.has(f.id) && f.groupId).map(f => f.groupId));
+  return d.furniture.filter(f => set.has(f.id) || (f.groupId && groups.has(f.groupId))).map(f => f.id);
+}
+
+/** 选中的一组家具是否正好是一个完整的持久组合。 */
+export function isPersistentGroup(d: Design, ids: string[]): boolean {
+  if (ids.length < 2) return false;
+  const groupId = d.furniture.find(f => f.id === ids[0])?.groupId;
+  if (!groupId) return false;
+  const members = d.furniture.filter(f => f.groupId === groupId).map(f => f.id);
+  return members.length === ids.length && ids.every(id => members.includes(id));
+}
+
+/** 组合：写入同一个新的 groupId；其中已有的组合并入这个新组。 */
+export function groupFurniture(d: Design, ids: string[], groupId: string): Design {
+  const set = new Set(expandToGroups(d, ids));
+  if (set.size < 2) return d;
+  return { ...d, furniture: d.furniture.map(f => set.has(f.id) ? { ...f, groupId } : f) };
+}
+
+/** 解除组合：清除这些家具的 groupId。 */
+export function ungroupFurniture(d: Design, ids: string[]): Design {
+  const set = new Set(ids);
+  if (!d.furniture.some(f => set.has(f.id) && f.groupId)) return d;
+  return { ...d, furniture: d.furniture.map(f => {
+    if (!set.has(f.id) || !f.groupId) return f;
+    const { groupId: _groupId, ...rest } = f;
+    return rest;
+  }) };
+}
+
 /** 删除整组家具。 */
 export function removeGroup(d: Design, ids: string[]): Design {
   const set = new Set(ids);

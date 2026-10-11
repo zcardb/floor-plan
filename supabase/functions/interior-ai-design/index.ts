@@ -557,7 +557,7 @@ function roomGeometry(room: Body['room']): Geometry {
     const spans = e.spans.slice(0, 400).filter((s) => s && finite(s.from) && finite(s.to) && SPAN_KINDS.includes(s.kind));
     return [{ side: e.side as Side, at: e.at, from: e.from, to: e.to, spans }];
   }) : [];
-  const keepOuts = Array.isArray(room?.keepOuts) ? (room!.keepOuts as unknown[]).slice(0, 40).flatMap((raw) => {
+  const keepOuts = Array.isArray(room?.keepOuts) ? (room!.keepOuts as unknown[]).slice(0, 40).flatMap((raw): KeepOut[] => {
     const k = raw as { kind?: unknown; poly?: unknown };
     const poly = polygon(k?.poly, 3, 20);
     return poly && (k.kind === 'doorway' || k.kind === 'doorSweep' || k.kind === 'window') ? [{ kind: k.kind, poly }] : [];

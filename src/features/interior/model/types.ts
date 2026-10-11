@@ -92,6 +92,8 @@ export interface Furniture {
   imageUrl?: string;
   /** AI 生成的简易 3D 模型（画布 3D 与详情预览共用）。 */
   model3d?: FurnitureModel3d;
+  /** 持久组合：同一 groupId 的家具点选、拖动、旋转、删除都作为一个整体。 */
+  groupId?: string;
 }
 export interface MaterialProcurement {
   length?: number;

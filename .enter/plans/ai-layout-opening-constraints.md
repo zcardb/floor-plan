@@ -126,49 +126,36 @@ keepOutsFor(room, openings) -> { polygon: Point[]; kind: 'doorSweep' | 'doorway'
 
 ## 实施清单
 
-- [ ] 新建 `model/backing.ts`：`backSpans(d, room)` 按 ≤100mm 采样分区四条边，输出 `wall / low / open / outside` 分段（判墙复用 `thickness/2 + 2` 写法，`kind === 'low'` 归 `low`）
-- [ ] `model/backing.ts`：`backCoverage(d, faceSegment, gap)` 返回 `wall` 覆盖比例（容差 200mm）
-- [ ] `model/backing.ts`：`BACK_REQUIRED_TYPES` 常量（柜类 + 壁挂类 + 柜机），沙发 / 床 / 桌椅类不在其中
-- [ ] `AiCatalogEntry` 增加 `height`；`buildAiCatalog` 用 `item.height ?? 类型默认高度` 填充
-- [ ] `AiRoomContext` 增加 `ring`、`edges` 与 `openings[].hinge / swingSide / sill / height / sliding`
-- [ ] `ai/context.ts` 组装请求时透传上述字段（数据源：`room.rings[0]`、`backSpans`、`Opening`、`openingSill`、`openingHeight`）
-- [ ] 后端实现同定义的 `backSpansOf` / `backCoverageOf` 与 `BACK_REQUIRED_TYPES`，两侧注释标注同步点
-- [ ] 后端实现 `keepOutsFor(room, openings)`，产出 `doorSweep` / `doorway` / `window` 三类保留区多边形
-- [ ] `checkItems` 改用房间 `ring`（`inRing` 逻辑）判定越界，替换现有 bbox 判定
-- [ ] `validatePlan` 的每组家具改用 `rooms[].ring` 而非 bbox
-- [ ] 新增背靠面校验：`BACK_REQUIRED_TYPES` 中覆盖 < 70% 报 `soft`，文案含代号、名称、边与原因；设计无墙可判定时跳过
-- [ ] 新增保留区相交校验：门扇扫掠区（> 5000 mm²）、门洞通行带、窗前区（仅 `height >= 1200`）
-- [ ] 窗前区 `sill >= 1900` 不产生保留区；`kind === 'passage'` 垭口不产生扫掠区
-- [ ] 新增过道连通性校验：100mm 栅格 + BFS，报出堵断家具的代号与名称
-- [ ] `PLANNING_RULES:173` 的「门型未知不得声称已检查」落到实现：折叠门 / 未知门型记「信息不足」而非通过
-- [ ] repair 轮耗尽后执行后端确定性校正：背靠面走「沿边移动 → 换边 → 丢弃（指定家具不丢弃，直接 422）」，门窗违规走「滑动 → 加 gap → 镜像 → 换墙」
-- [ ] `fitFurnitureIntoRoom` 增加 `keepOuts` 与背靠面校正，复用 `pushOut`
-- [ ] `sanitize.ts` / `apply.ts` 传入保留区与 `edges`，落库前做前端校正
-- [ ] `AiResults.tsx` 的 `warnings` 展示为可展开的具体说明
-- [ ] 提示词补充背靠面规则（`PLANNING_RULES` 第四条、`LIVING_SENSE` 客厅条）与门窗开向 / 窗台高核对要求
-- [ ] `PropertyPanel` 在柜类 / 壁挂类落在无墙一侧时给轻量提示（复用 `PanelHint` 样式），不阻断编辑
+> 实施中的调整：判定逻辑统一放进 `model/layoutRules.ts`（不是计划里的 `backing.ts`）；背靠面改为按**房间轮廓的每条边**测量，不只看外接矩形四边，L 形房间的内凹墙也能正确判定。确定性校正只在前端做一次（房间模式、整户模式共用），后端只负责校验并把问题交给模型修。
+
+- [x] `model/layoutRules.ts`：`roomEdges` 逐段探测每条轮廓边背后是 `wall / low / window / door / open`
+- [x] `model/layoutRules.ts`：`backingOf` 返回实墙覆盖比例与主要非实墙构造；`BACK_REQUIRED_TYPES`（柜类 + 电视 + 冰箱 + 空调 + 热水器），沙发 / 床 / 桌椅不在其中
+- [x] `model/layoutRules.ts`：`roomKeepOuts` 生成门口通行区（300）、门扇扫掠区（开向本房间才有）、窗前区（600，`sill >= 1900` 不生成）；垭口不生成扫掠区
+- [x] `AiCatalogEntry.height`：`item.height ?? 类型典型高度 ?? 700`
+- [x] `AiRoomContext` 增加 `ring / edges / keepOuts / doors`，窗带 `sill`；房间范例同步带 `edges`
+- [x] 后端同定义的 `BACK_REQUIRED / clipArea / backingOf / passageBlocker`，两侧注释标注同步点
+- [x] 后端房间模式读取前端测量；整户模式由 `planGeometry` 按模型输出的墙、房间、门窗现算
+- [x] `checkItems` 在外接矩形检查之外增加轮廓 `ring` 检查；整户模式改用房间轮廓
+- [x] 背靠面、保留区（> 5000 mm²，窗前区只限高度 ≥ 1200）、过道连通（100 mm 栅格，约 600 mm 通道）校验接入 repair 循环
+- [x] 前端 `settleFurniture`：违规家具沿各条轮廓边找最近的合法位置；合规的不动；找不到位置的保留原位并标为待手动处理
+- [x] `layoutRoom` / `planLayout` 落库前执行校正并返回说明
+- [x] `AiResults` 改为可展开的「已自动微调 N 处 / M 处需要手动调整」列表（`AiLayoutNotes`）
+- [x] 提示词：`PLANNING_RULES` 第四条、`LIVING_SENSE` 客厅条、`ROOM_CONTRACT` 的数据说明、`PLAN_CONTRACT` 第三节第 6 条
+- [x] 属性面板 `BackingNote`：柜类 / 壁挂类落在没有实墙的一侧时提示，不阻断编辑
+- [ ] 未做：推拉门滑动带（数据里没有推拉门类型）；折叠门「信息不足」标记；必选家具无法修正时返回 422（改为保留原位并提示）
 
 ## 验证清单
 
-- [ ] 单测：客厅朝阳台一侧为开间（分隔线 / 垭口）的户型上，`backSpans` 在该侧只返回 `open`，其余三侧返回 `wall` 分段
-- [ ] 单测：矮墙（`kind: 'low'`）一侧返回 `low`，不计入实墙
-- [ ] 单测：L 形房间的分区矩形凹口一侧返回 `outside`，不当作 `wall` 也不当作违规
-- [ ] 单测：电视柜 `back` 指向 `open` 边 → 报违规，文案含代号、名称与「那一侧没有实墙」
-- [ ] 单测：同位置的沙发 → 不报（不在 `BACK_REQUIRED_TYPES`）
-- [ ] 单测：`tv`（壁挂）距墙 300mm → 报违规
-- [ ] 单测：墙只覆盖背靠面 40% → 报违规；覆盖 100% → 不报；恰好 70% 的上下两侧各测一次
-- [ ] 单测：设计中没有任何可判定墙体 → 跳过校验，不误报
-- [ ] 单测：L 形房间放入横跨凹口的家具 → 报跨房间 / 出轮廓（现有 bbox 判定会漏过，新逻辑必须捕获）
-- [ ] 单测：衣柜落在平开门扇扫掠区内 → 报违规，文案含代号与占用尺寸
-- [ ] 单测：推拉门不产生四分之一圆扫掠区，改为滑动带
-- [ ] 单测：`height 2000` 的衣柜压在窗洞前 → 报违规；`height 750` 的书桌在同一位置 → 不报
-- [ ] 单测：餐桌堵断门口到房间另一侧的通道 → 报违规；保留 600mm 通道时不报
-- [ ] 单测：确定性校正把电视柜从 `open` 边移到有实墙的边，且校正后不与他人重叠、不越出 `ring`
-- [ ] 单测：指定家具（`required`）无法修正 → 422，文案指出冲突家具；非指定家具 → 丢弃并计入 `warnings`
-- [ ] 单测：前端 `fitFurnitureIntoRoom` 带 `keepOuts` 时把家具推出扫掠区且不越出 `ring`
-- [ ] 回归：`pnpm test` 全绿（重点 `model/roomFit`、`model/roomSides`、`model/doorOrientation`、`model/validation`、`ai/*.test.ts`）
-- [ ] 回归：`pnpm run build` 通过
-- [ ] 手工：客厅 + 阳台开间（垭口 / 矮墙）的户型生成，确认电视柜不再靠阳台一侧，`warnings` 说明与实际改动一致
-- [ ] 手工：小卧室放 2m 衣柜 + 平开门生成，确认无压门扇、无挡窗
-- [ ] 手工：整户模式生成，确认无家具越过内墙进入相邻房间
-- [ ] 手工：手动把柜类拖到无墙一侧，属性面板出现提示且不阻断编辑
+- [x] 单测：客厅与阳台之间是开间时，右侧整段为 `open`，左侧整段为 `wall`，窗段为 `window`
+- [x] 单测：衣柜背靠开间一侧会报背靠违规；改靠实墙后不再报
+- [x] 单测：沙发不要求背靠实墙
+- [x] 单测：实墙覆盖 ≥ 70% 通过；背面离墙时覆盖率为 0
+- [x] 单测：`height 2000` 衣柜压窗前区报违规，`height 750` 书桌不报
+- [x] 单测：开向本房间的平开门产生扫掠区，压在里面的床头柜报违规，地毯不报
+- [x] 单测：上下贯通的家具把两扇门隔开、或整块堵住门口时报出；只占一侧时不报；地毯不算挡路
+- [x] 单测：校正把背靠开间的衣柜挪到实墙边并记录；合规家具不动；越出轮廓的家具收回房间
+- [x] 后端冒烟：电视柜背靠阳台开间时，后端校验返回背靠违规；改靠实墙后无问题
+- [x] 回归：`vitest src/features/interior` 共 95 个文件、812 个测试全部通过
+- [x] 回归：`pnpm run build` 通过；`eslint` 没有错误；后端函数 strict 类型检查通过
+- [ ] 手工：在真实的客厅加阳台开间户型上用 AI 生成方案，确认电视柜不再靠阳台一侧
+- [ ] 手工：整户模式生成，确认没有家具越过内墙

@@ -221,8 +221,10 @@ export function validateDesign(value: unknown): Design {
       fail();
   for (const f of v.furniture)
     if (
-      f.catalogId !== undefined &&
-      (typeof f.catalogId !== "string" || f.catalogId.length > 250)
+      (f.catalogId !== undefined &&
+        (typeof f.catalogId !== "string" || f.catalogId.length > 250)) ||
+      (f.groupId !== undefined &&
+        (typeof f.groupId !== "string" || !f.groupId || f.groupId.length > 100))
     )
       fail();
   for (const f of v.furniture)

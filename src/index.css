@@ -994,12 +994,20 @@
   .plan-separator:hover line + line {
     stroke: var(--plan-selection);
   }
-  /* 框选模式：画布十字光标，拖动的选框用主色半透明 + 虚线。 */
-  .plan-canvas.marquee-on {
+  /* 选择模式：画布空白处十字光标（准备框选），房间 / 家具 / 墙等子元素各用自己的光标。 */
+  .plan-canvas.tool-select {
     cursor: crosshair;
   }
-  .plan-canvas.marquee-on .plan-furn {
-    cursor: move;
+  .plan-canvas.tool-select .plan-room,
+  .plan-canvas.tool-select .plan-wall {
+    cursor: default;
+  }
+  /* 按住空格或中键拖动平移画布。 */
+  .plan-canvas.is-panning {
+    cursor: grab;
+  }
+  .plan-canvas.is-panning:active {
+    cursor: grabbing;
   }
   .plan-marquee {
     fill: hsl(var(--primary) / 0.12);
@@ -4090,6 +4098,9 @@ button.room-cost-row:hover {
 .ai-composer-count:hover, .ai-composer-count[data-state="open"] { background: hsl(var(--accent)); }
 .ai-count-menu { min-width: 96px; font-size: var(--fs-control); }
 .ai-note { font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); }
+/* 手动摆放时「背后没有实墙」的提示：只提醒，不阻断编辑。 */
+.backing-note { display: flex; align-items: flex-start; gap: 6px; margin-top: 8px; padding: 8px 10px; border-radius: var(--ctl-radius); border: 1px solid hsl(var(--destructive) / 0.35); background: hsl(var(--destructive) / 0.08); font-size: var(--fs-meta); line-height: 1.5; color: hsl(var(--foreground)); overflow-wrap: anywhere; }
+.backing-note > svg { flex: none; margin-top: 2px; color: hsl(var(--destructive)); }
 .ai-link { justify-self: start; font-size: var(--fs-control); color: hsl(var(--primary)); text-decoration: underline; text-underline-offset: 3px; }
 .ai-create-form, .ai-create-results, .ai-results { display: grid; gap: 16px; min-width: 0; }
 .ai-size-hint { font-size: var(--fs-meta); color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
