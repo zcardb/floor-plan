@@ -16,7 +16,7 @@ import { createProject, TEMPLATE_PRESETS } from '../data/templates';
 import { ProjectCard } from './ProjectCard';
 import { PlanThumbnail, PresetThumbnail } from './PlanThumbnail';
 import { mineCardActions, templateCardActions } from './projectCardActions';
-import { CmsFilterBar } from './CmsFilterBar';
+import { CmsFilterGroup } from './CmsFilterGroup';
 import { ProjectLoadMore } from './ProjectLoadMore';
 import { filterProjects, visibleEntries, PROJECT_SCOPES, type ProjectScope } from '../model/projectFilter';
 import type { useProjects, ProjectSummary } from '../cloud/useProjects';
@@ -93,7 +93,9 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
   const loadingList = refreshing || (projects.loading && !rowAction.pending);
 
   return <>
-    <CmsPageHeader title="项目管理" description="把每个空间的灵感，保存成独立方案。" actions={<>
+    <CmsPageHeader title="项目管理" description="把每个空间的灵感，保存成独立方案。"
+      search={<CmsSearchField label="搜索项目" placeholder="搜索项目名称、户型…" value={query} onChange={setQuery} loading={projects.loading} loadingLabel="加载项目" matchCount={entries.length} />}
+      actions={<>
         <EditorTooltip label="刷新" disabled={loadingList}>
           <Button variant="outline" className="cms-refresh-button cms-icon-button" aria-label="刷新" disabled={loadingList} aria-busy={loadingList} onClick={() => void refresh()}><RefreshCw className={loadingList ? 'animate-spin' : ''} /></Button>
         </EditorTooltip>
@@ -111,14 +113,8 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
     {refreshing
       ? <ManagementLoading variant="projects" label="刷新项目列表" />
       : <>
-        <div className="cost-controls project-filter-panel">
-          <div className="cost-toolbar">
-            <CmsSearchField label="搜索项目" placeholder="搜索项目名称、户型…" value={query} onChange={setQuery} loading={projects.loading} loadingLabel="加载项目" matchCount={entries.length} />
-          </div>
-          <div className="cost-group project-scope-group">
-            <div className="cost-group-label"><LayoutGrid size={15} /><span>来源</span><small>{counts.all} 项</small></div>
-            <CmsFilterBar label="项目分类" value={scope} onChange={id => setScope(id as ProjectScope)} chips={PROJECT_SCOPES.map(s => ({ id: s.id, label: s.label, meta: counts[s.id] }))} />
-          </div>
+        <div className="cms-filter-rows">
+          <CmsFilterGroup icon={LayoutGrid} label="来源" count={counts.all} ariaLabel="项目分类" value={scope} onChange={id => setScope(id as ProjectScope)} chips={PROJECT_SCOPES.map(s => ({ id: s.id, label: s.label, meta: counts[s.id] }))} />
         </div>
         <div className="cost-results-heading">
           <h2>{SCOPE_TITLE[scope]}<span>{entries.length} 项{more ? ' · 向下滚动加载更多' : ''}</span></h2>

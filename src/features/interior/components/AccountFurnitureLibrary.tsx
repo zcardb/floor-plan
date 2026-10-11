@@ -16,7 +16,7 @@ import { furnitureGeometryPayload } from '../model/furnitureGeometrySave';
 import { assetsAdjusted, builtinOf, withBuiltinAssets } from '../model/builtinAssets';
 import type { useFurnitureCatalog } from '../cloud/useFurnitureCatalog';
 import type { CustomFloor, CustomOpening, CustomWall, Design, LibraryItem } from '../model/types';
-import { CmsFilterBar } from './CmsFilterBar';
+import { CmsFilterGroup } from './CmsFilterGroup';
 import { CostItemVisual } from './CostItemVisual';
 import { AccountMaterialDialog, type MaterialSaves } from './AccountMaterialDialog';
 import { AccountFurnitureDialog } from './AccountFurnitureDialog';
@@ -58,23 +58,17 @@ export function AccountFurnitureLibrary({ catalog, floors = [], walls = [], open
   const retry = async () => { if (await commit.retry()) notify.success('账号默认价已保存并生效'); };
   const open = (entry: CostEntry) => entry.furniture ? setDetail(entry.furniture) : setEditing(entry);
   const customIds = new Set(catalog.items.map(item => item.catalogId));
-  return <div className="account-cost-page">
-    <CmsPageHeader title="账号家具库" description="家具、地面、墙面、门窗、屋面与吊顶都在这里管理，设好单价后各项目直接沿用。" actions={<>
-      {(busy || failure || commit.saved) && <span className={'cms-sync-pill' + (failure && !busy ? ' is-error' : '')} role="status">{busy ? <><Loader2 size={13} className="animate-spin"/>正在保存…</> : failure ? <><AlertCircle size={13}/>修改尚未保存</> : <><Check size={13}/>已保存并生效</>}</span>}
-      <EditorTooltip label="新建家具" disabled={locked}>
-        <Button className="cms-create-button" disabled={locked} onClick={() => onNew(category)}><Plus/>新建家具</Button>
-      </EditorTooltip>
-    </>}/>
-    <div className="cost-controls">
-      <div className="cost-toolbar">
-        <CmsSearchField label="搜索材料或家具" placeholder="搜索材料、家具名称…" value={query} onChange={setQuery} loading={catalog.loading} loadingLabel="加载家具" matchCount={visible.length}/>
-      </div>
-      <div className="cost-group-columns">
-        {groups.map(group => <div className={'cost-group cost-group--' + (group.major === '硬装' ? 'hard' : 'soft')} key={group.major}>
-          <div className="cost-group-label"><group.icon size={15}/><span>{group.major}</span><small>{entries.filter(entry => entry.major === group.major).length} 项</small></div>
-          <CmsFilterBar label={group.major + '分类'} chips={chips(group.names)} value={category} onChange={pick}/>
-        </div>)}
-      </div>
+  return <>
+    <CmsPageHeader title="账号家具库" description="家具、地面、墙面、门窗、屋面与吊顶都在这里管理，设好单价后各项目直接沿用。"
+      search={<CmsSearchField label="搜索材料或家具" placeholder="搜索材料、家具名称…" value={query} onChange={setQuery} loading={catalog.loading} loadingLabel="加载家具" matchCount={visible.length}/>}
+      actions={<>
+        {(busy || failure || commit.saved) && <span className={'cms-sync-pill' + (failure && !busy ? ' is-error' : '')} role="status">{busy ? <><Loader2 size={13} className="animate-spin"/>正在保存…</> : failure ? <><AlertCircle size={13}/>修改尚未保存</> : <><Check size={13}/>已保存并生效</>}</span>}
+        <EditorTooltip label="新建家具" disabled={locked}>
+          <Button className="cms-create-button" disabled={locked} onClick={() => onNew(category)}><Plus/>新建家具</Button>
+        </EditorTooltip>
+      </>}/>
+    <div className="cms-filter-rows">
+      {groups.map(group => <CmsFilterGroup key={group.major} icon={group.icon} label={group.major} count={entries.filter(entry => entry.major === group.major).length} ariaLabel={group.major + '分类'} chips={chips(group.names)} value={category} onChange={pick}/>)}
     </div>
     {failure && <div className="cost-save-error" role="alert"><span>{failure}</span>{commit.pending && <Button variant="outline" disabled={busy} onClick={() => void retry()}>重试保存</Button>}</div>}
     {(loadError || catalog.error) && <LoadError title="家具与材料读取失败" message={loadError || catalog.error} retrying={catalog.loading} onRetry={reload || (() => void catalog.load())}/>}
@@ -102,5 +96,5 @@ export function AccountFurnitureLibrary({ catalog, floors = [], walls = [], open
       saveAssets={builtinOf(detail.catalogId) ? assets => catalog.saveOverride({ ...builtinOf(detail.catalogId)!, ...assets }) : undefined}
       onOpenChange={v => { if (!v) setDetail(null); }} onChanged={next => { setDetail(next); void catalog.load(); }}
       applyDefaultPrice={price => commit.apply(current => ({ ...current, furniturePrices: { ...current.furniturePrices, [detail.catalogId!]: price } }))} remove={catalog.remove}/>}
-  </div>;
+  </>;
 }

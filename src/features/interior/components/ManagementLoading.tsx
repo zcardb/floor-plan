@@ -1,23 +1,23 @@
 // 首屏骨架按目标页面真实版式对齐：
-// projects 为项目管理（页头+搜索+来源胶囊+结果标题+4:3 项目卡片），library 为账号家具库（页头+搜索+硬装/软装胶囊+分类价格卡片），
+// projects 为项目管理（页头含搜索+来源胶囊+结果标题+4:3 项目卡片），library 为账号家具库（页头含搜索+硬装/软装两行胶囊+分类价格卡片），
 // cards 为通用占位（恢复工作室）。
 type Variant = 'cards' | 'projects' | 'library';
 const keys = (n: number) => Array.from({ length: n }, (_, i) => i);
 
-function Heading({ actions }: { actions: ('icon' | 'button')[] }) {
+function Heading({ actions }: { actions: ('search' | 'icon' | 'button')[] }) {
   return <div className="cms-loading-heading cms-loading-heading--page" aria-hidden="true">
     <div className="cms-loading-heading-text">
       <span className="cms-skeleton cms-skeleton-title" />
       <span className="cms-skeleton cms-skeleton-description" />
     </div>
-    <div className="cms-loading-actions">{actions.map((kind, i) => <span key={i} className={'cms-skeleton ' + (kind === 'icon' ? 'cms-skeleton-icon-action' : 'cms-skeleton-action')} />)}</div>
+    <div className="cms-loading-actions">{actions.map((kind, i) => <span key={i} className={'cms-skeleton ' + (kind === 'search' ? 'cms-skeleton-search-inline' : kind === 'icon' ? 'cms-skeleton-icon-action' : 'cms-skeleton-action')} />)}</div>
   </div>;
 }
 
+/** 筛选区骨架：与 `.cms-filter-rows` 同版式，每组一行「分类描述 + 胶囊」。 */
 function FilterPanel({ groups }: { groups: number[] }) {
   return <>
-    <div className="cms-loading-panel" aria-hidden="true">
-      <div className="cms-loading-toolbar"><span className="cms-skeleton cms-skeleton-search" /></div>
+    <div className="cms-loading-filter-rows" aria-hidden="true">
       {groups.map((chips, group) => <div className="cms-loading-group" key={group}>
         <span className="cms-skeleton cms-skeleton-group-label" />
         <div className="cms-loading-chips">{keys(chips).map(chip => <span className="cms-skeleton" key={chip} />)}</div>
@@ -53,12 +53,12 @@ function LibraryBlocks() {
 export function ManagementLoading({ heading = false, label = '加载内容', variant = 'cards' }: { heading?: boolean; label?: string; variant?: Variant }) {
   const status = { className: 'cms-loading-placeholder', role: 'status', 'aria-label': label, 'aria-busy': true } as const;
   if (variant === 'projects') return <div {...status}>
-    {heading && <Heading actions={['icon', 'button']} />}
+    {heading && <Heading actions={['search', 'icon', 'button']} />}
     <FilterPanel groups={[3]} />
     <ProjectCardsSkeleton />
   </div>;
   if (variant === 'library') return <div {...status}>
-    {heading && <Heading actions={['button']} />}
+    {heading && <Heading actions={['search', 'button']} />}
     <FilterPanel groups={[3, 6]} />
     <LibraryBlocks />
   </div>;
