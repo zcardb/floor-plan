@@ -41,7 +41,7 @@ function harness(kind: Opening['kind'] = 'door', tool: Tool = 'select') {
   const finishTool = vi.fn();
   const select = vi.fn();
   const props: CanvasProps = { design, selection: null, tool, layers: { grid: false, dims: false, labels: false, furn: true, bearing: false, snap: true },
-    preview, commit, finishTool, select, add: vi.fn(), closePanels: vi.fn(), onScale: vi.fn(), onCoord: vi.fn(), onAnchor: vi.fn() };
+    preview, commit, finishTool, select, add: vi.fn(), closePanels: vi.fn(), onScale: vi.fn(), onAnchor: vi.fn() };
   // Execute the forwardRef render with deterministic hooks and SVG coordinate conversion.
   // This tests actual event handlers without adding a DOM test dependency.
   const component = PlanCanvas as unknown as { render: (props: CanvasProps, ref: null) => ReactElement<Handlers> };

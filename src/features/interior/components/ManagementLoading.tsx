@@ -1,5 +1,5 @@
 // 首屏骨架按目标页面真实版式对齐：
-// projects 为项目管理（页头含搜索+胶囊+4:3 项目卡片，无结果标题行），library 为账号家具库（页头含搜索+刷新+大类下拉与一排胶囊+连续价格卡片网格），
+// projects 为项目管理（页头含搜索+胶囊+4:3 项目卡片，无结果标题行），library 为账号家具库（页头含搜索+刷新+「全部 / 硬装 / 软装」一排胶囊+连续价格卡片网格），
 // cards 为通用占位（恢复工作室）。
 type Variant = 'cards' | 'projects' | 'library';
 const keys = (n: number) => Array.from({ length: n }, (_, i) => i);
@@ -14,13 +14,10 @@ function Heading({ actions }: { actions: ('search' | 'icon' | 'button')[] }) {
   </div>;
 }
 
-/** 筛选区骨架：与 `.cms-filter-rows` 同版式，一行「左侧大类切换（可选）+ 一排胶囊」。 */
-function FilterPanel({ chips, withSwitch = false }: { chips: number; withSwitch?: boolean }) {
+/** 筛选区骨架：与 `.cms-filter-rows` 同版式，一排胶囊。 */
+function FilterPanel({ chips }: { chips: number }) {
   return <div className="cms-loading-filter-rows cms-loading-filter-rows--single" aria-hidden="true">
     <div className="cms-loading-group">
-      {withSwitch
-        ? <span className="cms-skeleton cms-skeleton-filter-switch" />
-        : null}
       <div className="cms-loading-chips">{keys(chips).map(chip => <span className="cms-skeleton" key={chip} />)}</div>
     </div>
   </div>;
@@ -52,8 +49,8 @@ export function ManagementLoading({ heading = false, label = '加载内容', var
     <ProjectCardsSkeleton />
   </div>;
   if (variant === 'library') return <div {...status}>
-    {heading && <Heading actions={['search', 'button']} />}
-    <FilterPanel chips={7} withSwitch />
+    {heading && <Heading actions={['search', 'icon', 'button']} />}
+    <FilterPanel chips={3} />
     <LibraryItems />
   </div>;
   return <div {...status}>

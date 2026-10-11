@@ -18,16 +18,15 @@ Deno.serve(async req=>{
     if(!Array.isArray(files)||files.length>6||!files.every((m:{url?:unknown;name?:unknown;ext?:unknown})=>m&&typeof m.url==='string'&&m.url.startsWith(materialPrefix)&&m.url.length<=1000&&typeof m.name==='string'&&!!m.name.trim()&&m.name.length<=200&&typeof m.ext==='string'&&/^[a-z0-9]{1,8}$/.test(m.ext)))return json(400,{success:false,message:'素材附件无效（最多 6 个）'});
     if(!regenerating&&(view!=='top'||description||images.length||files.length))return json(400,{success:false,message:'调整图片请从家具详情发起'});
     const allowed=['bed','crib','nightstand','wardrobe','dresser','desk','chair','bookshelf','baycushion','sofa','cornersofa','armchair','beanbag','coffeetable','sidetable','tvstand','rug','shoecab','floorlamp','plant','table','roundtable','island','barstool','counter','stove','ksink','fridge','cabinet','toilet','vanity','shower','bathtub','washer','waterheater','tv','aircon','acwall','dishwasher','ovencol','dryer','purifier','officechair','piano','treadmill'];
-    const validTypes=regenerating?[...allowed,'fireplace','generic']:allowed;
-    if(!item||typeof item.catalogId!=='string'||(regenerating?(!item.catalogId||item.catalogId.length>250):!/^[0-9a-f-]{36}$/i.test(item.catalogId))||typeof item.name!=='string'||!item.name.trim()||item.name.length>100||typeof item.category!=='string'||item.category.length>30||!validTypes.includes(item.type)||![item.w,item.d].every(n=>typeof n==='number'&&Number.isFinite(n)&&n>=50&&n<=20000)||!Number.isFinite(item.height)||item.height<50||item.height>8000||!/^#[0-9a-f]{6}$/i.test(item.color))return json(400,{success:false,message:'家具名称、参考模型、尺寸或颜色无效'});
+        // 调整（regenerating）面向任意家具：内置家具、楼梯、自建家具都可以，类型只作为提示词里的参考，不做白名单。
+    const validType=(t:unknown)=>regenerating?typeof t==='string'&&!!t&&t.length<=40:allowed.includes(t as string);
+    // 内置家具、楼梯常常没有存高度：缺省按 700mm 处理，不因此拒绝。
+    if(item&&(item.height===undefined||item.height===null))item.height=700;
+    if(!item||typeof item.catalogId!=='string'||(regenerating?(!item.catalogId||item.catalogId.length>250):!/^[0-9a-f-]{36}$/i.test(item.catalogId))||typeof item.name!=='string'||!item.name.trim()||item.name.length>100||typeof item.category!=='string'||item.category.length>30||!validType(item.type)||![item.w,item.d].every(n=>typeof n==='number'&&Number.isFinite(n)&&n>=50&&n<=20000)||!Number.isFinite(item.height)||item.height<50||item.height>8000||!/^#[0-9a-f]{6}$/i.test(item.color))return json(400,{success:false,message:'家具名称、参考模型、尺寸或颜色无效'});
     if(regenerating&&((item.shape!=null&&!['reference','rectangle','circle'].includes(item.shape))||(item.shape==='circle'&&item.w!==item.d)))return json(400,{success:false,message:'家具外形或圆形尺寸无效'});
     const token=Deno.env.get('AI_API_TOKEN_eba6e37b0b3d');if(!token)return json(500,{success:false,message:'AI 服务尚未配置'});
     const admin=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-    if(regenerating){
-      const {data:owned,error:ownershipError}=await client.from('interior_furniture_catalog').select('catalog_id').eq('owner_id',user.id).eq('catalog_id',item.catalogId).maybeSingle();
-      if(ownershipError)throw ownershipError;
-      if(!owned)return json(404,{success:false,message:'家具不存在或不可访问'});
-    }
+    // 调整只生成候选图返回给前端；写回家具时走各自的保存接口（受行级权限约束），这里不再校验家具归属，内置家具也能调整。
     const requestTable=regenerating?'interior_furniture_image_regenerations':'interior_furniture_image_requests';
     const keyColumn=regenerating?'request_id':'catalog_id',keyValue=regenerating?request_id:item.catalogId;
     const {data:existing,error:readError}=await admin.from(requestTable).select('task_id,status').eq('owner_id',user.id).eq(keyColumn,keyValue).maybeSingle();

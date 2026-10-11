@@ -1,16 +1,9 @@
 import { useState } from "react";
 import {
   Search,
-  Armchair,
-  BedDouble,
-  UtensilsCrossed,
-  Bath,
-  Monitor,
-  BookOpen,
   Plus,
   DoorOpen,
   ScanLine,
-  BrickWall,
   type LucideIcon,
 } from "lucide-react";
 import { categories, library } from "../data/catalog";
@@ -25,7 +18,6 @@ const structuralGroups: { title: string; items: { tool: Tool; label: string; ico
   { title: '墙', items: wallTools },
   { title: '门窗', items: [{ tool: 'door', label: '门', icon: DoorOpen }, { tool: 'window', label: '窗', icon: ScanLine }] },
 ];
-const categoryIcons: Record<string, typeof Armchair> = { 卧室: BedDouble, 客厅: Armchair, 餐厨: UtensilsCrossed, 卫浴: Bath, 家电: Monitor, 书房: BookOpen, 硬装: BrickWall };
 export function Library({
   add,
   tool,
@@ -54,59 +46,45 @@ export function Library({
   );
   return (
     <>
-      <div className="panel-heading">
-        <span>构件与家具</span>
-        <EditorTooltip label="素材库">
-          <span className="mini-label">素材库</span>
-        </EditorTooltip>
+      <div className="library-toolbar">
+        <div className="library-search">
+          <Search size={15} />
+          <input
+            aria-label="搜索家具"
+            placeholder="搜索家具、家电、硬装…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+        {onNew && <EditorTooltip label="新建家具 / 账号库">
+          <button type="button" className="library-new" aria-label="新建家具 / 账号库" onClick={onNew}>
+            <Plus size={16} />
+          </button>
+        </EditorTooltip>}
       </div>
-      {onNew && <EditorTooltip label="新建家具 / 账号库">
-        <button className="new-furniture-button" onClick={onNew}>
-          <Plus size={15} />
-          新建家具 / 账号库
-        </button>
-      </EditorTooltip>}
-      <div className="library-search">
-        <Search size={15} />
-        <input
-          aria-label="搜索家具"
-          placeholder="搜索家具、家电、硬装…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <kbd>/</kbd>
-      </div>
-      <div className="library-categories">
-        {libraryCategories.map((c) => {
-          const Icon = categoryIcons[c];
-          return (
-            <EditorTooltip key={c} label={c}>
-              <button
-                className={c === category && !query ? "active" : ""}
-                onClick={() => {
-                  setCategory(c);
-                  setQuery("");
-                }}
-              >
-                <Icon size={16} />
-                {c}
-              </button>
-            </EditorTooltip>
-          );
-        })}
+      <div className="library-categories" role="group" aria-label="家具分类">
+        {libraryCategories.map((c) => (
+          <button
+            key={c}
+            type="button"
+            className={c === category && !query ? "active" : ""}
+            aria-pressed={c === category && !query}
+            onClick={() => {
+              setCategory(c);
+              setQuery("");
+            }}
+          >
+            {c}
+          </button>
+        ))}
       </div>
       {structureTools && <StructuralItems query={query} show={category === '硬装' || !!query} tool={tool} setTool={setTool} />}
-      <div className="library-tip">
-        <Plus size={14} />
-        <p>
-          点击添加，或拖入画布。
-          <br />
-          所有家具均按真实尺寸绘制。
-        </p>
-      </div>
       <div className="library-subheading">
-        {query ? "搜索结果" : category === '硬装' ? '硬装构件' : category + "家具"}
-        <span>{items.length} 件</span>
+        <span>
+          {query ? "搜索结果" : category === '硬装' ? '硬装构件' : category + "家具"}
+          <small> · {items.length} 件</small>
+        </span>
+        <small>点击添加或拖入</small>
       </div>
       <div className="library-grid">
         {items.map((it, i) => (

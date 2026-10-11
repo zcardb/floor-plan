@@ -77,7 +77,6 @@ interface Props {
   add: (it: LibraryItem, p: Point) => void;
   closePanels: () => void;
   onScale: (s: number) => void;
-  onCoord: (p: Point) => void;
   onAnchor: (r: ScreenRect | null) => void;
   finishTool: () => void;
   /** 选择模式单击墙身时切到绘墙工具（起点由画布设置）。 */
@@ -113,7 +112,6 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
     add,
     closePanels,
     onScale,
-    onCoord,
     onAnchor,
     finishTool,
     startWallTool,
@@ -654,7 +652,6 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
           return;
         }
         const p = mm(e);
-        onCoord(p);
         if (tool === 'wall') { wallDrawing.move(p); return; }
         if (tool === 'separator') { separatorDrawing.move(p); return; }
         const dr = drag.current;

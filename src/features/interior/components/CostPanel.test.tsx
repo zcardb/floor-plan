@@ -6,7 +6,6 @@ import { setPrice } from "../model/costs";
 import { yuan } from "../model/money";
 import type { Design, Selection } from "../model/types";
 import { CostPanel } from "./CostPanel";
-import { PanelModeTabs } from "./PanelModeTabs";
 
 const html = (design: Design, selection: Selection = null) =>
   renderToStaticMarkup(
@@ -64,14 +63,13 @@ describe("成本页口径", () => {
     expect(out).toContain(yuan(0));
   });
 });
-describe("面板模式标签", () => {
-  it("成本标签常驻全屋总额，有未定价项时带提示点", () => {
-    const d = referenceDesign(),
-      out = renderToStaticMarkup(
-        <PanelModeTabs design={d} mode="props" onChange={vi.fn()} />,
-      );
-    expect(out).toContain("属性");
-    expect(out).toContain(yuan(costBreakdown(d).total));
-    expect(out).toContain("panel-mode-dot");
+describe("成本页返回方案总览", () => {
+  it("传入 overview 时全屋口径顶部有「返回方案总览」，不传则没有", () => {
+    const d = referenceDesign();
+    const withBack = renderToStaticMarkup(
+      <CostPanel design={d} selection={null} change={vi.fn()} back={vi.fn()} select={vi.fn()} overview={vi.fn()} />,
+    );
+    expect(withBack).toContain("返回方案总览");
+    expect(html(d)).not.toContain("返回方案总览");
   });
 });

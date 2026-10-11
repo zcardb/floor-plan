@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, Loader2 } from 'lucide-react';
+import { Check, ChevronDown, Loader2, LogIn, LogOut } from 'lucide-react';
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSub, DropdownMenuSubContent,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent,
   DropdownMenuSubTrigger, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { CreateProjectMenuItems } from './CreateProjectMenuItems';
@@ -25,6 +25,11 @@ interface Props extends ProjectNavigation {
   project: ProjectSummary;
   loggedIn: boolean;
   onBack: () => void;
+  /** 底部账号区：游客「登录」，已登录显示邮箱 +「退出登录」。不传则不显示。 */
+  email?: string;
+  loggingOut?: boolean;
+  onLogin?: () => void;
+  onLogout?: () => void;
 }
 
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
@@ -46,8 +51,8 @@ export function LoadMoreSentinel({ disabled, onVisible }: { disabled: boolean; o
 
 /**
  * 工具条左侧：Logo + 当前项目名，同一个点击区。
- * 下拉是一个窄菜单，只有三项：返回项目管理 / 新建项目 ▸ / 切换项目 ▸，后两项悬停展开二级菜单。
- * 项目的重命名、删除只在项目管理页做，这里不放。
+ * 下拉是一个窄菜单：返回项目管理 / 新建项目 ▸ / 切换项目 ▸，后两项悬停展开二级菜单；
+ * 分隔线下是账号区（游客「登录」，已登录邮箱 +「退出登录」）。项目的重命名、删除只在项目管理页做，这里不放。
  */
 export function ProjectMenu(p: Props) {
   const [pending, setPending] = useState<string | null>(null);
@@ -106,6 +111,14 @@ export function ProjectMenu(p: Props) {
             </div>
           </DropdownMenuSubContent>
         </DropdownMenuSub>
+        {(p.onLogin || p.onLogout) && <DropdownMenuSeparator />}
+        {!p.loggedIn && p.onLogin && <DropdownMenuItem className="project-menu-entry" onSelect={p.onLogin}><LogIn />登录</DropdownMenuItem>}
+        {p.loggedIn && p.onLogout && <>
+          {p.email && <DropdownMenuLabel className="project-menu-email" title={p.email}>{p.email}</DropdownMenuLabel>}
+          <DropdownMenuItem className="project-menu-entry" disabled={p.loggingOut} onSelect={p.onLogout}>
+            {p.loggingOut ? <Loader2 className="animate-spin" /> : <LogOut />}退出登录
+          </DropdownMenuItem>
+        </>}
       </DropdownMenuContent>
     </DropdownMenu>
     {creation.dialogs}

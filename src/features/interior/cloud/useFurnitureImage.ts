@@ -4,7 +4,18 @@ import type { LibraryItem } from '../model/types';
 import { backend } from "../ai/client";
 import type { AiFileRef } from "../ai/referenceImages";
 import { sanitizeModel3d, type FurnitureModel3d } from "../model/furniture3d";
+import { furnitureHeight } from "../model/layoutRules";
+import { stairRiser } from "../model/stairs";
 import { notify } from "@/lib/notify";
+
+/**
+ * 发给 AI 的家具参数：内置家具、楼梯常常没有存高度，这里补上典型高度
+ * （楼梯 = 踏步数 × 踏步高，其余按类型），避免后端因缺字段拒绝。
+ */
+export const aiFurnitureItem = (item: LibraryItem): LibraryItem => ({
+  ...item,
+  height: item.height || (item.stair ? Math.round(item.stair.steps * stairRiser(item.stair)) : furnitureHeight(item)),
+});
 
 async function invoke(name: string, body: object) {
   const supabase = await backend();
@@ -52,7 +63,7 @@ export async function generateFurnitureImage(
 ): Promise<string | null> {
   const { requestId, view, description, images, files, onTaskFailed } = options;
   const data = await invoke("interior-furniture-image-submit", {
-    item,
+    item: aiFurnitureItem(item),
     ...(requestId ? { request_id: requestId } : {}),
     ...(view ? { view } : {}),
     ...(description ? { description } : {}),
@@ -88,7 +99,7 @@ export async function generateFurnitureModel(
   options: { description?: string; images?: string[]; files?: AiFileRef[]; model?: string },
 ): Promise<FurnitureModel3d> {
   const data = await invoke("interior-furniture-model", {
-    item,
+    item: aiFurnitureItem(item),
     ...(options.description ? { description: options.description } : {}),
     ...(options.images?.length ? { images: options.images } : {}),
     ...(options.files?.length ? { files: options.files } : {}),

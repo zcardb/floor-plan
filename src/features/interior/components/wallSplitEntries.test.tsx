@@ -7,34 +7,33 @@ vi.mock('react', async original => ({ ...await original<typeof import('react')>(
 vi.mock('./CostDefaultsContext', async original => ({ ...await original<typeof import('./CostDefaultsContext')>(), useCostDesign: (d: unknown) => d }));
 vi.mock('@/components/ui/confirm-dialog', () => ({ useConfirm: () => vi.fn() }));
 import { SelectionEditor } from './SelectionEditor';
-import { PropertyPanel } from './PropertyPanel';
 import { WallOptionsMenu } from './WallOptionsMenu';
 type Node = ReactElement<Record<string, unknown>>;
 function nodes(tree: ReactNode): Node[] { if (Array.isArray(tree)) return tree.flatMap(nodes); if (!isValidElement<Record<string, unknown>>(tree)) return []; return [tree, ...nodes(tree.props.children as ReactNode)]; }
 function text(tree: ReactNode): string { if (typeof tree === 'string' || typeof tree === 'number') return String(tree); if (Array.isArray(tree)) return tree.map(text).join(''); return isValidElement<{ children?: ReactNode }>(tree) ? text(tree.props.children) : ''; }
 
 const drawn: Wall = { id: 'inner', kind: 'partition', a: [3000, 0], b: [3000, 6000], thickness: 200 };
-/** 渲染属性面板里的墙选项菜单，返回菜单内容与本次 change/spy。 */
+const visual = SelectionEditor as unknown as { render: (p: React.ComponentProps<typeof SelectionEditor>, ref: null) => ReactElement };
+/** 渲染浮动工具条里的墙选项菜单，返回菜单内容与本次 change/spy。 */
 function wallMenu(design: Design, wallId: string, removeWall?: (id: string) => void) {
   const noop = vi.fn();
-  const tree = PropertyPanel({
+  const tree = visual.render({
     design, selection: { kind: 'wall', id: wallId }, change: noop, rotate: noop, duplicate: noop, remove: noop,
-    select: noop, openCosts: noop, showCosts: false, transaction: createSizeTransaction(() => design, noop, noop),
-    splitWall: noop, mergeWall: noop, removeWall,
-  });
+    showCosts: false, transaction: createSizeTransaction(() => design, noop, noop),
+    splitWall: noop, mergeWall: noop, removeWall, stage: { current: null }, hidden: false, close: noop, costs: noop,
+  }, null);
   const menu = nodes(tree).find(n => n.type === WallOptionsMenu)!;
   const content = WallOptionsMenu(menu.props as React.ComponentProps<typeof WallOptionsMenu>);
   const entry = (label: string) => nodes(content).find(n => n.props['aria-label'] === label);
   return { entry, noop };
 }
 
-describe('墙属性和浮动工具条分割按钮', () => {
-  it('两处都允许原始承重墙分割', () => {
+describe('浮动工具条分割按钮', () => {
+  it('允许原始承重墙分割', () => {
     const d = blankDesign(); d.walls[0].kind = 'bearing';
     const splitWall = vi.fn(), noop = vi.fn();
     const props = { design: d, selection: { kind: 'wall' as const, id: 'outer-0' }, change: noop, rotate: noop, duplicate: noop, remove: noop, showCosts: false, transaction: createSizeTransaction(() => d, noop, noop), splitWall };
-    const visual = SelectionEditor as unknown as { render: (p: React.ComponentProps<typeof SelectionEditor>, ref: null) => ReactElement };
-    const trees = [PropertyPanel({ ...props, select: noop, openCosts: noop }), visual.render({ ...props, stage: { current: null }, hidden: false, close: noop, costs: noop }, null)];
+    const trees = [visual.render({ ...props, stage: { current: null }, hidden: false, close: noop, costs: noop }, null)];
     for (const tree of trees) {
       const menu = nodes(tree).find(n => n.type === WallOptionsMenu)!;
       expect(menu).toBeDefined();
@@ -43,7 +42,7 @@ describe('墙属性和浮动工具条分割按钮', () => {
       expect(button.props.disabled).toBe(false);
       (button.props.onSelect as () => void)();
     }
-    expect(splitWall).toHaveBeenCalledTimes(2);
+    expect(splitWall).toHaveBeenCalledTimes(1);
     expect(splitWall).toHaveBeenCalledWith('outer-0');
   });
 });

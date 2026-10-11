@@ -262,6 +262,8 @@ Deno.serve(async (req) => {
     const item = (body as { item?: Record<string, unknown> }).item;
     if (!item || typeof item !== 'object') return json(400, { success: false, message: '缺少家具参数' });
     if (typeof item.name !== 'string' || !item.name.trim() || item.name.length > 100) return json(400, { success: false, message: '家具名称无效' });
+    // 内置家具、楼梯常常没有存高度：缺省按 700mm 处理，只校验宽深。
+    if (item.height === undefined || item.height === null) item.height = 700;
     if (![item.w, item.d, item.height].every((n) => num(n) !== undefined && num(n)! >= 50 && num(n)! <= 20000)) return json(400, { success: false, message: '家具尺寸无效' });
     if (typeof item.color !== 'string' || !/^#[0-9a-f]{6}$/i.test(item.color)) return json(400, { success: false, message: '家具颜色无效' });
     const description = (body as { description?: unknown }).description;

@@ -2,12 +2,14 @@ import { isValidElement, type ReactNode, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LibraryItem } from '../model/types';
 
-const harness = vi.hoisted(() => ({ slots: [] as unknown[], cursor: 0, category: '全部', generate: vi.fn(), save: vi.fn(), loadFloors: vi.fn(), loadWalls: vi.fn(), loadOpenings: vi.fn(), loadRoofs: vi.fn(), loadCeilings: vi.fn(), loadCatalog: vi.fn() }));
+const harness = vi.hoisted(() => ({ slots: [] as unknown[], cursor: 0, alls: 0, category: '全部', generate: vi.fn(), save: vi.fn(), loadFloors: vi.fn(), loadWalls: vi.fn(), loadOpenings: vi.fn(), loadRoofs: vi.fn(), loadCeilings: vi.fn(), loadCatalog: vi.fn() }));
 vi.mock('react', async importOriginal => ({
   ...await importOriginal<typeof import('react')>(),
   useState(initial: unknown) {
     const index = harness.cursor++;
-    if (!(index in harness.slots)) harness.slots[index] = initial === '全部' ? harness.category : typeof initial === 'function' ? initial() : initial;
+    // 家具库有两个默认「全部」的状态：先是大类（全部 / 硬装 / 软装），再是细分分类；只把细分分类替换成用例指定值。
+    const seed = initial === '全部' ? (harness.alls++ === 0 ? '全部' : harness.category) : typeof initial === 'function' ? initial() : initial;
+    if (!(index in harness.slots)) harness.slots[index] = seed;
     return [harness.slots[index], (next: unknown) => { harness.slots[index] = typeof next === 'function' ? next(harness.slots[index]) : next; }];
   },
   useRef(initial: unknown) { const index = harness.cursor++; if (!(index in harness.slots)) harness.slots[index] = { current: initial }; return harness.slots[index]; },
@@ -45,7 +47,7 @@ function nodes(tree: ReactNode): Node[] {
   // 页头的主操作、搜索与侧栏都通过插槽传入，也要遍历到
   return [tree, ...nodes(tree.props.children as ReactNode), ...nodes(tree.props.actions as ReactNode), ...nodes(tree.props.search as ReactNode), ...nodes(tree.props.sidebar as ReactNode), ...nodes(tree.props.after as ReactNode)];
 }
-function render<T>(callback: () => T): T { harness.cursor = 0; return callback(); }
+function render<T>(callback: () => T): T { harness.cursor = 0; harness.alls = 0; return callback(); }
 function fresh() { harness.slots = []; harness.cursor = 0; }
 beforeEach(() => { fresh(); harness.category = '全部'; harness.generate.mockReset().mockResolvedValue('https://example.com/furniture.png'); harness.save.mockReset().mockResolvedValue(true); });
 const catalog = { items: [], overrides: [], count: 0, counts: {}, loading: false, hasMore: false } as unknown as ReturnType<typeof useFurnitureCatalog>;

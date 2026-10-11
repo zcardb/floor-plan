@@ -124,7 +124,8 @@ describe('管理端精简与加载分支', () => {
     expect(html).toContain('aria-label="搜索项目"');
     expect(html).toContain('aria-label="项目分类"');
     // 项目管理没有左侧切换器：胶囊所在行是 bare 单列，从行首平铺，不被压进左侧固定列
-    expect(html).toContain('class="cms-filter-group cms-filter-group--bare"');
+    expect(html).toContain('class="cms-filter-group"');
+    expect(html).not.toContain('cms-filter-group--bare');
     expect(html).not.toContain('cms-filter-group-label');
     // 搜索框与新建在页头同一行，筛选另起一行
     const head = html.slice(0, html.indexOf('cms-filter-rows'));
@@ -143,13 +144,15 @@ describe('管理端精简与加载分支', () => {
     const many = Array.from({ length: 20 }, (_, i) => ({ ...project, id: 'p' + i, name: '项目' + i }));
     const first = render(createElement(ProjectManager, { projects: projects(false, many), opened: () => {} }));
     expect(first.match(/aria-label="打开项目 /g)).toHaveLength(12);
-    expect(first).toContain('正在加载更多');
+    // 不预取、不自动补页：首屏只有 12 条，底部是「加载更多」，用户滚到底才翻页
+    expect(first).toContain('>加载更多</button>');
+    expect(first).not.toContain('正在加载更多');
     expect(first).not.toContain('aria-label="项目分页"');
     expect(render(createElement(ProjectManager, { projects: projects(false), opened: () => {} }))).toContain('已显示全部');
     const more = render(createElement(ProjectManager, { projects: { ...projects(false), hasMore: true } as ReturnType<typeof useProjects>, opened: () => {} }));
     expect(more).toMatch(/>我的<b>1\+<\/b>/);
     expect(more).not.toContain('预览模板 ');
-    expect(more).toContain('正在加载更多');
+    expect(more).toContain('>加载更多</button>');
   });
   it('列表读取失败显示错误与重试，而不是“还没有设计项目”', () => {
     const failed = render(createElement(ProjectManager, { projects: { ...projects(false, []), listError: 'Failed to fetch' } as ReturnType<typeof useProjects>, opened: () => {} }));
@@ -166,19 +169,18 @@ describe('管理端精简与加载分支', () => {
     expect(html).not.toContain('cost-list-row');
     expect(html).not.toContain('cost-policy');
     expect(html).not.toContain('修改后自动保存');
-    // 一行筛选：左侧硬装 / 软装切换器，右侧当前大类的胶囊
-    expect(html).toContain('aria-label="硬装软装：硬装"');
-    expect(html).toContain('aria-label="硬装分类"');
     expect(html).toContain('class="cms-filter-group"');
-    // 默认硬装：只列硬装胶囊，软装胶囊切换后才出现
-    for (const name of ['地面', '墙面', '门窗', '屋面', '吊顶', '楼梯']) expect(html).toContain('>' + name + '<b>');
+    // 默认「全部」：第一级列出全部 / 硬装 / 软装，不出现细分胶囊
+    expect(html).toContain('aria-label="硬装软装"');
+    expect(html).toMatch(/aria-pressed="true"[^>]*>全部<b>\d+<\/b>/);
+    expect(html).toContain('>硬装<b>');
+    expect(html).toContain('>软装<b>');
+    // 「自定义」是一级分类，排在软装之后
+    expect(html).toMatch(/>自定义<b>\d+<\/b>/);
+    expect(html.indexOf('>软装<b>')).toBeLessThan(html.indexOf('>自定义<b>'));
+    expect(html).not.toContain('aria-label="硬装分类"');
     expect(html).not.toContain('>卧室<b>');
     expect(html.match(/class="cms-filter-group/g)).toHaveLength(1);
-    // 胶囊首项「全部」默认选中，末尾是「自定义」
-    expect(html).toMatch(/aria-pressed="true"[^>]*>全部<b>\d+<\/b>/);
-    expect(html).toMatch(/>自定义<b>\d+<\/b>/);
-    expect(html.indexOf('>全部<b>')).toBeLessThan(html.indexOf('>地面<b>'));
-    expect(html.indexOf('>楼梯<b>')).toBeLessThan(html.indexOf('>自定义<b>'));
     // 卡片连成一整片：没有「全部单价」标题行，也没有按分类分段的小标题
     expect(html).not.toContain('cost-results-heading');
     expect(html).not.toContain('全部单价');

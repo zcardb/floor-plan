@@ -36,13 +36,17 @@ import { Library } from './Library';
 import { WallToolMenu } from './WallToolMenu';
 import { DimensionEditDialog } from './DimensionEditDialog';
 import { WallSplitDialog } from './WallSplitDialog';
-import { PropertyPanel } from './PropertyPanel';
+import { SidePanel } from './SidePanel';
+import { CanvasRail } from './CanvasRail';
+import { CollectionMenu } from './CollectionMenu';
+import { AiChatPanel } from './AiChatPanel';
+import { OverviewPanel } from './OverviewPanel';
+import { HouseSettingsPanel } from './HouseSettingsPanel';
 import { SelectionEditor } from './SelectionEditor';
 import { ProjectMenu } from './ProjectMenu';
 import { Logo } from './Logo';
 import { Button } from '@/components/ui/button';
 import { ExportMenu } from './ExportMenu';
-import { AccountMenu } from './AccountMenu';
 import { WorkbenchBanner } from './WorkbenchBanner';
 import { perimeterDimensions } from '../model/perimeterDimensions';
 import type { DimensionSegment } from '../model/perimeterDimensions';
@@ -74,12 +78,19 @@ function tools(tree: Node[]) {
   return nodes(group);
 }
 beforeEach(() => { state.values = []; state.cursor = 0; state.effects = []; state.design = blankDesign(); state.furniture = []; state.change.mockReset(); state.commit.mockReset(); state.cancel.mockReset(); });
+/** 模拟窄屏：侧栏以抽屉形式打开，画布工具条让位。 */
+function stubDrawer(width: number) {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: Number(query.match(/(\d+)/)?.[1] ?? 0) >= width,
+    media: query, addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {}, onchange: null, dispatchEvent: () => false,
+  }));
+}
 describe('合并确认与快照', () => {
   it('取消无提交，确认仅提交一次并选中原根，过期拒绝', async () => {
     const original = blankDesign();
     const { splitWall } = await import('../model/wallSplit');
     state.design = splitWall(original, 'outer-0', [300]).design;
-    const callback = () => render().find(n => n.type === PropertyPanel)!.props.mergeWall as (id: string) => void;
+    const callback = () => render().find(n => n.type === SelectionEditor)!.props.mergeWall as (id: string) => void;
     state.confirm.mockResolvedValue(false); callback()('outer-0'); await Promise.resolve(); expect(state.commit).not.toHaveBeenCalled();
     state.confirm.mockResolvedValue(true); callback()('outer-0'); await Promise.resolve(); expect(state.commit).toHaveBeenCalledOnce();
     expect(state.values[0]).toEqual({ kind: 'wall', id: 'outer-0' });
@@ -88,14 +99,14 @@ describe('合并确认与快照', () => {
   });
 });
 describe('分割墙段共享入口及快照提交', () => {
-  const open = (entry: typeof PropertyPanel | typeof SelectionEditor = PropertyPanel) => {
+  const open = (entry: typeof SelectionEditor = SelectionEditor) => {
     const canvas = render().find(n => n.type === PlanCanvas)!;
     (canvas.props.select as (s: unknown) => void)({ kind: 'wall', id: 'outer-0' });
     (render().find(n => n.type === entry)!.props.splitWall as (id: string) => void)('outer-0');
     return render().find(n => n.type === WallSplitDialog)!;
   };
-  it('两个入口共用分割dialog，应用一次历史并选中指定段，取消不提交', () => {
-    for (const entry of [PropertyPanel, SelectionEditor]) {
+  it('浮动工具条的分割入口：应用一次历史并选中指定段，取消不提交', () => {
+    for (const entry of [SelectionEditor]) {
       state.values = []; state.commit.mockClear();
       const dialog = open(entry), before = state.design;
       expect(state.commit).not.toHaveBeenCalled();
@@ -113,7 +124,7 @@ describe('分割墙段共享入口及快照提交', () => {
     expect(() => (dialog.props.onApply as (cuts: number[], i: number) => void)([300], 0)).toThrow('设计已变化');
     expect(state.commit).not.toHaveBeenCalled(); expect(render().some(n => n.type === WallSplitDialog)).toBe(false);
     state.values = []; state.design!.demolished = ['outer-0']; expect(open()).toBeUndefined();
-    state.values[2] = { ...initialSceneState, view: '3d' }; expect(render().find(n => n.type === PropertyPanel)!.props.splitWall).toBeUndefined();
+    state.values[2] = { ...initialSceneState, view: '3d' }; expect(render().find(n => n.type === SelectionEditor)!.props.splitWall).toBeUndefined();
   });
 });
 describe('承重墙删除保护', () => {
@@ -160,7 +171,7 @@ describe('尺寸驱动墙体提交链', () => {
 });
 describe('2D 常用工具与顶部工具栏', () => {
   it('直接展示选择、墙 ▾、门、窗，墙下拉切换墙 / 垭口 / 房间分隔线', () => {
-    expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['选择', '门', '窗']);
+    expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['门', '窗']);
     const menu = () => tools(render()).find(node => node.type === WallToolMenu)!;
     expect(menu()).toBeDefined();
     for (const tool of ['wall', 'passage', 'separator'] as const) {
@@ -168,7 +179,7 @@ describe('2D 常用工具与顶部工具栏', () => {
       expect(state.values[1]).toBe(tool);
       expect(menu().props.tool).toBe(tool);
     }
-    for (const [label, tool] of [['选择', 'select'], ['门', 'door'], ['窗', 'window']]) {
+    for (const [label, tool] of [['门', 'door'], ['窗', 'window']]) {
       const button = tools(render()).find(node => node.props.label === label)!;
       (button.props.onClick as () => void)();
       expect(state.values[1]).toBe(tool);
@@ -221,7 +232,7 @@ describe('2D 常用工具与顶部工具栏', () => {
   });
   it('可编辑的参考户型（游客/复制项目）开放绘墙和门窗，3D 保持原有工具', () => {
     state.design = referenceDesign();
-    expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['选择', '门', '窗']);
+    expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['门', '窗']);
     expect(tools(render()).some(node => node.type === WallToolMenu)).toBe(true);
     expect(render().find(n => n.type === Library)!.props.structureTools).toBe(true);
     const more = tools(render()).find(node => node.props['aria-label'] === '更多')!;
@@ -232,7 +243,7 @@ describe('2D 常用工具与顶部工具栏', () => {
   it('内置模板只读预览不开放绘墙和门窗', () => {
     state.design = referenceDesign();
     const tree = render({ project: { id: 'builtin', name: '模板', state: state.design, builtin: true } as Project });
-    expect(tools(tree).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['选择']);
+    expect(tools(tree).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual([]);
     expect(tools(tree).some(node => node.type === WallToolMenu)).toBe(false);
     expect(tree.find(n => n.type === Library)!.props.structureTools).toBe(false);
   });
@@ -264,22 +275,32 @@ describe('账号家具库并入左侧家具库', () => {
   });
 });
 describe('单行顶部工具栏', () => {
-  it('只有一行工具栏：品牌 logo 在最左、紧跟项目菜单，视图、导出、账号在右；无帮助按钮和旧 header', () => {
+  it('只有一行工具栏：品牌 logo 在最左，右侧只有集合与保存', () => {
     const tree = render();
     expect(tree.some(n => typeof n.props.className === 'string' && (n.props.className as string).includes('main-header'))).toBe(false);
     const toolbar = tree.find(n => n.props.className === 'main-toolbar')!;
     const inside = nodes(toolbar);
-    const order = [ProjectMenu, ExportMenu, AccountMenu].map(type => inside.findIndex(n => n.type === type));
+    const order = [ProjectMenu, CollectionMenu, ExportMenu].map(type => inside.findIndex(n => n.type === type));
     expect(order.every(i => i >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
-    const lead = toolbar.props.children as ReactNode[];
     // 品牌 logo 现在在项目菜单的触发按钮里，两者是同一个点击区。
-    expect(nodes(lead[0])[0].type).toBe(ProjectMenu);
+    expect(nodes((toolbar.props.children as ReactNode[])[0])[0].type).toBe(ProjectMenu);
     expect(inside.some(n => n.type === Logo)).toBe(false);
+    // 全屏、头像、旧「视图」下拉与「选择」按钮都不再出现在顶栏
+    expect(tree.some(n => n.props['aria-label'] === '全屏')).toBe(false);
+    expect(tree.some(n => n.props['aria-label'] === '视图')).toBe(false);
+    expect(tree.some(n => n.props['aria-label'] === '选择')).toBe(false);
+    expect(tree.some(n => n.props['aria-label'] && String(n.props['aria-label']).startsWith('我的账号'))).toBe(false);
     expect(tree.some(n => n.props['aria-label'] === '操作帮助')).toBe(false);
-    expect(tree.some(n => n.props['aria-label'] === '视图')).toBe(true);
-    expect(tree.some(n => n.props['aria-label'] === '文件' || n.props['aria-label'] === '图层')).toBe(false);
-    expect(tree.some(n => n.props.className === 'workspace-save-status' && n.props.role === 'status')).toBe(true);
+    expect(tree.some(n => n.props.className === 'workspace-save-status')).toBe(false);
+    expect(tree.some(n => n.props.className === 'status-bar')).toBe(false);
+  });
+  it('项目下拉底部有登录 / 退出登录，保存按钮文案固定「保存」', () => {
+    const tree = render();
+    const project = tree.find(n => n.type === ProjectMenu)!;
+    expect(project.props.onLogin).toBeTypeOf('function');
+    expect(project.props.onLogout).toBeTypeOf('function');
+    expect(tree.find(n => n.type === ExportMenu)!.props.onSave).toBeTypeOf('function');
   });
   it('小屏的重置方案与各清空操作在 2D「更多」菜单的 compact-only 项里', () => {
     const more = tools(render()).filter(n => typeof n.props.className === 'string' && (n.props.className as string).includes('compact-only') && n.props.onSelect);
@@ -367,5 +388,64 @@ describe('内置模板只读预览提示条', () => {
     (create.props.onClick as () => void)();
     await Promise.resolve();
     expect(createFromTemplate).toHaveBeenCalledWith('reference');
+  });
+});
+
+describe('编辑器分区：侧栏、竖条与画布', () => {
+  const rail = (tree: Node[]) => tree.find(n => n.type === CanvasRail)!;
+  const panel = (tree: Node[]) => tree.find(n => n.type === SidePanel);
+  it('默认打开家具库侧栏，竖条「家具」高亮，集合菜单与竖条都没有 AI 之外的额外入口', () => {
+    const tree = render();
+    expect(panel(tree)!.props.title).toBe('家具库');
+    expect(nodes(panel(tree)!).find(n => n.type === Library)).toBeDefined();
+    expect(rail(tree).props.sidePanel).toBe('library');
+    expect(tree.some(n => n.type === CollectionMenu)).toBe(true);
+  });
+  it('竖条点「家具」关闭默认打开的侧栏，再点重新打开；「AI 模式」切到 AI 侧栏', () => {
+    const tree = render();
+    (rail(tree).props.onToggle as (kind: string) => void)('library');
+    expect(panel(render())).toBeUndefined();
+    const reopened = render();
+    (rail(reopened).props.onToggle as (kind: string) => void)('ai');
+    expect(panel(render())!.props.title).toBe('AI 模式');
+    expect(nodes(panel(render())!).find(n => n.type === AiChatPanel)).toBeDefined();
+  });
+  it('集合菜单打开对应侧栏，方案总览与户型设置各有自己的面板', () => {
+    const open = (kind: string) => {
+      const tree = render();
+      (tree.find(n => n.type === CollectionMenu)!.props.onOpen as (k: string) => void)(kind);
+      return render();
+    };
+    expect(panel(open('settings'))!.props.title).toBe('户型设置');
+    expect(nodes(panel(open('settings'))!).find(n => n.type === HouseSettingsPanel)).toBeDefined();
+    expect(nodes(panel(open('overview'))!).find(n => n.type === OverviewPanel)).toBeDefined();
+    expect(panel(open('cost'))!.props.title).toBe('成本');
+  });
+  it('绘墙模式显示「完成绘墙」提示并能回到选择工具，画布上不再渲染状态条 / 比例尺 / 左上角文案', () => {
+    const tree = render();
+    state.values[1] = 'wall';
+    const wall = render();
+    const hint = wall.find(n => n.props.className === 'mode-hint')!;
+    expect(nodes(hint).some(n => n.props.className === 'mode-hint-finish')).toBe(true);
+    (nodes(hint).find(n => n.props.className === 'mode-hint-finish')!.props.onClick as () => void)();
+    expect(state.values[1]).toBe('select');
+    for (const cls of ['status-bar', 'scale-bar', 'canvas-context', 'stage-topline', 'stage-pane-buttons', 'mobile-library'])
+      expect(tree.some(n => n.props.className === cls)).toBe(false);
+    expect(tree.find(n => n.type === PlanCanvas)!.props.onCoord).toBeUndefined();
+    expect(tree.some(n => n.props['aria-label'] === '适应窗口')).toBe(true);
+  });
+  it('窄屏（≤1100px）默认不弹侧栏，打开后画布工具条让位，画布交互会收起抽屉', () => {
+    stubDrawer(1100);
+    try {
+      const tree = render();
+      expect(panel(tree)).toBeUndefined();
+      (rail(tree).props.onToggle as (kind: string) => void)('library');
+      const openTree = render();
+      expect(panel(openTree)).toBeDefined();
+      expect(openTree.find(n => n.type === SelectionEditor)!.props.hidden).toBe(true);
+      expect(openTree.some(n => n.props.className === 'drawer-backdrop')).toBe(true);
+      (openTree.find(n => n.type === PlanCanvas)!.props.closePanels as () => void)();
+      expect(panel(render())).toBeUndefined();
+    } finally { vi.unstubAllGlobals(); }
   });
 });

@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { formatMeters } from '../model/lengthUnits';
 import { canDeleteWall } from '../model/wallPolicy';
 import { ExportMenu, type ExportFormat } from './ExportMenu';
 import { ProjectMenu, type ProjectNavigation } from './ProjectMenu';
 import { WorkbenchBanner } from './WorkbenchBanner';
-import { AccountMenu } from './AccountMenu';
 import { DimensionEditDialog } from './DimensionEditDialog';
 import { WallSplitDialog } from './WallSplitDialog';
 import { CompassRose } from './CompassRose';
@@ -32,32 +30,21 @@ import type { DimensionBinding } from '../model/dimensionBinding';
 import type { DimensionSegment } from '../model/perimeterDimensions';
 import {
   Armchair,
-  Check,
   ChevronDown,
   Combine,
-  Copy,
   DoorOpen,
-  Expand,
   Eye,
   Layers3,
   LayoutTemplate,
   Loader2,
-  Maximize2,
   Minus,
   Moon,
-  MousePointer2,
-  PanelLeftClose,
-  PanelLeftOpen,
-  PanelRightClose,
-  PanelRightOpen,
   Plus,
   Redo2,
   RotateCcw,
-  RotateCw,
-  Ruler,
+  Scan,
   ScanLine,
   Settings2,
-  ShieldCheck,
   ShieldOff,
   Sun,
   Trash2,
@@ -98,7 +85,7 @@ import {
   selectionKey,
   type Tool,
 } from "../model/types";
-import { blankDesign, designForTemplate, presetById, isAiDesign } from "../data/templates";
+import { blankDesign, designForTemplate, isAiDesign } from "../data/templates";
 import { openingKindLabel } from "../model/hardMaterials";
 import { useRoomAi } from "../ai/useRoomAi";
 import { useAiCatalog } from "../ai/useAiCatalog";
@@ -106,9 +93,13 @@ import { AiRoomDialog } from "./AiRoomDialog";
 import { library } from "../data/catalog";
 import { Library } from "./Library";
 import { WallToolMenu } from './WallToolMenu';
-import { PropertyPanel } from "./PropertyPanel";
 import { CostPanel } from "./CostPanel";
-import { PanelModeTabs } from "./PanelModeTabs";
+import { SidePanel, type PanelKind } from "./SidePanel";
+import { CanvasRail } from "./CanvasRail";
+import { CollectionMenu } from "./CollectionMenu";
+import { AiChatPanel } from "./AiChatPanel";
+import { OverviewPanel } from "./OverviewPanel";
+import { HouseSettingsPanel } from "./HouseSettingsPanel";
 import { CustomFurnitureDialog } from "./CustomFurnitureDialog";
 import { useFloorCatalog } from "../cloud/useFloorCatalog";
 import { useWallCatalog } from "../cloud/useWallCatalog";
@@ -120,7 +111,7 @@ import { furnitureKey } from "../model/costs";
 import type { ScreenRect } from "../model/selectionAnchor";
 import { PlanCanvas, type CanvasHandle } from "./PlanCanvas";
 import type { Scene3D, SceneHandle, SceneOptions } from "../scene/Scene3D";
-import { isSaveProblem, type SaveStatus } from "../cloud/useProjects";
+import type { SaveStatus } from "../cloud/useProjects";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { DXF_TEMPLATE_ID } from "../model/externalDxf/recognize";
 type SceneComponent = typeof Scene3D;
@@ -133,6 +124,9 @@ const loadScene = () =>
     scenePromise = null;
     throw e;
   }));
+/** 窄屏（≤1100px）侧栏以抽屉形式覆盖画布：放置家具、点画布、Esc 后自动收起。 */
+const isDrawerLayout = () => typeof matchMedia !== "undefined" && matchMedia("(max-width:1100px)").matches;
+const PANEL_TITLES: Record<PanelKind, string> = { library: "家具库", ai: "AI 模式", settings: "户型设置", overview: "方案总览", cost: "成本" };
 interface Props {
   project: Project;
   projectNavigation: ProjectNavigation;
@@ -197,9 +191,8 @@ export function Workbench(p: Props) {
     view = lifecycle.view,
     sceneLoading = lifecycle.loading;
   const [Scene, setScene] = useState<SceneComponent | null>(null),
-    [hideLib, setHideLib] = useState(false),
-    [hidePanel, setHidePanel] = useState(false),
-    [drawer, setDrawer] = useState<"lib" | "panel" | null>(null),
+    // 右侧统一侧栏：同一时间只开一个；宽屏默认打开家具库，窄屏默认收起（抽屉会盖住画布）。
+    [sidePanel, setSidePanel] = useState<PanelKind | null>(isDrawerLayout() ? null : "library"),
     [scale, setScale] = useState(0.05),
     [pendingFile, setPendingFile] = useState<PendingFile | null>(null);
   const selectionId = selectionKey(selection);
@@ -208,11 +201,6 @@ export function Workbench(p: Props) {
   useEffect(() => { if (view !== "2d") setSelection(s => (s?.kind === "group" ? null : s)); }, [view]);
   // 页面被切走前，先把尺寸输入框里未提交的修改并入设计，随后的立即保存才能带上它
   useEffect(() => onPageHide(() => sizeTransaction.flush(), "flush"), [sizeTransaction]);
-  const coordLabel = useRef<HTMLSpanElement>(null);
-  const onCoord = useCallback((p: Point) => {
-    if (coordLabel.current)
-      coordLabel.current.textContent = `X ${formatMeters(p[0])}  /  Y ${formatMeters(p[1])} m`;
-  }, []);
   const [layerState, setLayers] = useState<Layers>({
       grid: false,
       dims: true,
@@ -249,7 +237,7 @@ export function Workbench(p: Props) {
     const before = model.current.current;
     if (!before.walls.some(w => w.id === wallId) || before.demolished.includes(wallId)) return;
     setDimensionEdit(null);
-    setDrawer(null);
+    if (isDrawerLayout()) setSidePanel(null);
     setWallSplit({ wallId, before });
   };
   const cancelWallSplit = async (wallId: string) => {
@@ -268,8 +256,7 @@ export function Workbench(p: Props) {
       notify.success('已取消分割，连续墙段已合并');
     } catch (e) { notify.fail(e instanceof Error ? e.message : '取消分割失败'); }
   };
-  const [panelMode, setPanelMode] = useState<"props" | "cost">("props"),
-    [customOpen, setCustomOpen] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
   const floorCatalog = useFloorCatalog(), loadAccountFloors = floorCatalog.load;
   const wallCatalog = useWallCatalog(), loadAccountWalls = wallCatalog.load;
   const openingCatalog = useOpeningCatalog(), loadAccountOpenings = openingCatalog.load;
@@ -381,7 +368,7 @@ export function Workbench(p: Props) {
       setSelection(s);
       if (s?.kind === "room") scene.current?.flyTo(s.id);
     }, [sizeTransaction]),
-    closePanels = useCallback(() => { sizeTransaction.flush(); setDrawer(null); }, [sizeTransaction]);
+    closePanels = useCallback(() => { sizeTransaction.flush(); if (isDrawerLayout()) setSidePanel(null); }, [sizeTransaction]);
   const toggleView = async (next: "2d" | "3d") => {
     setTool("select");
     if (next === view) return;
@@ -429,7 +416,7 @@ export function Workbench(p: Props) {
       }));
       setSelection({ kind: "furniture", id: f.id });
       setTool("select");
-      setDrawer(null);
+      if (isDrawerLayout()) setSidePanel(null);
       notify.success("已添加 " + it.name);
     },
     [d, selection, view, change],
@@ -603,7 +590,7 @@ export function Workbench(p: Props) {
       } else if (k === "escape") {
         setSelection(null);
         setTool("select");
-        setDrawer(null);
+        if (isDrawerLayout()) setSidePanel(null);
       } else if (k === "delete" || k === "backspace") {
         e.preventDefault();
         remove();
@@ -626,12 +613,9 @@ export function Workbench(p: Props) {
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   });
-  const togglePane = (which: "lib" | "panel") => {
-    if (matchMedia("(max-width:1100px)").matches)
-      setDrawer((v) => (v === which ? null : which));
-    else if (which === "lib") setHideLib((v) => !v);
-    else setHidePanel((v) => !v);
-  };
+  /** 竖条入口：再点同一个就关闭。 */
+  const togglePanel = (kind: PanelKind) => { sizeTransaction.flush(); setSidePanel(sidePanel === kind ? null : kind); };
+  const openPanel = (kind: PanelKind) => { sizeTransaction.flush(); setSidePanel(kind); };
   const cloudSave = useAsyncAction(p.cloudSave);
   const templateCreate = useAsyncAction(async () => { if (p.createFromTemplate) await p.createFromTemplate(p.project.templateId ?? 'reference'); });
   // 游客改过模版才提示登录保存；「暂不保存」只关掉当前这一版，再改一次会重新出现。
@@ -750,11 +734,12 @@ export function Workbench(p: Props) {
     setSelection(null);
     notify.success("已重置为初始模板，可撤销恢复");
   };
+  /** 画布上的操作提示：只在非选择工具时出现（原来底部状态条的那一行）。 */
   const tip =
     tool === "wall"
-      ? "点击起点与转角连续绘墙 · 可拖动起段 · 双击 / 右键 / Enter 完成 · Esc 取消草稿"
+      ? "点击起点与转角连续绘墙 · 可拖动起段 · 双击 / 右键 / Enter 完成"
       : tool === "separator"
-        ? "点击起点与转角绘制房间分隔线 · 两端贴墙即把空间分成两个房间 · 双击 / 右键 / Enter 完成 · Esc 取消"
+        ? "点击起点与转角绘制房间分隔线 · 两端贴墙即把空间分成两个房间 · 双击 / 右键 / Enter 完成"
         : isOpeningTool(tool)
         ? "点击墙体放置门窗或垭口，选中后可沿墙拖动或使用可视编辑工具条调整"
         : view === "3d"
@@ -790,13 +775,7 @@ export function Workbench(p: Props) {
           </Button>
         </WorkbenchBanner>
       )}
-    <div
-      className={
-        "workbench " +
-        (hideLib ? "hide-library " : "") +
-        (hidePanel ? "hide-properties" : "")
-      }
-    >
+    <div className={"workbench" + (sidePanel ? " has-side-panel" : "")}>
       <div className="main-toolbar">
         <ProjectMenu
           {...p.projectNavigation}
@@ -806,6 +785,10 @@ export function Workbench(p: Props) {
           onOpen={async (row) => { sizeTransaction.cancel(); return p.projectNavigation.onOpen(row); }}
           onCreateProject={p.projectNavigation.onCreateProject && (async (project) => { sizeTransaction.cancel(); return p.projectNavigation.onCreateProject!(project); })}
           onDuplicate={p.projectNavigation.onDuplicate && (async (row) => { sizeTransaction.cancel(); return p.projectNavigation.onDuplicate!(row); })}
+          email={p.email}
+          loggingOut={p.loggingOut}
+          onLogin={p.login}
+          onLogout={p.logout}
         />
         <span className="toolbar-divider" />
         <div className="toolbar-scroll">
@@ -844,14 +827,6 @@ export function Workbench(p: Props) {
         <span className="toolbar-divider" />
         {view === "2d" ? (
           <div className="tool-group">
-            <ToolButton
-              label="选择"
-              shortcut="V"
-              active={tool === "select"}
-              onClick={() => setTool("select")}
-            >
-              <MousePointer2 size={16} />
-            </ToolButton>
             {structureTools && (
               <>
                 <WallToolMenu tool={tool} setTool={setTool} />
@@ -964,121 +939,32 @@ export function Workbench(p: Props) {
           </ToolButton>
         </div>
         <div className="toolbar-right">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="tool-button" aria-label="视图">
-                <Layers3 size={16} />
-                <span>视图</span>
-                <ChevronDown size={12} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {(
-                ["dims", "labels", "furn", "grid", "bearing", "snap"] as const
-              ).map((key, i) => (
-                <DropdownMenuItem
-                  key={key}
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    if (key === 'dims') change(d => ({ ...d, dimensionSettings: { ...d.dimensionSettings, visible: !(d.dimensionSettings?.visible ?? true) } }));
-                    else setLayers((l) => ({ ...l, [key]: !l[key] }));
-                  }}
-                >
-                  <span
-                    className={
-                      "layer-checkbox " + (layers[key] ? "checked" : "")
-                    }
-                  >
-                    {layers[key] && <Check size={11} />}
-                  </span>
-                  {
-                    [
-                      "尺寸标注",
-                      "房间名称",
-                      "家具显示",
-                      "辅助网格",
-                      "承重墙高亮",
-                      "贴墙吸附",
-                    ][i]
-                  }
-                </DropdownMenuItem>
-              ))}
-              <DropdownMenuSeparator />
-              {[60, 100].map((ratio) => (
-                <DropdownMenuItem key={ratio} disabled={view !== "2d"} onSelect={() => canvas.current?.ratio(ratio)}>
-                  <Ruler />
-                  显示比例 1:{ratio}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <ExportMenu view={view} pending={exportAction.pending} onExport={exportFile} />
-          <EditorTooltip label="全屏">
-            <button
-              className="toolbar-icon toolbar-fullscreen"
-              aria-label="全屏"
-              onClick={() => {
-                if (document.fullscreenElement) void document.exitFullscreen();
-                else
-                  document.documentElement
-                    .requestFullscreen?.()
-                    .catch(() => notify.info("当前浏览器不支持全屏"));
-              }}
-            >
-              <Expand size={17} />
-            </button>
-          </EditorTooltip>
-          <span className="toolbar-divider" />
-          <AccountMenu email={p.email} loggedIn={p.loggedIn} loggingOut={p.loggingOut} onLogin={p.login} onLogout={p.logout} />
+          <CollectionMenu
+            layers={layers}
+            view={view}
+            active={sidePanel}
+            loggedIn={p.loggedIn}
+            onToggleLayer={(key) => {
+              if (key === "dims") change(d => ({ ...d, dimensionSettings: { ...d.dimensionSettings, visible: !(d.dimensionSettings?.visible ?? true) } }));
+              else setLayers((l) => ({ ...l, [key]: !l[key] }));
+            }}
+            onRatio={(ratio) => canvas.current?.ratio(ratio)}
+            onOpen={openPanel}
+          />
+          <ExportMenu
+            view={view}
+            pending={exportAction.pending}
+            onExport={exportFile}
+            status={p.status}
+            loggedIn={p.loggedIn}
+            readOnly={readOnly}
+            guestDirty={p.guestEdits > 0}
+            saving={cloudSave.pending}
+            onSave={() => { sizeTransaction.cancel(); void cloudSave.run(); }}
+          />
         </div>
       </div>
-      <aside
-        className={"library-panel " + (drawer === "lib" ? "drawer-open" : "")}
-      >
-        <Library
-          add={(it) => add(it)}
-          tool={tool}
-          setTool={(t) => {
-            setTool(t);
-            setDrawer(null);
-          }}
-          structureTools={structureTools}
-          customItems={[...projectCatalog, ...accountFurniture]}
-          builtinItems={builtinLibrary}
-          onNew={p.loggedIn && !readOnly ? () => setCustomOpen(true) : undefined}
-          readOnly={readOnly}
-        />
-      </aside>
       <main className="stage" ref={stage}>
-        <div className="stage-topline">
-          <div className="canvas-context">
-            <span className="context-dot" />
-            {view === "2d" ? "平面布置图" : "立体空间预览"}
-            <span>
-              /{isAiDesign(d) ? " AI 生成户型" : d.template === "blank" ? " 自定义户型" : d.templateId === DXF_TEMPLATE_ID ? " CAD 导入户型" : ` ${presetById(d.templateId ?? 'reference')?.layout ?? '参考户型'}`}
-            </span>
-          </div>
-          <div className="stage-pane-buttons">
-            <EditorTooltip label={hideLib ? "展开家具库" : "收起家具库"}>
-              <button onClick={() => togglePane("lib")} aria-label={hideLib ? "展开家具库" : "收起家具库"}>
-                {hideLib ? (
-                  <PanelLeftOpen size={16} />
-                ) : (
-                  <PanelLeftClose size={16} />
-                )}
-              </button>
-            </EditorTooltip>
-            <EditorTooltip label={hidePanel ? "展开属性面板" : "收起属性面板"}>
-              <button onClick={() => togglePane("panel")} aria-label={hidePanel ? "展开属性面板" : "收起属性面板"}>
-                {hidePanel ? (
-                  <PanelRightOpen size={16} />
-                ) : (
-                  <PanelRightClose size={16} />
-                )}
-              </button>
-            </EditorTooltip>
-          </div>
-        </div>
         {view === "2d" ? (
           <PlanCanvas
             readOnly={readOnly}
@@ -1093,7 +979,6 @@ export function Workbench(p: Props) {
             add={add}
             closePanels={closePanels}
             onScale={setScale}
-            onCoord={onCoord}
             onAnchor={onAnchor}
             finishTool={()=>setTool('select')}
             startWallTool={structureTools ? () => setTool('wall') : undefined}
@@ -1126,14 +1011,20 @@ export function Workbench(p: Props) {
             正在加载 3D 场景…
           </div>
         )}
-        {tool !== "select" && tool !== "wall" && (
+        {tool !== "select" && (
           <div className="mode-hint">
             {tip}
-            <EditorTooltip label="退出当前工具" shortcut="Esc">
-              <button onClick={() => setTool("select")} aria-label="退出当前工具">
-                <X size={13} />
-              </button>
-            </EditorTooltip>
+            {tool === "wall" ? (
+              <EditorTooltip label="完成绘墙" shortcut="Enter">
+                <button className="mode-hint-finish" onClick={() => setTool("select")}>完成绘墙</button>
+              </EditorTooltip>
+            ) : (
+              <EditorTooltip label="退出当前工具" shortcut="Esc">
+                <button onClick={() => setTool("select")} aria-label="退出当前工具">
+                  <X size={13} />
+                </button>
+              </EditorTooltip>
+            )}
           </div>
         )}
         {view === "3d" && (
@@ -1174,12 +1065,6 @@ export function Workbench(p: Props) {
           </div>
         )}
         {view === "2d" && <CompassRose angle={northAngle(d)} />}
-        {view === "2d" && (
-          <div className="scale-bar">
-            <span>1 m</span>
-            <div style={{ width: Math.max(15, scale * 1000) }} />
-          </div>
-        )}
         <div className="canvas-zoom">
           <EditorTooltip label="缩小" side="top">
             <button
@@ -1225,7 +1110,7 @@ export function Workbench(p: Props) {
                 view === "2d" ? canvas.current?.fit() : scene.current?.iso()
               }
             >
-              <Maximize2 size={15} />
+              <Scan size={15} />
             </button>
           </EditorTooltip>
         </div>
@@ -1273,92 +1158,52 @@ export function Workbench(p: Props) {
           accountFloors={accountFloors} accountWalls={accountWalls} accountOpenings={accountOpenings}
           accountRoofs={accountRoofs} accountCeilings={accountCeilings}
           roomAi={aiEnabled && selection?.kind === "room" ? { tone: roomAi.toneOf(selection.id), open: () => roomAi.open(selection.id) } : undefined}
-          hidden={readOnly || tool !== 'select' || !!drawer || (view === "3d" && sceneOptions.mode === "walk")}
-          costs={() => {
-            setPanelMode("cost");
-            if (matchMedia("(max-width:1100px)").matches) setDrawer("panel");
-            else setHidePanel(false);
-          }}
+          hidden={readOnly || tool !== 'select' || (!!sidePanel && isDrawerLayout()) || (view === "3d" && sceneOptions.mode === "walk")}
+          costs={() => openPanel("cost")}
         />
-        <EditorTooltip label="家具库" side="top">
-          <button className="mobile-library" onClick={() => togglePane("lib")}>
-            <Armchair size={19} />
-            家具库
-          </button>
-        </EditorTooltip>
+        <CanvasRail sidePanel={sidePanel} stage={stage} onToggle={togglePanel} />
       </main>
-      <aside
-        className={
-          "property-panel " + (drawer === "panel" ? "drawer-open" : "")
-        }
-      >
-        {p.loggedIn && (
-          <PanelModeTabs
-            design={d}
-            mode={panelMode}
-            onChange={setPanelMode}
-          />
-        )}
-        <div className="panel-scroll">
-          <fieldset className="contents" disabled={readOnly}>
-          {p.loggedIn && panelMode === "cost" ? (
+      {sidePanel && (
+        <SidePanel title={PANEL_TITLES[sidePanel]} readOnly={readOnly && sidePanel !== "library"} onClose={() => { sizeTransaction.flush(); setSidePanel(null); }}>
+          {sidePanel === "library" ? (
+            <Library
+              add={(it) => add(it)}
+              tool={tool}
+              setTool={(t) => {
+                setTool(t);
+                if (isDrawerLayout()) setSidePanel(null);
+              }}
+              structureTools={structureTools}
+              customItems={[...projectCatalog, ...accountFurniture]}
+              builtinItems={builtinLibrary}
+              onNew={p.loggedIn && !readOnly ? () => setCustomOpen(true) : undefined}
+              readOnly={readOnly}
+            />
+          ) : sidePanel === "ai" ? (
+            <AiChatPanel loggedIn={p.loggedIn} login={p.login} />
+          ) : sidePanel === "settings" ? (
+            <HouseSettingsPanel design={d} change={change} />
+          ) : sidePanel === "cost" ? (
             <CostPanel
               design={d}
               selection={selection}
               change={change}
               select={select}
               back={() => select(null)}
+              overview={() => openPanel("overview")}
             />
           ) : (
-            <PropertyPanel
-              splitWall={view === '2d' && tool === 'select' ? openWallSplit : undefined}
-              mergeWall={view === '2d' && tool === 'select' ? id => void cancelWallSplit(id) : undefined}
-              removeWall={view === '2d' && tool === 'select' ? removeWall : undefined}
-              transaction={sizeTransaction} showCosts={p.loggedIn}
-              accountFloors={accountFloors} accountWalls={accountWalls} accountOpenings={accountOpenings}
-              accountRoofs={accountRoofs} accountCeilings={accountCeilings}
-              design={d}
-              selection={selection}
-              select={select}
-              change={change}
-              duplicate={duplicate}
-              remove={remove}
-              rotate={() => rotate()}
-              openCosts={() => setPanelMode("cost")}
-            />
+            <OverviewPanel design={d} change={change} select={select} onCosts={p.loggedIn ? () => openPanel("cost") : undefined} />
           )}
-          </fieldset>
-        </div>
-      </aside>
-      {drawer && (
+        </SidePanel>
+      )}
+      {sidePanel && (
         <button
           className="drawer-backdrop"
           aria-label="关闭侧栏"
-          onClick={() => setDrawer(null)}
+          onClick={() => setSidePanel(null)}
         />
       )}
-      <footer className="status-bar">
-        <span>
-          <MousePointer2 size={13} />
-          <b>
-            {tool === "select"
-              ? "选择模式"
-              : tool === "wall"
-                ? "绘制墙体"
-                : "结构编辑"}
-          </b>
-        </span>
-        <span className="status-coordinates" ref={coordLabel}>
-          X 0 / Y 0 m
-        </span>
-        <span className="status-tip" title={tip}>{tip}</span>
-        {tool === 'wall' && <EditorTooltip label="完成绘墙" side="top"><button className="status-finish-wall" onClick={() => setTool('select')}>完成绘墙</button></EditorTooltip>}
-        <span className={'workspace-save-status' + (isSaveProblem(p.status) ? ' is-error' : '')} role="status" title={p.status.label}><span className={isSaveProblem(p.status) ? 'error-dot' : 'status-dot'} />{p.status.label}</span>
-        <span className="status-safe">
-          <ShieldCheck size={13} />
-          设计示意 · 拆改须专业确认
-        </span>
-      </footer>
       {p.loggedIn && <CustomFurnitureDialog
         open={customOpen}
         onOpenChange={setCustomOpen}
