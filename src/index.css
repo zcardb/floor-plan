@@ -3925,6 +3925,21 @@ button.room-cost-row:hover {
 .project-menu-check { display:flex; color:hsl(var(--primary)); }
 .project-menu-sentinel { height:1px; }
 .project-menu-loading { display:flex; justify-content:center; padding:8px 0; color:hsl(var(--muted-foreground)); }
+/* 「新建项目」菜单（工作台下拉二级菜单 + 项目管理页页头新建菜单共用）：
+   与 .wall-options-item 同一套两行刻度 —— 标题 --fs-group、说明 --fs-hint、padding 9px。
+   组件 CreateProjectMenuItems 依赖这组 class，删菜单结构时必须同步处理，不要留下「组件在用、CSS 已删」的 class。 */
+.create-menu { width:min(260px,calc(100vw - 24px)); padding:6px; }
+.create-menu [role="menuitem"].create-option { min-height:48px; align-items:flex-start; gap:10px; padding:9px; border-radius:var(--ctl-radius-in); }
+.create-option-icon { display:grid; place-items:center; flex:none; width:16px; height:16px; margin-top:2px; }
+.create-option-icon>svg { width:16px; height:16px; stroke-width:1.75; }
+.create-option-text { display:grid; gap:3px; flex:1; min-width:0; }
+.create-option-text>b { font-size:var(--fs-group); line-height:17px; font-weight:500; color:hsl(var(--foreground)); }
+.create-option-text>small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--fs-hint); line-height:15px; color:hsl(var(--muted-foreground)); }
+/* 菜单里夹着的单行禁用项（从其他软件导入）：图标列、左边距与两行项对齐 */
+.create-menu [role="menuitem"].soon-item { min-height:var(--ctl-md); gap:10px; padding:0 9px; font-size:var(--fs-group); }
+.create-menu [role="menuitem"].soon-item>svg { width:16px; height:16px; stroke-width:1.75; }
+/* AI 标识统一主色（AiIcon）：工具条、按钮、菜单共用，漏掉这条星标会变成前景色黑。 */
+.ai-icon { flex:none; color:hsl(var(--primary)); }
 .field-counter { justify-self:end; font-size:11px; color:hsl(var(--muted-foreground)); font-variant-numeric:tabular-nums; }
 /* 右侧：导出按钮与账号 */
 .export-button { height:32px; padding:0 10px 0 12px; gap:6px; font-size:12px; font-weight:600; border-color:hsl(var(--primary) / 0.5); color:hsl(var(--primary)); background:hsl(var(--card)); }

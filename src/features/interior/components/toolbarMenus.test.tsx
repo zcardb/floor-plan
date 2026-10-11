@@ -1,4 +1,5 @@
 import { isValidElement, type ReactElement, type ReactNode } from 'react';
+import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({ values: [] as unknown[], cursor: 0, refs: [] as { current: unknown }[], effects: [] as (() => unknown)[] }));
@@ -155,6 +156,17 @@ describe('ProjectMenu', () => {
     createOptions(tree).forEach(n => (n.props.onSelect as () => void)());
     expect([actions.blank, actions.ai, actions.importFile].every(f => f.mock.calls.length === 1)).toBe(true);
     expect(createOptions(nodes(CreateProjectMenuItems({ actions: { ...actions, ai: undefined } }))).map(n => n.props.title)).not.toContain('AI 创建…');
+  });
+  it('新建菜单用到的 class 在 index.css 里都有定义，保持两行刻度（曾因整段 CSS 被删而塌成一行大图标）', () => {
+    const css = readFileSync('src/index.css', 'utf8');
+    const rule = (selector: string) => css.match(new RegExp(`(?:^|\\n)${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
+    expect(rule('.create-menu')).toContain('width:min(260px');
+    expect(rule('.create-menu [role="menuitem"].create-option')).toContain('min-height:48px');
+    expect(rule('.create-option-icon>svg')).toContain('width:16px');
+    expect(rule('.create-option-text>b')).toContain('font-size:var(--fs-group)');
+    expect(rule('.create-option-text>small')).toContain('font-size:var(--fs-hint)');
+    expect(rule('.create-menu [role="menuitem"].soon-item')).toContain('padding:0 9px');
+    expect(rule('.ai-icon')).toContain('color:hsl(var(--primary))');
   });
   it('复刻当前项目是子菜单里的第二项，只在可复刻时出现，点击复刻当前项目', () => {
     const onCreateProject = vi.fn(async () => true);
