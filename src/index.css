@@ -17,6 +17,8 @@
   --ctl-radius: 8px; --ctl-radius-in: 6px;
   --sp-x: 16px; --sp-section: 16px; --sp-group: 16px; --sp-title: 8px; --sp-row: 12px; --sp-col: 8px;
   --shadow-segment: 0 1px 2px hsl(var(--foreground) / 0.08), 0 1px 3px -1px hsl(var(--foreground) / 0.06);
+  /* 管理端侧栏宽度：侧栏列宽与底部账号弹窗共用，改一处两边一起变。 */
+  --cms-sidebar-w: 220px;
 }
 @media (pointer: coarse) { :root { --fs-input: 16px; } }
 .toaster [data-sonner-toast][data-styled="true"] { background: hsl(var(--toast-surface) / var(--toast-surface-alpha)); box-shadow: 0 8px 24px -6px hsl(var(--foreground) / 0.16), 0 2px 6px hsl(var(--foreground) / 0.06); }
@@ -270,7 +272,7 @@
   }
 }
 @layer components {
-  .account-cms { display:grid; grid-template-columns:220px minmax(0,1fr); height:100dvh; background:hsl(var(--background)); }
+  .account-cms { display:grid; grid-template-columns:var(--cms-sidebar-w) minmax(0,1fr); height:100dvh; background:hsl(var(--background)); }
   .cms-sidebar { display:flex; flex-direction:column; padding:16px 12px 12px; border-right:1px solid hsl(var(--border)); background:hsl(var(--card)); }
   /* 侧栏按常见 SaaS 侧栏的节奏：品牌行 → 20px → 导航（36px 行高、2px 间距）→ 底部账号区以分隔线收尾。 */
   .cms-brand { display:flex; align-items:center; gap:8px; padding:4px 8px 20px; color:hsl(var(--primary)); }
@@ -887,7 +889,7 @@
     color: hsl(var(--primary));
   }
   .stage {
-    grid-column: 2;
+    grid-column: 1;
     grid-row: 2;
     position: relative;
     min-width: 0;
@@ -1145,18 +1147,19 @@
     flex-direction: column;
     align-items: center;
     gap: 4px;
-    padding: 4px;
+    padding: 5px;
     background: hsl(var(--card) / 0.97);
     border: 1px solid hsl(var(--border));
-    border-radius: var(--ctl-radius);
+    /* 上下整条收成圆形胶囊 */
+    border-radius: 999px;
     box-shadow: var(--shadow-panel);
     z-index: 6;
   }
   .canvas-rail-grip {
     display: grid;
     place-items: center;
-    width: var(--ctl-md);
-    height: 20px;
+    width: 38px;
+    height: 22px;
     border-radius: var(--ctl-radius-in);
     color: hsl(var(--muted-foreground));
     cursor: grab;
@@ -1165,17 +1168,21 @@
   .canvas-rail-grip:hover { background: hsl(var(--secondary)); color: hsl(var(--foreground)); }
   .canvas-rail-grip[data-dragging] { cursor: grabbing; }
   .canvas-rail-grip:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
+  /* 竖条按钮：默认就有底色，悬停 / 打开时更亮 */
   .canvas-rail-button {
     display: grid;
     place-items: center;
-    width: var(--ctl-lg);
-    height: var(--ctl-lg);
-    border-radius: var(--ctl-radius-in);
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    background: hsl(var(--secondary));
     color: hsl(var(--muted-foreground));
     transition: background-color .15s ease, color .15s ease;
   }
-  .canvas-rail-button:hover { background: hsl(var(--secondary)); color: hsl(var(--foreground)); }
-  .canvas-rail-button.active { background: hsl(var(--accent)); color: hsl(var(--primary)); }
+  .canvas-rail-button > svg { width: 20px; height: 20px; }
+  .canvas-rail-button:hover { background: hsl(var(--accent)); color: hsl(var(--primary)); }
+  .canvas-rail-button[data-state="open"],
+  .canvas-rail-button.active { background: hsl(var(--primary) / 0.16); color: hsl(var(--primary)); }
   .canvas-rail-button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
   .mode-hint-finish {
     flex: none;
@@ -2006,9 +2013,6 @@
   .workbench.has-side-panel {
     grid-template-columns: minmax(0, 1fr);
   }
-  .stage {
-    grid-column: 1;
-  }
   .side-panel {
     position: absolute;
     top: var(--toolbar-h);
@@ -2422,54 +2426,61 @@
   border-radius: 10px;
   box-shadow: var(--shadow-panel);
 }
+/* 侧栏底部账号弹窗：与侧栏同宽（两侧各留 8px，浮层不贴屏幕边、不压侧栏分隔线）。
+   容器不留内边距：上半是账号信息，下半「退出登录」是贴边的整行，靠一条分隔线区分。 */
 .account-popover {
-  width: 246px;
-  max-width: calc(100vw - 24px);
+  width: calc(var(--cms-sidebar-w) - 16px);
+  max-width: calc(100vw - 16px);
   display: grid;
-  gap: 12px;
-  padding: 16px 14px 12px;
+  padding: 0;
+  overflow: hidden;
   border: 1px solid hsl(var(--border));
-  border-radius: 14px;
+  border-radius: 12px;
   background: hsl(var(--card));
   box-shadow: var(--shadow-panel);
 }
 .account-popover-head {
   display: grid;
   justify-items: center;
-  gap: 8px;
+  gap: 4px;
+  padding: 16px 12px 14px;
   text-align: center;
 }
 .account-popover-head .account-avatar {
-  box-shadow: 0 0 0 3px hsl(var(--accent)), var(--shadow-float);
+  margin-bottom: 6px;
+  box-shadow: 0 0 0 3px hsl(var(--accent));
 }
 .account-popover-head b {
-  font-size: 12.5px;
+  max-width: 100%;
+  font-size: var(--fs-group);
   font-weight: 600;
   color: hsl(var(--foreground));
   overflow-wrap: anywhere;
 }
 .account-popover-head small {
-  font-size: 11px;
+  font-size: var(--fs-meta);
   color: hsl(var(--muted-foreground));
-}
-.account-popover-sep {
-  display: block;
-  height: 1px;
-  margin: 0 -14px;
-  background: hsl(var(--border));
 }
 .account-popover-logout {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 9px;
-  font-size: 12.5px;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 40px;
+  border-top: 1px solid hsl(var(--border));
+  font-size: var(--fs-group);
   color: hsl(var(--foreground));
+  transition: background .15s ease, color .15s ease;
 }
-.account-popover-logout:hover {
+.account-popover-logout:hover:not(:disabled),
+.account-popover-logout:focus-visible {
+  outline: none;
   background: hsl(var(--destructive) / 0.08);
   color: hsl(var(--destructive));
+}
+.account-popover-logout:disabled {
+  color: hsl(var(--muted-foreground));
 }
 .visual-editor-popover h3 {
   font-size: var(--fs-title);
@@ -3667,17 +3678,23 @@ button.room-cost-row:hover {
 .save-menu-status .save-button-mark { width:6px; height:6px; }
 .save-menu-status.is-error .save-button-mark { background:hsl(var(--destructive)); }
 /* 顶栏「集合」：立方体图标按钮，与项目下拉同一刻度 */
-.collection-trigger { color:hsl(var(--muted-foreground)); }
-.collection-trigger[data-state="open"] { background:hsl(var(--secondary)); color:hsl(var(--foreground)); }
+/* 集合按钮：默认就有底色，悬停 / 打开时更亮，图标略大 */
+.collection-trigger { width:36px; height:36px; background:hsl(var(--secondary)); color:hsl(var(--foreground)); }
+.collection-trigger > svg { width:20px; height:20px; }
+.collection-trigger:hover { background:hsl(var(--accent)); color:hsl(var(--primary)); }
+.collection-trigger[data-state="open"] { background:hsl(var(--primary) / 0.16); color:hsl(var(--primary)); }
 .collection-menu { width:min(232px,calc(100vw - 24px)); padding:6px; }
 .collection-menu [role="menuitem"].project-menu-entry { min-height:var(--ctl-md); padding:0 9px; gap:10px; font-size:var(--fs-group); }
 .collection-menu [role="menuitem"].project-menu-entry>svg { width:15px; height:15px; color:hsl(var(--muted-foreground)); }
+/* 「视图设置」二级菜单朝左展开：箭头朝左放在最前，颜色用前景灰 */
+.collection-menu [role="menuitem"].collection-sub-trigger>svg.collection-caret { margin-left:0 !important; width:16px; height:16px; color:hsl(var(--muted-foreground)); }
+.collection-menu [role="menuitem"].collection-sub-trigger>svg:not(.collection-caret) { display:none; }
 .collection-menu [role="menuitem"].project-menu-entry[data-active] { color:hsl(var(--primary)); font-weight:600; }
 .collection-menu [role="menuitem"].project-menu-entry[data-active]>svg { color:hsl(var(--primary)); }
 .collection-submenu { width:min(232px,calc(100vw - 24px)); padding:6px; }
 .collection-submenu [role="menuitem"] { min-height:var(--ctl-md); padding:0 10px; gap:8px; font-size:var(--fs-group); }
 .collection-submenu [role="menuitem"]>svg { width:14px; height:14px; color:hsl(var(--muted-foreground)); }
-.project-menu-email { padding:6px 10px 4px; font-size:var(--fs-meta); color:hsl(var(--muted-foreground)); font-weight:400; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.project-menu-email { padding:6px 9px 4px; font-size:var(--fs-meta); color:hsl(var(--muted-foreground)); font-weight:400; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .export-menu { min-width:200px; }
 .account-trigger { display:grid; place-items:center; flex:none; width:40px; height:40px; border-radius:50%; }
 .account-trigger .account-avatar { transition:box-shadow .2s ease; }
@@ -4233,5 +4250,5 @@ svg.material-thumb { display: block; }
   /* 手机上竖条改成右下角横排、不可拖动（压掉拖动写入的内联位移），避开左下角缩放条 */
   .canvas-rail { top:auto; left:auto; right:12px; bottom:16px; flex-direction:row; transform:none !important; }
   .canvas-rail-grip { display:none; }
-  .canvas-rail-button { width:34px; height:34px; }
+  .canvas-rail-button { width:38px; height:38px; }
 }

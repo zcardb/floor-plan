@@ -44,11 +44,11 @@ export function CmsSidebar({ collapsed, onToggle, modules, active, onSelect, ema
             <button type="button" className="cms-account-trigger" aria-label={`账号菜单：${email}`}><AccountAvatar email={email} size={28} /><span className="cms-account-name"><b>{nameHead}</b><span>{nameTail}</span></span></button>
           </PopoverTrigger>
         </EditorTooltip>
-        <PopoverContent className="account-popover" side="top" align="start" sideOffset={10}>
-          <div className="account-popover-head"><AccountAvatar email={email} size={52} /><b>{email}</b><small>已登录 · 云端同步</small></div>
-          <span className="account-popover-sep" aria-hidden="true" />
+        {/* 宽度与侧栏一致（见 .account-popover）；collisionPadding 让它在展开、收起两种侧栏下都贴着左侧 8px 对齐。 */}
+        <PopoverContent className="account-popover" side="top" align="start" sideOffset={8} collisionPadding={8}>
+          <div className="account-popover-head"><AccountAvatar email={email} size={40} /><b>{email}</b><small>已登录 · 云端同步</small></div>
           <EditorTooltip label="退出登录" side="right" disabled={loggingOut}>
-            <button type="button" className="account-popover-logout" disabled={loggingOut} aria-busy={loggingOut} onClick={() => { setAccountOpen(false); onLogout(); }}>{loggingOut ? <Loader2 className="animate-spin" size={16} /> : <LogOut size={16} />}退出登录</button>
+            <button type="button" className="account-popover-logout" disabled={loggingOut} aria-busy={loggingOut} onClick={() => { setAccountOpen(false); onLogout(); }}>{loggingOut ? <Loader2 className="animate-spin" size={15} /> : <LogOut size={15} />}退出登录</button>
           </EditorTooltip>
         </PopoverContent>
       </Popover>

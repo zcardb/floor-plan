@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useRef } from "react";
-import { Armchair, GripVertical } from "lucide-react";
+import { Armchair, CircleDollarSign, GripVertical } from "lucide-react";
 import { EditorTooltip } from "@/components/ui/editor-tooltip";
 import { AiIcon } from "./AiIcon";
 import { useEditorDrag } from "./useEditorDrag";
@@ -9,15 +9,18 @@ import type { PanelKind } from "./SidePanel";
 const RAIL_INSET = 16;
 
 /**
- * 画布上的竖向工具条：只有「家具」与「AI 模式」两个常驻入口。
+ * 画布上的竖向工具条：「家具」「成本」（登录后）「AI 模式」三个常驻入口。
  * 默认贴画布右边缘垂直居中，顶部把手可拖动（复用 useEditorDrag，位置限制在画布内，只存内存）；
  * 窄屏由 CSS 改成画布底部横排，并取消位移，所以窄屏不做拖动。
  */
-export function CanvasRail({ sidePanel, stage, onToggle }: {
+type RailKind = "library" | "cost" | "ai";
+export function CanvasRail({ sidePanel, stage, showCosts = false, onToggle }: {
   /** 当前打开的侧栏种类，用于高亮。 */
   sidePanel: PanelKind | null;
   stage: React.RefObject<HTMLElement | null>;
-  onToggle: (kind: "library" | "ai") => void;
+  /** 成本只对登录用户开放。 */
+  showCosts?: boolean;
+  onToggle: (kind: RailKind) => void;
 }) {
   const node = useRef<HTMLElement>(null);
   const { place, handlers } = useEditorDrag(node, stage, () => {});
@@ -38,7 +41,7 @@ export function CanvasRail({ sidePanel, stage, onToggle }: {
     observer.observe(host);
     return () => observer.disconnect();
   }, [position, stage]);
-  const button = (kind: "library" | "ai", label: string, children: React.ReactNode) => (
+  const button = (kind: RailKind, label: string, children: React.ReactNode) => (
     <EditorTooltip key={kind} label={label} side="left">
       <button
         type="button"
@@ -58,8 +61,9 @@ export function CanvasRail({ sidePanel, stage, onToggle }: {
           <GripVertical size={14} />
         </button>
       </EditorTooltip>
-      {button("library", "家具", <Armchair size={17} />)}
-      {button("ai", "AI 模式", <AiIcon size={17} />)}
+      {button("library", "家具", <Armchair size={20} />)}
+      {showCosts && button("cost", "成本", <CircleDollarSign size={20} />)}
+      {button("ai", "AI 模式", <AiIcon size={20} />)}
     </aside>
   );
 }

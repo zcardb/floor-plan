@@ -126,7 +126,7 @@ const loadScene = () =>
   }));
 /** 窄屏（≤1100px）侧栏以抽屉形式覆盖画布：放置家具、点画布、Esc 后自动收起。 */
 const isDrawerLayout = () => typeof matchMedia !== "undefined" && matchMedia("(max-width:1100px)").matches;
-const PANEL_TITLES: Record<PanelKind, string> = { library: "家具库", ai: "AI 模式", settings: "户型设置", overview: "方案总览", cost: "成本" };
+const PANEL_TITLES: Record<PanelKind, string> = { library: "家具库", ai: "AI 模式", settings: "户型设置", overview: "方案总览", cost: "成本管理" };
 interface Props {
   project: Project;
   projectNavigation: ProjectNavigation;
@@ -1161,7 +1161,7 @@ export function Workbench(p: Props) {
           hidden={readOnly || tool !== 'select' || (!!sidePanel && isDrawerLayout()) || (view === "3d" && sceneOptions.mode === "walk")}
           costs={() => openPanel("cost")}
         />
-        <CanvasRail sidePanel={sidePanel} stage={stage} onToggle={togglePanel} />
+        <CanvasRail sidePanel={sidePanel} stage={stage} showCosts={p.loggedIn} onToggle={togglePanel} />
       </main>
       {sidePanel && (
         <SidePanel title={PANEL_TITLES[sidePanel]} readOnly={readOnly && sidePanel !== "library"} onClose={() => { sizeTransaction.flush(); setSidePanel(null); }}>

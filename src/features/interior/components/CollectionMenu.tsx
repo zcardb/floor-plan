@@ -1,4 +1,4 @@
-import { Box, Layers3, Ruler, Check } from 'lucide-react';
+import { Box, ChevronLeft, Ruler, Check } from 'lucide-react';
 import { EditorTooltip } from '@/components/ui/editor-tooltip';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub,
@@ -17,9 +17,10 @@ export const LAYER_ITEMS: [keyof Layers, string][] = [
 ];
 
 /**
- * 顶栏右侧的「集合」菜单：一路平铺、不分组，
- * 视图 ▸（图层开关 + 显示比例）→ 家具库 / 户型设置 → 方案总览 / 成本。
- * AI 模式不进这里（它只在画布竖条上），游客只保留「视图 ▸」与「家具库」。
+ * 顶栏右侧的「集合」菜单，两组：
+ * 1. 看方案本身：方案总览 / 户型设置 / ◂ 视图设置（二级菜单向左展开，图层开关 + 显示比例）
+ * 2. 往方案里加东西、算钱：家具库 / 成本管理
+ * AI 模式不进这里（它只在画布竖条上），游客只保留「视图设置」与「家具库」。
  */
 export function CollectionMenu({ layers, view, active, loggedIn, onToggleLayer, onRatio, onOpen }: {
   layers: Layers;
@@ -46,10 +47,12 @@ export function CollectionMenu({ layers, view, active, loggedIn, onToggleLayer, 
         </DropdownMenuTrigger>
       </EditorTooltip>
       <DropdownMenuContent align="end" className="collection-menu">
+        {loggedIn && entry('overview', '方案总览')}
+        {loggedIn && entry('settings', '户型设置')}
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="project-menu-entry">
-            <Layers3 size={15} />
-            视图
+          <DropdownMenuSubTrigger className="project-menu-entry collection-sub-trigger">
+            <ChevronLeft className="collection-caret" />
+            视图设置
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="collection-submenu" sideOffset={6}>
             {LAYER_ITEMS.map(([key, label]) => (
@@ -75,10 +78,7 @@ export function CollectionMenu({ layers, view, active, loggedIn, onToggleLayer, 
         </DropdownMenuSub>
         <DropdownMenuSeparator />
         {entry('library', '家具库')}
-        {loggedIn && entry('settings', '户型设置')}
-        {loggedIn && <DropdownMenuSeparator />}
-        {loggedIn && entry('overview', '方案总览')}
-        {loggedIn && entry('cost', '成本')}
+        {loggedIn && entry('cost', '成本管理')}
       </DropdownMenuContent>
     </DropdownMenu>
   );

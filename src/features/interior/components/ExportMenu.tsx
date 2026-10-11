@@ -28,7 +28,8 @@ interface Props {
 }
 
 /** 按钮标记与下拉首行文案都从现有的保存状态推出来，不另存状态。 */
-export function saveState({ status, loggedIn, readOnly, guestDirty, saving, pending }: Pick<Props, 'status' | 'loggedIn' | 'readOnly' | 'guestDirty' | 'saving' | 'pending'>) {
+type SaveStateInput = Pick<Props, 'status' | 'loggedIn'> & Partial<Pick<Props, 'readOnly' | 'guestDirty' | 'saving' | 'pending'>>;
+export function saveState({ status, loggedIn, readOnly, guestDirty, saving, pending }: SaveStateInput) {
   if (readOnly) return { mark: (pending ? 'busy' : 'none') as SaveMark, label: '内置模板 · 只读', action: null };
   if (!loggedIn) return guestDirty
     ? { mark: (saving || pending ? 'busy' : 'dirty') as SaveMark, label: '登录后保存到云端', action: '登录并保存' }

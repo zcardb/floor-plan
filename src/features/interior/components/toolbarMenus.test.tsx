@@ -12,6 +12,7 @@ vi.mock('react', async original => ({
   },
   useRef: (value: unknown) => { const ref = { current: value }; state.refs.push(ref); return ref; },
   useEffect: (effect: () => unknown) => { state.effects.push(effect); },
+  useLayoutEffect: (effect: () => unknown) => { state.effects.push(effect); },
   useCallback: <T,>(fn: T) => fn,
 }));
 import { ProjectMenu, LoadMoreSentinel } from './ProjectMenu';
@@ -64,14 +65,14 @@ const actions = (tree: Node[]) => tree.filter(n => n.type === ProjectRowActions)
 beforeEach(() => { state.values = []; state.cursor = 0; state.refs = []; state.effects = []; });
 
 describe('ProjectMenu', () => {
-  it('触发器是 logo + 项目名；窄下拉只有三项：返回项目管理 → 新建项目 ▸ → 切换项目 ▸，项目列表在切换的二级菜单里', () => {
+  it('触发器是 logo + 项目名；窄下拉为 返回 → 新建项目 ▸ → 切换项目 ▸ + 账号区，项目列表在切换的二级菜单里', () => {
     const { props, tree } = menu({ onCreateProject: vi.fn(async () => true) });
     const trigger = tree.find(n => n.props.className === 'project-menu-trigger')!;
     expect(nodes(trigger).some(n => n.type === Logo)).toBe(true);
     expect(trigger.props['aria-label']).toBe('项目：三室两厅两卫');
     expect(text(nodes(trigger).find(n => n.props.className === 'project-menu-title')!.props.children as ReactNode)).toBe('三室两厅两卫');
     const all = items(tree), back = all[0]!, rows = options(tree);
-    expect(text(back.props.children as ReactNode)).toBe('返回项目管理');
+    expect(text(back.props.children as ReactNode)).toBe('返回');
     const subs = tree.filter(n => n.type === DropdownMenuSubTrigger);
     expect(subs.map(n => text(n.props.children as ReactNode))).toEqual(['新建项目', '切换项目']);
     expect(tree.indexOf(subs[0]!)).toBeGreaterThan(tree.indexOf(back));
@@ -312,12 +313,19 @@ describe('集合菜单 CollectionMenu', () => {
     };
     return { props, tree: nodes(CollectionMenu(props)) };
   };
-  it('触发器是立方体图标按钮，平铺顺序为 视图 / 家具库 / 户型设置 / 方案总览 / 成本，无分组标题', () => {
+  it('触发器是立方体图标按钮；两组平铺：方案总览 / 户型设置 / 视图设置 — 家具库 / 成本管理', () => {
     const { tree } = render();
     expect(tree.find(n => n.props['aria-label'] === '集合')!.props.className).toContain('collection-trigger');
     const top = tree.filter(n => n.type === DropdownMenuItem && n.props.className === 'project-menu-entry');
-    expect(top.map(n => text(n.props.children as ReactNode))).toEqual(['家具库', '户型设置', '方案总览', '成本']);
-    expect(tree.filter(n => n.type === DropdownMenuSubTrigger).map(n => text(n.props.children as ReactNode))).toEqual(['视图']);
+    expect(top.map(n => text(n.props.children as ReactNode))).toEqual(['方案总览', '户型设置', '家具库', '成本管理']);
+    // 两组之间与组内顺序一致：第 1 组在前，家具库在第二组开头
+    expect(tree.indexOf(top[0]!)).toBeLessThan(tree.indexOf(top[2]!));
+    const subs = tree.filter(n => n.type === DropdownMenuSubTrigger);
+    expect(subs.map(n => text(n.props.children as ReactNode))).toEqual(['视图设置']);
+    // 「视图设置」不放左侧图标，只留一个朝左的箭头（二级菜单朝左展开）
+    expect(subs[0]!.props.className).toContain('collection-sub-trigger');
+    const icons = nodes(subs[0]!.props.children as ReactNode);
+    expect(icons.map(n => n.props.className)).toEqual(['collection-caret']);
     expect(tree.some(n => n.props.className === 'project-menu-heading')).toBe(false);
     expect(text(tree.map(n => n.props.children as ReactNode))).not.toContain('AI 模式');
   });
@@ -337,9 +345,9 @@ describe('集合菜单 CollectionMenu', () => {
     expect(props.onRatio).toHaveBeenCalledWith(100);
     expect(render({ view: '3d' }).tree.find(n => text(n.props.children as ReactNode) === '显示比例 1:60')!.props.disabled).toBe(true);
   });
-  it('「成本」打开成本侧栏，当前打开的项高亮；游客只有 视图 / 家具库', () => {
+  it('「成本管理」打开成本侧栏，当前打开的项高亮；游客只有 视图设置 / 家具库', () => {
     const { props, tree } = render({ active: 'cost' });
-    const cost = tree.find(n => n.props.className === 'project-menu-entry' && text(n.props.children as ReactNode) === '成本')!;
+    const cost = tree.find(n => n.props.className === 'project-menu-entry' && text(n.props.children as ReactNode) === '成本管理')!;
     expect(cost.props['data-active']).toBe(true);
     (cost.props.onSelect as () => void)();
     expect(props.onOpen).toHaveBeenCalledWith('cost');
@@ -353,24 +361,28 @@ describe('统一侧栏与画布竖条', () => {
   it('侧栏有标题与关闭按钮，内容包在可滚动区里；只读时整体禁用', () => {
     const onClose = vi.fn();
     const tree = nodes(SidePanel({ title: '家具库', onClose, children: '内容' }));
-    const panel = tree.find(n => n.props.className === 'side-panel')!;
-    expect(text(panel).includes('家具库')).toBe(true);
+    const panel = tree.find(n => String(n.props.className).startsWith('side-panel '))!;
+    expect(text(nodes(panel).find(n => n.props.className === 'side-panel-head')!.props.children as ReactNode)).toContain('家具库');
     expect(nodes(panel).find(n => n.props.className === 'panel-scroll')).toBeDefined();
     expect(nodes(panel).find(n => n.props.disabled === false)).toBeDefined();
     (tree.find(n => n.props['aria-label'] === '关闭侧栏')!.props.onClick as () => void)();
     expect(onClose).toHaveBeenCalledOnce();
     expect(nodes(SidePanel({ title: '成本', readOnly: true, onClose: vi.fn(), children: 'x' })).find(n => n.props.disabled === true)).toBeDefined();
   });
-  it('竖条只有家具与 AI 两个按钮，没有选择 / 编辑按钮；打开项高亮，再点同一个关闭', () => {
+  it('竖条是 家具 / 成本 / AI 模式（成本仅登录可见），没有选择 / 编辑按钮；打开项高亮', () => {
     const onToggle = vi.fn();
     const stage = { current: null };
-    const tree = nodes(CanvasRail({ sidePanel: 'library', stage, onToggle }));
+    const tree = nodes(CanvasRail({ sidePanel: 'library', stage, showCosts: true, onToggle }));
     const labels = tree.filter(n => n.type === 'button' && typeof n.props['aria-label'] === 'string').map(n => n.props['aria-label']);
-    expect(labels).toEqual(['拖动工具条', '家具', 'AI 模式']);
+    expect(labels).toEqual(['拖动工具条', '家具', '成本', 'AI 模式']);
     expect(labels).not.toContain('选择');
     const rail = tree.find(n => n.props.className === 'canvas-rail')!;
-    expect(nodes(rail).filter(n => n.type === 'button').map(n => n.props.className)).toEqual(['canvas-rail-grip', 'canvas-rail-button active', 'canvas-rail-button']);
+    expect(nodes(rail).filter(n => n.type === 'button').map(n => n.props.className)).toEqual(['canvas-rail-grip', 'canvas-rail-button active', 'canvas-rail-button', 'canvas-rail-button']);
     expect(nodes(rail).find(n => n.props['aria-label'] === '家具')!.props['aria-pressed']).toBe(true);
+    const guest = CanvasRail({ sidePanel: 'cost', stage, onToggle });
+    expect(nodes(guest).filter(n => typeof n.props['aria-label'] === 'string').map(n => n.props['aria-label'])).toEqual(['画布工具条', '拖动工具条', '家具', 'AI 模式']);
+    (nodes(rail).find(n => n.props['aria-label'] === '成本')!.props.onClick as () => void)();
+    expect(onToggle).toHaveBeenCalledWith('cost');
     (nodes(rail).find(n => n.props['aria-label'] === 'AI 模式')!.props.onClick as () => void)();
     expect(onToggle).toHaveBeenCalledWith('ai');
     const grip = nodes(rail).find(n => n.props.className === 'canvas-rail-grip')!;

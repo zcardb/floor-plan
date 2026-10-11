@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, Loader2, LogIn, LogOut } from 'lucide-react';
+import { Check, ChevronDown, Loader2 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent,
   DropdownMenuSubTrigger, DropdownMenuTrigger,
@@ -51,7 +51,7 @@ export function LoadMoreSentinel({ disabled, onVisible }: { disabled: boolean; o
 
 /**
  * 工具条左侧：Logo + 当前项目名，同一个点击区。
- * 下拉是一个窄菜单：返回项目管理 / 新建项目 ▸ / 切换项目 ▸，后两项悬停展开二级菜单；
+ * 下拉是一个窄菜单：返回（项目管理）/ 新建项目 ▸ / 切换项目 ▸，后两项悬停展开二级菜单；
  * 分隔线下是账号区（游客「登录」，已登录邮箱 +「退出登录」）。项目的重命名、删除只在项目管理页做，这里不放。
  */
 export function ProjectMenu(p: Props) {
@@ -86,7 +86,7 @@ export function ProjectMenu(p: Props) {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="project-menu" onCloseAutoFocus={event => { if (creation.dialogOpen) event.preventDefault(); }}>
-        {p.loggedIn && <DropdownMenuItem className="project-menu-entry" disabled={busy} onSelect={p.onBack}>返回项目管理</DropdownMenuItem>}
+        {p.loggedIn && <DropdownMenuItem className="project-menu-entry" disabled={busy} onSelect={p.onBack}>返回</DropdownMenuItem>}
         {p.loggedIn && p.onCreateProject && <DropdownMenuSub>
           <DropdownMenuSubTrigger className="project-menu-entry" disabled={busy}>新建项目</DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="create-menu" sideOffset={6}>
@@ -112,11 +112,11 @@ export function ProjectMenu(p: Props) {
           </DropdownMenuSubContent>
         </DropdownMenuSub>
         {(p.onLogin || p.onLogout) && <DropdownMenuSeparator />}
-        {!p.loggedIn && p.onLogin && <DropdownMenuItem className="project-menu-entry" onSelect={p.onLogin}><LogIn />登录</DropdownMenuItem>}
+        {!p.loggedIn && p.onLogin && <DropdownMenuItem className="project-menu-entry" onSelect={p.onLogin}>登录</DropdownMenuItem>}
         {p.loggedIn && p.onLogout && <>
           {p.email && <DropdownMenuLabel className="project-menu-email" title={p.email}>{p.email}</DropdownMenuLabel>}
           <DropdownMenuItem className="project-menu-entry" disabled={p.loggingOut} onSelect={p.onLogout}>
-            {p.loggingOut ? <Loader2 className="animate-spin" /> : <LogOut />}退出登录
+            退出登录{p.loggingOut && <Loader2 className="animate-spin" />}
           </DropdownMenuItem>
         </>}
       </DropdownMenuContent>

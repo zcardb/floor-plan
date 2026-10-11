@@ -419,7 +419,7 @@ describe('编辑器分区：侧栏、竖条与画布', () => {
     expect(panel(open('settings'))!.props.title).toBe('户型设置');
     expect(nodes(panel(open('settings'))!).find(n => n.type === HouseSettingsPanel)).toBeDefined();
     expect(nodes(panel(open('overview'))!).find(n => n.type === OverviewPanel)).toBeDefined();
-    expect(panel(open('cost'))!.props.title).toBe('成本');
+    expect(panel(open('cost'))!.props.title).toBe('成本管理');
   });
   it('绘墙模式显示「完成绘墙」提示并能回到选择工具，画布上不再渲染状态条 / 比例尺 / 左上角文案', () => {
     const tree = render();
