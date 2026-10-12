@@ -175,6 +175,20 @@ describe('PlanCanvas 家具拖边调整尺寸', () => {
     expect(h.commit.mock.calls[0][1].furniture[0].w).toBe(1000);
   });
 });
+describe('PlanCanvas 门窗两端手柄', () => {
+  it('拖右端手柄：右端跟随、左端不动，释放只提交一次', () => {
+    const h = harness();
+    hooks.refs = []; hooks.states = [];
+    h.handlers = h.component.render({ ...h.props, selection: { kind: 'opening', id: 'opening' } }, null).props;
+    h.handlers.onPointerDown!(event(2500, 0, 1, 'data-handle', 'opb'));
+    h.handlers.onPointerMove!(event(3200, 0, 1, 'data-handle', 'opb'));
+    const o = h.preview.mock.calls[h.preview.mock.calls.length - 1][0].openings[0];
+    expect([o.offset - o.width / 2, o.offset + o.width / 2]).toEqual([1500, 3200]);
+    h.handlers.onPointerUp!(event(3200, 0, 1, 'data-handle', 'opb'));
+    expect(h.commit).toHaveBeenCalledOnce();
+    expect(h.commit.mock.calls[0][1].openings[0].width).toBe(1000);
+  });
+});
 describe('PlanCanvas 门窗事件链', () => {
   it('选中门窗时距离层接收实时设计，关闭外围尺寸仍显示，取消选中隐藏', () => {
     const h = harness();

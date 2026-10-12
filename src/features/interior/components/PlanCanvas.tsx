@@ -56,7 +56,7 @@ import { PerimeterDimensions } from './PerimeterDimensions';
 import { doorOrientation } from '../model/doorOrientation';
 import { openingKindLabel } from '../model/hardMaterials';
 import { placeOpening } from '../model/openingPlacement';
-import { dragOpening } from '../model/openingDrag';
+import { dragOpening, dragOpeningEdge } from '../model/openingDrag';
 import { isCompletionClick, supportsPointerCompletion } from '../model/toolCompletion';
 import { createWheelIntent } from '../model/wheelIntent';
 import { expandToGroups, furnitureCorners, furnitureInRect, groupBounds, groupIds, normalizeRect, persistentGroupOf, selectionOf, type Rect } from '../model/furnitureGroup';
@@ -384,10 +384,10 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       wallClickStart.current = { wallId: dr.id!, point: start };
       return;
     }
-    if (dr.kind === 'openingmove') {
+    if (dr.kind === 'openingmove' || dr.kind === 'openingedge') {
       const original = dr.before.openings.find(o => o.id === dr.id);
       const moved = d.openings.find(o => o.id === dr.id);
-      if (dr.moved && original && moved && original.offset !== moved.offset) {
+      if (dr.moved && original && moved && (original.offset !== moved.offset || original.width !== moved.width)) {
         commit(d, dr.before);
         if (isOnBearingWall(d, moved.wallId)) notify.warning(BEARING_WALL_WARNING);
       }
@@ -525,6 +525,11 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
         if (tool === 'select' && selection?.kind === 'separator' && (handle === 'sepa' || handle === 'sepb')) {
           // 选中分隔线的端点手柄：沿分隔线方向伸缩。
           drag.current = { ...base, kind: 'sependpoint', id: selection.id, room: handle === 'sepa' ? 'a' : 'b' };
+          return;
+        }
+        if (tool === 'select' && selection?.kind === 'opening' && (handle === 'opa' || handle === 'opb')) {
+          // 选中门窗的两端手柄：和墙端点一样，拖哪端哪端走，另一端不动，宽度随之改变。
+          drag.current = { ...base, kind: 'openingedge', id: selection.id, room: handle === 'opa' ? 'a' : 'b' };
           return;
         }
         if (sid && tool === 'select' && !fid) {
@@ -687,6 +692,12 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
             x: dr.view!.x - (e.clientX - dr.screen[0]) / dr.view!.s,
             y: dr.view!.y - (e.clientY - dr.screen[1]) / dr.view!.s,
           });
+          return;
+        }
+        if (dr.kind === 'openingedge') {
+          const next = dragOpeningEdge(dr.before, dr.id!, dr.room as 'a' | 'b', p);
+          const was = current.current.openings.find(o => o.id === dr.id), now = next?.openings.find(o => o.id === dr.id);
+          if (next && now && (now.width !== was?.width || now.offset !== was?.offset)) preview(next);
           return;
         }
         if (dr.kind === 'openingmove') {
@@ -1070,6 +1081,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
                 </g>
               ))}
           {selection.kind === 'opening' && <polygon points={selectionPoints(design, selection).map(p=>p.join(',')).join(' ')} fill="none" stroke="var(--plan-selection)" strokeWidth={2/view.s} pointerEvents="none"/>}
+          {selection.kind === 'opening' && !readOnly && <OpeningEndHandles design={design} openingId={selection.id} scale={view.s} />}
           {["wall", "opening"].includes(selection.kind) &&
             design.walls
               .filter(
@@ -1150,4 +1162,21 @@ function FurnitureEdgeHandle({ edge, f, scale }: { edge: FurnitureEdge; f: { w: 
       <rect {...box(grip, thick)} rx={thick / 2} fill="var(--plan-porcelain)" stroke="var(--plan-selection)" strokeWidth={1.5 / scale} />
     </g>
   );
+}
+
+/** 选中门窗 / 垭口时两端的圆形手柄：样式与墙体端点一致，拖动即改宽度（另一端不动）。 */
+function OpeningEndHandles({ design, openingId, scale }: { design: Design; openingId: string; scale: number }) {
+  const o = design.openings.find(x => x.id === openingId);
+  const w = o && design.walls.find(x => x.id === o.wallId);
+  if (!o || !w) return null;
+  const L = length(w);
+  if (!L) return null;
+  const at = (t: number): Point => [w.a[0] + ((w.b[0] - w.a[0]) * t) / L, w.a[1] + ((w.b[1] - w.a[1]) * t) / L];
+  return <>
+    {([['opa', o.offset - o.width / 2], ['opb', o.offset + o.width / 2]] as const).map(([key, t]) => {
+      const [cx, cy] = at(t);
+      return <circle key={key} data-handle={key} data-editor-keep-visible="handle" className="plan-opening-end" cx={cx} cy={cy} r={10 / scale}
+        fill="var(--plan-porcelain)" stroke="var(--plan-selection)" strokeWidth={2 / scale} />;
+    })}
+  </>;
 }

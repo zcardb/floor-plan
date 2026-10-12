@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { blankDesign } from '../data/templates';
-import { dragOpening } from './openingDrag';
+import { dragOpening, dragOpeningEdge } from './openingDrag';
 import type { Opening, Point } from './types';
 
 function fixture(kind: Opening['kind'] = 'door', a: Point = [0, 0], b: Point = [6000, 0]) {
@@ -41,5 +41,32 @@ describe('门窗沿墙拖动', () => {
     expect(dragOpening(d, 'missing', [0, 0], [100, 0])).toBeNull();
     expect(dragOpening({ ...d, walls: [] }, 'opening', [0, 0], [100, 0])).toBeNull();
     expect(dragOpening(fixture('door', [0, 0], [500, 0]), 'opening', [0, 0], [100, 0])).toBeNull();
+  });
+});
+
+describe('dragOpeningEdge（两端手柄改宽度）', () => {
+  // 横墙 0→6000，门 offset 3000、宽 800：两端在 2600 / 3400。
+  const setup = () => {
+    const d = blankDesign();
+    const wall = d.walls[0];
+    d.walls = [{ ...wall, a: [0, 0], b: [6000, 0] }, ...d.walls.slice(1)];
+    d.openings = [{ id: 'door', wallId: wall.id, kind: 'door', offset: 3000, width: 800 }];
+    return d;
+  };
+  const ends = (d: ReturnType<typeof setup>) => { const o = d.openings.find(x => x.id === 'door')!; return [o.offset - o.width / 2, o.offset + o.width / 2]; };
+
+  it('拖右端：右端跟随（按步进取整），左端不动', () => {
+    expect(ends(dragOpeningEdge(setup(), 'door', 'b', [3912, 150])!)).toEqual([2600, 3900]);
+  });
+  it('拖左端：左端跟随，右端不动；拉过对端时自动翻转', () => {
+    expect(ends(dragOpeningEdge(setup(), 'door', 'a', [2000, 0])!)).toEqual([2000, 3400]);
+    expect(ends(dragOpeningEdge(setup(), 'door', 'a', [4000, 0])!)).toEqual([3400, 4000]);
+  });
+  it('不小于 10 cm、不超出墙段、不与同墙门窗重叠', () => {
+    expect(dragOpeningEdge(setup(), 'door', 'b', [2650, 0])).toBeNull();
+    expect(ends(dragOpeningEdge(setup(), 'door', 'b', [9000, 0])!)).toEqual([2600, 6000]);
+    const d = setup();
+    d.openings.push({ id: 'win', wallId: d.walls[0].id, kind: 'window', offset: 4500, width: 1000 });
+    expect(dragOpeningEdge(d, 'door', 'b', [4200, 0])).toBeNull();
   });
 });

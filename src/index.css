@@ -1041,6 +1041,9 @@
   .selection-overlay [data-handle] {
     cursor: pointer;
   }
+  /* 门窗两端手柄：沿墙拉伸，悬停时填充选中色 */
+  .selection-overlay .plan-opening-end { cursor: ew-resize; }
+  .plan-opening-end:hover { fill: var(--plan-selection); }
   /* 家具边手柄：悬停时中点把手填充选中色，提示可拖 */
   .plan-furniture-edge:hover rect + rect {
     fill: var(--plan-selection);
