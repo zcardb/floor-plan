@@ -17,13 +17,12 @@ import { ProjectCard } from './ProjectCard';
 import { PlanThumbnail, PresetThumbnail } from './PlanThumbnail';
 import { mineCardActions, templateCardActions } from './projectCardActions';
 import { CmsFilterGroup } from './CmsFilterGroup';
-import { ProjectLoadMore } from './ProjectLoadMore';
+import { ListLoadMore } from './ListLoadMore';
+import { PAGE_SIZE } from '@/lib/paging';
 import { filterProjects, visibleEntries, PROJECT_SCOPES, type ProjectScope } from '../model/projectFilter';
 import type { useProjects, ProjectSummary } from '../cloud/useProjects';
 
 type Projects = ReturnType<typeof useProjects>;
-/** 滚动加载的批次：先展示 12 条，滚到底部再补下一批。 */
-const PAGE_SIZE = 12;
 type RowKind = 'open' | 'duplicate' | 'remove' | 'copyTemplate';
 const BUSY_LABEL: Record<RowKind, string> = { open: '正在打开…', duplicate: '正在复制…', remove: '正在删除…', copyTemplate: '正在复制…' };
 
@@ -132,7 +131,7 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
             busyLabel={busyLabel(row)} locked={rowAction.pending} openLabel="打开项目" onOpen={() => void rowAction.run('open', row)}
             actions={mineCardActions(row, { rename: () => setRename(row), duplicate: () => void rowAction.run('duplicate', row), remove: () => setDeleting(row) })} />;
         })}</div>
-        <ProjectLoadMore shown={shown.items.length} total={shown.available} hasMore={more} loading={projects.loading} onReach={() => loadMore(shown.available)} />
+        <ListLoadMore list={{ list: shown.items, pagination: { page: 1, pageSize: PAGE_SIZE, total: more ? Math.max(shown.available, PAGE_SIZE) + 1 : shown.available }, loading: false, loadingMore: projects.loading, loadMore: () => loadMore(shown.available) }} />
       </>}
 
     {creation.dialogs}

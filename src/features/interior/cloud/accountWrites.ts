@@ -3,6 +3,7 @@ import type { Json } from '@/integrations/supabase/types';
 import type { CustomFloor, CustomOpening, CustomWall, LibraryItem } from '../model/types';
 import { validFurnitureOutline, validFurnitureType } from '../model/furnitureAppearance';
 import { sanitizeModel3d } from '../model/furniture3d';
+import { validDecorStyle, type DecorStyle } from '../model/decorStyles';
 
 /** 账号库写入：各类条目仍存各自的表（读取由视图 interior_account_library 合并），只有本人可写（RLS）。 */
 async function ownerId() {
@@ -68,3 +69,18 @@ export const accountMaterialSaves = {
   roof: (item: CustomWall) => saveAccountColorMaterial('roof', item),
   ceiling: (item: CustomWall) => saveAccountColorMaterial('ceiling', item),
 };
+
+/** 自定义风格：名称单独成列，其余定义存进 spec；同 id 再存即覆盖（风格详情页的保存）。 */
+export async function saveAccountStyle(style: DecorStyle) {
+  if (!validDecorStyle(style)) throw new Error('风格数据无效');
+  const { id, name, ...spec } = style;
+  const { error } = await supabase.from('interior_style_catalog').upsert({
+    owner_id: await ownerId(), style_key: id, name, spec: spec as unknown as Json, updated_at: new Date().toISOString(),
+  }, { onConflict: 'owner_id,style_key' });
+  fail(error);
+}
+
+export async function removeAccountStyle(id: string) {
+  const { error } = await supabase.from('interior_style_catalog').delete().eq('owner_id', await ownerId()).eq('style_key', id);
+  fail(error);
+}

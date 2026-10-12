@@ -45,7 +45,7 @@ export function parseFurnitureDraft(draft: FurnitureDraft): ParsedFurnitureDraft
   return { name: draft.name.trim(), category: draft.category, type: resolvedFurnitureType(draft.name, draft.typeChoice), shape: draft.shape, w, d, height, color: draft.color, price };
 }
 
-/** 预览用：无效尺寸时退回占位尺寸，保证参考符号 / 3D 模型始终可画。 */
+/** 预览用：无效尺寸时退回占位尺寸，保证参考符号始终可画。 */
 export function previewFurnitureDraft(draft: FurnitureDraft, fallback: Pick<LibraryItem, 'w' | 'd' | 'height'> = { w: 1800, d: 800, height: 800 }) {
   const height = parseMeterDraft(draft.h);
   return {

@@ -7,6 +7,7 @@ import { LoadError } from './LoadError';
 import { Button } from '@/components/ui/button';
 import { EditorTooltip } from '@/components/ui/editor-tooltip';
 import { notify } from '@/lib/notify';
+import { usePagedList } from '@/hooks/usePagedList';
 import { categories } from '../data/catalog';
 import { formatMeters } from '../model/lengthUnits';
 import { priceOf } from '../model/costs';
@@ -19,7 +20,7 @@ import type { AccountLibrary } from '../cloud/useAccountLibrary';
 import { accountMaterialSaves, removeAccountFurniture, saveAccountFurniture } from '../cloud/accountWrites';
 import type { Design, LibraryItem } from '../model/types';
 import { CmsFilterGroup } from './CmsFilterGroup';
-import { ProjectLoadMore } from './ProjectLoadMore';
+import { ListLoadMore } from './ListLoadMore';
 import { CostItemVisual } from './CostItemVisual';
 import { AccountMaterialDialog } from './AccountMaterialDialog';
 import { AccountFurnitureDialog } from './AccountFurnitureDialog';
@@ -32,15 +33,13 @@ type Props = {
   onDirty: (dirty: boolean) => void; onNew: (category: string) => void;
 };
 const sizeOf = (entry: CostEntry) => entry.furniture ? ` · ${formatMeters(entry.furniture.w)} × ${formatMeters(entry.furniture.d)} m` : entry.opening ? ` · ${formatMeters(entry.opening.width)} × ${formatMeters(entry.opening.height)} m` : '';
-/** 每页 12 个：进来先显示一页，滚到底部再显示下一页（数据已一次读完，翻页不再请求）。 */
-const PAGE_SIZE = 12;
 const ALL = '全部';
 type MajorFilter = typeof ALL | CostMajor | typeof CUSTOM_CATEGORY;
 
 /** 账号家具库：家具与地面、墙面、门窗、屋面、吊顶统一管理，并在这里设置账号默认单价。 */
 export function AccountFurnitureLibrary({ library, defaults, saveDefaults, saving = false, saveError = '', onDirty, onNew }: Props) {
   const { furniture, overrides, floors, walls, openings, roofs, ceilings } = library;
-  const [major, setMajor] = useState<MajorFilter>(ALL), [category, setCategory] = useState(ALL), [query, setQuery] = useState(''), [shown, setShown] = useState(PAGE_SIZE), [editing, setEditing] = useState<CostEntry | null>(null), [detail, setDetail] = useState<LibraryItem | null>(null);
+  const [major, setMajor] = useState<MajorFilter>(ALL), [category, setCategory] = useState(ALL), [query, setQuery] = useState(''), [editing, setEditing] = useState<CostEntry | null>(null), [detail, setDetail] = useState<LibraryItem | null>(null);
   const commit = useAccountCostCommit({ settings: defaults, save: saveDefaults, onDirty });
   const design: Design = { ...referenceDesign(), customCatalog: furniture, customFloors: floors, customWalls: walls, customOpenings: openings, customRoofs: roofs, customCeilings: ceilings, costSettings: commit.settings };
   /** 内置家具的覆盖行（账号库里与内置同 catalogId 的那一行）：名称、尺寸、颜色与素材。 */
@@ -59,17 +58,15 @@ export function AccountFurnitureLibrary({ library, defaults, saveDefaults, savin
   const visible = major === CUSTOM_CATEGORY ? filterCostEntries(entries, CUSTOM_CATEGORY, query) : filterCostEntries(entries, category, query, major === ALL ? undefined : major);
   // 按分类顺序排成一整片（硬装地面…楼梯，再软装卧室…），不加分类小标题；分类之外的条目排在最后。
   const ordered = [...costCategories.flatMap(name => visible.filter(entry => entry.category === name)), ...visible.filter(entry => !costCategories.includes(entry.category))];
-  const page = ordered.slice(0, shown);
-  const loadMore = () => setShown(shown + PAGE_SIZE);
+  const paged = usePagedList({ remote: null, local: ordered, key: [major, category, query].join('|') });
   /** 第一级：全部 / 硬装 / 软装 / 自定义，默认全部。 */
   const majorChips = [ALL, '硬装', '软装', CUSTOM_CATEGORY].map(id => ({ id, label: id, meta: String(id === ALL ? entries.length : id === CUSTOM_CATEGORY ? entries.filter(entry => entry.custom).length : entries.filter(entry => entry.major === id).length) }));
   /** 第二级：只在选了硬装或软装后出现，列出该大类的细分。 */
   const countOf = (name: string) => entries.filter(entry => entry.major === major && entry.category === name).length;
   const subChips = major === ALL || major === CUSTOM_CATEGORY ? [] : [{ id: ALL, label: ALL, meta: String(entries.filter(entry => entry.major === major).length) },
     ...(major === '硬装' ? materialCostCategories : categories).map(name => ({ id: name, label: name, meta: String(countOf(name)) }))];
-  const pickMajor = (next: string) => { setMajor(next as MajorFilter); setCategory(ALL); setShown(PAGE_SIZE); };
-  const pick = (next: string) => { setCategory(current => current === next ? ALL : next); setShown(PAGE_SIZE); };
-  const search = (next: string) => { setQuery(next); setShown(PAGE_SIZE); };
+  const pickMajor = (next: string) => { setMajor(next as MajorFilter); setCategory(ALL); };
+  const pick = (next: string) => setCategory(current => current === next ? ALL : next);
   const busy = saving || commit.busy, locked = busy || !!commit.pending;
   const failure = saveError || commit.error;
   const change = (update: (design: Design) => Design) => commit.apply(current => update({ ...design, costSettings: current }).costSettings as AccountCostSettings);
@@ -80,7 +77,7 @@ export function AccountFurnitureLibrary({ library, defaults, saveDefaults, savin
   const [refreshing, setRefreshing] = useState(false);
   const refresh = async () => {
     setRefreshing(true);
-    setShown(PAGE_SIZE);
+    paged.reload();
     try { await library.load(); } finally { setRefreshing(false); }
   };
   const loadingList = refreshing || library.loading;
@@ -88,7 +85,7 @@ export function AccountFurnitureLibrary({ library, defaults, saveDefaults, savin
   const saveOverride = async (item: LibraryItem) => { const ok = await saveAccountFurniture(item); if (ok) void library.load(); return ok; };
   return <>
     <CmsPageHeader title="账号家具库" description="家具、地面、墙面、门窗、屋面与吊顶都在这里管理，设好单价后各项目直接沿用。"
-      search={<CmsSearchField label="搜索材料或家具" placeholder="搜索材料、家具名称…" value={query} onChange={search} loading={library.loading} loadingLabel="加载家具" matchCount={visible.length}/>}
+      search={<CmsSearchField label="搜索材料或家具" placeholder="搜索材料、家具名称…" value={query} onChange={setQuery} loading={library.loading} loadingLabel="加载家具" matchCount={visible.length}/>}
       actions={<>
         {(busy || failure || commit.saved) && <span className={'cms-sync-pill' + (failure && !busy ? ' is-error' : '')} role="status">{busy ? <><Loader2 size={13} className="animate-spin"/>正在保存…</> : failure ? <><AlertCircle size={13}/>修改尚未保存</> : <><Check size={13}/>已保存并生效</>}</span>}
         <EditorTooltip label="刷新" disabled={loadingList || locked}>
@@ -106,7 +103,7 @@ export function AccountFurnitureLibrary({ library, defaults, saveDefaults, savin
     {failure && <div className="cost-save-error" role="alert"><span>{failure}</span>{commit.pending && <Button variant="outline" disabled={busy} onClick={() => void retry()}>重试保存</Button>}</div>}
     {library.error && <LoadError title="家具与材料读取失败" message={library.error} retrying={library.loading} onRetry={() => void refresh()}/>}
     <div className="cms-item-grid">
-      {page.map(entry => {
+      {paged.list.map(entry => {
         const price = priceOf(design, entry.group, entry.key), source = accountCostSource(design, entry);
         const size = sizeOf(entry);
         return <EditorTooltip key={entry.group + ':' + entry.key} label={entry.name} disabled={locked}>
@@ -118,8 +115,8 @@ export function AccountFurnitureLibrary({ library, defaults, saveDefaults, savin
         </EditorTooltip>;
       })}
     </div>
-    {!library.loading && !visible.length && <div className="cms-empty"><Search size={30}/><h2>没有匹配的条目</h2><p>换个分类，或清空搜索再试。</p><Button variant="outline" onClick={() => { pickMajor(ALL); search(''); }}>清空筛选</Button></div>}
-    {!!visible.length && <ProjectLoadMore shown={page.length} total={ordered.length} hasMore={false} loading={false} onReach={loadMore}/>}
+    {!library.loading && !visible.length && <div className="cms-empty"><Search size={30}/><h2>没有匹配的条目</h2><p>换个分类，或清空搜索再试。</p><Button variant="outline" onClick={() => { pickMajor(ALL); setQuery(''); }}>清空筛选</Button></div>}
+    <ListLoadMore list={paged}/>
     </>}
     {editing && <AccountMaterialDialog key={editing.group + ':' + editing.key} entry={{ ...editing, unit: entries.find(entry => entry.key === editing.key && entry.group === editing.group)?.unit || editing.unit }} design={design} change={change} price={priceOf(design, editing.group, editing.key)} saves={accountMaterialSaves}
       applyDefaultPrice={price => commit.apply(current => ({ ...current, [editing.group]: { ...current[editing.group], [editing.key]: price } }))}

@@ -2,10 +2,11 @@ import { ChevronRight } from "lucide-react";
 import { EditorTooltip } from "@/components/ui/editor-tooltip";
 import type { CostBreakdown } from "../model/costBreakdown";
 import { floorMaterialOf } from "../model/floorMaterials";
+import { area } from "../model/geometry";
 import { yuan } from "../model/money";
 import type { Design, Selection } from "../model/types";
 
-/** 全屋口径：各房间金额与占比，点击进入房间口径。 */
+/** 全屋口径：各房间的面积、金额与占比，点击进入房间口径。 */
 export function RoomCostList({
   design,
   breakdown,
@@ -34,7 +35,11 @@ export function RoomCostList({
             >
               <span className="room-cost-name">
                 <i style={{ background: floorMaterialOf(design, room.mat).color }} />
-                {room.name}
+                <span className="room-cost-name-text">
+                  {room.name}
+                  {room.counted === false ? " *" : ""}
+                </span>
+                <em>{area(room).toFixed(2)} m²</em>
               </span>
               <span className="room-cost-bar">
                 <i style={bar(rc.total)} />
@@ -46,12 +51,10 @@ export function RoomCostList({
         );
       })}
       <div className="room-cost-row is-shared">
-        <span className="room-cost-name">全屋公共项</span>
-        <span className="room-cost-bar">
-          <i style={bar(breakdown.sharedTotal)} />
-        </span>
-        <b>{yuan(breakdown.sharedTotal)}</b>
-        <span />
+      <span className="room-cost-name">全屋公共项</span>
+      <span className="room-cost-bar" />
+      <b>{yuan(breakdown.sharedTotal)}</b>
+      <span />
       </div>
     </div>
   );

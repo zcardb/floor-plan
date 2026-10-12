@@ -47,8 +47,13 @@
 
 | 场景 | 组件 | 说明 |
 |---|---|---|
-| 右侧侧栏（家具库 / 方案总览 / 成本 / 户型 / AI 共用） | `SidePanel`（`PanelKind`） | 轻量标题行（13px 常规灰字 + 关闭，无分割线）+ 滚动区，宽 340px；≤1100px 变抽屉。内容按 UI_GUIDELINES §10 的刻度写 |
-| 侧栏入口 | `CanvasRail` | 画布右侧竖条：方案总览 → 家具列表 → 成本核算 → 户型设置 + 收起（AI 设计暂时隐藏）；游客与登录一致；整条可拖动 |
+| 右侧侧栏（家具库 / 方案与成本 / 户型 / 风格 / AI 共用） | `SidePanel`（`PanelKind`） | 轻量标题行（13px 常规灰字 + 关闭，无分割线）+ 滚动区，宽 340px；≤1100px 变抽屉。内容按 UI_GUIDELINES §10 的刻度写 |
+| 画布竖条 | `CanvasRail` + `RailTools.tsx`（`PlanRailTools` / `SceneRailTools`） | 画布左上，内容随 2D / 3D 切换：2D 选择 / 墙 / 门 / 窗 / 更多 / 家具，3D 鸟瞰 / 漫游 / 斜视 / 俯视 / 剖切 / 风格；底部固定「户型设置」+ 收起；游客与登录一致；整条可拖动 |
+| 竖条里的一行 | `RailButton` | 图标 + 文字，当前项主色底 |
+| 顶栏造价 | `CostChip` | 直接显示全屋造价，点击打开「方案与成本」侧栏 |
+| 方案报告导出 | 无组件（`model/reportExport.ts` 的 `reportFile`） | 入口在顶栏右侧「生成方案报告」，点击直接导出 PDF，没有预览、没有页面级路由。PDF 页序：平面图 + 关键信息 → 目录 + 预算构成 + 关键数字 → 逐间清单 → 布局体检 → 家具清单；保存与提示走工作台统一导出出口（`saveFile` → `notify`）。数据见 `model/report.ts`，规范见 `docs/features/report.md` |
+| 方案指标卡 | `PlanMetrics` | 套内净面积 / 空间数 / 家具数，放在成本侧栏顶部 |
+| 装修风格 | `StylePanel`（编辑器侧栏）、`StyleManager`（管理端「风格管理」） | 数据来自 `model/decorStyles.ts`，只影响 3D 渲染 |
 | 顶栏视图设置 | `ViewMenu`（`LAYER_ITEMS`） | 「视图」文字按钮 + 下拉箭头；图层开关 + 显示比例 |
 | 成本合计 / 定价 | `CostSummary` / `CostPricing` | 全屋与房间口径共用 |
 | 顶栏保存与导出 | `ExportMenu`（`saveState`） | 登录后主按钮；游客为副按钮，右侧另有主按钮「登录」 |
@@ -61,7 +66,7 @@
 
 ## 2. 方向：对象编辑在 Visual Editor 工具条，全局内容在右侧侧栏
 
-右侧属性面板已删除：选中对象的编辑都在浮动工具条（`SelectionEditor`）里完成；方案总览、户型、成本、家具库、AI 这类全局内容放在 `SidePanel`，入口统一在 `CanvasRail`。所以：
+右侧属性面板已删除：选中对象的编辑都在浮动工具条（`SelectionEditor`）里完成；方案与成本、户型、风格、家具库、AI 这类全局内容放在 `SidePanel`，入口在 `CanvasRail` 竖条（方案与成本另有顶栏 `CostChip` 入口）。所以：
 
 - 对象编辑能力只加在工具条里，不要再往侧栏塞对象属性。
 - 信息展示类的内容（例如房间指标）用小字放进对应的工具条弹层。

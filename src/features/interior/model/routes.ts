@@ -11,6 +11,8 @@ import type { Project } from "./types";
 export const PROJECTS_PATH = "/projects";
 export const FURNITURE_PATH = "/furniture";
 export const ASSISTANTS_PATH = "/assistants";
+export const STYLES_PATH = "/styles";
+export const STYLE_ROUTE = "/styles/:styleId";
 export const TEMPLATE_ROUTE = "/templates/:templateId";
 export const PROJECT_ROUTE = "/projects/:projectId";
 
@@ -18,6 +20,7 @@ const CMS_PATHS = {
   projects: PROJECTS_PATH,
   furniture: FURNITURE_PATH,
   assistants: ASSISTANTS_PATH,
+  styles: STYLES_PATH,
 } as const;
 
 export type CmsTab = keyof typeof CMS_PATHS;
@@ -27,6 +30,9 @@ export const CMS_TABS = Object.keys(CMS_PATHS) as CmsTab[];
 export const cmsPath = (tab: string): string => CMS_PATHS[tab as CmsTab] ?? PROJECTS_PATH;
 
 export const projectPath = (projectId: string) => PROJECTS_PATH + "/" + projectId;
+
+/** 风格详情页地址；内置与自定义风格共用。 */
+export const stylePath = (styleId: string) => STYLES_PATH + "/" + encodeURIComponent(styleId);
 
 export const templatePath = (templateId: string) => "/templates/" + templateId;
 
@@ -45,7 +51,7 @@ export function projectPathFor(project: Project): string | null {
 
 export type StudioView =
   | { kind: "guest" }
-  | { kind: "cms"; tab: CmsTab }
+  | { kind: "cms"; tab: CmsTab; styleId?: string }
   | { kind: "project"; projectId: string }
   | { kind: "redirect"; to: string };
 
@@ -60,6 +66,8 @@ export function resolveView({ pathname, loggedIn }: { pathname: string; loggedIn
   if (templateId && isPresetId(templateId)) return { kind: "project", projectId: templateProjectId(templateId) };
   const projectId = matchPath(PROJECT_ROUTE, path)?.params.projectId;
   if (projectId) return { kind: "project", projectId };
+  const styleId = matchPath(STYLE_ROUTE, path)?.params.styleId;
+  if (styleId) return { kind: "cms", tab: "styles", styleId };
   const tab = CMS_TABS.find((id) => CMS_PATHS[id] === path);
   if (tab) return { kind: "cms", tab };
   return { kind: "redirect", to: PROJECTS_PATH };

@@ -24,6 +24,7 @@ export default defineConfig(({ mode }) => {
         "three/examples/jsm/controls/PointerLockControls.js",
         "three/examples/jsm/renderers/CSS2DRenderer.js",
         "three/examples/jsm/geometries/RoundedBoxGeometry.js",
+        "three/examples/jsm/environments/RoomEnvironment.js",
         "three/examples/jsm/utils/BufferGeometryUtils.js",
       ],
     },

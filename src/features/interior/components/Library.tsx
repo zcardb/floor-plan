@@ -1,23 +1,16 @@
 import { useState } from "react";
-import {
-  Search,
-  Plus,
-  DoorOpen,
-  ScanLine,
-  type LucideIcon,
-} from "lucide-react";
+import { DoorOpen, ScanLine, type LucideIcon } from "lucide-react";
 import { categories, library } from "../data/catalog";
 import { formatMeters } from '../model/lengthUnits';
 import { FurnitureShape } from "./FurnitureShape";
-import { CmsFilterBar } from './CmsFilterBar';
-import { ProjectLoadMore } from './ProjectLoadMore';
+import { PanelList } from './PanelList';
+import { ListLoadMore } from './ListLoadMore';
 import { EditorTooltip } from '@/components/ui/editor-tooltip';
+import { usePagedList } from '@/hooks/usePagedList';
 import type { LibraryItem, Tool } from "../model/types";
 import { wallTools } from './wallTools';
 /** 默认分类：展示全部家具。 */
 export const LIBRARY_ALL = '全部';
-/** 滚动分页：首屏 12 件，滚到底再加 12 件（12 → 24 → 36 …）。 */
-export const LIBRARY_PAGE_SIZE = 12;
 const libraryCategories = [LIBRARY_ALL, ...categories, '硬装'];
 const categoryChips = libraryCategories.map(c => ({ id: c, label: c }));
 /** 「硬装」里的构件按钮：墙（墙 / 垭口 / 房间分隔线）与门窗（门 / 窗），可按名称搜索。 */
@@ -27,8 +20,8 @@ const structuralGroups: { title: string; items: { tool: Tool; label: string; ico
 ];
 const categoryOf = (i: LibraryItem) => i.type === 'stairs' ? '硬装' : i.category;
 /**
- * 家具库侧栏：头部（搜索 + 新建、分类胶囊、分组小标题）固定，
- * 只有下面的家具列表滚动；列表按 12 件一页滚动加载。
+ * 家具库侧栏：版式用 `PanelList`（头部固定，只有家具列表滚动）；
+ * 家具都在内存里（内置 + 项目目录 + 账号家具），按统一分页一页 20 件滚动显示。
  */
 export function Library({
   add,
@@ -52,91 +45,68 @@ export function Library({
   onNew?: () => void;
 }) {
   const [category, setCategory] = useState(LIBRARY_ALL),
-    [query, setQuery] = useState(""),
-    [shown, setShown] = useState(LIBRARY_PAGE_SIZE);
+    [query, setQuery] = useState("");
   const items = [...customItems, ...builtinItems].filter((i) =>
     query ? i.name.includes(query) : category === LIBRARY_ALL || categoryOf(i) === category,
   );
-  const page = items.slice(0, shown);
-  const search = (next: string) => { setQuery(next); setShown(LIBRARY_PAGE_SIZE); };
-  const pick = (next: string) => { setCategory(next); setQuery(""); setShown(LIBRARY_PAGE_SIZE); };
+  const listKey = query ? 'q:' + query : category;
+  const paged = usePagedList({ remote: null, local: items, key: listKey });
+  const pick = (next: string) => { setCategory(next); setQuery(""); };
   const heading = query ? "搜索结果" : category === LIBRARY_ALL ? '全部家具' : category === '硬装' ? '硬装构件' : category + "家具";
   return (
-    <div className="library-panel">
-      <div className="library-head">
-        <div className="library-toolbar">
-          <div className="library-search">
-            <Search size={15} />
-            <input
-              aria-label="搜索家具"
-              placeholder="搜索家具、家电、硬装…"
-              value={query}
-              onChange={(e) => search(e.target.value)}
-            />
-          </div>
-          {onNew && <EditorTooltip label="新建家具 / 账号库">
-            <button type="button" className="library-new" aria-label="新建家具 / 账号库" onClick={onNew}>
-              <Plus size={16} />
-            </button>
-          </EditorTooltip>}
-        </div>
-        <CmsFilterBar className="library-categories" label="家具分类" chips={categoryChips} value={query ? '' : category} onChange={pick} />
-        <div className="library-subheading">
-          <span>
-            {heading}
-            <small> · {items.length} 件</small>
-          </span>
-          <small>点击添加或拖入</small>
-        </div>
-      </div>
-      {/* 切换分类或搜索时重新挂载，列表回到顶部 */}
-      <div className="library-scroll" key={query ? 'q:' + query : category}>
-        {structureTools && <StructuralItems query={query} show={category === '硬装' || !!query} tool={tool} setTool={setTool} />}
-        <div className="library-grid">
-          {page.map((it, i) => (
-            <EditorTooltip
-              key={it.name + i}
-              label={it.name}
+    <PanelList
+      search={{ label: "搜索家具", placeholder: "搜索家具、家电、硬装…", value: query, onChange: setQuery }}
+      action={onNew && { label: "新建家具 / 账号库", onClick: onNew }}
+      chips={{ label: "家具分类", items: categoryChips, value: query ? '' : category, onChange: pick }}
+      title={heading}
+      count={`${items.length} 件`}
+      hint="点击添加或拖入"
+      listKey={listKey}
+    >
+      {structureTools && <StructuralItems query={query} show={category === '硬装' || !!query} tool={tool} setTool={setTool} />}
+      <div className="library-grid">
+        {paged.list.map((it, i) => (
+          <EditorTooltip
+            key={it.name + i}
+            label={it.name}
+          >
+            <button
+              className="library-item"
+              draggable={!readOnly}
+              disabled={readOnly}
+              onDragStart={(e) =>
+                e.dataTransfer.setData(
+                  "application/interior-item",
+                  JSON.stringify(it),
+                )
+              }
+              onClick={() => add(it)}
+              aria-label={"添加" + it.name}
             >
-              <button
-                className="library-item"
-                draggable={!readOnly}
-                disabled={readOnly}
-                onDragStart={(e) =>
-                  e.dataTransfer.setData(
-                    "application/interior-item",
-                    JSON.stringify(it),
-                  )
-                }
-                onClick={() => add(it)}
-                aria-label={"添加" + it.name}
-              >
-                <span className="library-visual">
-                  {it.imageUrl ? (
-                    <img src={it.imageUrl} crossOrigin="anonymous" alt={it.name} />
-                  ) : (
-                    <svg
-                      viewBox={`${-it.w / 2 - 100} ${-it.d / 2 - 100} ${it.w + 200} ${it.d + 200}`}
-                    >
-                      <FurnitureShape f={it} />
-                    </svg>
-                  )}
-                </span>
-                <b>{it.name}</b>
-                <small>
-                  {formatMeters(it.w)} × {formatMeters(it.d)} m
-                </small>
-              </button>
-            </EditorTooltip>
-          ))}
-        </div>
-        {items.length > LIBRARY_PAGE_SIZE && (
-          <ProjectLoadMore shown={page.length} total={items.length} hasMore={false} loading={false} onReach={() => setShown(shown + LIBRARY_PAGE_SIZE)} />
-        )}        {!items.length && (
-          <div className="empty-small">没有找到家具，试试其他关键词。</div>
-        )}
+              <span className="library-visual">
+                {it.imageUrl ? (
+                  <img src={it.imageUrl} crossOrigin="anonymous" alt={it.name} />
+                ) : (
+                  <svg
+                    viewBox={`${-it.w / 2 - 100} ${-it.d / 2 - 100} ${it.w + 200} ${it.d + 200}`}
+                  >
+                    <FurnitureShape f={it} />
+                  </svg>
+                )}
+              </span>
+              <b>{it.name}</b>
+              <small>
+                {formatMeters(it.w)} × {formatMeters(it.d)} m
+              </small>
+            </button>
+          </EditorTooltip>
+        ))}
       </div>
-    </div>
+      <ListLoadMore list={paged} />
+      {!items.length && (
+        <div className="empty-small">没有找到家具，试试其他关键词。</div>
+      )}
+    </PanelList>
   );
 }
 

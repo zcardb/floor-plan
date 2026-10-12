@@ -1,5 +1,5 @@
 import { library } from "./catalog";
-import { NEW_TEMPLATE_PRESETS, type TemplatePreset } from './templatePresets';
+import type { TemplatePreset } from './templatePresets';
 import { normalizeFurniture } from "../model/costs";
 import { outerWalls, rect } from "../model/geometry";
 import { mergeAllSplits } from "../model/wallBulk";
@@ -323,10 +323,13 @@ export function blankDesign({ width, depth }: BlankSize = DEFAULT_BLANK_SIZE): D
  * 模板生成时每个门窗各占一段满宽墙，门窗无法沿墙拖动：出厂即执行一次「清空分割」。
  * 模板只给出房间轮廓，开敞相连的房间（厨房 / 餐厅、飘窗）由迁移补上房间分隔线。
  */
+export const finalizeTemplate = (design: Design): Design =>
+  migrateSeparators(mergeAllSplits(design, { keepBearingRuns: true }).design);
+
+/** 内置模板只保留「原木之家」一套：风格差异由 3D 装修风格承担，不再靠多套户型模板体现。 */
 export const TEMPLATE_PRESETS: TemplatePreset[] = [
   { id: 'reference', name: '三室两厅两卫 · 原木之家', layout: '三室两厅两卫', description: '原木风格 · 双卫 · 完整家具方案', area: 125, build: referenceDesign },
-  ...NEW_TEMPLATE_PRESETS,
-].map((preset) => ({ ...preset, build: () => migrateSeparators(mergeAllSplits(preset.build(), { keepBearingRuns: true }).design) }));
+].map((preset) => ({ ...preset, build: () => finalizeTemplate(preset.build()) }));
 export const presetById = (id: string) => TEMPLATE_PRESETS.find(p => p.id === id);
 export const designForTemplate = (id: string): Design => (presetById(id) ?? TEMPLATE_PRESETS[0]).build();
 

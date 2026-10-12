@@ -140,11 +140,11 @@ describe('管理端精简与加载分支', () => {
     // 我的项目按修改时间排在内置模板之前
     expect(html.indexOf('打开项目 我的项目')).toBeLessThan(html.indexOf('预览模板 '));
   });
-  it('滚动加载：首批只渲染 12 条，云端还有更多时内置模板暂不露出、数量带 +', () => {
-    const many = Array.from({ length: 20 }, (_, i) => ({ ...project, id: 'p' + i, name: '项目' + i }));
+  it('滚动加载：首批只渲染 20 条，云端还有更多时内置模板暂不露出、数量带 +', () => {
+    const many = Array.from({ length: 45 }, (_, i) => ({ ...project, id: 'p' + i, name: '项目' + i }));
     const first = render(createElement(ProjectManager, { projects: projects(false, many), opened: () => {} }));
-    expect(first.match(/aria-label="打开项目 /g)).toHaveLength(12);
-    // 首屏只有第 1 页的 12 条；滚到底部自动加载下一页，没有需要点击的「加载更多」按钮
+    expect(first.match(/aria-label="打开项目 /g)).toHaveLength(20);
+    // 首屏只有第 1 页的 20 条；滚到底部自动加载下一页，没有需要点击的「加载更多」按钮
     expect(first).toContain('正在加载更多');
     expect(first).not.toContain('>加载更多</button>');
     expect(first).not.toContain('aria-label="项目分页"');

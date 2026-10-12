@@ -10,3 +10,4 @@ export const CustomFurnitureDialog = lazy(() => import("./CustomFurnitureDialog"
 export const AiRoomDialog = lazy(() => import("./AiRoomDialog").then((m) => ({ default: m.AiRoomDialog })));
 export const AiChatPanel = lazy(() => import("./AiChatPanel").then((m) => ({ default: m.AiChatPanel })));
 export const AiCreateProjectDialog = lazy(() => import("./AiCreateProjectDialog").then((m) => ({ default: m.AiCreateProjectDialog })));
+export const ReportPreview = lazy(() => import("./ReportPreview").then((m) => ({ default: m.ReportPreview })));

@@ -13,7 +13,8 @@ const accountPriced = (defaults: AccountCostSettings, group: PriceGroup, key: st
 
 /**
  * 项目内统一改价入口：来源标签、恢复账号默认、同步到账号库（账号库未定价时默认勾选）。
- * 勾选同步时先写账号库，成功后项目改为继承账号默认价；失败则项目价不变。
+ * 勾选同步时：账号默认价乐观更新、项目改为继承它，回车即见新价，云端在后台写入；
+ * 云端没写成则账号默认价自动回滚，这次输入改为本项目单价保留下来，并提示同步失败。
  */
 export function PriceField({ design, group, priceKey, name, unit, change }: {
   design: Design; group: PriceGroup; priceKey: string; name: string; unit: string;
@@ -30,10 +31,12 @@ export function PriceField({ design, group, priceKey, name, unit, change }: {
       const next: AccountCostSettings = { ...defaults, [group]: { ...defaults[group], [priceKey]: price } };
       // 地面价格以采购单位计价，同步时一并写入采购规格，避免账号库单位与单价错配。
       if (group === 'floorPrices') next.procurement = { ...defaults.procurement, [priceKey]: effective?.procurement?.[priceKey] || { unit: 'm²', waste: 5 } };
-      const ok = await saveAccount(next);
-      if (!ok) { notify.fail(`「${name}」未能同步到账号库，项目价格未改动，请重试`); return false; }
+      const saved = saveAccount(next);
       change(d => restorePrice(d, group, priceKey));
-      return;
+      if (await saved) return;
+      change(d => setPrice(d, group, priceKey, price, defaults));
+      notify.fail(`「${name}」同步到账号库失败，已只在本项目生效`);
+      return false;
     }
     change(d => setPrice(d, group, priceKey, price, defaults));
   };

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildPlan, libraryResolver, type PlanSpec } from "../data/floorplanBuilder";
 import type { Design, Furniture, Room } from "./types";
-import { backingOf, furnitureHeight, passageBlocker, roomLayout, settleFurniture, violationsOf, type RoomLayout } from "./layoutRules";
+import { backingOf, furnitureByRoom, furnitureHeight, layoutIssues, passageBlocker, roomLayout, settleFurniture, tidyLayout, violationsOf, type RoomLayout } from "./layoutRules";
 
 /**
  * 你描述的场景：客厅 6000×5000 与右侧 2000 宽的阳台之间没有墙（开间），
@@ -207,5 +207,42 @@ describe("门扇开启范围", () => {
     // 地毯可以压在门扇下。
     const rug = item("rug", "地毯", 500, 1000, 600, 600, 0);
     expect(kinds(rug, layout)).not.toContain("doorSweep");
+  });
+});
+
+describe("布局整理：逐间校正整套方案", () => {
+  const d = living();
+  const hall = roomOf(d, "客厅");
+  const [x1, y1, x2, y2] = hall.rings[0]!.reduce(
+    ([ax, ay, bx, by], [x, y]) => [Math.min(ax, x), Math.min(ay, y), Math.max(bx, x), Math.max(by, y)],
+    [Infinity, Infinity, -Infinity, -Infinity] as [number, number, number, number],
+  );
+  const sofa = item("sofa", "三人沙发", (x1 + x2) / 2, (y1 + y2) / 2, 2200, 900, 0);
+  /** 背靠开间（右侧通向阳台）的衣柜：中心仍在客厅里，需要挪到有实墙的位置。 */
+  const wardrobe = item("wardrobe", "衣柜", x2 - 300, (y1 + y2) / 2, 600, 600, 90, 2000);
+
+  it("家具按中心点归到所在房间", () => {
+    const byRoom = furnitureByRoom({ ...d, furniture: [sofa, wardrobe] });
+    expect(byRoom.get(hall.id)?.map((f) => f.id)).toEqual([sofa.id, wardrobe.id]);
+  });
+
+  it("只挪违规的家具，说明带房间名", () => {
+    const { design, report } = tidyLayout({ ...d, furniture: [sofa, wardrobe] });
+    expect(design.furniture[0]).toBe(sofa);
+    expect(design.furniture[1]).not.toBe(wardrobe);
+    expect(kinds(design.furniture[1]!, roomLayout(design, hall))).not.toContain("backing");
+    expect(report.adjusted).toEqual([expect.stringMatching(/^客厅 · 衣柜/)]);
+  });
+
+  it("布局体检列出违规家具（带房间与中文说明），整理后只剩下挪不动的", () => {
+    const before = layoutIssues({ ...d, furniture: [sofa, wardrobe] });
+    expect(before.checked).toBe(2);
+    expect(before.issues).toEqual([expect.objectContaining({ room: "客厅", furnitureId: wardrobe.id, kind: "backing", problem: expect.stringContaining("没有实墙") })]);
+    expect(layoutIssues(tidyLayout({ ...d, furniture: [sofa, wardrobe] }).design).issues).toEqual([]);
+  });
+
+  it("没有需要整理的家具时原样返回同一个方案对象", () => {
+    const tidy = { ...d, furniture: [sofa] };
+    expect(tidyLayout(tidy).design).toBe(tidy);
   });
 });

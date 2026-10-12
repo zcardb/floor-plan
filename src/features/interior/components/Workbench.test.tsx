@@ -28,12 +28,15 @@ import { initialSceneState } from './useSceneLifecycle';
 import { blankDesign, referenceDesign } from '../data/templates';
 import { PlanCanvas } from './PlanCanvas';
 import { Library } from './Library';
-import { WallToolMenu } from './WallToolMenu';
-import { AiChatPanel, DimensionEditDialog, WallSplitDialog } from './lazyDialogs';
+import { PlanRailTools, SceneRailPanels, SceneRailTools, SceneViewMenu } from './RailTools';
+import { CostChip } from './CostChip';
+import { LayoutPanel, LayoutTidyButton } from './LayoutPanel';
+import { AiChatPanel, DimensionEditDialog, ReportPreview, WallSplitDialog } from './lazyDialogs';
 import { SidePanel } from './SidePanel';
-import { CanvasRail } from './CanvasRail';
+import { CanvasRail, RailButton } from './CanvasRail';
+import { DropdownMenu, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { ViewMenu } from './ViewMenu';
-import { OverviewPanel } from './OverviewPanel';
+import { StylePanel } from './StylePanel';
 import { HouseSettingsPanel } from './HouseSettingsPanel';
 import { CostPanel } from './CostPanel';
 import { SelectionEditor } from './SelectionEditor';
@@ -74,9 +77,31 @@ function renderWithLibrary(overrides: Partial<Parameters<typeof Workbench>[0]> =
   (tree.find(n => n.type === CanvasRail)!.props.onToggle as (kind: string) => void)('library');
   return render(overrides);
 }
-function tools(tree: Node[]) {
-  const group = tree.find(node => node.props.className === 'tool-group')!;
-  return nodes(group);
+/** 展开竖条上的一段（工具段 / 侧栏段）：2D / 3D 各一套，由 RailTools 提供。 */
+function railPart(tree: Node[], part: 'tools' | 'panels'): Node[] {
+  const rail = tree.find(node => node.type === CanvasRail);
+  const element = rail?.props[part] as ReactElement<Record<string, unknown>> | false | undefined;
+  if (!element) return [];
+  const restore = state.cursor;
+  const out = nodes((element.type as (p: Record<string, unknown>) => ReactNode)(element.props));
+  state.cursor = restore;
+  return out;
+}
+/** 画布竖条上当前模式的工具段。 */
+const tools = (tree: Node[]) => railPart(tree, 'tools');
+/** 竖条按钮的短名，按显示顺序；带菜单的「墙体」「视图」以组件出现。 */
+const railLabels = (tree: Node[]) => tree.flatMap(node =>
+  node.type === RailButton ? [node.props.label as string]
+    : typeof node.type === 'function' && (node.type as { name?: string }).name === 'RailWallMenu' ? ['墙体']
+      : node.type === SceneViewMenu ? ['视图'] : []);
+/** 竖条「墙」下拉里的条目。 */
+function railWall(tree: Node[]): Node[] {
+  const menu = tools(tree).find(node => typeof node.type === 'function' && (node.type as { name?: string }).name === 'RailWallMenu');
+  if (!menu) return [];
+  const restore = state.cursor;
+  const out = nodes((menu.type as (props: unknown) => ReactNode)(menu.props));
+  state.cursor = restore;
+  return out;
 }
 beforeEach(() => { state.values = []; state.cursor = 0; state.effects = []; state.design = blankDesign(); state.furniture = []; state.change.mockReset(); state.commit.mockReset(); state.cancel.mockReset(); });
 /** 模拟窄屏：侧栏以抽屉形式打开，画布工具条让位。 */
@@ -171,33 +196,42 @@ describe('尺寸驱动墙体提交链', () => {
   });
 });
 describe('2D 常用工具与顶部工具栏', () => {
-  it('直接展示选择、墙 ▾、门、窗，墙下拉切换墙 / 垭口 / 房间分隔线', () => {
-    expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['门', '窗']);
-    const menu = () => tools(render()).find(node => node.type === WallToolMenu)!;
-    expect(menu()).toBeDefined();
-    for (const tool of ['wall', 'passage', 'separator'] as const) {
-      (menu().props.setTool as (tool: string) => void)(tool);
-      expect(state.values[1]).toBe(tool);
-      expect(menu().props.tool).toBe(tool);
-    }
-    for (const [label, tool] of [['门', 'door'], ['窗', 'window']]) {
-      const button = tools(render()).find(node => node.props.label === label)!;
+  it('竖条按顺序给选择 / 墙体 ▾ / 门 / 窗，墙体下拉里是墙体工具与楼梯', () => {
+    const railButtons = () => tools(render()).filter(node => node.type === RailButton);
+    expect(railLabels(tools(render()))).toEqual(['选择', '墙体', '门', '窗']);
+    expect(railWall(render()).length).toBeGreaterThan(0);
+    for (const [label, tool] of [['选择', 'select'], ['门', 'door'], ['窗', 'window']] as const) {
+      const button = railButtons().find(node => node.props.label === label)!;
       (button.props.onClick as () => void)();
       expect(state.values[1]).toBe(tool);
-      expect(tools(render()).find(node => node.props.label === label)!.props.active).toBe(true);
+      expect(railButtons().find(node => node.props.label === label)!.props.active).toBe(true);
     }
-    const tree = tools(render());
-    expect(tree.filter(node => node.type === 'button').map(node => node.props['aria-label'])).toEqual(['更多']);
-    expect(text(tree.map(node => node.props.children as ReactNode))).not.toContain('添加门');
+    // 墙下拉：墙 / 垭口 / 房间分隔线（两行菜单项：标题 + 说明）、楼梯，以及窄屏才出现的重置 / 清空
+    const items = railWall(render()).filter(node => node.type === DropdownMenuItem);
+    expect(items.map(node => text(node.props.children as ReactNode))).toEqual([
+      '墙点击起点与转角连续绘墙',
+      '垭口无门扇的落地洞口',
+      '房间分隔线不砌墙也能划分房间，不计价',
+      '楼梯放到当前房间中央，选中后可换 L 型、U 型等',
+      '重置方案',
+      '清空家具',
+      '清空门窗',
+      '清空分割',
+      '清空承重',
+    ]);
+    for (const tool of ['wall', 'passage', 'separator'] as const) {
+      const item = railWall(render()).find(node => node.type === DropdownMenuItem && text(node.props.children as ReactNode).startsWith({ wall: '墙', passage: '垭口', separator: '房间分隔线' }[tool]))!;
+      (item.props.onSelect as () => void)();
+      expect(state.values[1]).toBe(tool);
+    }
   });
-  it('测量与拆改入口已移除，更多菜单只保留窄屏可用的破坏性操作', () => {
-    const tree = tools(render());
-    expect(text(tree.map(node => node.props.children as ReactNode))).not.toContain('测量距离');
-    expect(text(tree.map(node => node.props.children as ReactNode))).not.toContain('拆改非承重墙');
-    const more = tools(render()).find(node => node.props['aria-label'] === '更多')!;
-    expect(more.props.className).toContain('compact-only');
-    const items = tools(render()).filter(node => typeof node.props.onSelect === 'function');
-    expect(items.map(item => text(item.props.children as ReactNode))).toEqual(['重置方案', '清空家具', '清空门窗', '清空分割', '清空承重']);
+  it('测量与拆改入口已移除；破坏性操作在窄屏收进竖条「墙」下拉', () => {
+    const tree = render();
+    const all = text(tree.map(node => node.props.children as ReactNode));
+    expect(all).not.toContain('测量距离');
+    expect(all).not.toContain('拆改非承重墙');
+    const compact = railWall(tree).filter(node => typeof node.props.className === 'string' && (node.props.className as string).includes('compact-only') && node.props.onSelect);
+    expect(compact.map(node => text(node.props.children as ReactNode))).toEqual(['重置方案', '清空家具', '清空门窗', '清空分割', '清空承重']);
   });
   it('V、Esc 保留工具切换，M、X 不再切换工具', () => {
     const listeners = new Map<string, (event: KeyboardEvent) => void>();
@@ -231,22 +265,26 @@ describe('2D 常用工具与顶部工具栏', () => {
       vi.unstubAllGlobals();
     }
   });
-  it('可编辑的参考户型（游客/复制项目）开放绘墙和门窗，3D 保持原有工具', () => {
+  it('可编辑的参考户型（游客/复制项目）开放绘墙和门窗，3D 换成选择 / 漫游 / 视图，风格在侧栏组', () => {
     state.design = referenceDesign();
-    expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['门', '窗']);
-    expect(tools(render()).some(node => node.type === WallToolMenu)).toBe(true);
+    const labels = () => railLabels(tools(render()));
+    expect(labels()).toEqual(['选择', '墙体', '门', '窗']);
+    expect(railWall(render()).length).toBeGreaterThan(0);
     expect(renderWithLibrary().find(n => n.type === Library)!.props.structureTools).toBe(true);
-    const more = tools(render()).find(node => node.props['aria-label'] === '更多')!;
-    expect(more.props.className).toContain('compact-only');
     state.values[2] = { ...initialSceneState, view: '3d' };
-    expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['鸟瞰', '漫游', '俯视', '剖切']);
+    expect(labels()).toEqual(['选择', '漫游', '视图']);
+    expect(railLabels(railPart(render(), 'panels'))).toEqual(['风格']);
   });
-  it('内置模板只读预览不开放绘墙和门窗', () => {
+  it('内置模板只读预览不开放绘墙和门窗，3D 仍有视图工具', () => {
     state.design = referenceDesign();
-    const tree = renderWithLibrary({ project: { id: 'builtin', name: '模板', state: state.design, builtin: true } as Project });
-    expect(tools(tree).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual([]);
-    expect(tools(tree).some(node => node.type === WallToolMenu)).toBe(false);
-    expect(tree.find(n => n.type === Library)!.props.structureTools).toBe(false);
+    const preview = () => renderWithLibrary({ project: { id: 'builtin', name: '模板', state: state.design, builtin: true } as Project });
+    const labels = () => railLabels(tools(preview()));
+    expect(labels()).toEqual(['选择']);
+    // 只读预览：墙体下拉里全是写操作，整个隐藏
+    expect(railWall(preview())).toEqual([]);
+    expect(preview().find(n => n.type === Library)!.props.structureTools).toBe(false);
+    state.values[2] = { ...initialSceneState, view: '3d' };
+    expect(labels()).toEqual(['选择', '漫游', '视图']);
   });
 });
 describe('账号家具库并入左侧家具库', () => {
@@ -305,8 +343,8 @@ describe('单行顶部工具栏', () => {
     expect(project.props.onLogout).toBeTypeOf('function');
     expect(tree.find(n => n.type === ExportMenu)!.props.onSave).toBeTypeOf('function');
   });
-  it('小屏的重置方案与各清空操作在 2D「更多」菜单的 compact-only 项里', () => {
-    const more = tools(render()).filter(n => typeof n.props.className === 'string' && (n.props.className as string).includes('compact-only') && n.props.onSelect);
+  it('小屏的重置方案与各清空操作在竖条「墙」下拉的 compact-only 项里', () => {
+    const more = railWall(render()).filter(n => typeof n.props.className === 'string' && (n.props.className as string).includes('compact-only') && n.props.onSelect);
     expect(more.map(n => text(n.props.children as ReactNode))).toEqual(['重置方案', '清空家具', '清空门窗', '清空分割', '清空承重']);
   });
   const dangerItems = () => nodes(render().find(n => n.props.className === 'tool-group danger-actions')!).filter(n => n.props.onSelect);
@@ -397,15 +435,17 @@ describe('内置模板只读预览提示条', () => {
 describe('编辑器分区：侧栏、竖条与画布', () => {
   const rail = (tree: Node[]) => tree.find(n => n.type === CanvasRail)!;
   const panel = (tree: Node[]) => tree.find(n => n.type === SidePanel);
-  it('宽屏默认也不打开侧栏，竖条无高亮；点「家具」打开家具列表', () => {
+  it('宽屏默认也不打开侧栏，竖条无高亮；点顶栏「家具」打开家具列表', () => {
     const tree = render();
     expect(panel(tree)).toBeUndefined();
     expect(rail(tree).props.sidePanel).toBeNull();
-    (rail(tree).props.onToggle as (kind: string) => void)('library');
+    const library = (tree: Node[]) => tree.find(n => n.type === 'button' && n.props['aria-label'] === '家具库')!;
+    expect(library(tree).props['aria-pressed']).toBe(false);
+    (library(tree).props.onClick as () => void)();
     const opened = render();
     expect(panel(opened)!.props.title).toBe('家具列表');
     expect(nodes(panel(opened)!).find(n => n.type === Library)).toBeDefined();
-    expect(rail(opened).props.sidePanel).toBe('library');
+    expect(library(opened).props['aria-pressed']).toBe(true);
     // 视图设置现在是左下角缩放条里的第一个图标
     const zoom = tree.find(n => n.props.className === 'canvas-zoom')!;
     expect(nodes(zoom)[1].type).toBe(ViewMenu);
@@ -421,7 +461,7 @@ describe('编辑器分区：侧栏、竖条与画布', () => {
     expect(panel(render())!.props.title).toBe('AI 设计');
     expect(nodes(panel(render())!).find(n => n.type === AiChatPanel)).toBeDefined();
   });
-  it('竖条打开对应侧栏，方案总览与户型设置各有自己的面板', () => {
+  it('竖条打开对应侧栏：户型设置、方案与成本（方案总览已并入）、装修风格各有自己的面板', () => {
     const open = (kind: string) => {
       const tree = render();
       (rail(tree).props.onToggle as (k: string) => void)(kind);
@@ -430,12 +470,58 @@ describe('编辑器分区：侧栏、竖条与画布', () => {
     const settings = panel(open('settings'))!;
     expect(settings.props.title).toBe('户型设置');
     expect(nodes(settings).find(n => n.type === HouseSettingsPanel)).toBeDefined();
-    expect(nodes(panel(open('overview'))!).find(n => n.type === OverviewPanel)).toBeDefined();
-    expect(panel(open('cost'))!.props.title).toBe('成本核算');
-    // 成本、总览与账号无关：游客（默认 loggedIn: false）也能打开，总览里有成本入口，成本页没有「返回方案总览」
-    expect(nodes(panel(open('overview'))!).find(n => n.type === OverviewPanel)!.props.onCosts).toBeTypeOf('function');
-    expect(nodes(panel(open('cost'))!).find(n => n.type === CostPanel)!.props.overview).toBeUndefined();
+    // 成本与账号无关：游客（默认 loggedIn: false）也能打开；方案指标卡在成本面板顶部
+    const cost = panel(open('cost'))!;
+    expect(cost.props.title).toBe('方案与成本');
+    expect(nodes(cost).find(n => n.type === CostPanel)).toBeDefined();
+    const style = panel(open('style'))!;
+    expect(style.props.title).toBe('装修风格');
+    // 游客能换风格但不能新建；登录后才有新建入口
+    expect(nodes(style).find(n => n.type === StylePanel)!.props).toMatchObject({ mine: [], onCreate: undefined });
     expect(render().find(n => n.type === SelectionEditor)!.props.showCosts).toBe(true);
+  });
+  it('竖条随 2D / 3D 换工具：2D 是绘制工具，3D 是视图工具，风格排在侧栏组', () => {
+    const plan = rail(render()).props;
+    expect((plan.tools as { type: unknown }).type).toBe(PlanRailTools);
+    expect(plan.panels).toBeFalsy();
+    state.values[2] = { ...initialSceneState, view: '3d' };
+    const scene = rail(render()).props;
+    expect((scene.tools as { type: unknown }).type).toBe(SceneRailTools);
+    expect((scene.panels as { type: unknown }).type).toBe(SceneRailPanels);
+  });
+  it('3D「视图」菜单平铺斜视 / 俯视 / 剖切 / 夜景，开关写回场景选项', () => {
+    state.values[2] = { ...initialSceneState, view: '3d' };
+    const view = tools(render()).find(n => n.type === SceneViewMenu)!.props as { cut: boolean; night: boolean; onCut: (on: boolean) => void; onNight: (on: boolean) => void };
+    expect(view).toMatchObject({ cut: false, night: false });
+    // 测试里的 useState 只记录 setter 收到的值：找到被写入函数式更新的那一格，套到原值上验证结果
+    const applied = (act: () => void) => {
+      const before = [...state.values];
+      act();
+      const index = state.values.findIndex((value, i) => value !== before[i]);
+      return (state.values[index] as (o: unknown) => Record<string, unknown>)(before[index]);
+    };
+    expect(applied(() => view.onNight(true))).toMatchObject({ night: true, cut: false });
+    expect(applied(() => view.onCut(true))).toMatchObject({ cut: true });
+  });
+  it('顶栏右侧依次是家具、成本、保存；「生成方案报告」在保存下拉里，点开先预览', () => {
+    const right = render().find(n => n.props.className === 'toolbar-right')!;
+    const order = nodes(right).filter(n => n.type === CostChip || n.type === ExportMenu || (n.type === 'button' && n.props['aria-label'] === '家具库'));
+    expect(order.map(n => n.type === CostChip ? '成本' : n.type === ExportMenu ? '保存' : '家具')).toEqual(['家具', '成本', '保存']);
+    expect(render().some(n => n.type === ReportPreview)).toBe(false);
+    (render().find(n => n.type === ExportMenu)!.props.onReport as () => void)();
+    const preview = render().find(n => n.type === ReportPreview)!;
+    expect(preview.props).toMatchObject({ exporting: false, onExport: expect.any(Function) });
+    (preview.props.onClose as () => void)();
+    expect(render().some(n => n.type === ReportPreview)).toBe(false);
+  });
+  it('左下角视图区有「布局整理」（带问题角标），只读预览不显示；点它先整理再打开布局整理侧栏', () => {
+    const tidy = (tree: Node[]) => tree.find(n => n.type === LayoutTidyButton);
+    expect(tidy(render())).toBeDefined();
+    expect(tidy(render({ project: { id: 'builtin', name: '模板', state: state.design, builtin: true } as Project }))).toBeUndefined();
+    (tidy(render())!.props.onTidy as () => void)();
+    const opened = render().find(n => n.type === SidePanel)!;
+    expect(opened.props.title).toBe('布局整理');
+    expect(nodes(opened).find(n => n.type === LayoutPanel)!.props.lastTidy).toEqual({ adjusted: [], unresolved: [] });
   });
   it('绘墙模式显示「完成绘墙」提示并能回到选择工具，画布上不再渲染状态条 / 比例尺 / 左上角文案', () => {
     const tree = render();

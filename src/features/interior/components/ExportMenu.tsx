@@ -1,4 +1,4 @@
-import { ChevronDown, CloudUpload, FileCode2, FileJson, FilePenLine, FileText, Image, Loader2, LogIn } from 'lucide-react';
+import { ChevronDown, ClipboardList, CloudUpload, FileCode2, FileJson, FilePenLine, FileText, Image, Loader2, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EditorTooltip } from '@/components/ui/editor-tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -16,6 +16,8 @@ interface Props {
   /** 导出进行中。 */
   pending: boolean;
   onExport: (format: ExportFormat) => void;
+  /** 打开方案报告预览（预览里再下载 PDF）。 */
+  onReport: () => void;
   status: SaveStatus;
   loggedIn: boolean;
   /** 内置模板只读预览。 */
@@ -42,7 +44,7 @@ export function saveState({ status, loggedIn, readOnly, guestDirty, saving, pend
 /**
  * 顶栏右侧「保存」按钮：文案固定「保存」，状态只用按钮上的小标记和下拉第一行表达；
  * 登录后是主按钮；游客时右侧另有主按钮「登录」，这里降为副按钮（`.save-button.is-secondary`）。
- * 下拉其余部分是导出：「按格式导出」5 项 + 分隔线 +「导出到其他软件」。
+ * 下拉其余部分是导出：「按格式导出」5 项 + 分隔线 +「生成方案报告」「导出到其他软件」。
  */
 export function ExportMenu(p: Props) {
   const state = saveState(p);
@@ -83,6 +85,9 @@ export function ExportMenu(p: Props) {
         </DropdownMenuItem>
       ))}
       <DropdownMenuSeparator />
+      <DropdownMenuItem disabled={p.pending} onSelect={p.onReport}>
+        <ClipboardList />生成方案报告
+      </DropdownMenuItem>
       <SoftwareSoonItem label="导出到其他软件" />
     </DropdownMenuContent>
   </DropdownMenu>;

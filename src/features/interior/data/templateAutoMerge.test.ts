@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createProject, designForTemplate, referenceDesign, TEMPLATE_PRESETS } from './templates';
+import { createProject, designForTemplate, referenceDesign } from './templates';
+import { AI_EXAMPLE_PLANS } from '../ai/examplePlans';
 import { length } from '../model/geometry';
 import { isBearingWall } from '../model/wallPolicy';
 import { dragOpening } from '../model/openingDrag';
@@ -9,8 +10,8 @@ import type { Design, Opening } from '../model/types';
 const hostLonger = (d: Design, o: Opening) => length(d.walls.find(w => w.id === o.wallId)!) > o.width + 1;
 
 describe('复刻模板默认清空分割', () => {
-  it.each(TEMPLATE_PRESETS.filter(p => p.id !== 'reference').map(p => p.id))('%s：所有门窗都不再独占满宽墙段', id => {
-    const d = createProject(id).state;
+  it.each(AI_EXAMPLE_PLANS.map(p => p.id))('%s：所有门窗都不再独占满宽墙段', id => {
+    const d = AI_EXAMPLE_PLANS.find(p => p.id === id)!.design();
     expect(d.walls.some(w => w.id.startsWith('opening-wall-'))).toBe(false);
     expect(d.openings.every(o => hostLonger(d, o))).toBe(true);
   });
@@ -23,7 +24,7 @@ describe('复刻模板默认清空分割', () => {
   });
 
   it('复刻出来的门可以沿墙拖动', () => {
-    const d = createProject('two-bed').state;
+    const d = AI_EXAMPLE_PLANS.find(p => p.id === 'two-bed')!.design();
     const door = d.openings.find(o => o.kind === 'door')!;
     const wall = d.walls.find(w => w.id === door.wallId)!;
     const L = length(wall), dir = [(wall.b[0] - wall.a[0]) / L, (wall.b[1] - wall.a[1]) / L];

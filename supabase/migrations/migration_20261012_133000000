@@ -1,0 +1,185 @@
+-- 账号自定义装修风格：每行一套风格，name 之外的定义存在 spec（字段见 src/features/interior/model/decorStyles.ts 的 DecorStyle），仅本人可读写。
+CREATE TABLE public.interior_style_catalog (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), owner_id uuid NOT NULL DEFAULT auth.uid(), style_key text NOT NULL CHECK (style_key ~ '^my-[a-z0-9]{6,32}$'), name text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 20), spec jsonb NOT NULL CHECK (jsonb_typeof(spec) = 'object' AND octet_length(spec::text) <= 20000), created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), UNIQUE (owner_id, style_key));
+ALTER TABLE public.interior_style_catalog ENABLE ROW LEVEL SECURITY;
+CREATE POLICY interior_style_catalog_own ON public.interior_style_catalog FOR ALL TO authenticated USING (auth.uid() = owner_id) WITH CHECK (auth.uid() = owner_id);
+
+-- 账号素材库合并视图（列表接口 interior_library_page 的数据来源）：
+--   1) 加入「风格」行，分类取风格大类（未归类为空串）；
+--   2) 楼梯（type = 'stairs'）归到「楼梯」分类，与管理页的分类一致；
+--   3) 末尾补两列供列表筛选：major（硬装 / 软装 / 风格）、search（小写的搜索文本）。
+-- 原有六列的名称、顺序、类型不变；security_invoker 沿用各表「仅本人」的 RLS。
+create or replace view public.interior_account_library
+with (security_invoker = true) as
+select 'furniture'::text as kind, t.catalog_id as item_key, t.name,
+       case when t.type = 'stairs' then '楼梯' else t.category end as category,
+       t.created_at, to_jsonb(t) - 'owner_id' - 'id' as data,
+       case when t.type = 'stairs' then '硬装' else '软装' end as major,
+       lower(t.name) as search
+  from public.interior_furniture_catalog t
+union all
+select 'floor', t.floor_key, t.name, '地面', t.created_at, to_jsonb(t) - 'owner_id' - 'id', '硬装', lower(t.name)
+  from public.interior_floor_catalog t
+union all
+select 'wall', t.wall_key, t.name, '墙面', t.created_at, to_jsonb(t) - 'owner_id' - 'id', '硬装', lower(t.name)
+  from public.interior_wall_catalog t
+union all
+select 'opening', t.opening_key, t.name, '门窗', t.created_at, to_jsonb(t) - 'owner_id' - 'id', '硬装', lower(t.name)
+  from public.interior_opening_catalog t
+union all
+select 'roof', t.roof_key, t.name, '屋面', t.created_at, to_jsonb(t) - 'owner_id' - 'id', '硬装', lower(t.name)
+  from public.interior_roof_catalog t
+union all
+select 'ceiling', t.ceiling_key, t.name, '吊顶', t.created_at, to_jsonb(t) - 'owner_id' - 'id', '硬装', lower(t.name)
+  from public.interior_ceiling_catalog t
+union all
+select 'style', t.style_key, t.name, coalesce(t.spec->>'category', ''), t.created_at, to_jsonb(t) - 'owner_id' - 'id', '风格',
+       lower(concat_ws(' ', t.name, t.spec->>'summary', t.spec->>'category'))
+  from public.interior_style_catalog t;
+
+revoke all on public.interior_account_library from anon, public;
+grant select on public.interior_account_library to authenticated;
+
+-- ── 列表接口（统一分页格式）──────────────────────────────────────────────
+-- 三个函数返回同一个形状，前端见 src/lib/paging.ts：
+--   { "list": [...], "pagination": { "page", "pageSize", "total" }, "counts": { 分类: 条数 } }
+-- page 从 1 开始；pageSize 默认 20、最大 100，传 0 表示只要 total 与 counts。
+-- total 是符合当前筛选的条数；counts 是各分类的条数，不随所选分类与搜索词变化。
+-- 都是 security invoker：按调用者身份查询，只能读到本人的行（各表 RLS）。
+
+-- 我的项目：按修改时间倒序；p_query 按名称模糊匹配；p_thumbnails = false 时不带缩略图（项目切换菜单用）。
+create or replace function public.interior_project_page(
+  p_page integer default 1,
+  p_page_size integer default 20,
+  p_query text default null,
+  p_thumbnails boolean default true
+) returns jsonb
+language plpgsql stable security invoker
+set search_path = public
+as $$
+declare
+  v_page integer := greatest(coalesce(p_page, 1), 1);
+  v_size integer := least(greatest(coalesce(p_page_size, 20), 0), 100);
+  v_query text := lower(btrim(coalesce(p_query, '')));
+  v_mine bigint;
+  v_total bigint;
+  v_list jsonb;
+begin
+  select count(*) into v_mine from public.interior_design_projects;
+  if v_query = '' then
+    v_total := v_mine;
+  else
+    select count(*) into v_total from public.interior_design_projects t where position(v_query in lower(t.name)) > 0;
+  end if;
+  select coalesce(jsonb_agg(jsonb_build_object('id', r.id, 'name', r.name, 'updated_at', r.updated_at, 'revision', r.revision, 'thumbnail', r.thumbnail)
+                            order by r.updated_at desc, r.id), '[]'::jsonb)
+    into v_list
+    from (select t.id, t.name, t.updated_at, t.revision, case when coalesce(p_thumbnails, true) then t.thumbnail end as thumbnail
+            from public.interior_design_projects t
+           where v_query = '' or position(v_query in lower(t.name)) > 0
+           order by t.updated_at desc, t.id
+          offset (v_page - 1) * v_size limit v_size) r;
+  return jsonb_build_object(
+    'list', v_list,
+    'pagination', jsonb_build_object('page', v_page, 'pageSize', v_size, 'total', v_total),
+    'counts', jsonb_build_object('mine', v_mine));
+end;
+$$;
+
+-- 账号素材库（家具 / 地面 / 墙面 / 门窗 / 屋面 / 吊顶 / 风格）：新建的在前。
+--   p_kinds         只看这些种类（见视图的 kind 列）；不传为全部
+--   p_exclude_keys  排除这些条目（内置家具的覆盖行不算自建条目）
+--   p_major / p_category / p_query  硬装或软装、分类、名称搜索
+-- counts 按分类统计 p_kinds 与 p_exclude_keys 范围内的全部条目。
+create or replace function public.interior_library_page(
+  p_page integer default 1,
+  p_page_size integer default 20,
+  p_kinds text[] default null,
+  p_major text default null,
+  p_category text default null,
+  p_query text default null,
+  p_exclude_keys text[] default null
+) returns jsonb
+language plpgsql stable security invoker
+set search_path = public
+as $$
+declare
+  v_page integer := greatest(coalesce(p_page, 1), 1);
+  v_size integer := least(greatest(coalesce(p_page_size, 20), 0), 100);
+  v_query text := lower(btrim(coalesce(p_query, '')));
+  v_total bigint;
+  v_counts jsonb;
+  v_list jsonb;
+begin
+  select coalesce(jsonb_object_agg(c.category, c.n), '{}'::jsonb)
+    into v_counts
+    from (select l.category, count(*) as n
+            from public.interior_account_library l
+           where (p_kinds is null or l.kind = any(p_kinds))
+             and (p_exclude_keys is null or l.item_key <> all(p_exclude_keys))
+           group by l.category) c;
+  -- 先只取这一页的主键（不碰 data 大字段），再回表取这 20 行的完整数据。
+  with matched as (
+    select l.kind, l.item_key, l.created_at
+      from public.interior_account_library l
+     where (p_kinds is null or l.kind = any(p_kinds))
+       and (p_exclude_keys is null or l.item_key <> all(p_exclude_keys))
+       and (p_major is null or l.major = p_major)
+       and (p_category is null or l.category = p_category)
+       and (v_query = '' or position(v_query in l.search) > 0)
+  ), paged as (
+    select m.kind, m.item_key, m.created_at
+      from matched m
+     order by m.created_at desc, m.kind, m.item_key
+    offset (v_page - 1) * v_size limit v_size
+  )
+  select (select count(*) from matched),
+         coalesce((select jsonb_agg(jsonb_build_object('kind', l.kind, 'item_key', l.item_key, 'name', l.name, 'category', l.category, 'data', l.data)
+                                    order by p.created_at desc, p.kind, p.item_key)
+                     from paged p
+                     join public.interior_account_library l on l.kind = p.kind and l.item_key = p.item_key), '[]'::jsonb)
+    into v_total, v_list;
+  return jsonb_build_object(
+    'list', v_list,
+    'pagination', jsonb_build_object('page', v_page, 'pageSize', v_size, 'total', v_total),
+    'counts', v_counts);
+end;
+$$;
+
+-- 我的小助手：新建的在前；没有分类，counts 为空对象。
+create or replace function public.interior_assistant_page(
+  p_page integer default 1,
+  p_page_size integer default 20
+) returns jsonb
+language plpgsql stable security invoker
+set search_path = public
+as $$
+declare
+  v_page integer := greatest(coalesce(p_page, 1), 1);
+  v_size integer := least(greatest(coalesce(p_page_size, 20), 0), 100);
+  v_total bigint;
+  v_list jsonb;
+begin
+  select count(*) into v_total from public.interior_ai_assistants;
+  select coalesce(jsonb_agg(jsonb_build_object('id', r.id, 'name', r.name, 'avatar', r.avatar, 'model', r.model, 'prompt', r.prompt, 'updated_at', r.updated_at)
+                            order by r.created_at desc, r.id), '[]'::jsonb)
+    into v_list
+    from (select t.id, t.name, t.avatar, t.model, t.prompt, t.updated_at, t.created_at
+            from public.interior_ai_assistants t
+           order by t.created_at desc, t.id
+          offset (v_page - 1) * v_size limit v_size) r;
+  return jsonb_build_object(
+    'list', v_list,
+    'pagination', jsonb_build_object('page', v_page, 'pageSize', v_size, 'total', v_total),
+    'counts', '{}'::jsonb);
+end;
+$$;
+
+revoke all on function public.interior_project_page(integer, integer, text, boolean) from public, anon;
+revoke all on function public.interior_library_page(integer, integer, text[], text, text, text, text[]) from public, anon;
+revoke all on function public.interior_assistant_page(integer, integer) from public, anon;
+grant execute on function public.interior_project_page(integer, integer, text, boolean) to authenticated;
+grant execute on function public.interior_library_page(integer, integer, text[], text, text, text, text[]) to authenticated;
+grant execute on function public.interior_assistant_page(integer, integer) to authenticated;
+
+-- 让 PostgREST 立刻认到新表与新函数。
+notify pgrst, 'reload schema';

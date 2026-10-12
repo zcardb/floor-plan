@@ -12,6 +12,7 @@ describe('页面级路由解析', () => {
     ['/projects', 'projects'],
     ['/furniture', 'furniture'],
     ['/assistants', 'assistants'],
+    ['/styles', 'styles'],
     ['/furniture/', 'furniture'],
   ])('已登录访问 %s 显示管理页 %s', (pathname, tab) => {
     expect(view(pathname, true)).toEqual({ kind: 'cms', tab });
@@ -34,7 +35,7 @@ describe('页面级路由解析', () => {
     expect(view('/', false)).toEqual({ kind: 'guest' });
   });
 
-  it.each(['/projects', '/projects/abc-123', '/templates/reference', '/furniture', '/assistants'])('未登录访问 %s 回到首页', pathname => {
+  it.each(['/projects', '/projects/abc-123', '/templates/reference', '/furniture', '/assistants', '/styles'])('未登录访问 %s 回到首页', pathname => {
     expect(view(pathname, false)).toEqual({ kind: 'redirect', to: '/' });
   });
 });
@@ -44,6 +45,7 @@ describe('路径生成', () => {
     expect(cmsPath('projects')).toBe('/projects');
     expect(cmsPath('furniture')).toBe('/furniture');
     expect(cmsPath('assistants')).toBe('/assistants');
+    expect(cmsPath('styles')).toBe('/styles');
     expect(cmsPath('unknown')).toBe('/projects');
   });
 

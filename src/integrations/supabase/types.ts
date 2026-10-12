@@ -3844,6 +3844,36 @@ export type Database = {
         }
         Relationships: []
       }
+      interior_style_catalog: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          owner_id: string
+          spec: Json
+          style_key: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          owner_id?: string
+          spec: Json
+          style_key: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          owner_id?: string
+          spec?: Json
+          style_key?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       interior_wall_catalog: {
         Row: {
           color: string

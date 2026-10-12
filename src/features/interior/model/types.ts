@@ -1,3 +1,4 @@
+import type { DecorStyle } from "./decorStyles";
 import type { FurnitureOutline } from './furnitureAppearance';
 import type { FurnitureModel3d } from './furniture3d';
 export type Point = [number, number];
@@ -139,6 +140,10 @@ export interface Design {
   northAngle?: number;
   /** 拖动门窗时的步进（mm）；旧项目没有该字段，默认 50。 */
   dragStep?: number;
+  /** 装修风格 id（见 model/decorStyles.ts），只影响 3D 渲染；旧项目没有该字段，按默认配色渲染。 */
+  styleId?: string;
+  /** 套用自定义风格时连同定义一起存（应用即拷贝，之后改风格库不影响本方案）；内置风格不存。 */
+  customStyle?: DecorStyle;
   costSettings?: CostSettings;
   customCatalog?: LibraryItem[];
   customFloors?: CustomFloor[];

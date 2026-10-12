@@ -1,4 +1,4 @@
-import { isValidElement, type ReactElement, type ReactNode } from 'react';
+import { createElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -28,7 +28,7 @@ import { ExportMenu, saveState } from './ExportMenu';
 import { SoftwareSoonItem } from './SoftwareSoonItem';
 import { ViewMenu, LAYER_ITEMS } from './ViewMenu';
 import { SidePanel } from './SidePanel';
-import { CanvasRail } from './CanvasRail';
+import { CanvasRail, RailButton } from './CanvasRail';
 import { Button } from '@/components/ui/button';
 import { EditorTooltip } from '@/components/ui/editor-tooltip';
 import { DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuSubTrigger } from '@/components/ui/dropdown-menu';
@@ -255,9 +255,9 @@ describe('AccountMenu', () => {
 
 describe('ExportMenu 保存状态与导出', () => {
   const menu = (overrides: Partial<Parameters<typeof ExportMenu>[0]> = {}) => {
-    const onExport = vi.fn(), onSave = vi.fn();
-    const props = { view: '2d' as const, pending: false, onExport, onSave, status: { kind: 'saved' as const, label: '云端已保存' }, loggedIn: true, ...overrides };
-    return { props, tree: nodes(ExportMenu(props)), onExport, onSave };
+    const onExport = vi.fn(), onSave = vi.fn(), onReport = vi.fn();
+    const props = { view: '2d' as const, pending: false, onExport, onSave, onReport, status: { kind: 'saved' as const, label: '云端已保存' }, loggedIn: true, ...overrides };
+    return { props, tree: nodes(ExportMenu(props)), onExport, onSave, onReport };
   };
   it('文案固定「保存」，下拉第一行是状态，其下是可用的 5 种导出格式', () => {
     const { tree, onExport } = menu();
@@ -266,12 +266,23 @@ describe('ExportMenu 保存状态与导出', () => {
     expect(text(button.props.children as ReactNode)).not.toContain('导出');
     const status = tree.find(n => n.props.className?.toString().startsWith('save-menu-status'))!;
     expect(text(status.props.children as ReactNode)).toContain('云端已保存');
-    const formats = items(tree);
+    const formats = items(tree).slice(0, 5);
     expect(formats.map(n => text(n.props.children as ReactNode))).toEqual(['PNG 平面图', 'PDF 矢量图', 'SVG 矢量图', 'DXF CAD 图纸', 'JSON 方案文件']);
     formats.forEach(n => (n.props.onSelect as () => void)());
     expect(onExport.mock.calls.map(c => c[0])).toEqual(['png', 'pdf', 'svg', 'dxf', 'json']);
     expect(tree.some(n => n.type === SoftwareSoonItem && n.props.label === '导出到其他软件')).toBe(true);
     expect(text(nodes(ExportMenu({ ...menu().props, view: '3d' })).filter(n => n.type === DropdownMenuItem)[0].props.children as ReactNode)).toBe('PNG 当前视角');
+  });
+  it('「生成方案报告」在格式导出之后、「导出到其他软件」之前，点开预览；导出中禁用', () => {
+    const { tree, onReport } = menu();
+    const content = tree.filter(n => n.type === DropdownMenuItem || n.type === SoftwareSoonItem);
+    const report = content.findIndex(n => n.type === DropdownMenuItem && text(n.props.children as ReactNode) === '生成方案报告');
+    expect(report).toBe(content.length - 2);
+    expect(content[report + 1]!.type).toBe(SoftwareSoonItem);
+    (content[report]!.props.onSelect as () => void)();
+    expect(onReport).toHaveBeenCalledOnce();
+    const busy = menu({ pending: true }).tree.find(n => n.type === DropdownMenuItem && text(n.props.children as ReactNode) === '生成方案报告')!;
+    expect(busy.props.disabled).toBe(true);
   });
   it('状态标记：已保存无标记、待保存带小圆点与「立即保存」、失败用错误色、导出中转圈', () => {
     expect(saveState({ status: { kind: 'saved', label: '云端已保存' }, loggedIn: true })).toEqual({ mark: 'none', label: '云端已保存', action: null, problem: false });
@@ -357,46 +368,52 @@ describe('统一侧栏与画布竖条', () => {
     expect(onClose).toHaveBeenCalledOnce();
     expect(nodes(SidePanel({ title: '成本', readOnly: true, onClose: vi.fn(), children: 'x' })).find(n => n.props.disabled === true)).toBeDefined();
   });
-  it('竖条顺序：方案总览 / 家具列表 / 成本核算 / 户型设置 + 收起，游客与登录一致；AI 设计暂时隐藏；打开项高亮', () => {
+  it('竖条分两组：上组工具、下组侧栏入口（模式专属入口排在户型前），最后是收起；整条可拖', () => {
     const onToggle = vi.fn();
     const stage = { current: null };
-    const tree = nodes(CanvasRail({ sidePanel: 'library', stage, onToggle }));
-    const labels = tree.filter(n => n.type === 'button' && typeof n.props['aria-label'] === 'string').map(n => n.props['aria-label']);
-    expect(labels).toEqual(['方案总览', '家具列表', '成本核算', '户型设置', '收起工具条']);
-    expect(labels).not.toContain('选择');
-    expect(labels).not.toContain('AI 设计');
+    const tools = createElement('span', { 'data-tools': 'mode' });
+    const panels = createElement('span', { 'data-panels': 'mode' });
+    const tree = nodes(CanvasRail({ sidePanel: 'settings', stage, onToggle, tools, panels }));
     const rail = tree.find(n => n.props.className === 'canvas-rail')!;
-    expect(nodes(rail).filter(n => n.type === 'button').map(n => n.props.className)).toEqual(['canvas-rail-button', 'canvas-rail-button active', 'canvas-rail-button', 'canvas-rail-button', 'canvas-rail-toggle']);
-    expect(nodes(rail).find(n => n.props['aria-label'] === '家具列表')!.props['aria-pressed']).toBe(true);
-    (nodes(rail).find(n => n.props['aria-label'] === '方案总览')!.props.onClick as () => void)();
-    expect(onToggle).toHaveBeenCalledWith('overview');
-    (nodes(rail).find(n => n.props['aria-label'] === '户型设置')!.props.onClick as () => void)();
+    const groups = nodes(rail).filter(n => n.props.className === 'canvas-rail-group');
+    expect(groups).toHaveLength(2);
+    // 上组只有 Workbench 传入的工具；下组先放模式专属入口，再放公共的「户型」
+    expect(nodes(groups[0]!).find(n => n.type === 'span')!.props['data-tools']).toBe('mode');
+    expect(nodes(groups[1]!).find(n => n.type === 'span')!.props['data-panels']).toBe('mode');
+    const settings = nodes(groups[1]!).find(n => n.type === RailButton)!;
+    expect(settings.props).toMatchObject({ label: '户型', title: '户型设置', open: true });
+    (settings.props.onClick as () => void)();
     expect(onToggle).toHaveBeenCalledWith('settings');
-    (nodes(rail).find(n => n.props['aria-label'] === '成本核算')!.props.onClick as () => void)();
-    expect(onToggle).toHaveBeenCalledWith('cost');
     // 整条可拖：拖动能力挂在竖条本体上，不再有单独的把手
-    expect(tree.every(n => n.props.className !== 'canvas-rail-grip')).toBe(true);
     expect(typeof rail.props.onPointerDown).toBe('function');
     expect(typeof rail.props.onPointerMove).toBe('function');
     expect(typeof rail.props.onClickCapture).toBe('function');
-    // 收起后只剩一个圆形展开按钮
-    const toggle = nodes(rail).find(n => n.props.className === 'canvas-rail-toggle')!;
-    expect(toggle.props['aria-expanded']).toBe(true);
-    const railProps = { sidePanel: null, stage, onToggle } as Parameters<typeof CanvasRail>[0];
+    // 收起后只剩「展开」按钮，再点回来
+    const railProps = { sidePanel: null, stage, onToggle, tools } as Parameters<typeof CanvasRail>[0];
+    const toggle = (tree: Node[]) => tree.find(n => n.props.className === 'canvas-rail-toggle')!;
     state.cursor = 0;
-    const folded = nodes(CanvasRail(railProps));
-    const foldButton = folded.find(n => n.props.className === 'canvas-rail-toggle')!;
-    (foldButton.props.onClick as () => void)();
+    (toggle(nodes(CanvasRail(railProps))).props.onClick as () => void)();
     state.cursor = 0;
     const collapsed = nodes(CanvasRail(railProps));
-    expect(collapsed.map(n => n.props['aria-label']).filter(Boolean)).toEqual(['画布工具条', '展开工具条']);
-    const shell = collapsed.find(n => n.props['aria-label'] === '画布工具条')!;
-    expect(shell.props.className).toBe('canvas-rail collapsed');
-    expect(typeof shell.props.onPointerDown).toBe('function');
-    // 收起状态下点击重新展开
-    (collapsed.find(n => n.props['aria-label'] === '展开工具条')!.props.onClick as () => void)();
+    expect(collapsed.find(n => n.props.className === 'canvas-rail collapsed')).toBeDefined();
+    expect(collapsed.filter(n => n.props.className === 'canvas-rail-group')).toHaveLength(0);
+    expect(toggle(collapsed).props['aria-label']).toBe('展开工具条');
+    (toggle(collapsed).props.onClick as () => void)();
     state.cursor = 0;
-    const expanded = nodes(CanvasRail(railProps));
-    expect(expanded.filter(n => typeof n.props['aria-label'] === 'string' && n.type === 'button').map(n => n.props['aria-label'])).toEqual(['方案总览', '家具列表', '成本核算', '户型设置', '收起工具条']);
+    expect(toggle(nodes(CanvasRail(railProps))).props['aria-label']).toBe('收起工具条');
+  });
+  it('竖条按钮：图标下方显示两字短名；完整名称给无障碍与悬停提示；当前工具与已开侧栏用不同样式', () => {
+    const plain = nodes(RailButton({ icon: null, label: '选择', active: true }));
+    const button = plain.find(n => n.type === 'button')!;
+    expect(button.props['aria-label']).toBe('选择');
+    expect(button.props.className).toBe('canvas-rail-button active');
+    expect(text(nodes(button).find(n => n.props.className === 'canvas-rail-label')!.props.children as ReactNode)).toBe('选择');
+    const panel = nodes(RailButton({ icon: null, label: '户型', title: '户型设置', open: true }));
+    expect(panel.find(n => n.type === 'button')!.props).toMatchObject({ 'aria-label': '户型设置', 'aria-pressed': true, className: 'canvas-rail-button is-open' });
+    const menu = nodes(RailButton({ icon: null, label: '视图', menu: true, badge: true }));
+    const trigger = menu.find(n => n.type === 'button')!;
+    expect(trigger.props['aria-pressed']).toBeUndefined();
+    expect(trigger.props.className).toBe('canvas-rail-button has-menu');
+    expect(nodes(trigger).some(n => n.props.className === 'canvas-rail-badge')).toBe(true);
   });
 });

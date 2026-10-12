@@ -5,6 +5,8 @@ import {
   FURNITURE_PATH,
   PROJECTS_PATH,
   PROJECT_ROUTE,
+  STYLES_PATH,
+  STYLE_ROUTE,
   TEMPLATE_ROUTE,
 } from "./features/interior/model/routes";
 
@@ -24,6 +26,8 @@ export const routers = [
       { path: TEMPLATE_ROUTE, name: "template-preview" },
       { path: FURNITURE_PATH, name: "furniture" },
       { path: ASSISTANTS_PATH, name: "assistants" },
+      { path: STYLES_PATH, name: "styles" },
+      { path: STYLE_ROUTE, name: "style-detail" },
     ],
   },
   /* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */

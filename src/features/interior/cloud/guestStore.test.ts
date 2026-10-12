@@ -88,12 +88,24 @@ describe('本机方案存储', () => {
 
   it('不同模板各自保留改动，刷新默认选中原木之家', () => {
     use(fakeStorage());
-    const a=createProject('studio'), b=createProject('two-bed');
-    a.state.furniture[0].cx+=100;b.state.furniture[0].cy+=200;
-    expect(writeGuestDefault(a).ok).toBe(true);expect(writeGuestDefault(b).ok).toBe(true);
-    expect(readGuestDefault('studio').state.furniture[0].cx).toBe(a.state.furniture[0].cx);
-    expect(readGuestDefault('two-bed').state.furniture[0].cy).toBe(b.state.furniture[0].cy);
-    expect(readGuestDefault().state.templateId).toBe('reference');
+    const reference = createProject('reference');
+    // two-bed 模板已下线（createProject 会回落到参考户型），这里手动标上旧 id，代表用户浏览器里遗留的旧版草稿键。
+    const legacy = createProject('reference');
+    legacy.state = { ...legacy.state, templateId: 'two-bed' };
+    reference.state.furniture[0].cx += 100;
+    legacy.state.furniture[0].cy += 200;
+    const mine = { ...reference.state.furniture[0] }, old = { ...legacy.state.furniture[0] };
+    expect(writeGuestDefault(reference).ok).toBe(true);
+    expect(writeGuestDefault(legacy).ok).toBe(true);
+    // 按各自 id 读回自己的改动，互不覆盖
+    expect(readGuestDefault('reference').state.furniture[0]).toMatchObject({ cx: mine.cx, cy: mine.cy });
+    const restored = readGuestDefault('two-bed');
+    expect(restored.state.templateId).toBe('two-bed');
+    expect(restored.state.furniture[0]).toMatchObject({ cx: old.cx, cy: old.cy });
+    const fallback = readGuestDefault();
+    expect(fallback.templateId).toBe('reference');
+    expect(fallback.state.templateId).toBe('reference');
+    expect(fallback.state.furniture[0].cx).toBe(mine.cx);
   });
 
   it('清理历史恢复副本与废弃键，保留其它键', () => {
