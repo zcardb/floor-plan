@@ -13,7 +13,7 @@ const MODELS: Record<string, { protocol: Protocol; vision: boolean }> = {
   'alibaba/qwen-3.8-max': { protocol: 'chat', vision: true },
   'minimax/minimax-m3': { protocol: 'chat', vision: true },
 };
-const DEFAULT_MODEL = 'openai/gpt-6-luna';
+const DEFAULT_MODEL = 'google/gemini-3.8-flash';
 const BASE = 'https://api.enter.pro/code/api/v1/ai';
 const ENDPOINT: Record<Exclude<Protocol, 'gemini'>, string> = { anthropic: `${BASE}/messages`, chat: `${BASE}/chat/completions`, responses: `${BASE}/responses` };
 const PROJECT_ID = 'eba6e37b0b3d4d608b63a3efedec61a3';

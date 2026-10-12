@@ -101,7 +101,7 @@ describe("共用 AI 输入区", () => {
 
 describe("AI 创建户型表单", () => {
   const html = renderToStaticMarkup(createElement(AiCreateProjectForm, { pending: false, onClose: () => {}, onSubmit: () => {} }));
-  it("需求描述默认填入示例（含长宽、几室几厅几卫），可编辑可直接发送；没有「高级设计」；数量默认 2；模型默认 GPT 6 Luna", () => {
+  it("需求描述默认填入示例（含长宽、几室几厅几卫），可编辑可直接发送；没有「高级设计」；数量默认 2；模型默认 Gemini 3.8 Flash", () => {
     expect(html).not.toContain("高级设计");
     expect(html).not.toContain('id="ai-project-width"');
     expect(html).toContain(DEFAULT_PLAN_PROMPT);
@@ -112,6 +112,6 @@ describe("AI 创建户型表单", () => {
     expect(html).toContain("ai-field-optional");
     expect(html).toContain("数量 2");
     expect(html).not.toContain("个方案");
-    expect(html).toContain("GPT 6 Luna");
+    expect(html).toContain("Gemini 3.8 Flash");
   });
 });

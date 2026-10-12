@@ -21,7 +21,7 @@ export const AI_MODELS: AiModel[] = [
 ];
 
 /** 默认模型取可读图模型里最快的：新建即能用图，又不让用户等。 */
-export const DEFAULT_AI_MODEL = "openai/gpt-6-luna";
+export const DEFAULT_AI_MODEL = "google/gemini-3.8-flash";
 
 export const modelOf = (id: string | undefined) => AI_MODELS.find((m) => m.id === id);
 export const modelName = (id: string | undefined) => modelOf(id)?.name ?? "未知模型";
