@@ -1,22 +1,16 @@
-import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
 import type { CustomFloor, CustomOpening, CustomWall, LibraryItem } from '../model/types';
 import { validFurnitureOutline, validFurnitureType } from '../model/furnitureAppearance';
 import { sanitizeModel3d } from '../model/furniture3d';
-import { validDecorStyle, type DecorStyle } from '../model/decorStyles';
+import { backend, requireUserId } from './backend';
 
 /** 账号库写入：各类条目仍存各自的表（读取由视图 interior_account_library 合并），只有本人可写（RLS）。 */
-async function ownerId() {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('请先登录');
-  return session.user.id;
-}
 const fail = (error: { message: string } | null) => { if (error) throw new Error(error.message); };
 
 export async function saveAccountFurniture(item: LibraryItem) {
   if (!validFurnitureType(item.type) || !validFurnitureOutline(item.shape)) throw new Error('参考类型或外形无效');
-  const { error } = await supabase.from('interior_furniture_catalog').upsert({
-    owner_id: await ownerId(), catalog_id: item.catalogId!, name: item.name, category: item.category, type: item.type, shape: item.shape ?? null,
+  const { error } = await (await backend()).from('interior_furniture_catalog').upsert({
+    owner_id: await requireUserId(), catalog_id: item.catalogId!, name: item.name, category: item.category, type: item.type, shape: item.shape ?? null,
     width: item.w, depth: item.d, height: item.height || 700, color: item.color, price: item.price ?? null,
     image_url: item.imageUrl || null, image_3d_url: item.image3dUrl || null, model_3d: (sanitizeModel3d(item.model3d) ?? null) as unknown as Json,
   }, { onConflict: 'owner_id,catalog_id' });
@@ -25,22 +19,22 @@ export async function saveAccountFurniture(item: LibraryItem) {
 }
 
 export async function removeAccountFurniture(catalogId: string) {
-  const { error } = await supabase.from('interior_furniture_catalog').delete().eq('owner_id', await ownerId()).eq('catalog_id', catalogId);
+  const { error } = await (await backend()).from('interior_furniture_catalog').delete().eq('owner_id', await requireUserId()).eq('catalog_id', catalogId);
   fail(error);
   return true;
 }
 
 export async function saveAccountFloor(floor: CustomFloor) {
-  const { error } = await supabase.from('interior_floor_catalog').upsert({
-    owner_id: await ownerId(), floor_key: floor.key, name: floor.name, pattern: floor.pattern,
+  const { error } = await (await backend()).from('interior_floor_catalog').upsert({
+    owner_id: await requireUserId(), floor_key: floor.key, name: floor.name, pattern: floor.pattern,
     length: floor.length ?? null, width: floor.width ?? null, color: floor.color, price: floor.price,
   }, { onConflict: 'owner_id,floor_key' });
   fail(error);
 }
 
 export async function saveAccountOpening(opening: CustomOpening) {
-  const { error } = await supabase.from('interior_opening_catalog').upsert({
-    owner_id: await ownerId(), opening_key: opening.key, name: opening.name, kind: opening.kind,
+  const { error } = await (await backend()).from('interior_opening_catalog').upsert({
+    owner_id: await requireUserId(), opening_key: opening.key, name: opening.name, kind: opening.kind,
     width: opening.width, height: opening.height, price: opening.price,
   }, { onConflict: 'owner_id,opening_key' });
   fail(error);
@@ -56,8 +50,8 @@ export type ColorMaterialKind = keyof typeof colorTables;
 
 export async function saveAccountColorMaterial(kind: ColorMaterialKind, item: CustomWall) {
   const { table, key } = colorTables[kind];
-  const row = { owner_id: await ownerId(), [key]: item.key, name: item.name, color: item.color, price: item.price };
-  const { error } = await supabase.from(table).upsert(row as never, { onConflict: 'owner_id,' + key });
+  const row = { owner_id: await requireUserId(), [key]: item.key, name: item.name, color: item.color, price: item.price };
+  const { error } = await (await backend()).from(table).upsert(row as never, { onConflict: 'owner_id,' + key });
   fail(error);
 }
 
@@ -69,18 +63,3 @@ export const accountMaterialSaves = {
   roof: (item: CustomWall) => saveAccountColorMaterial('roof', item),
   ceiling: (item: CustomWall) => saveAccountColorMaterial('ceiling', item),
 };
-
-/** 自定义风格：名称单独成列，其余定义存进 spec；同 id 再存即覆盖（风格详情页的保存）。 */
-export async function saveAccountStyle(style: DecorStyle) {
-  if (!validDecorStyle(style)) throw new Error('风格数据无效');
-  const { id, name, ...spec } = style;
-  const { error } = await supabase.from('interior_style_catalog').upsert({
-    owner_id: await ownerId(), style_key: id, name, spec: spec as unknown as Json, updated_at: new Date().toISOString(),
-  }, { onConflict: 'owner_id,style_key' });
-  fail(error);
-}
-
-export async function removeAccountStyle(id: string) {
-  const { error } = await supabase.from('interior_style_catalog').delete().eq('owner_id', await ownerId()).eq('style_key', id);
-  fail(error);
-}

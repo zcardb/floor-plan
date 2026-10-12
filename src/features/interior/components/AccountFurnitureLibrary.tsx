@@ -26,15 +26,16 @@ import { ListLoadMore } from './ListLoadMore';
 import { CostItemVisual } from './CostItemVisual';
 import { AccountMaterialDialog } from './AccountMaterialDialog';
 import { AccountFurnitureDialog } from './AccountFurnitureDialog';
+import { CustomFurnitureDialog } from './CustomFurnitureDialog';
 import { useAccountCostCommit } from './useAccountCostCommit';
 
 type Props = {
-  /** 新建了家具或材料就加一：列表回到第一页重新读取，新条目出现在最前面。 */
-  revision: number;
+  /** 当前账号的用户 id：新建弹窗用它区分账号（换账号时丢弃未提交的草稿）。 */
+  ownerKey: string;
   /** 账号默认价还在读取：价格未就绪前整片显示骨架屏。 */
   costsLoading?: boolean;
   defaults: AccountCostSettings; saveDefaults: (settings: AccountCostSettings) => Promise<boolean>; saving?: boolean; saveError?: string;
-  onDirty: (dirty: boolean) => void; onNew: (category: string) => void;
+  onDirty: (dirty: boolean) => void;
 };
 const sizeOf = (entry: CostEntry) => entry.furniture ? ` · ${formatMeters(entry.furniture.w)} × ${formatMeters(entry.furniture.d)} m` : entry.opening ? ` · ${formatMeters(entry.opening.width)} × ${formatMeters(entry.opening.height)} m` : '';
 type MajorFilter = typeof COST_ALL | CostMajor | typeof CUSTOM_CATEGORY;
@@ -67,9 +68,12 @@ function useBuiltinOverrides() {
  * 列表统一分页（一页 20 张卡片）：账号里自建的条目由列表接口按页读取、排在前面，内置条目接在后面；
  * 硬装 / 软装 / 分类 / 搜索的筛选，自建条目在数据库里做，内置条目在本地做，分类数量两边相加。
  */
-export function AccountFurnitureLibrary({ revision, costsLoading = false, defaults, saveDefaults, saving = false, saveError = '', onDirty, onNew }: Props) {
+export function AccountFurnitureLibrary({ ownerKey, costsLoading = false, defaults, saveDefaults, saving = false, saveError = '', onDirty }: Props) {
   const [major, setMajor] = useState<MajorFilter>(COST_ALL), [category, setCategory] = useState(COST_ALL), [query, setQuery] = useState(''), [editing, setEditing] = useState<CostEntry | null>(null), [detail, setDetail] = useState<Detail | null>(null);
   const search = useDebouncedValue(query.trim());
+  // 新建家具或材料：弹窗的默认分类跟随当前筛选；建成后列表回到第一页重新读取，新条目出现在最前面。
+  const [creating, setCreating] = useState(false), [revision, setRevision] = useState(0);
+  const created = () => setRevision(n => n + 1);
   const commit = useAccountCostCommit({ settings: defaults, save: saveDefaults, onDirty });
   const overrides = useBuiltinOverrides();
   const builtin = useMemo(() => builtinCostEntries(overrides.items), [overrides.items]);
@@ -118,7 +122,7 @@ export function AccountFurnitureLibrary({ revision, costsLoading = false, defaul
           <Button variant="outline" className="cms-refresh-button cms-icon-button" aria-label="刷新" disabled={list.loading || locked} aria-busy={list.loading} onClick={refresh}><RefreshCw className={list.loading ? 'animate-spin' : ''}/></Button>
         </EditorTooltip>
         <EditorTooltip label="新建家具" disabled={locked}>
-          <Button className="cms-create-button" disabled={locked} onClick={() => onNew(category)}><Plus/>新建家具</Button>
+          <Button className="cms-create-button" disabled={locked} onClick={() => setCreating(true)}><Plus/>新建家具</Button>
         </EditorTooltip>
       </>}/>
     {firstLoad ? <ManagementLoading variant="library" label="加载家具与材料"/> : <>
@@ -153,5 +157,7 @@ export function AccountFurnitureLibrary({ revision, costsLoading = false, defaul
       saveFields={builtinItem ? next => saveAccountFurniture({ ...next, price: priceOf(design, 'furniturePrices', next.catalogId!) }) : undefined}
       onOpenChange={v => { if (!v) setDetail(null); }} onChanged={next => { reread(detail.entry); setDetail(next && { ...detail, item: next }); }}
       applyDefaultPrice={price => commit.apply(current => ({ ...current, furniturePrices: { ...current.furniturePrices, [detail.item.catalogId!]: price } }))} remove={removeAccountFurniture}/>}
+    {creating && <CustomFurnitureDialog open onOpenChange={setCreating} loggedIn login={() => {}} ownerKey={ownerKey} accountOnly initialCategory={category}
+      onCreate={created} onCreateFloor={created} onCreateWall={created} onCreateOpening={created} onCreateRoof={created} onCreateCeiling={created} onImport={() => {}}/>}
   </>;
 }

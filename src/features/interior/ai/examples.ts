@@ -1,6 +1,6 @@
 import { INNER_WALL, libraryResolver, type Box, type FurnitureSpec, type FurnitureZone, type PlanSpec } from "../data/floorplanBuilder";
 import { AI_EXAMPLE_PLANS, type ExamplePlan } from "./examplePlans";
-import { catalogIdOf, isBuiltinItem } from "./catalog";
+import { catalogIdOf, isBuiltinItem } from "../data/catalog";
 import { roomContext } from "./context";
 import type { AiCatalog, AiCatalogEntry, AiPlacedItem, AiPlanExample, AiRoomContext, AiRoomExample } from "./types";
 

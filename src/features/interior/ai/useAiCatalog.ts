@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { LibraryItem } from "../model/types";
 import { buildAiCatalog } from "./catalog";
-import { backend } from "./client";
+import { backend } from "../cloud/backend";
 import { furnitureFromRow } from "./furnitureRow";
 import type { AiCatalog } from "./types";
 

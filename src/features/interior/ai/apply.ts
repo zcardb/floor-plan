@@ -6,7 +6,7 @@ import { mergeAllSplits } from "../model/wallBulk";
 import { fitFurnitureIntoRoom } from "../model/roomFit";
 import { roomLayout, settleFurniture } from "../model/layoutRules";
 import type { Design, Furniture, LibraryItem } from "../model/types";
-import { isBuiltinItem } from "./catalog";
+import { isBuiltinItem } from "../data/catalog";
 import { furnitureInRoom, roomZone } from "./context";
 import { catalogResolver } from "./sanitize";
 import type { AiCatalog, AiLayoutNotes } from "./types";

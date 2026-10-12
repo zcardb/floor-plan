@@ -1,15 +1,8 @@
-import { categories, library } from "../data/catalog";
+import { catalogIdOf, categories, library } from "../data/catalog";
 import { furnitureHeight } from "../model/layoutRules";
 import type { LibraryItem } from "../model/types";
 import type { AiCatalog, AiCatalogEntry } from "./types";
 
-const builtinIds = new Set(library.map((item) => item.catalogId));
-
-/** 内置素材库条目（按 catalogId 判断；账号 / 项目家具的 catalogId 不在其中）。 */
-export const isBuiltinItem = (item: Pick<LibraryItem, "catalogId">) =>
-  !!item.catalogId && builtinIds.has(item.catalogId);
-
-export const catalogIdOf = (item: LibraryItem) => item.catalogId || `${item.type}:${item.name}`;
 
 const categoryRank = (category: string) => {
   const index = categories.indexOf(category);

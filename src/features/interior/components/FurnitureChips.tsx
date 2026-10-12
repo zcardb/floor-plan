@@ -4,7 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FurniturePicker } from "./FurniturePicker";
-import { furniturePickerItems } from "./pickerItems";
+import { furniturePickerItems } from "./furniturePickerItems";
 import { addPick, removePick, resizePick } from "../ai/picks";
 import { formatMeters, meterDraft, parseMeterDraft } from "../model/lengthUnits";
 import type { AiFurniturePick } from "../ai/types";

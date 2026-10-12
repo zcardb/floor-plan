@@ -2,13 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // 假后端：记录列表函数的调用，返回用例指定的结果。
 const db = vi.hoisted(() => ({ calls: [] as { fn: string; args: Record<string, unknown> }[], result: null as unknown, error: null as null | { message: string } }));
-vi.mock('../ai/client', () => ({
+vi.mock('./backend', () => ({
   backend: async () => ({
     rpc: async (fn: string, args: Record<string, unknown>) => { db.calls.push({ fn, args }); return { data: db.result, error: db.error }; },
   }),
 }));
 import { readPage } from './pageRpc';
-import { accountItemPage, accountStylePage } from './libraryPages';
+import { accountItemPage } from './libraryPages';
+import { accountStylePage } from './accountStyles';
 import { assistantPage } from './assistants';
 import { projectPage } from './projectPages';
 import { BUILTIN_IDS } from '../model/builtinAssets';

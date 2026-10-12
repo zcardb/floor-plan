@@ -187,7 +187,7 @@ describe('管理端精简与加载分支', () => {
     expect(failed).toContain('重试');
     expect(failed).not.toContain('还没有设计项目');
   });
-  const furniture = () => render(createElement(AccountFurnitureLibrary, { revision: 0, defaults: {}, saveDefaults: async () => true, onDirty: () => {}, onNew: () => {} }));
+  const furniture = () => render(createElement(AccountFurnitureLibrary, { ownerKey: 'user-1', defaults: {}, saveDefaults: async () => true, onDirty: () => {} }));
   it('家具管理首次进入：页头可用、刷新转圈，列表位置是家具库版式的骨架', () => {
     pagedListFake.remote = { list: [], total: 0, counts: {} };
     pagedListFake.loading = true;

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import type { LibraryItem } from '../model/types';
-import { backend } from "../ai/client";
+import { backend } from "./backend";
 import type { AiFileRef } from "../ai/referenceImages";
 import { sanitizeModel3d, type FurnitureModel3d } from "../model/furniture3d";
 import { furnitureHeight } from "../model/layoutRules";

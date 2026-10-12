@@ -1,11 +1,11 @@
 import type { PageRequest, PageResult } from '@/lib/paging';
-import { backend } from '../ai/client';
+import { backend } from './backend';
 import { furnitureFromRow } from '../ai/furnitureRow';
 import type { AccountItem } from '../model/accountCostEntries';
 import { BUILTIN_IDS } from '../model/builtinAssets';
-import type { DecorStyle } from '../model/decorStyles';
+import { STAIR_CATEGORY } from '../model/stairs';
 import type { LibraryItem } from '../model/types';
-import { accountItemFromRow, styleFromRow } from './accountRows';
+import { accountItemFromRow } from './accountRows';
 import { readPage } from './pageRpc';
 
 /** 列表接口 interior_library_page 的一行：视图 interior_account_library 的种类、主键、名称、分类，data 是整行数据。 */
@@ -33,18 +33,18 @@ export async function accountItemPage(request: PageRequest, { kinds = ITEM_KINDS
   return { ...page, list: page.list.flatMap(row => accountItemFromRow(row.kind, row.data ?? {}) ?? []) };
 }
 
-/** 我的装修风格的一页（新建的在前）；counts 按风格大类统计，未归类的计在空串下。 */
-export async function accountStylePage(request: PageRequest, filter: Omit<LibraryFilter, 'major'> = {}): Promise<PageResult<DecorStyle>> {
-  const page = await readPage<Row>('interior_library_page', { p_kinds: ['style'], ...filterArgs(filter) }, request);
-  return { ...page, list: page.list.flatMap(row => styleFromRow(row.data ?? {}) ?? []) };
-}
-
-/** 按 id 读一套我的风格（直接打开 /styles/:id 时用）；不存在时返回 null。 */
-export async function readAccountStyle(id: string): Promise<DecorStyle | null> {
-  const supabase = await backend();
-  const { data, error } = await supabase.from('interior_style_catalog').select('style_key,name,spec').eq('style_key', id).maybeSingle();
-  if (error) throw new Error(error.message);
-  return data ? styleFromRow(data) : null;
+/**
+ * 我的家具的一页（不含楼梯这类硬装构件）；category 只看某个家具分类。
+ * counts.mine 是我的家具总数，不随 category 变化。
+ */
+export async function accountFurniturePage(request: PageRequest, { category }: { category?: string } = {}): Promise<PageResult<LibraryItem, 'mine'>> {
+  const page = await accountItemPage(request, { kinds: ['furniture'], major: '软装', category });
+  const mine = Object.entries(page.counts).reduce((sum, [name, count = 0]) => (name === STAIR_CATEGORY ? sum : sum + count), 0);
+  return {
+    list: page.list.flatMap(entry => (entry.kind === 'furniture' ? [entry.item] : [])),
+    pagination: page.pagination,
+    counts: { mine },
+  };
 }
 
 /** 内置家具在账号里的覆盖行（调整过的名称、尺寸、颜色与素材），条数不超过内置家具的件数，一次读完。 */

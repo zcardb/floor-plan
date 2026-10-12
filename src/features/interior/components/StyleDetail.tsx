@@ -5,11 +5,9 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { usePagedList } from "@/hooks/usePagedList";
 import { notify } from "@/lib/notify";
-import type { PageRequest, PageResult } from "@/lib/paging";
-import { removeAccountStyle, saveAccountStyle } from "../cloud/accountWrites";
-import { accountItemPage } from "../cloud/libraryPages";
+import { removeAccountStyle, saveAccountStyle } from "../cloud/accountStyles";
+import { accountFurniturePage } from "../cloud/libraryPages";
 import { library as catalog } from "../data/catalog";
-import { costCounts } from "../model/accountCostEntries";
 import {
   DECOR_CATEGORIES,
   DECOR_ROLES,
@@ -44,16 +42,6 @@ const MINE = "我的家具";
 /** 家具清单里的内置家具（楼梯是构件，不随风格着色）与它们的分类。 */
 const BUILTIN = catalog.filter((item) => item.type !== "stairs");
 const GROUPS = [ALL, ...new Set(BUILTIN.map((item) => item.category))];
-
-/** 家具清单的接口部分：我的家具（不含楼梯）；分类数量只需要知道我的家具一共几件。 */
-const myFurniture = (group: string) => async (request: PageRequest): Promise<PageResult<LibraryItem>> => {
-  const page = await accountItemPage(request, { kinds: ["furniture"], major: "软装", category: group === ALL || group === MINE ? undefined : group });
-  return {
-    list: page.list.flatMap((entry) => (entry.kind === "furniture" ? [entry.item] : [])),
-    pagination: page.pagination,
-    counts: { [MINE]: costCounts(page.counts, { custom: false })["软装"] ?? 0 },
-  };
-};
 
 /** 一行颜色：色块 + 色号；可编辑时右侧是取色器。 */
 function ColorRow({ label, hint, value, editable, onChange, extra }: {
@@ -165,12 +153,12 @@ export function StyleDetail({ style, custom, onBack, onDuplicate, duplicating = 
     }
   };
   // 家具清单统一分页（一页 20 件）：我的家具由列表接口按页读取、排在前面，内置家具接在后面。
-  const furniture = usePagedList<LibraryItem>({
-    remote: myFurniture(group),
+  const furniture = usePagedList<LibraryItem, "mine">({
+    remote: (request) => accountFurniturePage(request, { category: group === ALL || group === MINE ? undefined : group }),
     local: group === MINE ? [] : group === ALL ? BUILTIN : BUILTIN.filter((item) => item.category === group),
     key: group,
   });
-  const chips = [...GROUPS, ...(furniture.counts[MINE] ? [MINE] : [])].map((id) => ({ id, label: id }));
+  const chips = [...GROUPS, ...(furniture.counts.mine ? [MINE] : [])].map((id) => ({ id, label: id }));
   return (
     <div className="style-detail">
       <button type="button" className="style-detail-back" onClick={onBack}><ArrowLeft size={15} />风格管理</button>

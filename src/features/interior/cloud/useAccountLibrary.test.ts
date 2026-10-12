@@ -1,6 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
-
-vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
+import { describe, expect, it } from 'vitest';
 import { splitAccountLibrary } from './useAccountLibrary';
 import { BUILTIN_IDS } from '../model/builtinAssets';
 

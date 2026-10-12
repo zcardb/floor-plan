@@ -7,7 +7,8 @@ import { AiResults } from "./AiResults";
 import { AiComposer } from "./AiComposer";
 import { DEFAULT_AI_ENGINE } from "../ai/models";
 import { AiCreateProjectForm, DEFAULT_PLAN_PROMPT } from "./AiCreateProjectDialog";
-import { filterPickerItems, furniturePickerItems, groupPickerItems, typePickerItems } from "./pickerItems";
+import { filterPickerItems, groupPickerItems } from "./pickerItems";
+import { furniturePickerItems, typePickerItems } from "./furniturePickerItems";
 import type { LibraryItem } from "../model/types";
 
 const mine: LibraryItem = { catalogId: "33333333-3333-4333-8333-333333333333", name: "胡桃木边柜", category: "客厅", type: "cabinet", w: 1200, d: 400, color: "#775533" };

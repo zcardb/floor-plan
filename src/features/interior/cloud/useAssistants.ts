@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorMessage } from "@/lib/notify";
 import { readAll } from "@/lib/paging";
-import { backend } from "../ai/client";
+import { backend } from "./backend";
 import { assistantPage, createAssistant, type Assistant, type AssistantInput } from "./assistants";
 
 /**

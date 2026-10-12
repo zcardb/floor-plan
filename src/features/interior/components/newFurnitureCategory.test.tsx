@@ -51,28 +51,18 @@ function render<T>(callback: () => T): T { harness.cursor = 0; harness.alls = 0;
 function fresh() { harness.slots = []; harness.cursor = 0; }
 beforeEach(() => { fresh(); pagedListFake.reset(); harness.category = '全部'; harness.generate.mockReset().mockResolvedValue('https://example.com/furniture.png'); harness.save.mockReset().mockResolvedValue(true); });
 /** 家具管理页：列表接口已返回的自建条目由 pagedListFake.remote 指定。 */
-const furniturePage = (onNew: (category: string) => void = () => {}) => AccountFurnitureLibrary({ revision: 0, defaults: {}, saveDefaults: async () => true, onDirty: () => {}, onNew });
+const furniturePage = () => AccountFurnitureLibrary({ ownerKey: 'owner', defaults: {}, saveDefaults: async () => true, onDirty: () => {} });
 describe('新建家具默认分类', () => {
   it.each(['卧室', '客厅', '餐厨', '卫浴', '家电', '书房'])('有效分类 %s 原样保留', category => { expect(newFurnitureCategory(category)).toBe(category); });
   it.each(['地面', '墙面', '门窗', '屋面', '吊顶'])('硬装分类 %s 原样保留', category => { expect(newFurnitureCategory(category)).toBe(category); });
   it.each([undefined, '', '全部', '自定义'])('非分类 %s 默认客厅', category => { expect(newFurnitureCategory(category)).toBe('客厅'); });
-  it.each(['卧室', '餐厨', '全部', '地面', '墙面'])('家具管理点击新建传入当前筛选 %s', category => {
+  it.each(['卧室', '餐厨', '全部', '地面', '墙面'])('家具管理点击新建：弹窗的默认分类跟随当前筛选 %s', category => {
     harness.category = category;
-    const onNew = vi.fn();
-    const furniture = render(() => furniturePage(onNew));
-    const click = nodes(furniture).find(node => Array.isArray(node.props.children) && node.props.children.includes('新建家具') && typeof node.props.onClick === 'function');
-    expect(click).toBeDefined(); (click!.props.onClick as () => void)(); expect(onNew).toHaveBeenLastCalledWith(category);
-  });
-  it.each(['卧室', '全部', '墙面'])('账号父组件将 %s 归一化后传给新建弹窗', category => {
-    const projects = { session: { user: { id: 'owner', email: 'test@example.com' } } } as ReturnType<typeof useProjects>;
-    const costs = { settings: {}, saving: false } as ReturnType<typeof useAccountCosts>;
-    let tab = 'projects';
-    const page = () => render(() => AccountCMS({ projects, costs, opened: () => {}, tab, onTab: next => { tab = next; } }));
-    const menu = nodes(page()).find(node => node.type === 'button' && node.props['aria-label'] === '家具管理');
-    (menu!.props.onClick as () => void)();
-    const library = nodes(page()).find(node => node.type === AccountFurnitureLibrary)!;
-    (library.props.onNew as (value: string) => void)(category);
-    expect(nodes(page()).find(node => node.type === CustomFurnitureDialog)?.props.initialCategory).toBe(newFurnitureCategory(category));
+    expect(nodes(render(furniturePage)).some(node => node.type === CustomFurnitureDialog)).toBe(false);
+    const click = nodes(render(furniturePage)).find(node => Array.isArray(node.props.children) && node.props.children.includes('新建家具') && typeof node.props.onClick === 'function');
+    expect(click).toBeDefined(); (click!.props.onClick as () => void)();
+    const dialog = nodes(render(furniturePage)).find(node => node.type === CustomFurnitureDialog)!;
+    expect(dialog.props).toMatchObject({ initialCategory: category, accountOnly: true, ownerKey: 'owner' });
   });
   it('弹窗默认客厅，手动改分类后提交使用手动值，不被初始值覆盖', async () => {
     const onCreate = vi.fn();
@@ -125,19 +115,17 @@ describe('新建家具默认分类', () => {
     const labels = nodes(render(() => AccountCMS({ projects, costs, opened: () => {}, tab: 'projects', onTab: () => {} }))).filter(node => node.type === 'button' && typeof node.props['aria-label'] === 'string').map(node => node.props['aria-label'] as string);
     expect(labels).toContain('项目管理'); expect(labels).toContain('家具管理'); expect(labels).not.toContain('成本管理');
   });
-  it('账号页新建家具或任意材料后，家具管理的列表回到第一页重新读取', () => {
-    const projects = { session: { user: { id: 'owner', email: 'test@example.com' } } } as ReturnType<typeof useProjects>;
-    const costs = { settings: {}, saving: false } as ReturnType<typeof useAccountCosts>;
-    let tab = 'projects';
-    const page = () => render(() => AccountCMS({ projects, costs, opened: () => {}, tab, onTab: next => { tab = next; } }));
-    const menu = nodes(page()).find(node => node.type === 'button' && node.props['aria-label'] === '家具管理');
-    (menu!.props.onClick as () => void)();
-    const lib = () => nodes(page()).find(node => node.type === AccountFurnitureLibrary)!;
-    expect(lib().props.revision).toBe(0);
-    (lib().props.onNew as (value: string) => void)('地面');
-    const dialog = nodes(page()).find(node => node.type === CustomFurnitureDialog)!;
-    for (const key of ['onCreateFloor', 'onCreate', 'onCreateWall', 'onCreateOpening', 'onCreateRoof', 'onCreateCeiling']) (dialog.props[key] as () => void)();
-    expect(lib().props.revision).toBe(6);
+  it('新建家具或任意材料后，家具管理的列表回到第一页重新读取', () => {
+    const listKey = () => { render(furniturePage); return pagedListFake.options!.key; };
+    const before = listKey();
+    (nodes(render(furniturePage)).find(node => Array.isArray(node.props.children) && node.props.children.includes('新建家具') && typeof node.props.onClick === 'function')!.props.onClick as () => void)();
+    const dialog = nodes(render(furniturePage)).find(node => node.type === CustomFurnitureDialog)!;
+    for (const key of ['onCreateFloor', 'onCreate', 'onCreateWall', 'onCreateOpening', 'onCreateRoof', 'onCreateCeiling']) {
+      const previous = listKey();
+      (dialog.props[key] as () => void)();
+      expect(listKey()).not.toBe(previous);
+    }
+    expect(listKey()).not.toBe(before);
   });
   it('家具管理在“墙面”“门窗”筛选下展示自定义墙面与内置门窗', () => {
     harness.category = '墙面';

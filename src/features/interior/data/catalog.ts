@@ -115,3 +115,12 @@ export const library: LibraryItem[] = [...groups.flatMap(([category, items]) =>
   })),
 ), ...stairLibrary];
 export const categories = groups.map(([category]) => category);
+
+const builtinIds = new Set(library.map((item) => item.catalogId));
+
+/** 内置素材库条目（按 catalogId 判断；账号 / 项目家具的 catalogId 不在其中）。 */
+export const isBuiltinItem = (item: Pick<LibraryItem, "catalogId">) =>
+  !!item.catalogId && builtinIds.has(item.catalogId);
+
+/** 家具在目录里的标识：没有 catalogId 的旧数据用「类型:名称」。 */
+export const catalogIdOf = (item: LibraryItem) => item.catalogId || `${item.type}:${item.name}`;

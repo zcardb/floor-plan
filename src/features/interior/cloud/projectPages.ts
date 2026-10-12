@@ -1,6 +1,6 @@
 import type { Json } from '@/integrations/supabase/types';
 import type { PageRequest, PageResult } from '@/lib/paging';
-import { backend } from '../ai/client';
+import { backend } from './backend';
 import { compactThumbnail, readThumbnail } from '../model/planThumbnail';
 import type { Design } from '../model/types';
 import { readPage } from './pageRpc';

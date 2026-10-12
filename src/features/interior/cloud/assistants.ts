@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PageRequest, PageResult } from "@/lib/paging";
-import { backend } from "../ai/client";
+import { backend } from "./backend";
 import { readPage } from "./pageRpc";
 
 export interface Assistant {

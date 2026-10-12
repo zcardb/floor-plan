@@ -1,5 +1,5 @@
 import type { PageCounts, PageRequest, PageResult } from '@/lib/paging';
-import { backend } from '../ai/client';
+import { backend } from './backend';
 
 /** 数据库里的列表函数（supabase/migrations）：返回值都是统一分页格式 { list, pagination, counts }。 */
 export type PageFunction = 'interior_project_page' | 'interior_library_page' | 'interior_assistant_page';

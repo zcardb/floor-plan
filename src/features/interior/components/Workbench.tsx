@@ -96,6 +96,7 @@ import { SidePanel, type PanelKind } from "./SidePanel";
 import { CanvasRail } from "./CanvasRail";
 import { ViewMenu } from "./ViewMenu";
 import { HouseSettingsPanel } from "./HouseSettingsPanel";
+import { saveAccountStyle } from "../cloud/accountStyles";
 import { useAccountLibrary } from "../cloud/useAccountLibrary";
 import { SelectionEditor, type SelectionEditorHandle } from "./SelectionEditor";
 import type { ScreenRect } from "../model/selectionAnchor";
@@ -651,9 +652,8 @@ export function Workbench(p: Props) {
       return file;
     });
   };
-  /** 新建风格：存进账号风格库并重读，套用由风格面板完成。写入模块按需加载，不进首屏包。 */
+  /** 新建风格：存进账号风格库并重读，套用由风格面板完成。 */
   const createStyle = async (style: DecorStyle) => {
-    const { saveAccountStyle } = await import("../cloud/accountWrites");
     await saveAccountStyle(style);
     await loadAccountLibrary();
     notify.success(`已新建「${style.name}」并套用`);

@@ -1,9 +1,10 @@
 import { useCallback, useRef, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { BUILTIN_IDS } from '../model/builtinAssets';
 import type { CustomFloor, CustomOpening, CustomWall, LibraryItem } from '../model/types';
 import type { DecorStyle } from '../model/decorStyles';
-import { accountItemFromRow, styleFromRow } from './accountRows';
+import { styleFromRow } from '../model/decorStyles';
+import { accountItemFromRow } from './accountRows';
+import { backend } from './backend';
 
 /** 账号库全部条目：数据库视图 interior_account_library 把 家具 / 地面 / 墙面 / 门窗 / 屋面 / 吊顶 / 风格 合成一张表。 */
 export interface AccountLibraryData {
@@ -55,7 +56,7 @@ export function useAccountLibrary() {
     const run = ++epoch.current;
     setLoading(true); setError('');
     try {
-      const { data: rows, error: readError } = await supabase.from('interior_account_library').select('kind,data').order('created_at', { ascending: false });
+      const { data: rows, error: readError } = await (await backend()).from('interior_account_library').select('kind,data').order('created_at', { ascending: false });
       if (run !== epoch.current) return;
       if (readError) { setError(readError.message); return; }
       setData(splitAccountLibrary(rows ?? []));

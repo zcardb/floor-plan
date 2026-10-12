@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { VisualSelectField } from './VisualSelectField';
 import { furnitureThumb, outlineThumb } from './materialThumbs';
-import { typePickerItems } from './pickerItems';
+import { typePickerItems } from './furniturePickerItems';
 import { ColorPicker } from './ColorPicker';
 import { furnitureTypes, matchFurnitureType, type FurnitureOutline } from '../model/furnitureAppearance';
 import { previewFurnitureDraft, type FurnitureDraft } from '../model/furnitureDraft';

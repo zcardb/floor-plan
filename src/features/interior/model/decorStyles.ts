@@ -300,3 +300,10 @@ export const styleSwatches = (style: DecorStyle): string[] => [
   style.accent,
   METAL_FINISH[style.metal].color,
 ];
+
+/** 自定义风格：style_key 即风格 id，名称单独成列，其余定义在 spec；不合规的行丢弃。 */
+export function styleFromRow(r: Record<string, unknown>): DecorStyle | null {
+  const spec = r.spec && typeof r.spec === 'object' && !Array.isArray(r.spec) ? r.spec as Record<string, unknown> : {};
+  const style = { ...spec, id: String(r.style_key), name: String(r.name) };
+  return validDecorStyle(style) ? style : null;
+}

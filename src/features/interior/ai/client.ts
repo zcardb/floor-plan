@@ -1,5 +1,6 @@
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import type { AiCatalogEntry, AiPlanExample, AiPlanSnapshot, AiRequiredItem, AiRoomContext, AiRoomExample } from "./types";
+import { backend } from "../cloud/backend";
 
 export const AI_FUNCTION = "interior-ai-design";
 export const AI_COUNT_OPTIONS = [1, 2, 3, 4] as const;
@@ -7,9 +8,6 @@ export const AI_IMAGE_LIMIT = 4;
 /** 附件总数（图片 + 素材）。 */
 export const AI_ATTACHMENT_LIMIT = 6;
 export const AI_REFERENCE_BUCKET = "images";
-
-/** 后端客户端按需加载：只在真正发请求时初始化，引用 AI 模块本身没有副作用。 */
-export const backend = async () => (await import("@/integrations/supabase/client")).supabase;
 
 export interface AiCandidatePayload<T> {
   candidateId: string;
