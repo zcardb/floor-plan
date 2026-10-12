@@ -15,39 +15,38 @@ import { accountCostEntries, accountCostSource, costCategories, CUSTOM_CATEGORY,
 import { referenceDesign } from '../data/templates';
 import { furnitureGeometryPayload } from '../model/furnitureGeometrySave';
 import { assetsAdjusted, builtinOf, withBuiltinAssets } from '../model/builtinAssets';
-import type { useFurnitureCatalog } from '../cloud/useFurnitureCatalog';
-import type { CustomFloor, CustomOpening, CustomWall, Design, LibraryItem } from '../model/types';
+import type { AccountLibrary } from '../cloud/useAccountLibrary';
+import { accountMaterialSaves, removeAccountFurniture, saveAccountFurniture } from '../cloud/accountWrites';
+import type { Design, LibraryItem } from '../model/types';
 import { CmsFilterGroup } from './CmsFilterGroup';
 import { ProjectLoadMore } from './ProjectLoadMore';
 import { CostItemVisual } from './CostItemVisual';
-import { AccountMaterialDialog, type MaterialSaves } from './AccountMaterialDialog';
+import { AccountMaterialDialog } from './AccountMaterialDialog';
 import { AccountFurnitureDialog } from './AccountFurnitureDialog';
 import { useAccountCostCommit } from './useAccountCostCommit';
 
 type Props = {
-  catalog: ReturnType<typeof useFurnitureCatalog>; floors?: CustomFloor[]; walls?: CustomWall[]; openings?: CustomOpening[]; roofs?: CustomWall[]; ceilings?: CustomWall[];
+  /** 账号库（数据库合并视图一次读完）：家具、内置家具覆盖与各类材料，以及刷新。 */
+  library: Pick<AccountLibrary, 'furniture' | 'overrides' | 'floors' | 'walls' | 'openings' | 'roofs' | 'ceilings' | 'loading' | 'error' | 'load'>;
   defaults: AccountCostSettings; saveDefaults: (settings: AccountCostSettings) => Promise<boolean>; saving?: boolean; saveError?: string;
-  onDirty: (dirty: boolean) => void; onNew: (category: string) => void; loadError?: string;
-  /** 重取家具与硬装账号库：页头刷新按钮与读取失败的「重试」共用。 */
-  reload?: () => Promise<void>;
-  /** 硬装账号库的保存与刷新：查看弹窗里修改自定义地面 / 墙面 / 门窗 / 屋面 / 吊顶。 */
-  materialSaves?: MaterialSaves; reloadMaterial?: (kind: keyof MaterialSaves) => void;
+  onDirty: (dirty: boolean) => void; onNew: (category: string) => void;
 };
 const sizeOf = (entry: CostEntry) => entry.furniture ? ` · ${formatMeters(entry.furniture.w)} × ${formatMeters(entry.furniture.d)} m` : entry.opening ? ` · ${formatMeters(entry.opening.width)} × ${formatMeters(entry.opening.height)} m` : '';
-/** 滚动加载的批次：与项目管理一致，先露出 12 个，滚到底部再补下一批。 */
+/** 每页 12 个：进来先显示一页，滚到底部再显示下一页（数据已一次读完，翻页不再请求）。 */
 const PAGE_SIZE = 12;
 const ALL = '全部';
 type MajorFilter = typeof ALL | CostMajor | typeof CUSTOM_CATEGORY;
 
 /** 账号家具库：家具与地面、墙面、门窗、屋面、吊顶统一管理，并在这里设置账号默认单价。 */
-export function AccountFurnitureLibrary({ catalog, floors = [], walls = [], openings = [], roofs = [], ceilings = [], defaults, saveDefaults, saving = false, saveError = '', onDirty, onNew, loadError = '', reload, materialSaves, reloadMaterial }: Props) {
+export function AccountFurnitureLibrary({ library, defaults, saveDefaults, saving = false, saveError = '', onDirty, onNew }: Props) {
+  const { furniture, overrides, floors, walls, openings, roofs, ceilings } = library;
   const [major, setMajor] = useState<MajorFilter>(ALL), [category, setCategory] = useState(ALL), [query, setQuery] = useState(''), [shown, setShown] = useState(PAGE_SIZE), [editing, setEditing] = useState<CostEntry | null>(null), [detail, setDetail] = useState<LibraryItem | null>(null);
   const commit = useAccountCostCommit({ settings: defaults, save: saveDefaults, onDirty });
-  const design: Design = { ...referenceDesign(), customCatalog: catalog.items, customFloors: floors, customWalls: walls, customOpenings: openings, customRoofs: roofs, customCeilings: ceilings, costSettings: commit.settings };
+  const design: Design = { ...referenceDesign(), customCatalog: furniture, customFloors: floors, customWalls: walls, customOpenings: openings, customRoofs: roofs, customCeilings: ceilings, costSettings: commit.settings };
   /** 内置家具的覆盖行（账号库里与内置同 catalogId 的那一行）：名称、尺寸、颜色与素材。 */
-  const overrideById = new Map(catalog.overrides.map(item => [item.catalogId, item]));
+  const overrideById = new Map(overrides.map(item => [item.catalogId, item]));
   // 内置家具套用账号里的覆盖：卡片名称、尺寸、缩略图与详情预览都用调整后的值。
-  const entries = accountCostEntries(catalog.items, commit.settings, floors, walls, openings, { roofs, ceilings }).map(entry => {
+  const entries = accountCostEntries(furniture, commit.settings, floors, walls, openings, { roofs, ceilings }).map(entry => {
     const builtin = builtinOf(entry.furniture?.catalogId);
     if (!builtin) return entry;
     const furniture = withBuiltinAssets(builtin, overrideById.get(builtin.catalogId));
@@ -61,11 +60,7 @@ export function AccountFurnitureLibrary({ catalog, floors = [], walls = [], open
   // 按分类顺序排成一整片（硬装地面…楼梯，再软装卧室…），不加分类小标题；分类之外的条目排在最后。
   const ordered = [...costCategories.flatMap(name => visible.filter(entry => entry.category === name)), ...visible.filter(entry => !costCategories.includes(entry.category))];
   const page = ordered.slice(0, shown);
-  /** 滚到底部：先露出下一批已读到的条目；本地都露出了，才向云端要下一页家具。 */
-  const loadMore = () => {
-    if (shown < ordered.length) return setShown(shown + PAGE_SIZE);
-    if (catalog.hasMore && !catalog.loading && !catalog.error) { setShown(shown + PAGE_SIZE); void catalog.load(true); }
-  };
+  const loadMore = () => setShown(shown + PAGE_SIZE);
   /** 第一级：全部 / 硬装 / 软装 / 自定义，默认全部。 */
   const majorChips = [ALL, '硬装', '软装', CUSTOM_CATEGORY].map(id => ({ id, label: id, meta: String(id === ALL ? entries.length : id === CUSTOM_CATEGORY ? entries.filter(entry => entry.custom).length : entries.filter(entry => entry.major === id).length) }));
   /** 第二级：只在选了硬装或软装后出现，列出该大类的细分。 */
@@ -80,19 +75,20 @@ export function AccountFurnitureLibrary({ catalog, floors = [], walls = [], open
   const change = (update: (design: Design) => Design) => commit.apply(current => update({ ...design, costSettings: current }).costSettings as AccountCostSettings);
   const retry = async () => { if (await commit.retry()) notify.success('账号默认价已保存并生效'); };
   const open = (entry: CostEntry) => entry.furniture ? setDetail(entry.furniture) : setEditing(entry);
-  const customIds = new Set(catalog.items.map(item => item.catalogId));
+  const customIds = new Set(furniture.map(item => item.catalogId));
   // 刷新与项目管理页同一套逻辑：整页切回骨架屏，按钮转圈并禁用，直到所有账号库重新读完。
   const [refreshing, setRefreshing] = useState(false);
-  const reloadAll = reload ?? (() => catalog.load());
   const refresh = async () => {
     setRefreshing(true);
     setShown(PAGE_SIZE);
-    try { await reloadAll(); } finally { setRefreshing(false); }
+    try { await library.load(); } finally { setRefreshing(false); }
   };
-  const loadingList = refreshing || catalog.loading;
+  const loadingList = refreshing || library.loading;
+  /** 内置家具的覆盖保存后重读账号库，卡片和详情立即用上新素材。 */
+  const saveOverride = async (item: LibraryItem) => { const ok = await saveAccountFurniture(item); if (ok) void library.load(); return ok; };
   return <>
     <CmsPageHeader title="账号家具库" description="家具、地面、墙面、门窗、屋面与吊顶都在这里管理，设好单价后各项目直接沿用。"
-      search={<CmsSearchField label="搜索材料或家具" placeholder="搜索材料、家具名称…" value={query} onChange={search} loading={catalog.loading} loadingLabel="加载家具" matchCount={visible.length}/>}
+      search={<CmsSearchField label="搜索材料或家具" placeholder="搜索材料、家具名称…" value={query} onChange={search} loading={library.loading} loadingLabel="加载家具" matchCount={visible.length}/>}
       actions={<>
         {(busy || failure || commit.saved) && <span className={'cms-sync-pill' + (failure && !busy ? ' is-error' : '')} role="status">{busy ? <><Loader2 size={13} className="animate-spin"/>正在保存…</> : failure ? <><AlertCircle size={13}/>修改尚未保存</> : <><Check size={13}/>已保存并生效</>}</span>}
         <EditorTooltip label="刷新" disabled={loadingList || locked}>
@@ -108,7 +104,7 @@ export function AccountFurnitureLibrary({ catalog, floors = [], walls = [], open
       {!!subChips.length && <CmsFilterGroup ariaLabel={major + '分类'} chips={subChips} value={category} onChange={pick}/>}
     </div>
     {failure && <div className="cost-save-error" role="alert"><span>{failure}</span>{commit.pending && <Button variant="outline" disabled={busy} onClick={() => void retry()}>重试保存</Button>}</div>}
-    {(loadError || catalog.error) && <LoadError title="家具与材料读取失败" message={loadError || catalog.error} retrying={catalog.loading} onRetry={() => void refresh()}/>}
+    {library.error && <LoadError title="家具与材料读取失败" message={library.error} retrying={library.loading} onRetry={() => void refresh()}/>}
     <div className="cms-item-grid">
       {page.map(entry => {
         const price = priceOf(design, entry.group, entry.key), source = accountCostSource(design, entry);
@@ -122,17 +118,17 @@ export function AccountFurnitureLibrary({ catalog, floors = [], walls = [], open
         </EditorTooltip>;
       })}
     </div>
-    {!catalog.loading && !visible.length && <div className="cms-empty"><Search size={30}/><h2>没有匹配的条目</h2><p>{catalog.hasMore ? '已读取的条目中没有匹配项，换个关键词，或清空筛选后向下滚动加载更多。' : '换个分类，或清空搜索再试。'}</p><Button variant="outline" onClick={() => { pickMajor(ALL); search(''); }}>清空筛选</Button></div>}
-    {!!visible.length && <ProjectLoadMore shown={page.length} total={ordered.length} hasMore={catalog.hasMore && !catalog.error} loading={catalog.loading} onReach={loadMore}/>}
+    {!library.loading && !visible.length && <div className="cms-empty"><Search size={30}/><h2>没有匹配的条目</h2><p>换个分类，或清空搜索再试。</p><Button variant="outline" onClick={() => { pickMajor(ALL); search(''); }}>清空筛选</Button></div>}
+    {!!visible.length && <ProjectLoadMore shown={page.length} total={ordered.length} hasMore={false} loading={false} onReach={loadMore}/>}
     </>}
-    {editing && materialSaves && <AccountMaterialDialog key={editing.group + ':' + editing.key} entry={{ ...editing, unit: entries.find(entry => entry.key === editing.key && entry.group === editing.group)?.unit || editing.unit }} design={design} change={change} price={priceOf(design, editing.group, editing.key)} saves={materialSaves}
+    {editing && <AccountMaterialDialog key={editing.group + ':' + editing.key} entry={{ ...editing, unit: entries.find(entry => entry.key === editing.key && entry.group === editing.group)?.unit || editing.unit }} design={design} change={change} price={priceOf(design, editing.group, editing.key)} saves={accountMaterialSaves}
       applyDefaultPrice={price => commit.apply(current => ({ ...current, [editing.group]: { ...current[editing.group], [editing.key]: price } }))}
-      busy={busy} error={failure} retry={commit.pending ? () => void retry() : undefined} onSaved={kind => reloadMaterial?.(kind)} onClose={() => { if (!busy) setEditing(null); }}/>}
+      busy={busy} error={failure} retry={commit.pending ? () => void retry() : undefined} onSaved={() => void library.load()} onClose={() => { if (!busy) setEditing(null); }}/>}
     {detail && <AccountFurnitureDialog key={detail.catalogId} item={{ ...detail, price: priceOf(design, 'furniturePrices', detail.catalogId!) }} isCustom={customIds.has(detail.catalogId!)} adjusted={adjustedOf(detail.catalogId)} referencePrice={priceOf(design, 'furniturePrices', detail.catalogId!)} commitBusy={commit.busy} commitError={commit.error} retryPrice={commit.pending ? commit.retry : undefined} saved={commit.saved}
-      saveGeometry={customIds.has(detail.catalogId!) ? next => { const stored = catalog.items.find(item => item.catalogId === next.catalogId); if (!stored) return Promise.reject(new Error('家具数据尚未就绪，请重新加载后重试')); return catalog.save(furnitureGeometryPayload(next, stored)); } : undefined}
-      saveAssets={builtinOf(detail.catalogId) ? assets => catalog.saveOverride({ ...(catalog.overrides.find(row => row.catalogId === detail.catalogId) ?? builtinOf(detail.catalogId)!), ...assets }) : undefined}
-      saveFields={builtinOf(detail.catalogId) ? next => catalog.saveOverride({ ...next, price: priceOf(design, 'furniturePrices', next.catalogId!) }) : undefined}
-      onOpenChange={v => { if (!v) setDetail(null); }} onChanged={next => { setDetail(next); void catalog.load(); }}
-      applyDefaultPrice={price => commit.apply(current => ({ ...current, furniturePrices: { ...current.furniturePrices, [detail.catalogId!]: price } }))} remove={catalog.remove}/>}
+      saveGeometry={customIds.has(detail.catalogId!) ? next => { const stored = furniture.find(item => item.catalogId === next.catalogId); if (!stored) return Promise.reject(new Error('家具数据尚未就绪，请重新加载后重试')); return saveAccountFurniture(furnitureGeometryPayload(next, stored)); } : undefined}
+      saveAssets={builtinOf(detail.catalogId) ? assets => saveOverride({ ...(overrides.find(row => row.catalogId === detail.catalogId) ?? builtinOf(detail.catalogId)!), ...assets }) : undefined}
+      saveFields={builtinOf(detail.catalogId) ? next => saveOverride({ ...next, price: priceOf(design, 'furniturePrices', next.catalogId!) }) : undefined}
+      onOpenChange={v => { if (!v) setDetail(null); }} onChanged={next => { setDetail(next); void library.load(); }}
+      applyDefaultPrice={price => commit.apply(current => ({ ...current, furniturePrices: { ...current.furniturePrices, [detail.catalogId!]: price } }))} remove={removeAccountFurniture}/>}
   </>;
 }

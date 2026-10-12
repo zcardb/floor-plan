@@ -4,11 +4,7 @@ import { CmsLayout, CmsSidebar, type CmsModule } from './CmsLayout';
 import { AssistantManager } from './AssistantManager';
 import type { useProjects } from '../cloud/useProjects';
 import type { useAccountCosts } from '../cloud/useAccountCosts';
-import { useFurnitureCatalog } from '../cloud/useFurnitureCatalog';
-import { useFloorCatalog } from '../cloud/useFloorCatalog';
-import { useWallCatalog } from '../cloud/useWallCatalog';
-import { useOpeningCatalog } from '../cloud/useOpeningCatalog';
-import { useCeilingCatalog, useRoofCatalog } from '../cloud/useSurfaceCatalogs';
+import { useAccountLibrary } from '../cloud/useAccountLibrary';
 import { ProjectManager } from './ProjectManager';
 import { ManagementEntry } from './ManagementEntry';
 import { newFurnitureCategory } from '../model/newFurnitureCategory';
@@ -29,17 +25,16 @@ export function AccountCMS({projects,costs,opened,tab,onTab,onDirty,pendingLeave
   const navigate=(next:string)=>{if(next===tab||costs.saving)return;if(next!=='logout'){onTab(next);return;}if(dirty){setLeaving(next);return;}void projects.signOut();};
   const cancelLeave=()=>{setLeaving(null);pendingLeave?.reset();};
   const confirmLeave=()=>{setDirty(false);if(leaving==='logout')void projects.signOut();pendingLeave?.proceed();setLeaving(null);};
-  const catalog=useFurnitureCatalog(),load=catalog.load,reset=catalog.reset,floors=useFloorCatalog(),loadFloors=floors.load,walls=useWallCatalog(),loadWalls=walls.load,openings=useOpeningCatalog(),loadOpenings=openings.load,roofs=useRoofCatalog(),loadRoofs=roofs.load,ceilings=useCeilingCatalog(),loadCeilings=ceilings.load;
-  const loadAll=useCallback(async()=>{await Promise.all([load(),loadFloors(),loadWalls(),loadOpenings(),loadRoofs(),loadCeilings()]);return;},[load,loadFloors,loadWalls,loadOpenings,loadRoofs,loadCeilings]);
-  const materialError=floors.error||walls.error||openings.error||roofs.error||ceilings.error;
+  // 账号库一次读完（家具 + 地面 / 墙面 / 门窗 / 屋面 / 吊顶），不再逐个库各发一次请求。
+  const library=useAccountLibrary(),load=library.load,reset=library.reset;
   const [initialCategory,setInitialCategory]=useState('客厅');
   const newFurniture=(category:string)=>{setInitialCategory(newFurnitureCategory(category));setCreating(true);};
   return <CmsLayout collapsed={collapsed} sidebar={<CmsSidebar collapsed={collapsed} onToggle={toggleSidebar} modules={MODULES} active={tab} onSelect={navigate} email={projects.session?.user.email??''} loggingOut={projects.signingOut} onLogout={()=>navigate('logout')}/>} after={<>
     <AlertDialog open={!!leaving||!!pendingLeave} onOpenChange={v=>{if(!v)cancelLeave();}}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>账号单价尚未保存</AlertDialogTitle><AlertDialogDescription>继续编辑可保留草稿；离开将丢弃未保存的账号调价，已有项目数据不变。</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>继续编辑</AlertDialogCancel><AlertDialogAction onClick={confirmLeave}>放弃更改并离开</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-    {creating&&<CustomFurnitureDialog open={creating} onOpenChange={setCreating} loggedIn={true} login={()=>{}} ownerKey={projects.session!.user.id} accountOnly initialCategory={initialCategory} onCreate={()=>{void load();}} onCreateFloor={()=>{void loadFloors();}} onCreateWall={()=>{void loadWalls();}} onCreateOpening={()=>{void loadOpenings();}} onCreateRoof={()=>{void loadRoofs();}} onCreateCeiling={()=>{void loadCeilings();}} onImport={()=>{}}/>}
+    {creating&&<CustomFurnitureDialog open={creating} onOpenChange={setCreating} loggedIn={true} login={()=>{}} ownerKey={projects.session!.user.id} accountOnly initialCategory={initialCategory} onCreate={()=>{void load();}} onCreateFloor={()=>{void load();}} onCreateWall={()=>{void load();}} onCreateOpening={()=>{void load();}} onCreateRoof={()=>{void load();}} onCreateCeiling={()=>{void load();}} onImport={()=>{}}/>}
   </>}>
-    {tab==='assistants'?<AssistantManager key={projects.session?.user.id}/>:<ManagementEntry key={tab} label={tab==='projects'?'加载项目':'加载家具'} variant={tab==='projects'?'projects':'library'} loading={tab==='projects'?!projects.listReady||projects.loading:costs.loading||catalog.loading||floors.loading||walls.loading||openings.loading||roofs.loading||ceilings.loading} load={tab==='projects'?undefined:loadAll} reset={tab==='projects'?undefined:reset}>
-      {tab==='projects'?<ProjectManager projects={projects} opened={opened}/>:<AccountFurnitureLibrary key={projects.session?.user.id} catalog={catalog} floors={floors.items} walls={walls.items} openings={openings.items} roofs={roofs.items} ceilings={ceilings.items} defaults={costs.settings} saveDefaults={costs.save} saving={costs.saving} saveError={costs.error} onDirty={setDirty} onNew={newFurniture} loadError={materialError} reload={loadAll} materialSaves={{floor:floors.save,opening:openings.save,wall:walls.save,roof:roofs.save,ceiling:ceilings.save}} reloadMaterial={kind=>void({floor:loadFloors,opening:loadOpenings,wall:loadWalls,roof:loadRoofs,ceiling:loadCeilings}[kind])()}/>}
+    {tab==='assistants'?<AssistantManager key={projects.session?.user.id}/>:<ManagementEntry key={tab} label={tab==='projects'?'加载项目':'加载家具'} variant={tab==='projects'?'projects':'library'} loading={tab==='projects'?!projects.listReady||projects.loading:costs.loading||library.loading} load={tab==='projects'?undefined:load} reset={tab==='projects'?undefined:reset}>
+      {tab==='projects'?<ProjectManager projects={projects} opened={opened}/>:<AccountFurnitureLibrary key={projects.session?.user.id} library={library} defaults={costs.settings} saveDefaults={costs.save} saving={costs.saving} saveError={costs.error} onDirty={setDirty} onNew={newFurniture}/>}
     </ManagementEntry>}
   </CmsLayout>;
 }

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('../cloud/useFurnitureImage',()=>({useFurnitureImage:()=>({image:'',busy:false,error:'',generate:vi.fn(),cancel:vi.fn()})}));
 // 识别确认弹窗走 Portal，服务端渲染不出内容：换成一个标记，并让导入流程的状态可由用例指定。
 const importState = vi.hoisted(() => ({ drawing: null as null | { source: unknown; name: string } }));
+vi.mock('../cloud/accountWrites', () => ({ saveAccountFurniture: vi.fn(), removeAccountFurniture: vi.fn(), accountMaterialSaves: { floor: vi.fn(), opening: vi.fn(), wall: vi.fn(), roof: vi.fn(), ceiling: vi.fn() } }));
 vi.mock('./DxfImportDialog', () => ({ DxfImportDialog: ({ defaultName }: { defaultName: string }) => createElement('div', { 'data-dxf-import': defaultName }) }));
 vi.mock('./useProjectImport', async original => {
   const actual = await original<typeof import('./useProjectImport')>();
@@ -17,7 +18,6 @@ import type { useProjects, ProjectSummary } from '../cloud/useProjects';
 import { TEMPLATE_PRESETS, createProject } from '../data/templates';
 import { mineCardActions, templateCardActions } from './projectCardActions';
 import { compactThumbnail } from '../model/planThumbnail';
-import type { useFurnitureCatalog } from '../cloud/useFurnitureCatalog';
 
 const project = { id: 'one', name: '我的项目', updatedAt: '2026-10-08', revision: 0, cloud: true };
 const render = (node: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(node);
@@ -164,8 +164,8 @@ describe('管理端精简与加载分支', () => {
     expect(failed).not.toContain('还没有设计项目');
   });
   it('家具管理采用成本版式：页头刷新、硬装软装切换与价格卡片', () => {
-    const catalog = { items: [], overrides: [], count: 0, counts: {}, loading: true, error: '', hasMore: false } as unknown as ReturnType<typeof useFurnitureCatalog>;
-    const html = render(createElement(AccountFurnitureLibrary, { catalog, defaults: {}, saveDefaults: async () => true, onDirty: () => {}, onNew: () => {} }));
+    const library = { furniture: [], overrides: [], floors: [], walls: [], openings: [], roofs: [], ceilings: [], loading: true, error: '', load: async () => {} };
+    const html = render(createElement(AccountFurnitureLibrary, { library, defaults: {}, saveDefaults: async () => true, onDirty: () => {}, onNew: () => {} }));
     expect(html).toContain('aria-busy="true"');
     expect(html).toContain('cms-item-card--cost');
     expect(html).not.toContain('cost-list-row');
@@ -199,8 +199,8 @@ describe('管理端精简与加载分支', () => {
     expect(html).not.toContain('正在读取');
   });
   it('家具读取仍显示内置家具并保留错误，但不增加读取文字行', () => {
-    const catalog = { items: [], overrides: [], count: 0, counts: {}, loading: true, error: '读取失败', hasMore: false } as unknown as ReturnType<typeof useFurnitureCatalog>;
-    const html = render(createElement(AccountFurnitureLibrary, { catalog, defaults: {}, saveDefaults: async () => true, onDirty: () => {}, onNew: () => {} }));
+    const library = { furniture: [], overrides: [], floors: [], walls: [], openings: [], roofs: [], ceilings: [], loading: true, error: '读取失败', load: async () => {} };
+    const html = render(createElement(AccountFurnitureLibrary, { library, defaults: {}, saveDefaults: async () => true, onDirty: () => {}, onNew: () => {} }));
     expect(html).toContain('aria-busy="true"');
     expect(html).toContain('cms-item-card');
     expect(html).toContain('读取失败');

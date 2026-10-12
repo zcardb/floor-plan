@@ -98,11 +98,7 @@ import { CanvasRail } from "./CanvasRail";
 import { ViewMenu } from "./ViewMenu";
 import { OverviewPanel } from "./OverviewPanel";
 import { HouseSettingsPanel } from "./HouseSettingsPanel";
-import { useFloorCatalog } from "../cloud/useFloorCatalog";
-import { useWallCatalog } from "../cloud/useWallCatalog";
-import { useOpeningCatalog } from "../cloud/useOpeningCatalog";
-import { useCeilingCatalog, useRoofCatalog } from "../cloud/useSurfaceCatalogs";
-import { useFurnitureCatalog } from "../cloud/useFurnitureCatalog";
+import { useAccountLibrary } from "../cloud/useAccountLibrary";
 import { SelectionEditor, type SelectionEditorHandle } from "./SelectionEditor";
 import type { ScreenRect } from "../model/selectionAnchor";
 import { PlanCanvas, type CanvasHandle } from "./PlanCanvas";
@@ -258,21 +254,17 @@ export function Workbench(p: Props) {
     // 自定义家具弹窗按需下载：第一次打开后才挂载，之后保持挂载以保留关闭动画。
     [customMounted, setCustomMounted] = useState(false);
   const openCustom = () => { setCustomMounted(true); setCustomOpen(true); };
-  const floorCatalog = useFloorCatalog(), loadAccountFloors = floorCatalog.load;
-  const wallCatalog = useWallCatalog(), loadAccountWalls = wallCatalog.load;
-  const openingCatalog = useOpeningCatalog(), loadAccountOpenings = openingCatalog.load;
-  const roofCatalog = useRoofCatalog(), loadAccountRoofs = roofCatalog.load;
-  const ceilingCatalog = useCeilingCatalog(), loadAccountCeilings = ceilingCatalog.load;
-  const furnitureCatalog = useFurnitureCatalog(), loadAccountFurniture = furnitureCatalog.load;
-  const accountFloors = p.loggedIn ? floorCatalog.items : [];
-  const accountWalls = p.loggedIn ? wallCatalog.items : [];
-  const accountOpenings = p.loggedIn ? openingCatalog.items : [];
-  const accountRoofs = p.loggedIn ? roofCatalog.items : [];
-  const accountCeilings = p.loggedIn ? ceilingCatalog.items : [];
+  // 账号库（家具与各类材料）一次读完，来源是数据库里的合并视图。
+  const accountLibrary = useAccountLibrary(), loadAccountLibrary = accountLibrary.load;
+  const accountFloors = p.loggedIn ? accountLibrary.floors : [];
+  const accountWalls = p.loggedIn ? accountLibrary.walls : [];
+  const accountOpenings = p.loggedIn ? accountLibrary.openings : [];
+  const accountRoofs = p.loggedIn ? accountLibrary.roofs : [];
+  const accountCeilings = p.loggedIn ? accountLibrary.ceilings : [];
   // 账号家具库（家具管理里新建的家具）并入左侧列表：已在本项目目录中的以项目版本为准。
   const projectCatalog = d.customCatalog || [];
   const accountFurniture = p.loggedIn
-    ? furnitureCatalog.items.filter((item) => !projectCatalog.some((i) => i.catalogId === item.catalogId))
+    ? accountLibrary.furniture.filter((item) => !projectCatalog.some((i) => i.catalogId === item.catalogId))
     : [];
   // 打开项目时补一次：房间按「墙 + 分隔线」重算（之后由改墙流程负责）。
   const projectId = p.project.id;
@@ -285,7 +277,7 @@ export function Workbench(p: Props) {
     }
   }, [projectId, readOnly, sync, designRef]);
   // 内置家具套用账号里的 2D / 3D 素材覆盖：左侧素材库、新放置的家具都用调整后的素材。
-  const builtinOverrides = p.loggedIn ? furnitureCatalog.overrides : emptyOverrides;
+  const builtinOverrides = p.loggedIn ? accountLibrary.overrides : emptyOverrides;
   const builtinLibrary = libraryWithOverrides(builtinOverrides);
   // 已放置的内置家具跟随素材覆盖（只改素材字段）。
   useEffect(() => {
@@ -294,7 +286,7 @@ export function Workbench(p: Props) {
     if (next) sync(next);
   }, [readOnly, d.furniture, builtinOverrides, sync, designRef]);
   // 账号家具库里改过的家具同步到本项目（项目内单独改过的单价、尺寸等保留）。
-  const accountFurnitureItems = furnitureCatalog.items;
+  const accountFurnitureItems = accountLibrary.furniture;
   useEffect(() => {
     if (!p.loggedIn || readOnly || !d.customCatalog?.length) return;
     const next = syncAccountFurniture(designRef.current, accountFurnitureItems);
@@ -303,14 +295,14 @@ export function Workbench(p: Props) {
   // 账号硬装库（地面 / 墙面 / 门窗 / 屋面 / 吊顶）里改过的材料同步到本项目副本（单价以项目为准）。
   useEffect(() => {
     if (!p.loggedIn || readOnly) return;
-    const next = syncAccountMaterials(designRef.current, { customFloors: floorCatalog.items, customWalls: wallCatalog.items, customOpenings: openingCatalog.items, customRoofs: roofCatalog.items, customCeilings: ceilingCatalog.items });
+    const next = syncAccountMaterials(designRef.current, { customFloors: accountLibrary.floors, customWalls: accountLibrary.walls, customOpenings: accountLibrary.openings, customRoofs: accountLibrary.roofs, customCeilings: accountLibrary.ceilings });
     if (next) sync(next);
-  }, [p.loggedIn, readOnly, d.customFloors, d.customWalls, d.customOpenings, d.customRoofs, d.customCeilings, floorCatalog.items, wallCatalog.items, openingCatalog.items, roofCatalog.items, ceilingCatalog.items, sync, designRef]);
-  // 登录后读取账号地面 / 墙面 / 门窗 / 屋面 / 吊顶 / 家具库；新建弹窗关闭后刷新，让刚建的材料立即可选。
+  }, [p.loggedIn, readOnly, d.customFloors, d.customWalls, d.customOpenings, d.customRoofs, d.customCeilings, accountLibrary.floors, accountLibrary.walls, accountLibrary.openings, accountLibrary.roofs, accountLibrary.ceilings, sync, designRef]);
+  // 登录后一次读完账号库（家具 + 各类材料）；新建弹窗关闭后刷新，让刚建的条目立即可选。
   useEffect(() => {
     if (!p.loggedIn || customOpen) return;
-    void loadAccountFurniture(); void loadAccountFloors(); void loadAccountWalls(); void loadAccountOpenings(); void loadAccountRoofs(); void loadAccountCeilings();
-  }, [p.loggedIn, customOpen, loadAccountFurniture, loadAccountFloors, loadAccountWalls, loadAccountOpenings, loadAccountRoofs, loadAccountCeilings]);
+    void loadAccountLibrary();
+  }, [p.loggedIn, customOpen, loadAccountLibrary]);
   // AI 布局：登录且可编辑时才有入口；目录 = 内置 + 项目 + 账号家具，新建家具弹窗关闭后刷新。
   const aiEnabled = p.loggedIn && !readOnly;
   const aiCatalog = useAiCatalog(d.customCatalog, aiEnabled && !customOpen);

@@ -16,11 +16,7 @@ vi.mock('react', async original => ({
 }));
 vi.mock('@/components/ui/confirm-dialog', () => ({ useConfirm: () => state.confirm }));
 vi.mock('../cloud/useProjects', () => ({ isSaveProblem: () => false }));
-vi.mock('../cloud/useFloorCatalog', () => ({ useFloorCatalog: () => ({ items: [], loading: false, error: '', load: async () => {}, save: async () => {} }) }));
-vi.mock('../cloud/useWallCatalog', () => ({ useWallCatalog: () => ({ items: [], loading: false, error: '', load: async () => {}, save: async () => {} }) }));
-vi.mock('../cloud/useOpeningCatalog', () => ({ useOpeningCatalog: () => ({ items: [], loading: false, error: '', load: async () => {}, save: async () => {} }) }));
-vi.mock('../cloud/useSurfaceCatalogs', () => ({ useRoofCatalog: () => ({ items: [], loading: false, error: '', load: async () => {}, save: async () => {} }), useCeilingCatalog: () => ({ items: [], loading: false, error: '', load: async () => {}, save: async () => {} }) }));
-vi.mock('../cloud/useFurnitureCatalog', () => ({ useFurnitureCatalog: () => ({ items: state.furniture, overrides: [], loading: false, error: '', hasMore: false, count: state.furniture.length, counts: {}, load: async () => {}, save: async () => {}, remove: async () => {}, reset: () => {} }) }));
+vi.mock('../cloud/useAccountLibrary', () => ({ useAccountLibrary: () => ({ furniture: state.furniture, overrides: [], floors: [], walls: [], openings: [], roofs: [], ceilings: [], loading: false, error: '', load: async () => {}, reset: () => {} }) }));
 vi.mock('../ai/useAiCatalog', () => ({ useAiCatalog: () => ({ catalog: { entries: [], byCode: new Map(), byId: new Map(), codeOf: () => undefined }, items: [], loading: false, error: '', reload: async () => {} }) }));
 vi.mock('../ai/useRoomAi', () => ({ useRoomAi: () => ({ toneOf: () => 'idle', open: vi.fn(), room: undefined }) }));
 vi.mock('../model/useDesign', () => ({ useDesign: () => ({
