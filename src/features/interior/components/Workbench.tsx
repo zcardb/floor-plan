@@ -190,8 +190,8 @@ export function Workbench(p: Props) {
     view = lifecycle.view,
     sceneLoading = lifecycle.loading;
   const [Scene, setScene] = useState<SceneComponent | null>(null),
-    // 右侧统一侧栏：同一时间只开一个；宽屏默认打开家具库，窄屏默认收起（抽屉会盖住画布）。
-    [sidePanel, setSidePanel] = useState<PanelKind | null>(isDrawerLayout() ? null : "library"),
+    // 右侧统一侧栏：同一时间只开一个；默认收起，画布完整可见，需要时从竖条打开。
+    [sidePanel, setSidePanel] = useState<PanelKind | null>(null),
     [scale, setScale] = useState(0.05),
     [pendingFile, setPendingFile] = useState<PendingFile | null>(null);
   const selectionId = selectionKey(selection);

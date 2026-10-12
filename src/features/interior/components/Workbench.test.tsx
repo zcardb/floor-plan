@@ -71,6 +71,13 @@ function render(overrides: Partial<Parameters<typeof Workbench>[0]> = {}) {
     ...overrides,
   }));
 }
+/** 侧栏默认收起：需要家具库的用例先通过竖条打开它（已打开则直接返回）。 */
+function renderWithLibrary(overrides: Partial<Parameters<typeof Workbench>[0]> = {}) {
+  const tree = render(overrides);
+  if (tree.some(n => n.type === Library)) return tree;
+  (tree.find(n => n.type === CanvasRail)!.props.onToggle as (kind: string) => void)('library');
+  return render(overrides);
+}
 function tools(tree: Node[]) {
   const group = tree.find(node => node.props.className === 'tool-group')!;
   return nodes(group);
@@ -232,7 +239,7 @@ describe('2D 常用工具与顶部工具栏', () => {
     state.design = referenceDesign();
     expect(tools(render()).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual(['门', '窗']);
     expect(tools(render()).some(node => node.type === WallToolMenu)).toBe(true);
-    expect(render().find(n => n.type === Library)!.props.structureTools).toBe(true);
+    expect(renderWithLibrary().find(n => n.type === Library)!.props.structureTools).toBe(true);
     const more = tools(render()).find(node => node.props['aria-label'] === '更多')!;
     expect(more.props.className).toContain('compact-only');
     state.values[2] = { ...initialSceneState, view: '3d' };
@@ -240,7 +247,7 @@ describe('2D 常用工具与顶部工具栏', () => {
   });
   it('内置模板只读预览不开放绘墙和门窗', () => {
     state.design = referenceDesign();
-    const tree = render({ project: { id: 'builtin', name: '模板', state: state.design, builtin: true } as Project });
+    const tree = renderWithLibrary({ project: { id: 'builtin', name: '模板', state: state.design, builtin: true } as Project });
     expect(tools(tree).filter(node => node.props.label && node.props.onClick).map(node => node.props.label)).toEqual([]);
     expect(tools(tree).some(node => node.type === WallToolMenu)).toBe(false);
     expect(tree.find(n => n.type === Library)!.props.structureTools).toBe(false);
@@ -249,7 +256,7 @@ describe('2D 常用工具与顶部工具栏', () => {
 describe('账号家具库并入左侧家具库', () => {
   const furnace = { catalogId: 'custom-furnace', name: '火炉', category: '客厅', type: 'stove', w: 1200, d: 400, height: 900, color: '#b7c4b0', price: 800 } as LibraryItem;
   const sofa = { ...furnace, catalogId: 'custom-sofa', name: '账号沙发' } as LibraryItem;
-  const libraryNode = (loggedIn = true) => render({ loggedIn }).find(n => n.props.customItems !== undefined)!;
+  const libraryNode = (loggedIn = true) => renderWithLibrary({ loggedIn }).find(n => n.props.customItems !== undefined)!;
   const names = (node: Node) => (node.props.customItems as LibraryItem[]).map(item => item.name);
   it('登录后账号家具进入侧栏，与项目目录同 id 的只保留项目版本', () => {
     state.design = { ...blankDesign(), customCatalog: [sofa] };
@@ -394,18 +401,24 @@ describe('内置模板只读预览提示条', () => {
 describe('编辑器分区：侧栏、竖条与画布', () => {
   const rail = (tree: Node[]) => tree.find(n => n.type === CanvasRail)!;
   const panel = (tree: Node[]) => tree.find(n => n.type === SidePanel);
-  it('默认打开家具库侧栏，竖条「家具」高亮', () => {
+  it('宽屏默认也不打开侧栏，竖条无高亮；点「家具」打开家具列表', () => {
     const tree = render();
-    expect(panel(tree)!.props.title).toBe('家具列表');
-    expect(nodes(panel(tree)!).find(n => n.type === Library)).toBeDefined();
-    expect(rail(tree).props.sidePanel).toBe('library');
+    expect(panel(tree)).toBeUndefined();
+    expect(rail(tree).props.sidePanel).toBeNull();
+    (rail(tree).props.onToggle as (kind: string) => void)('library');
+    const opened = render();
+    expect(panel(opened)!.props.title).toBe('家具列表');
+    expect(nodes(panel(opened)!).find(n => n.type === Library)).toBeDefined();
+    expect(rail(opened).props.sidePanel).toBe('library');
     // 视图设置现在是左下角缩放条里的第一个图标
     const zoom = tree.find(n => n.props.className === 'canvas-zoom')!;
     expect(nodes(zoom)[1].type).toBe(ViewMenu);
   });
-  it('竖条点「家具」关闭默认打开的侧栏，再点重新打开；AI 侧栏入口隐藏但功能保留', () => {
+  it('竖条再点「家具」收起已打开的侧栏；AI 侧栏入口隐藏但功能保留', () => {
     const tree = render();
     (rail(tree).props.onToggle as (kind: string) => void)('library');
+    expect(panel(render())!.props.title).toBe('家具列表');
+    (rail(render()).props.onToggle as (kind: string) => void)('library');
     expect(panel(render())).toBeUndefined();
     const reopened = render();
     (rail(reopened).props.onToggle as (kind: string) => void)('ai');
