@@ -3662,8 +3662,11 @@ button.room-cost-row:hover {
 .project-menu-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .project-menu-date { display:flex; align-items:center; font-size:var(--fs-meta); color:hsl(var(--muted-foreground)); font-variant-numeric:tabular-nums; }
 .project-menu-check { display:flex; color:hsl(var(--primary)); }
-.project-menu-sentinel { height:1px; }
 .project-menu-loading { display:flex; justify-content:center; padding:8px 0; color:hsl(var(--muted-foreground)); }
+.project-menu-error { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; font-size:var(--fs-meta); color:hsl(var(--destructive)); }
+.project-menu-error button { padding:2px 8px; border-radius:var(--ctl-radius-in); color:hsl(var(--primary)); }
+.project-menu-error button:hover { background:hsl(var(--accent)); }
+.project-menu-list .list-load-more { min-height:32px; margin:0; font-size:var(--fs-meta); }
 /* 「新建项目」菜单（工作台下拉二级菜单 + 项目管理页页头新建菜单共用）：
    与 .wall-options-item 同一套两行刻度 —— 标题 --fs-group、说明 --fs-hint、padding 9px。
    组件 CreateProjectMenuItems 依赖这组 class，删菜单结构时必须同步处理，不要留下「组件在用、CSS 已删」的 class。 */

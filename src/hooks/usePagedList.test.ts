@@ -30,6 +30,8 @@ vi.mock('@/lib/notify', () => ({ errorMessage: (cause: unknown, fallback: string
 import { usePagedList, type PagedListOptions } from './usePagedList';
 
 type Options = PagedListOptions<string, string>;
+/** 渲染一次：上面的极简运行时里，Hook 按调用顺序占槽位，所以每次调用就是一次渲染。 */
+// eslint-disable-next-line react-hooks/rules-of-hooks -- 测试运行时直接调用 Hook，不经过 React 组件
 const render = (options: Options) => { rt.cursor = 0; rt.effect = 0; return usePagedList(options); };
 /** 等所有已完成的 Promise 回调跑完。 */
 const settle = async () => { for (let i = 0; i < 5; i++) await Promise.resolve(); };
@@ -213,6 +215,45 @@ describe('usePagedList：接口数据在前，本地数据在后', () => {
     expect(list.loadingMore).toBe(false);
   });
 
+  it('卸载之后再调用 refresh / loadMore 不会发请求', async () => {
+    const remote = fakeRemote(45);
+    const options: Options = { remote: remote.source, key: 'all' };
+    const list = render(options); await settle();
+    // 卸载：执行所有 effect 的清理函数
+    rt.effects.forEach((effect) => { if (effect.cleanup) effect.cleanup(); });
+    await list.refresh(); list.loadMore(); list.reload(); await settle();
+    expect(remote.calls).toHaveLength(1);
+  });
+
+  it('卸载后又重新挂载（StrictMode 二次挂载）照常翻页', async () => {
+    const remote = fakeRemote(45);
+    const options: Options = { remote: remote.source, key: 'all' };
+    render(options); await settle();
+    rt.effects.forEach((effect) => { if (effect.cleanup) effect.cleanup(); });
+    rt.effects = [];
+    render(options); await settle();
+    render(options).loadMore(); await settle();
+    expect(render(options).list).toHaveLength(40);
+    expect(remote.calls.map((call) => call.page)).toEqual([1, 1, 2]);
+  });
+
+  it('某一页因为丢弃了不完整的行而不满 20 条时，照常继续翻页', async () => {
+    // 共 45 行，第 1 页有一行读不懂被丢弃：第 1 页只有 19 条
+    const calls: number[] = [];
+    const source = async ({ page, pageSize }: PageRequest) => {
+      calls.push(page);
+      const rows = range((page - 1) * pageSize, Math.min(page * pageSize, 45)).filter(row => row !== 'r7');
+      return { list: rows, pagination: { page, pageSize, total: 45 }, counts: {} };
+    };
+    const options: Options = { remote: source, key: 'all' };
+    render(options); await settle();
+    expect(render(options).list).toHaveLength(19);
+    for (let i = 0; i < 3; i++) { render(options).loadMore(); await settle(); }
+    const list = render(options);
+    expect(list.list).toHaveLength(44);
+    expect(list.hasMore).toBe(false);
+    expect(calls).toEqual([1, 2, 3, 4]);
+  });
   it('接口返回的总数与实际条数对不上时不会卡在「还有更多」', async () => {
     // 声称 25 条，第 2 页却是空的（期间被删除）
     const calls: number[] = [];

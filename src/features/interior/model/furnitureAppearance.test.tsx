@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { matchFurnitureType, resolvedFurnitureType, appearanceDimensions, filterFurnitureLibrary, needsParameterOnly } from './furnitureAppearance';
-import { accountCostEntries, filterCostEntries } from './accountCostEntries';
+import { accountItemEntry, builtinCostEntries, filterCostEntries } from './accountCostEntries';
 import { blankDesign } from '../data/templates';
 import { library } from '../data/catalog';
 import { validateDesign } from './validation';
@@ -40,7 +40,7 @@ describe('家具外观和成本分类',()=>{
     expect(()=>validateDesign(blankDesign())).not.toThrow();
   });
   it('硬装与软装筛选隔离且保留家电',()=>{
-    const entries=accountCostEntries([item],{});
+    const entries=[accountItemEntry({kind:'furniture',item}),...builtinCostEntries()];
     expect(filterCostEntries(entries,'全部','','硬装').every(e=>['地面','墙面','门窗','屋面','吊顶','楼梯'].includes(e.category))).toBe(true);
     expect(filterCostEntries(entries,'家电','','软装').length).toBeGreaterThan(0);
     expect(filterCostEntries(entries,'全部','火炉','硬装')).toEqual([]);

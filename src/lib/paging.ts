@@ -41,6 +41,32 @@ export interface LoadedPages<T, K extends string = string> {
 
 export const EMPTY_PAGES: LoadedPages<never, never> = { items: [], total: 0, counts: {} };
 
+/** 本地数据的分类数量：按 `keyOf` 的结果计数。 */
+export function countBy<T, K extends string>(items: readonly T[], keyOf: (item: T) => K): PageCounts<K> {
+  const counts: PageCounts<K> = {};
+  for (const item of items) {
+    const key = keyOf(item);
+    counts[key] = (counts[key] ?? 0) + 1;
+  }
+  return counts;
+}
+
+/**
+ * 接口这一侧新取回一页之后，已取回的数据是否已经是全部：这一页是空的，或条数达到了总数。
+ * 页面拿到的条数可能比接口返回的少（数据不完整的行不显示），所以不按「这一页没装满」判断。
+ */
+export const fetchedAll = (items: readonly unknown[], page: readonly unknown[], total: number) => !page.length || items.length >= total;
+
+/** 选择器类的下拉要一次拿全：按页读到取完为止（每页 100 条，接口单页上限）。 */
+export async function readAll<T, K extends string = string>(source: PageSource<T, K>, pageSize = 100): Promise<T[]> {
+  const items: T[] = [];
+  for (let page = 1; ; page++) {
+    const result = await source({ page, pageSize });
+    items.push(...result.list);
+    if (fetchedAll(items, result.list, result.pagination.total)) return items;
+  }
+}
+
 /** 两份分类数量按分类相加。 */
 export function addCounts<K extends string>(a: PageCounts<K>, b: PageCounts<K>): PageCounts<K> {
   const sum: PageCounts<K> = { ...a };

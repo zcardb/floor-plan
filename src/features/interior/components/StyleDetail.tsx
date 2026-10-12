@@ -3,10 +3,13 @@ import { ArrowLeft, Copy, Loader2, RotateCcw, Save, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
+import { usePagedList } from "@/hooks/usePagedList";
 import { notify } from "@/lib/notify";
+import type { PageRequest, PageResult } from "@/lib/paging";
 import { removeAccountStyle, saveAccountStyle } from "../cloud/accountWrites";
-import type { AccountLibrary } from "../cloud/useAccountLibrary";
+import { accountItemPage } from "../cloud/libraryPages";
 import { library as catalog } from "../data/catalog";
+import { costCounts } from "../model/accountCostEntries";
 import {
   DECOR_CATEGORIES,
   DECOR_ROLES,
@@ -24,6 +27,8 @@ import {
 import type { LibraryItem } from "../model/types";
 import { CmsFilterBar } from "./CmsFilterBar";
 import { FurnitureShape } from "./FurnitureShape";
+import { ListLoadMore } from "./ListLoadMore";
+import { LoadError } from "./LoadError";
 
 const ROLE_LABEL = Object.fromEntries(DECOR_ROLES.map((r) => [r.id, r.label])) as Record<DecorRole, string>;
 /** 硬装与收边的颜色字段：详情页逐行展示，自定义风格可改。 */
@@ -36,6 +41,19 @@ const HARD_FIELDS: { key: "wall" | "door" | "wood" | "legs" | "accent"; label: s
 ];
 const ALL = "全部";
 const MINE = "我的家具";
+/** 家具清单里的内置家具（楼梯是构件，不随风格着色）与它们的分类。 */
+const BUILTIN = catalog.filter((item) => item.type !== "stairs");
+const GROUPS = [ALL, ...new Set(BUILTIN.map((item) => item.category))];
+
+/** 家具清单的接口部分：我的家具（不含楼梯）；分类数量只需要知道我的家具一共几件。 */
+const myFurniture = (group: string) => async (request: PageRequest): Promise<PageResult<LibraryItem>> => {
+  const page = await accountItemPage(request, { kinds: ["furniture"], major: "软装", category: group === ALL || group === MINE ? undefined : group });
+  return {
+    list: page.list.flatMap((entry) => (entry.kind === "furniture" ? [entry.item] : [])),
+    pagination: page.pagination,
+    counts: { [MINE]: costCounts(page.counts, { custom: false })["软装"] ?? 0 },
+  };
+};
 
 /** 一行颜色：色块 + 色号；可编辑时右侧是取色器。 */
 function ColorRow({ label, hint, value, editable, onChange, extra }: {
@@ -93,12 +111,15 @@ function FurnitureRow({ item, style, editable, onColor, onReset }: {
  * 内置风格只读，可「复制为我的风格」；自定义风格的每一项都能改，包括逐类家具单独定色
  * （按家具类型生效，同类型的家具一起变）。改完点「保存」写回账号库；已经套用过它的方案不受影响。
  */
-export function StyleDetail({ style, custom, library, onBack, onDuplicate, onDeleted, onDirty }: {
+export function StyleDetail({ style, custom, onBack, onDuplicate, duplicating = false, onSaved, onDeleted, onDirty }: {
   style: DecorStyle;
   custom: boolean;
-  library: AccountLibrary;
   onBack: () => void;
   onDuplicate: () => void;
+  /** 「复制为我的风格」正在准备新建弹窗。 */
+  duplicating?: boolean;
+  /** 保存成功：传回保存后的风格。 */
+  onSaved: (style: DecorStyle) => void;
   onDeleted: () => void;
   onDirty: (dirty: boolean) => void;
 }) {
@@ -119,11 +140,13 @@ export function StyleDetail({ style, custom, library, onBack, onDuplicate, onDel
   });
   const save = async () => {
     if (!draft.name.trim()) { notify.fail("风格名称不能为空"); return; }
+    const saved = { ...draft, name: draft.name.trim() };
     setSaving(true);
     try {
-      await saveAccountStyle({ ...draft, name: draft.name.trim() });
-      await library.load();
-      notify.success(`已保存「${draft.name.trim()}」`);
+      await saveAccountStyle(saved);
+      setDraft(saved);
+      onSaved(saved);
+      notify.success(`已保存「${saved.name}」`);
     } catch (cause) {
       notify.error("风格保存失败", cause);
     } finally {
@@ -135,17 +158,19 @@ export function StyleDetail({ style, custom, library, onBack, onDuplicate, onDel
     if (!ok) return;
     try {
       await removeAccountStyle(style.id);
-      await library.load();
       notify.success(`已删除「${style.name}」`);
       onDeleted();
     } catch (cause) {
       notify.error("删除失败", cause);
     }
   };
-  const builtin = catalog.filter((item) => item.type !== "stairs");
-  const groups = [ALL, ...new Set(builtin.map((item) => item.category)), ...(library.furniture.length ? [MINE] : [])];
-  const items = group === ALL ? [...builtin, ...library.furniture] : group === MINE ? library.furniture : builtin.filter((item) => item.category === group);
-  const chips = groups.map((id) => ({ id, label: id }));
+  // 家具清单统一分页（一页 20 件）：我的家具由列表接口按页读取、排在前面，内置家具接在后面。
+  const furniture = usePagedList<LibraryItem>({
+    remote: myFurniture(group),
+    local: group === MINE ? [] : group === ALL ? BUILTIN : BUILTIN.filter((item) => item.category === group),
+    key: group,
+  });
+  const chips = [...GROUPS, ...(furniture.counts[MINE] ? [MINE] : [])].map((id) => ({ id, label: id }));
   return (
     <div className="style-detail">
       <button type="button" className="style-detail-back" onClick={onBack}><ArrowLeft size={15} />风格管理</button>
@@ -171,7 +196,7 @@ export function StyleDetail({ style, custom, library, onBack, onDuplicate, onDel
           {custom ? <>
             <Button variant="outline" onClick={() => void remove()} disabled={saving}><Trash2 />删除</Button>
             <Button onClick={() => void save()} disabled={!dirty || saving}>{saving ? <Loader2 className="animate-spin" /> : <Save />}保存</Button>
-          </> : <Button onClick={onDuplicate}><Copy />复制为我的风格</Button>}
+          </> : <Button onClick={onDuplicate} disabled={duplicating} aria-busy={duplicating}>{duplicating ? <Loader2 className="animate-spin" /> : <Copy />}复制为我的风格</Button>}
         </div>
       </header>
       <div className="style-detail-palette" aria-label="主色板">
@@ -229,15 +254,17 @@ export function StyleDetail({ style, custom, library, onBack, onDuplicate, onDel
       </div>
       <section className="style-detail-furniture" aria-labelledby="style-furniture">
         <div className="style-detail-furniture-head">
-          <h2 id="style-furniture">家具清单 <small>{items.length} 件</small></h2>
+          <h2 id="style-furniture">家具清单 <small>{furniture.loading ? "…" : `${furniture.pagination.total} 件`}</small></h2>
           <p className="style-detail-hint">{custom ? "点色块可以给某类家具单独定色，同类型的家具（如两种尺寸的双人床）一起变。" : "每件家具都按这套风格着色；复制为我的风格后可以逐类调整。"}</p>
         </div>
         <CmsFilterBar label="家具分类" chips={chips} value={group} onChange={setGroup} />
+        {furniture.error && <LoadError title="我的家具读取失败" message={furniture.error} retrying={furniture.loading} onRetry={furniture.reload} />}
         <ul className="style-furniture-grid">
-          {items.map((item) => (
+          {furniture.list.map((item) => (
             <FurnitureRow key={item.catalogId ?? item.type + item.name} item={item} style={draft} editable={custom} onColor={setItem} onReset={resetItem} />
           ))}
         </ul>
+        <ListLoadMore list={furniture} />
       </section>
     </div>
   );

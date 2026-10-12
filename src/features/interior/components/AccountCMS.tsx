@@ -5,9 +5,7 @@ import { AssistantManager } from './AssistantManager';
 import { StyleManager } from './StyleManager';
 import type { useProjects } from '../cloud/useProjects';
 import type { useAccountCosts } from '../cloud/useAccountCosts';
-import { useAccountLibrary } from '../cloud/useAccountLibrary';
 import { ProjectManager } from './ProjectManager';
-import { ManagementEntry } from './ManagementEntry';
 import { newFurnitureCategory } from '../model/newFurnitureCategory';
 import { AccountFurnitureLibrary } from './AccountFurnitureLibrary';
 import { CustomFurnitureDialog } from './CustomFurnitureDialog';
@@ -26,16 +24,18 @@ export function AccountCMS({projects,costs,opened,tab,styleId,onTab,onStyle,onDi
   const navigate=(next:string)=>{if(next===tab||costs.saving)return;if(next!=='logout'){onTab(next);return;}if(dirty){setLeaving(next);return;}void projects.signOut();};
   const cancelLeave=()=>{setLeaving(null);pendingLeave?.reset();};
   const confirmLeave=()=>{setDirty(false);if(leaving==='logout')void projects.signOut();pendingLeave?.proceed();setLeaving(null);};
-  // 账号库一次读完（家具 + 地面 / 墙面 / 门窗 / 屋面 / 吊顶），不再逐个库各发一次请求。
-  const library=useAccountLibrary(),load=library.load,reset=library.reset;
   const [initialCategory,setInitialCategory]=useState('客厅');
   const newFurniture=(category:string)=>{setInitialCategory(newFurnitureCategory(category));setCreating(true);};
+  // 新建了家具或材料：家具管理的列表回到第一页重新读取，新条目出现在最前面。
+  const [revision,setRevision]=useState(0),created=()=>setRevision(n=>n+1);
+  const owner=projects.session?.user.id;
   return <CmsLayout collapsed={collapsed} sidebar={<CmsSidebar collapsed={collapsed} onToggle={toggleSidebar} modules={MODULES} active={tab} onSelect={navigate} email={projects.session?.user.email??''} loggingOut={projects.signingOut} onLogout={()=>navigate('logout')}/>} after={<>
     <AlertDialog open={!!leaving||!!pendingLeave} onOpenChange={v=>{if(!v)cancelLeave();}}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{tab==='styles'?'风格修改尚未保存':'账号单价尚未保存'}</AlertDialogTitle><AlertDialogDescription>{tab==='styles'?'继续编辑可保留修改；离开将丢弃这套风格未保存的调整，已套用它的方案不受影响。':'继续编辑可保留草稿；离开将丢弃未保存的账号调价，已有项目数据不变。'}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>继续编辑</AlertDialogCancel><AlertDialogAction onClick={confirmLeave}>放弃更改并离开</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-    {creating&&<CustomFurnitureDialog open={creating} onOpenChange={setCreating} loggedIn={true} login={()=>{}} ownerKey={projects.session!.user.id} accountOnly initialCategory={initialCategory} onCreate={()=>{void load();}} onCreateFloor={()=>{void load();}} onCreateWall={()=>{void load();}} onCreateOpening={()=>{void load();}} onCreateRoof={()=>{void load();}} onCreateCeiling={()=>{void load();}} onImport={()=>{}}/>}
+    {creating&&<CustomFurnitureDialog open={creating} onOpenChange={setCreating} loggedIn={true} login={()=>{}} ownerKey={owner!} accountOnly initialCategory={initialCategory} onCreate={created} onCreateFloor={created} onCreateWall={created} onCreateOpening={created} onCreateRoof={created} onCreateCeiling={created} onImport={()=>{}}/>}
   </>}>
-    {tab==='assistants'?<AssistantManager key={projects.session?.user.id}/>:tab==='styles'?<ManagementEntry key={tab} label="加载风格" variant="library" loading={library.loading} load={load} reset={reset}><StyleManager key={projects.session?.user.id} library={library} styleId={styleId} onOpen={id=>onStyle?.(id)} onDirty={setDirty}/></ManagementEntry>:<ManagementEntry key={tab} label={tab==='projects'?'加载项目':'加载家具'} variant={tab==='projects'?'projects':'library'} loading={tab==='projects'?!projects.listReady||projects.loading:costs.loading||library.loading} load={tab==='projects'?undefined:load} reset={tab==='projects'?undefined:reset}>
-      {tab==='projects'?<ProjectManager projects={projects} opened={opened}/>:<AccountFurnitureLibrary key={projects.session?.user.id} library={library} defaults={costs.settings} saveDefaults={costs.save} saving={costs.saving} saveError={costs.error} onDirty={setDirty} onNew={newFurniture}/>}
-    </ManagementEntry>}
+    {tab==='assistants'?<AssistantManager key={owner}/>
+      :tab==='styles'?<StyleManager key={owner} styleId={styleId} onOpen={id=>onStyle?.(id)} onDirty={setDirty}/>
+      :tab==='projects'?<ProjectManager projects={projects} opened={opened}/>
+      :<AccountFurnitureLibrary key={owner} revision={revision} costsLoading={costs.loading} defaults={costs.settings} saveDefaults={costs.save} saving={costs.saving} saveError={costs.error} onDirty={setDirty} onNew={newFurniture}/>}
   </CmsLayout>;
 }

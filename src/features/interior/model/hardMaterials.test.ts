@@ -3,7 +3,7 @@ import { blankDesign } from '../data/templates';
 import { applyOpeningVariant, applyRoomWall, pickableWalls } from './hardMaterials';
 import { calculateCosts } from './costs';
 import { validateDesign } from './validation';
-import { accountCostEntries, accountCostSource } from './accountCostEntries';
+import { accountCostSource, accountItemEntry, builtinCostEntries } from './accountCostEntries';
 import type { CustomOpening, CustomWall, Design } from './types';
 
 const wall: CustomWall = { key: 'custom-33333333-3333-4333-8333-333333333333', name: '艺术涂料', color: '#d9cbb6', price: 120 };
@@ -51,7 +51,7 @@ describe('自定义墙面与门窗', () => {
     expect(() => validateDesign(mismatched)).toThrow();
   });
   it('账号条目包含自定义墙面与门窗及来源', () => {
-    const entries = accountCostEntries([], {}, [], [wall], [door]);
+    const entries = [accountItemEntry({ kind: 'wall', item: wall }), accountItemEntry({ kind: 'opening', item: door }), ...builtinCostEntries()];
     expect(entries.filter(e => e.category === '墙面').map(e => e.name)).toEqual(['艺术涂料', '乳胶漆', '墙纸', '墙砖']);
     expect(entries.filter(e => e.category === '门窗').map(e => e.name)).toEqual(['实木门', '门', '窗', '垭口']);
     const design = { ...blankDesign(), customWalls: [wall], customOpenings: [door] };

@@ -15,7 +15,8 @@ vi.mock('react', async original => ({
   useLayoutEffect: (effect: () => unknown) => { state.effects.push(effect); },
   useCallback: <T,>(fn: T) => fn,
 }));
-import { ProjectMenu, LoadMoreSentinel } from './ProjectMenu';
+import { ProjectMenu, ProjectSwitchList } from './ProjectMenu';
+import { ListLoadMore } from './ListLoadMore';
 import { ProjectDeleteDialog, ProjectRenameDialog } from './ProjectDialogs';
 import { NewProjectDialog } from './NewProjectDialog';
 import { AiCreateProjectDialog } from './lazyDialogs';
@@ -39,6 +40,8 @@ type Node = ReactElement<Record<string, unknown>>;
 function nodes(tree: ReactNode): Node[] {
   if (Array.isArray(tree)) return tree.flatMap(nodes);
   if (!isValidElement<Record<string, unknown>>(tree)) return [];
+  // 「切换项目」的项目列表是独立组件（统一分页）：展开它渲染出的内容
+  if (tree.type === ProjectSwitchList) return [tree, ...nodes(ProjectSwitchList(tree.props as Parameters<typeof ProjectSwitchList>[0]))];
   return [tree, ...nodes(tree.props.children as ReactNode)];
 }
 function text(tree: ReactNode): string {
@@ -51,8 +54,8 @@ const current = row('a', '三室两厅两卫'), other = row('b', 'Home');
 function menu(overrides: Partial<Parameters<typeof ProjectMenu>[0]> = {}) {
   state.cursor = 0;
   const props = {
-    project: current, loggedIn: true, projectList: [current, other], hasMore: false, listLoading: false,
-    onOpen: vi.fn(async () => true), onLoadMore: vi.fn(), onBack: vi.fn(),
+    project: current, loggedIn: true, localProjects: [current, other],
+    onOpen: vi.fn(async () => true), onBack: vi.fn(),
     onRename: vi.fn(async () => true), onRemove: vi.fn(async () => true), ...overrides,
   };
   return { props, tree: nodes(ProjectMenu(props)) };
@@ -99,12 +102,15 @@ describe('ProjectMenu', () => {
     expect(state.values[0]).toBe('b');
     expect(options(menu().tree).every(n => n.props.disabled === !n.props['aria-current'])).toBe(true);
   });
-  it('有下一页时渲染底部哨兵，加载中显示 spinner', () => {
-    expect(menu().tree.some(n => n.type === LoadMoreSentinel)).toBe(false);
-    const { props, tree } = menu({ hasMore: true });
-    const sentinel = tree.find(n => n.type === LoadMoreSentinel)!;
-    expect(sentinel.props.onVisible).toBe(props.onLoadMore);
-    expect(menu({ hasMore: true, listLoading: true }).tree.some(n => n.props.className === 'project-menu-loading')).toBe(true);
+  it('项目列表统一分页：一次显示 20 个，底部是滚动加载的哨兵', () => {
+    const many = Array.from({ length: 25 }, (_, i) => row('p' + i, '项目' + i));
+    const { tree } = menu({ localProjects: [current, ...many] });
+    expect(options(tree)).toHaveLength(20);
+    const more = tree.find(n => n.type === ListLoadMore)!;
+    expect((more.props.list as { pagination: { total: number } }).pagination.total).toBe(26);
+    // 云端项目由列表接口提供，排在本机方案与模板之前
+    const cloudProjects = vi.fn();
+    expect(menu({ cloudProjects }).tree.find(n => n.type === ProjectSwitchList)!.props.p).toMatchObject({ cloudProjects });
   });
   it('底部账号区：游客是「登录」，已登录是邮箱 +「退出登录」', () => {
     const onLogin = vi.fn(), onLogout = vi.fn();
@@ -133,7 +139,7 @@ describe('ProjectMenu', () => {
     expect(actions(tree)).toHaveLength(0);
   });
   it('项目行只有名称、日期与当前勾选，不再放重命名 / 删除（只在项目管理页操作）', () => {
-    const { tree } = menu({ projectList: [current, other, row('s', '默认方案', true)] });
+    const { tree } = menu({ localProjects: [current, other, row('s', '默认方案', true)] });
     expect(actions(tree)).toHaveLength(0);
     expect(tree.some(n => n.type === ProjectRenameDialog || n.type === ProjectDeleteDialog)).toBe(false);
     expect(options(tree)).toHaveLength(3);
@@ -210,26 +216,35 @@ describe('ProjectMenu', () => {
   });
 });
 
-describe('LoadMoreSentinel', () => {
-  it('滚到底触发加载，禁用时不监听', () => {
-    const observers: { callback: IntersectionObserverCallback; disconnect: () => void }[] = [];
+describe('ListLoadMore', () => {
+  const page = (shown: number, total: number, busy = false) => ({
+    list: Array.from({ length: shown }, (_, i) => i), pagination: { page: Math.ceil(shown / 20), pageSize: 20, total },
+    loading: false, loadingMore: busy, loadMore: vi.fn(),
+  });
+  it('滚到底只触发一次加载；读取中或已全部显示时不监听；不足一页时不渲染', () => {
+    const observers: { callback: IntersectionObserverCallback }[] = [];
     vi.stubGlobal('IntersectionObserver', class {
       constructor(public callback: IntersectionObserverCallback) { observers.push(this as never); }
       observe() {} disconnect() {}
     });
+    vi.stubGlobal('getComputedStyle', () => ({ overflowY: 'visible' }));
     try {
-      const onVisible = vi.fn();
-      LoadMoreSentinel({ disabled: false, onVisible });
-      state.refs[0].current = { parentElement: {} };
+      const list = page(20, 45);
+      const tree = ListLoadMore({ list })!;
+      expect(text(tree.props.children as ReactNode)).toContain('正在加载更多');
+      state.refs.find(ref => ref.current === null)!.current = { parentElement: null };
       state.effects.forEach(effect => effect());
       expect(observers).toHaveLength(1);
-      observers[0].callback([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
-      expect(onVisible).toHaveBeenCalledOnce();
+      const hit = () => observers[0].callback([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
+      hit(); hit();
+      expect(list.loadMore).toHaveBeenCalledOnce();
       state.refs = []; state.effects = [];
-      LoadMoreSentinel({ disabled: true, onVisible });
-      state.refs[0].current = { parentElement: {} };
+      ListLoadMore({ list: page(20, 45, true) });
+      state.refs.forEach(ref => { if (ref.current === null) ref.current = { parentElement: null }; });
       state.effects.forEach(effect => effect());
       expect(observers).toHaveLength(1);
+      expect(text(ListLoadMore({ list: page(45, 45) })!.props.children as ReactNode)).toContain('已加载全部 45 条');
+      expect(ListLoadMore({ list: page(12, 12) })).toBeNull();
     } finally { vi.unstubAllGlobals(); }
   });
 });

@@ -5,7 +5,7 @@ import { calculateCosts, setPrice } from './costs';
 import { costBreakdown } from './costBreakdown';
 import { area } from './geometry';
 import { validateDesign } from './validation';
-import { accountCostEntries, accountCostSource } from './accountCostEntries';
+import { accountCostSource, accountItemEntry, builtinCostEntries } from './accountCostEntries';
 import { createDrawingDocument } from './drawingDocument';
 import type { CustomWall, Design, Layers } from './types';
 
@@ -64,7 +64,7 @@ describe('屋面与吊顶（按房间计入硬装）', () => {
     expect(validateDesign(d).rooms[0]).toMatchObject({ roofMat: tile.key, roofSlope: 30, ceilingMat: board.key });
   });
   it('账号库条目归入硬装屋面 / 吊顶并标注来源', () => {
-    const entries = accountCostEntries([], {}, [], [], [], { roofs: [tile], ceilings: [board] });
+    const entries = [accountItemEntry({ kind: 'roof', item: tile }), accountItemEntry({ kind: 'ceiling', item: board }), ...builtinCostEntries()];
     expect(entries.filter(e => e.category === '屋面').map(e => e.name)).toEqual(['仿古琉璃瓦', '琉璃瓦', '水泥瓦', '沥青瓦', '树脂瓦', '石板瓦', '现浇混凝土平屋面（含防水保温）', '彩钢瓦', '阳光板']);
     expect(entries.filter(e => e.category === '吊顶').map(e => e.name)).toEqual(['双层石膏板', '石膏板吊顶', '铝扣板吊顶', '集成吊顶']);
     expect(entries.filter(e => e.category === '屋面' || e.category === '吊顶').every(e => e.major === '硬装')).toBe(true);

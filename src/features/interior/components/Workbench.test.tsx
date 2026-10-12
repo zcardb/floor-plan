@@ -64,7 +64,7 @@ function render(overrides: Partial<Parameters<typeof Workbench>[0]> = {}) {
   const noop = vi.fn();
   return nodes(Workbench({
     project: { id: 'test', name: '测试', state: state.design } as Project,
-    projectNavigation: { projectList: [], hasMore: false, listLoading: false, onOpen: noop, onLoadMore: noop },
+    projectNavigation: { localProjects: [], onOpen: noop },
     update: noop, status: { kind: 'saved' as const, label: '' }, loggedIn: false, projects: noop, login: noop, logout: noop,
     cloudSave: noop, guestEdits: 0,
     ...overrides,

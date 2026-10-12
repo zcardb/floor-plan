@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorMessage } from "@/lib/notify";
-import { EMPTY_PAGES, PAGE_SIZE, pagedView, type LoadedPages, type PageCounts, type PageResult, type PageSource } from "@/lib/paging";
+import { EMPTY_PAGES, PAGE_SIZE, fetchedAll, pagedView, type LoadedPages, type PageCounts, type PageResult, type PageSource } from "@/lib/paging";
 
 export interface PagedListOptions<T, K extends string = string> {
   /** 接口部分：按页读取。没有接口数据的列表（游客、数据已在内存里的列表）传 null。 */
@@ -45,12 +45,12 @@ const initial = <T, K extends string>(key: string, hasRemote: boolean): State<T,
 const READ_FAILED = "读取失败，请重试";
 
 /**
- * 接口这一侧新取回一页：这一页没装满，或条数已达到总数，就算取完；
- * 取完后总数以实际条数为准，避免别处增删导致「总数对不上、一直还有更多」。
+ * 接口这一侧新取回一页，见 `fetchedAll`。取完后总数以实际条数为准，
+ * 避免别处增删、或有数据不完整的行被丢弃时「总数对不上、一直还有更多」。
  */
 function accept<T, K extends string>(items: T[], result: PageResult<T, K>): LoadedPages<T, K> {
   const all = [...items, ...result.list];
-  const done = result.list.length < result.pagination.pageSize || all.length >= result.pagination.total;
+  const done = fetchedAll(all, result.list, result.pagination.total);
   return { items: all, total: done ? all.length : result.pagination.total, counts: result.counts };
 }
 
@@ -76,6 +76,13 @@ export function usePagedList<T, K extends string = string>({ remote, local = [],
   keyRef.current = key;
   /** 每次重新读取第一页就加一，用来作废还在路上的旧请求。 */
   const epoch = useRef(0);
+  /** 卸载后不再发请求、不再写状态（异步操作收尾时可能还会调用 refresh）。 */
+  const alive = useRef(true);
+  useEffect(() => {
+    // 卸载后又重新挂载（如开发环境 StrictMode 的二次挂载）时恢复。
+    alive.current = true;
+    return () => { alive.current = false; };
+  }, []);
   /** 上一次读完时显示的内容：切换筛选、等待第一页期间继续显示它，避免整片闪动。 */
   const settled = useRef<PageResult<T, K> | null>(null);
   /** 状态同时记到 ref：同一轮事件里连续调用（如哨兵连续触发）也能读到刚写入的值。 */
@@ -86,19 +93,20 @@ export function usePagedList<T, K extends string = string>({ remote, local = [],
 
   const enabled = !!remote;
   useEffect(() => {
-    const source = remoteRef.current;
+    const source = remoteRef.current, counter = epoch;
     if (!source) return;
-    const run = ++epoch.current;
+    const run = ++counter.current;
     source({ page: 1, pageSize: PAGE_SIZE }).then(
-      (result) => { if (run === epoch.current) commit({ key, loaded: accept([], result), page: 1, status: "ready", error: "" }); },
-      (cause) => { if (run === epoch.current) commit({ key, loaded: EMPTY_PAGES, page: 1, status: "ready", error: errorMessage(cause, READ_FAILED) }); },
+      (result) => { if (run === counter.current) commit({ key, loaded: accept([], result), page: 1, status: "ready", error: "" }); },
+      (cause) => { if (run === counter.current) commit({ key, loaded: EMPTY_PAGES, page: 1, status: "ready", error: errorMessage(cause, READ_FAILED) }); },
     );
-    return () => { epoch.current++; };
+    // 作废这一次还在路上的请求（筛选又变了、点了刷新或卸载）。
+    return () => { counter.current++; };
   }, [key, version, enabled, commit]);
 
   const loadMore = useCallback(() => {
     const current = stateRef.current, source = remoteRef.current;
-    if (current.status !== "ready") return;
+    if (!alive.current || current.status !== "ready") return;
     const page = current.page + 1;
     // 接口数据已经取完（或本来就没有接口部分）：多显示一页本地数据即可。
     if (!source || current.loaded.items.length >= current.loaded.total) {
@@ -115,6 +123,7 @@ export function usePagedList<T, K extends string = string>({ remote, local = [],
   }, [commit]);
 
   const reload = useCallback(() => {
+    if (!alive.current) return;
     settled.current = null;
     commit(initial(keyRef.current, !!remoteRef.current));
     setVersion((n) => n + 1);
@@ -122,7 +131,7 @@ export function usePagedList<T, K extends string = string>({ remote, local = [],
 
   const refresh = useCallback(async () => {
     const current = stateRef.current, source = remoteRef.current;
-    if (!source || current.status === "loading") return;
+    if (!alive.current || !source || current.status === "loading") return;
     const run = ++epoch.current;
     commit({ ...current, status: "more" });
     try {

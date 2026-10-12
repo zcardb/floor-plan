@@ -1,10 +1,9 @@
 import { useCallback, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { furnitureFromRow } from '../ai/furnitureRow';
 import { BUILTIN_IDS } from '../model/builtinAssets';
 import type { CustomFloor, CustomOpening, CustomWall, LibraryItem } from '../model/types';
 import type { DecorStyle } from '../model/decorStyles';
-import { colorMaterialFromRow, floorFromRow, openingFromRow, styleFromRow } from './accountRows';
+import { accountItemFromRow, styleFromRow } from './accountRows';
 
 /** 账号库全部条目：数据库视图 interior_account_library 把 家具 / 地面 / 墙面 / 门窗 / 屋面 / 吊顶 / 风格 合成一张表。 */
 export interface AccountLibraryData {
@@ -18,24 +17,30 @@ export interface AccountLibraryData {
 }
 const EMPTY: AccountLibraryData = { furniture: [], overrides: [], floors: [], walls: [], openings: [], roofs: [], ceilings: [], styles: [] };
 const builtin = new Set(BUILTIN_IDS);
-const keep = <T,>(value: T | null): value is T => value !== null;
 
 type ViewRow = { kind: string | null; data: unknown };
 
 /** 视图的行按 kind 分到各个列表（无效行丢弃）。 */
 export function splitAccountLibrary(rows: ViewRow[]): AccountLibraryData {
-  const of = (kind: string) => rows.filter(row => row.kind === kind).map(row => (row.data ?? {}) as Record<string, unknown>);
-  const furniture = of('furniture').map(r => furnitureFromRow(r as Parameters<typeof furnitureFromRow>[0]));
-  return {
-    furniture: furniture.filter(item => !builtin.has(item.catalogId!)),
-    overrides: furniture.filter(item => builtin.has(item.catalogId!)),
-    floors: of('floor').map(floorFromRow).filter(keep),
-    walls: of('wall').map(r => colorMaterialFromRow(r, 'wall_key')).filter(keep),
-    openings: of('opening').map(openingFromRow).filter(keep),
-    roofs: of('roof').map(r => colorMaterialFromRow(r, 'roof_key')).filter(keep),
-    ceilings: of('ceiling').map(r => colorMaterialFromRow(r, 'ceiling_key')).filter(keep),
-    styles: of('style').map(styleFromRow).filter(keep),
-  };
+  const data: AccountLibraryData = { furniture: [], overrides: [], floors: [], walls: [], openings: [], roofs: [], ceilings: [], styles: [] };
+  for (const row of rows) {
+    const value = (row.data ?? {}) as Record<string, unknown>;
+    if (row.kind === 'style') {
+      const style = styleFromRow(value);
+      if (style) data.styles.push(style);
+      continue;
+    }
+    const entry = accountItemFromRow(row.kind, value);
+    switch (entry?.kind) {
+      case 'furniture': (builtin.has(entry.item.catalogId!) ? data.overrides : data.furniture).push(entry.item); break;
+      case 'floor': data.floors.push(entry.item); break;
+      case 'opening': data.openings.push(entry.item); break;
+      case 'wall': data.walls.push(entry.item); break;
+      case 'roof': data.roofs.push(entry.item); break;
+      case 'ceiling': data.ceilings.push(entry.item); break;
+    }
+  }
+  return data;
 }
 
 /**

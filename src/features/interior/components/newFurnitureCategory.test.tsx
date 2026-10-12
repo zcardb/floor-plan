@@ -17,6 +17,8 @@ vi.mock('react', async importOriginal => ({
   useMemo(calculate: () => unknown) { return calculate(); },
   useCallback(callback: unknown) { return callback; },
 }));
+// 列表接口在直接调用组件时不会返回：由用例直接指定接口已返回的数据（见 usePagedList.testing）。
+vi.mock('@/hooks/usePagedList', () => import('@/hooks/usePagedList.testing'));
 vi.mock('./useAccountCostCommit', () => ({ useAccountCostCommit: () => ({ settings: {}, busy: false, pending: null, error: '', saved: false }) }));
 vi.mock('../cloud/useFurnitureImage', () => ({ useFurnitureImage: () => ({ cancel: () => {}, generate: harness.generate, busy: false }) }));
 vi.mock('../cloud/useAccountLibrary', () => ({ useAccountLibrary: () => ({ furniture: [], overrides: [], floors: [], walls: [], openings: [], roofs: [], ceilings: [], loading: false, error: '', load: harness.loadLibrary, reset: () => {} }) }));
@@ -32,6 +34,8 @@ import { AccountCMS } from './AccountCMS';
 import { CmsSidebar } from './CmsLayout';
 import type { useProjects } from '../cloud/useProjects';
 import type { useAccountCosts } from '../cloud/useAccountCosts';
+import { accountItemEntry } from '../model/accountCostEntries';
+import { pagedListFake } from '@/hooks/usePagedList.testing';
 
 type Node = ReactElement<Record<string, unknown>>;
 function nodes(tree: ReactNode): Node[] {
@@ -45,9 +49,9 @@ function nodes(tree: ReactNode): Node[] {
 }
 function render<T>(callback: () => T): T { harness.cursor = 0; harness.alls = 0; return callback(); }
 function fresh() { harness.slots = []; harness.cursor = 0; }
-beforeEach(() => { fresh(); harness.category = '全部'; harness.generate.mockReset().mockResolvedValue('https://example.com/furniture.png'); harness.save.mockReset().mockResolvedValue(true); });
-const empty = { furniture: [], overrides: [], floors: [], walls: [], openings: [], roofs: [], ceilings: [], loading: false, error: '', load: async () => {} };
-const library = (patch: Partial<typeof empty> = {}) => ({ ...empty, ...patch });
+beforeEach(() => { fresh(); pagedListFake.reset(); harness.category = '全部'; harness.generate.mockReset().mockResolvedValue('https://example.com/furniture.png'); harness.save.mockReset().mockResolvedValue(true); });
+/** 家具管理页：列表接口已返回的自建条目由 pagedListFake.remote 指定。 */
+const furniturePage = (onNew: (category: string) => void = () => {}) => AccountFurnitureLibrary({ revision: 0, defaults: {}, saveDefaults: async () => true, onDirty: () => {}, onNew });
 describe('新建家具默认分类', () => {
   it.each(['卧室', '客厅', '餐厨', '卫浴', '家电', '书房'])('有效分类 %s 原样保留', category => { expect(newFurnitureCategory(category)).toBe(category); });
   it.each(['地面', '墙面', '门窗', '屋面', '吊顶'])('硬装分类 %s 原样保留', category => { expect(newFurnitureCategory(category)).toBe(category); });
@@ -55,7 +59,7 @@ describe('新建家具默认分类', () => {
   it.each(['卧室', '餐厨', '全部', '地面', '墙面'])('家具管理点击新建传入当前筛选 %s', category => {
     harness.category = category;
     const onNew = vi.fn();
-    const furniture = render(() => AccountFurnitureLibrary({ library: library(), defaults: {}, saveDefaults: async () => true, onDirty: () => {}, onNew }));
+    const furniture = render(() => furniturePage(onNew));
     const click = nodes(furniture).find(node => Array.isArray(node.props.children) && node.props.children.includes('新建家具') && typeof node.props.onClick === 'function');
     expect(click).toBeDefined(); (click!.props.onClick as () => void)(); expect(onNew).toHaveBeenLastCalledWith(category);
   });
@@ -121,35 +125,36 @@ describe('新建家具默认分类', () => {
     const labels = nodes(render(() => AccountCMS({ projects, costs, opened: () => {}, tab: 'projects', onTab: () => {} }))).filter(node => node.type === 'button' && typeof node.props['aria-label'] === 'string').map(node => node.props['aria-label'] as string);
     expect(labels).toContain('项目管理'); expect(labels).toContain('家具管理'); expect(labels).not.toContain('成本管理');
   });
-  it('账号页新建家具或任意材料后，重读一次账号库', () => {
-    harness.loadLibrary.mockReset();
+  it('账号页新建家具或任意材料后，家具管理的列表回到第一页重新读取', () => {
     const projects = { session: { user: { id: 'owner', email: 'test@example.com' } } } as ReturnType<typeof useProjects>;
     const costs = { settings: {}, saving: false } as ReturnType<typeof useAccountCosts>;
     let tab = 'projects';
     const page = () => render(() => AccountCMS({ projects, costs, opened: () => {}, tab, onTab: next => { tab = next; } }));
     const menu = nodes(page()).find(node => node.type === 'button' && node.props['aria-label'] === '家具管理');
     (menu!.props.onClick as () => void)();
-    const lib = nodes(page()).find(node => node.type === AccountFurnitureLibrary)!;
-    expect((lib.props.library as { floors: unknown[] }).floors).toEqual([]);
-    (lib.props.onNew as (value: string) => void)('地面');
+    const lib = () => nodes(page()).find(node => node.type === AccountFurnitureLibrary)!;
+    expect(lib().props.revision).toBe(0);
+    (lib().props.onNew as (value: string) => void)('地面');
     const dialog = nodes(page()).find(node => node.type === CustomFurnitureDialog)!;
     for (const key of ['onCreateFloor', 'onCreate', 'onCreateWall', 'onCreateOpening', 'onCreateRoof', 'onCreateCeiling']) (dialog.props[key] as () => void)();
-    expect(harness.loadLibrary).toHaveBeenCalledTimes(6);
+    expect(lib().props.revision).toBe(6);
   });
   it('家具管理在“墙面”“门窗”筛选下展示自定义墙面与内置门窗', () => {
     harness.category = '墙面';
     const wall = { key: 'custom-22222222-2222-4222-8222-222222222222', name: '艺术涂料', color: '#d9cbb6', price: 120 };
-    const walls = nodes(render(() => AccountFurnitureLibrary({ library: library({ walls: [wall] }), defaults: {}, saveDefaults: async () => true, onDirty: () => {}, onNew: () => {} })));
+    pagedListFake.remote = { list: [accountItemEntry({ kind: 'wall', item: wall })], total: 1, counts: { 墙面: 1 } };
+    const walls = nodes(render(() => furniturePage()));
     expect(walls.some(node => node.type === 'b' && node.props.children === '艺术涂料')).toBe(true);
-    fresh(); harness.category = '门窗';
-    const doors = nodes(render(() => AccountFurnitureLibrary({ library: library(), defaults: {}, saveDefaults: async () => true, onDirty: () => {}, onNew: () => {} })));
+    fresh(); pagedListFake.reset(); harness.category = '门窗';
+    const doors = nodes(render(() => furniturePage()));
     expect(doors.some(node => node.type === 'b' && node.props.children === '门')).toBe(true);
     expect(doors.some(node => node.type === 'b' && node.props.children === '乳胶漆')).toBe(false);
   });
   it('家具管理展示账号地面，并计入“地面”筛选', () => {
     harness.category = '地面';
     const floor = { key: 'custom-11111111-1111-4111-8111-111111111111', name: '混凝土浇筑', pattern: 'seamless' as const, color: '#b8b8b0', price: null };
-    const tree = nodes(render(() => AccountFurnitureLibrary({ library: library({ floors: [floor] }), defaults: {}, saveDefaults: async () => true, onDirty: () => {}, onNew: () => {} })));
+    pagedListFake.remote = { list: [accountItemEntry({ kind: 'floor', item: floor })], total: 1, counts: { 地面: 1 } };
+    const tree = nodes(render(() => furniturePage()));
     expect(tree.some(node => node.type === 'b' && node.props.children === '混凝土浇筑')).toBe(true);
   });
 });

@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Check } from "lucide-react";
 import { usePagedList } from "@/hooks/usePagedList";
+import { addCounts } from "@/lib/paging";
 import { DECOR_STYLES, applyStyle, designStyle, isCustomStyleId, styleSwatches, type DecorStyle } from "../model/decorStyles";
 import type { Design } from "../model/types";
 import { ListLoadMore } from "./ListLoadMore";
 import { NewStyleDialog } from "./NewStyleDialog";
 import { PanelHint } from "./PanelHint";
 import { PanelList } from "./PanelList";
-import { STYLE_ALL, filterStyles, styleChips } from "./styleFilters";
+import { STYLE_ALL, countStyles, filterStyles, styleChips } from "./styleFilters";
 
 /**
  * 侧栏「风格」：给 3D 场景换一套装修风格。版式与家具库相同（`PanelList`：头部固定，只有风格列表滚动），
@@ -45,7 +46,7 @@ export function StylePanel({ design, change, mine, onCreate }: {
       <PanelList
         search={{ label: "搜索风格", placeholder: "搜索风格、材质…", value: query, onChange: setQuery }}
         action={onCreate && { label: "新建风格", onClick: () => setCreating(true) }}
-        chips={{ label: "风格大类", items: styleChips(DECOR_STYLES, own), value: searching ? "" : category, onChange: (id) => { setCategory(id); setQuery(""); } }}
+        chips={{ label: "风格大类", items: styleChips(addCounts(countStyles(own, { mine: true }), countStyles(DECOR_STYLES, { mine: false }))), value: searching ? "" : category, onChange: (id) => { setCategory(id); setQuery(""); } }}
         title={searching ? "搜索结果" : category === STYLE_ALL ? "全部风格" : category}
         count={`${shown.length} 套`}
         listKey={listKey}
