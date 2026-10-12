@@ -1,8 +1,8 @@
 # Interior 编辑器 UI 规范
 
-本目录（`src/features/interior`）下所有新增或修改的 UI 都按这份规范来做。数值统一取自 `src/index.css` 顶部的编辑器刻度变量，**不要另外写死数字**。
+本目录（`src/features/interior`）下所有新增或修改的 UI 都按这份规范来做。数值统一取自 `src/styles/index.css` 顶部的编辑器刻度变量，**不要另外写死数字**。
 
-## 1. 刻度变量（`src/index.css` `:root`）
+## 1. 刻度变量（`src/styles/index.css` `:root`）
 
 | 用途 | 变量 | 值 |
 |---|---|---|
@@ -30,7 +30,7 @@
 
 新增入口时：
 - **用原生 `<button type="button">`**，并加上 `aria-label`。它会自动继承 `.visual-selection-editor > button` 和 `.editor-tooltip-trigger > button` 的统一样式。
-- 需要弹层时用 `<PopoverTrigger asChild><button …/></PopoverTrigger>`，写法参考 `SelectionEditor.tsx` 里的「材质」和「开向」。
+- 需要弹层时用 `<PopoverTrigger asChild><button …/></PopoverTrigger>`，写法参考 `selection-editor.tsx` 里的「材质」和「开向」。
 - 需要提示时用 `EditorTooltip` 包一层。
 
 ## 3. 不要在工具条 / 面板里直接用 shadcn `<Button>`
@@ -84,7 +84,7 @@ min-height `--ctl-md`（32px）、gap 10px、padding `0 10px`、圆角 `--ctl-ra
 - 主操作（例如项目下拉里的「新建项目」）只用浅主色底 `--primary / 0.06` 和主色图标区分，不加边框，不用实色图标块，字号与其它项相同。
 - 项目下拉是一个 196px 的窄菜单（比 §5.1 单行菜单更窄，属例外），只有纯文字入口：「返回」→「新建项目 ▸」→「切换项目 ▸」，分隔线下是账号区（游客「登录」；已登录邮箱 +「退出登录」，全部左对齐纯文字）。不放左侧图标，只保留右侧 14px 子菜单箭头。项目行只有名称、日期和当前勾选；重命名、删除只放在项目管理页。
 - 子菜单箭头 14px，`--muted-foreground`，垂直居中。
-- 删菜单结构时，必须同步处理 `index.css` 里对应的 `.xxx-menu` / `.xxx-option` 规则：要么删掉规则并确认没有组件还在引用，要么保留。**不要留下「组件还在渲染这个 class、CSS 已经被删」的状态**——它不会有任何编译或测试报错，只会让菜单悄悄退回 shadcn 默认的大图标单行样式（「新建项目」菜单就这样坏过一次）。`toolbarMenus.test.tsx` 里有针对 `.create-menu` / `.create-option` / `.ai-icon` 的 CSS 断言兜底。
+- 删菜单结构时，必须同步处理 `index.css` 里对应的 `.xxx-menu` / `.xxx-option` 规则：要么删掉规则并确认没有组件还在引用，要么保留。**不要留下「组件还在渲染这个 class、CSS 已经被删」的状态**——它不会有任何编译或测试报错，只会让菜单悄悄退回 shadcn 默认的大图标单行样式（「新建项目」菜单就这样坏过一次）。`toolbar-menus.test.tsx` 里有针对 `.create-menu` / `.create-option` / `.ai-icon` 的 CSS 断言兜底。
 
 ### 5.4 弹层（Popover）
 
@@ -118,7 +118,7 @@ padding `--sp-x`（16px），圆角 10px，标题 `--fs-title` 600，标题下�
 
 ### 5.8 管理端页面（项目管理 / 家具管理 / 小助手）
 
-- **外壳统一**：侧栏 + 右侧面板只用 `CmsLayout` / `CmsSidebar`（`CmsLayout.tsx`），页面内容自动包在 `.cms-page` 里，铺满 `.cms-main` 的内边距（桌面 36px、≤700px 16px）。**页面组件不要再写 `max-width` 或自己的左右 padding**（家具管理曾居中 1160px，和其它页留白不一致）。
+- **外壳统一**：侧栏 + 右侧面板只用 `CmsLayout` / `CmsSidebar`（`cms-layout.tsx`），页面内容自动包在 `.cms-page` 里，铺满 `.cms-main` 的内边距（桌面 36px、≤700px 16px）。**页面组件不要再写 `max-width` 或自己的左右 padding**（家具管理曾居中 1160px，和其它页留白不一致）。
 - **页头一行**：`CmsPageHeader` 左边标题 + 说明；右边同一行依次是 `search`（`CmsSearchField`，280px、36px 高）→ 刷新 / 同步状态 → 主操作（新建）。窄屏操作行换到标题下方，搜索框占满剩余宽度。
 - **筛选另起一行**：页头下方 `.cms-filter-rows`，一组一行，统一用 `CmsFilterGroup`：左侧分类描述（15px 图标 + 名称 + `N 项`，88px 列宽），右侧 `CmsFilterBar` 胶囊。项目管理一行「来源」；家具管理两行「硬装」「软装」。行间只用间距，不加箱式面板和分隔线。
 - **分类胶囊**：高 `--ctl-md`、padding `0 12px`、圆角 `--ctl-radius-in`、1px `--border` 描边、透明底、`--fs-group` 灰字；数量用 `--fs-label` 灰字跟在后面；激活态 `--accent` 底 + 主色描边 + 600 字重。超出宽度横向滚动并两端渐隐。
@@ -184,7 +184,7 @@ padding `--sp-x`（16px），圆角 10px，标题 `--fs-title` 600，标题下�
 | 顶栏左 | `ProjectMenu`（Logo + 项目名）→ 2D / 3D 切换 | 下拉见 §5.3；2D / 3D 紧跟项目名，是全局最高频的模式切换 |
 | 顶栏中 | 重置 / 清空（宽屏常驻、≤600px 收进竖条「更多」）→ 撤销 / 重做 | 只放改全局方案的操作，绘制工具不放顶栏 |
 | 顶栏右 | `CostChip`（直接显示全屋造价）→ 生成方案报告 → `ExportMenu`「保存」→ 游客时主按钮「登录」 | 金额按钮打开「方案与成本」侧栏；一屏只突出「保存」或「登录」一个主操作 |
-| 画布左上 | `CanvasRail` 竖条 | 内容随 2D / 3D 切换（`RailTools.tsx`）：2D 为 选择 → 墙 → 门 → 窗 → 更多（垭口 / 分隔线 / 楼梯 / 窄屏的重置清空）→ 家具；3D 为 鸟瞰 → 漫游 → 斜视 → 俯视 → 剖切 → 风格。两种模式底部都是「户型设置」+ 收起。按钮为图标 + 文字的行，**默认无底色**，悬停 `--secondary`，当前项 `--primary / 0.14` 底 + 主色。整条可拖（移动 >4px 才算拖，松手不误触按钮），收起后只剩一个展开按钮。≤600px 改为右下角横排、不可拖 |
+| 画布左上 | `CanvasRail` 竖条 | 内容随 2D / 3D 切换（`rail-tools.tsx`）：2D 为 选择 → 墙 → 门 → 窗 → 更多（垭口 / 分隔线 / 楼梯 / 窄屏的重置清空）→ 家具；3D 为 鸟瞰 → 漫游 → 斜视 → 俯视 → 剖切 → 风格。两种模式底部都是「户型设置」+ 收起。按钮为图标 + 文字的行，**默认无底色**，悬停 `--secondary`，当前项 `--primary / 0.14` 底 + 主色。整条可拖（移动 >4px 才算拖，松手不误触按钮），收起后只剩一个展开按钮。≤600px 改为右下角横排、不可拖 |
 | 画布左下 | 缩放 / 比例尺 `.canvas-zoom` | |
 | 画布右上 | 指北针（2D） | |
 | 画布右下 | 3D 光照：白天 → 日照时间 → 夜晚 | 只在 3D 出现；≤600px 移到右上，给竖条让位 |

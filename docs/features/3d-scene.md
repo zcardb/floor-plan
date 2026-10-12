@@ -4,17 +4,17 @@
 
 | 文件 | 职责 |
 | --- | --- |
-| `model/decorStyles.ts` | 装修风格、家具配色角色、`furnitureLook(style, f)` 解析出的 `FurnitureLook` |
-| `scene/furniture.ts` | `buildFurniture(f, look)`：45 种家具的精修模型、几何小工具、材质缓存 `mat()`、合批、环境反射副本 |
-| `scene/floorTexture.ts` | 地面贴图：`floorSurface(m)` 决定画法，`floorTexture(m)` 绘制 |
-| `scene/archLook.ts` | 墙面、天花、压顶、门扇、入户门、窗框的配色 |
-| `scene/sceneMaterials.ts` | 一个渲染器一份环境贴图，以及本场景的材质副本（反射 + 发光件） |
-| `scene/lighting.ts` | 昼夜参数、吸顶灯、大地面，以及 `applyLighting(rig, night)` |
-| `scene/Scene3D.tsx` | 解析风格、搭建墙门窗地面天花、挂环境贴图、昼夜灯光、按需重建 |
+| `lib/floor-plan/decor-styles.ts` | 装修风格、家具配色角色、`furnitureLook(style, f)` 解析出的 `FurnitureLook` |
+| `features/scene-3d/model/furniture.ts` | `buildFurniture(f, look)`：45 种家具的精修模型、几何小工具、材质缓存 `mat()`、合批、环境反射副本 |
+| `features/scene-3d/model/floor-texture.ts` | 地面贴图：`floorSurface(m)` 决定画法，`floorTexture(m)` 绘制 |
+| `features/scene-3d/model/arch-look.ts` | 墙面、天花、压顶、门扇、入户门、窗框的配色 |
+| `features/scene-3d/model/scene-materials.ts` | 一个渲染器一份环境贴图，以及本场景的材质副本（反射 + 发光件） |
+| `features/scene-3d/model/lighting.ts` | 昼夜参数、吸顶灯、大地面，以及 `applyLighting(rig, night)` |
+| `features/scene-3d/components/scene-3d.tsx` | 解析风格、搭建墙门窗地面天花、挂环境贴图、昼夜灯光、按需重建 |
 
 ## 1. 家具模型
 
-- 家具库 `data/catalog.ts` 里的每个类型（楼梯除外）都要在 `buildFurniture` 里有专门的模型；新增类型时同时补模型，`scene/furniture.test.ts` 会检查一一对应。
+- 家具库 `lib/floor-plan/catalog.ts` 里的每个类型（楼梯除外）都要在 `buildFurniture` 里有专门的模型；新增类型时同时补模型，`features/scene-3d/__tests__/furniture.test.ts` 会检查一一对应。
 - 分支优先级不变：`model3d`（AI 部件）→ `fireplace` → `shape` 圆形 / 矩形 → 按 `type` 的精修模型 → 通用方块。之后统一 `mergeParts` 合批、按 `f.height` 等比缩放、写入位置 / 旋转 / `userData.fid`。
 - 构建器**不解析风格**：调用方传 `furnitureLook(decorStyleById(design.styleId), f)`；不属于某个方案的展示（例如家具库）用默认风格。
 - 有配色角色的家具用 look：主色 `main`、木色 `wood`、深色收边 `legs`（踢脚、深色腿、画框）、点缀 `accent`（浅色抱枕、搭毯、毛巾）、五金 `metal`（拉手、柜钮、浴室柜龙头）、腿型 `legsKind`（木腿收分 / 金属细腿；书桌、吧椅这类本来就是金属框的，木腿风格保留黑铁）、圆角 `softness`（`rbox` 半径乘以它）。
@@ -59,8 +59,8 @@
 
 ## 7. 必备测试
 
-- `scene/furniture.test.ts`：家具库全部类型在三套风格下都能构建（三角形数 > 0、无 NaN、`fid` 正确、已合批），`f.height` 缩放，AI 分支不随风格变色，沙发跟风格变色、冰箱等无角色家具颜色与形状不变，腿型 / 五金 / 圆角跟风格，环境反射只挂光滑材质。
-- `scene/archLook.test.ts`：墙色优先级、门色、入户门识别。
-- `scene/floorTexture.test.ts`：内置与自定义地面的画法、尺寸、勾缝与粗糙度。
-- `scene/sceneMaterials.test.ts`：反射只挂光滑材质、原件不动、场景之间互不影响；发光件昼夜取值；环境贴图缺失时退化。
-- `scene/lighting.test.ts`：昼夜参数取值；吸顶灯位置、数量上限、随剖切高度显示 / 隐藏；`applyLighting` 前后曝光 / 背景 / 地面 / 日光 / 点光源 / 发光件的取值，以及「不重建几何、不换材质」。
+- `features/scene-3d/__tests__/furniture.test.ts`：家具库全部类型在三套风格下都能构建（三角形数 > 0、无 NaN、`fid` 正确、已合批），`f.height` 缩放，AI 分支不随风格变色，沙发跟风格变色、冰箱等无角色家具颜色与形状不变，腿型 / 五金 / 圆角跟风格，环境反射只挂光滑材质。
+- `features/scene-3d/__tests__/arch-look.test.ts`：墙色优先级、门色、入户门识别。
+- `features/scene-3d/__tests__/floor-texture.test.ts`：内置与自定义地面的画法、尺寸、勾缝与粗糙度。
+- `features/scene-3d/__tests__/scene-materials.test.ts`：反射只挂光滑材质、原件不动、场景之间互不影响；发光件昼夜取值；环境贴图缺失时退化。
+- `features/scene-3d/__tests__/lighting.test.ts`：昼夜参数取值；吸顶灯位置、数量上限、随剖切高度显示 / 隐藏；`applyLighting` 前后曝光 / 背景 / 地面 / 日光 / 点光源 / 发光件的取值，以及「不重建几何、不换材质」。

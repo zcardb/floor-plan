@@ -4,10 +4,10 @@
 
 | 文件 | 职责 |
 | --- | --- |
-| `drawingDocument.ts` | 从 `Design` 生成与格式无关的 `DrawingDocument`（图元、尺寸、图块、插入） |
-| `drawingStyle.ts` | 导出配色、图层样式表、DXF 颜色 / 线宽 / 线型表 |
-| `furnitureDrawing.ts` | 把家具的 SVG 符号转成图元；DXF 与 SVG / PDF 共用 |
-| `dxfExport.ts` / `svgExport.ts` / `pdfExport.ts` | 三种格式的写出 |
+| `drawing-document.ts` | 从 `Design` 生成与格式无关的 `DrawingDocument`（图元、尺寸、图块、插入） |
+| `drawing-style.ts` | 导出配色、图层样式表、DXF 颜色 / 线宽 / 线型表 |
+| `furniture-drawing.ts` | 把家具的 SVG 符号转成图元；DXF 与 SVG / PDF 共用 |
+| `dxf-export.ts` / `svg-export.ts` / `pdf-export.ts` | 三种格式的写出 |
 
 ## 1. 图元
 
@@ -19,11 +19,11 @@
 ## 2. 图层
 
 - **每个对象类别一个图层**，并在两处登记后才能在导出里出现：
-  - `drawingDocument.ts` 的 `DrawingLayer` 与 `DRAWING_LAYERS`、`DRAWING_LAYER_NAMES`（中文名，界面和 PDF 图层名用）
-  - `drawingStyle.ts` 的 `LAYER_STYLES`（导出配色）与 `DXF_LAYER_STYLES`（ACI 颜色、线宽、线型）
+  - `drawing-document.ts` 的 `DrawingLayer` 与 `DRAWING_LAYERS`、`DRAWING_LAYER_NAMES`（中文名，界面和 PDF 图层名用）
+  - `drawing-style.ts` 的 `LAYER_STYLES`（导出配色）与 `DXF_LAYER_STYLES`（ACI 颜色、线宽、线型）
 - 图层命名参照天正（`WALL`、`WINDOW`、`STAIR`、`AXIS`…）和 AIA（`A-WALL`、`A-DOOR`、`A-FLOR-STRS`…）。现有：`WALLS`、`WALL_HATCH`（仅 DXF）、`DEMOLISHED`、`ROOMS`、`OPENINGS`、`FURNITURE`、`STAIRS`、`ROOM_LABELS`、`DIMENSIONS`。
-- 线宽用标准档位（1/100 mm），单位为毫米；`$INSUNITS` 与 `$MEASUREMENT` 已在 `dxfExport.ts` 里设置，不要改成米或英寸。
-- 图层中文名要与 `layerNames.ts` 的匹配规则一致（`layerNames.test.ts` 有一条守护测试）。
+- 线宽用标准档位（1/100 mm），单位为毫米；`$INSUNITS` 与 `$MEASUREMENT` 已在 `dxf-export.ts` 里设置，不要改成米或英寸。
+- 图层中文名要与 `layer-names.ts` 的匹配规则一致（`layer-names.test.ts` 有一条守护测试）。
 
 ## 3. 图块（BLOCK + INSERT）
 
@@ -36,7 +36,7 @@
 ## 4. 文字
 
 - 制图标准（GB/T 50001 附录、ISO 128）要求文字从图纸下方或右侧阅读，也就是 DXF 角度不落在 (90°, 270°]。
-- 所有文字角度都要经过 `drawingDocument.ts` 的 `readableRotation()`；`transformEntity` 和 `furnitureDrawing` 已自动处理，新增文字走这两条路径即可。
+- 所有文字角度都要经过 `drawing-document.ts` 的 `readableRotation()`；`transformEntity` 和 `furnitureDrawing` 已自动处理，新增文字走这两条路径即可。
 - 文字样式固定用 `STUDIO_CN`（`simplex.shx` + `gbcbig.shx`），否则中文在 AutoCAD 里显示成 `?`。
 - 字号写毫米模型尺寸，不要写屏幕像素。
 
@@ -47,7 +47,7 @@
 
 ## 6. 必须有的测试
 
-`src/features/interior/model/drawingExport.test.ts`：
+`src/lib/drawing/__tests__/drawing-export.test.ts`：
 
 - **回读**：用 `dxf-parser` 解析导出的 DXF，检查实体类型、图层、无 `NaN`。
 - **图层**：每个图层在 DXF 表里的 ACI 颜色、线宽（组码 370）、线型与 `DXF_LAYER_STYLES` 一致。

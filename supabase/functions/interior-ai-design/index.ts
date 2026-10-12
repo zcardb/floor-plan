@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 type Protocol = 'anthropic' | 'chat' | 'responses' | 'gemini';
-/** 可选模型白名单（与前端 src/features/interior/ai/models.ts 保持一致）：协议决定接口与请求格式，vision 决定是否带参考图。 */
+/** 可选模型白名单（与前端 src/features/ai-design/model/models.ts 保持一致）：协议决定接口与请求格式，vision 决定是否带参考图。 */
 const MODELS: Record<string, { protocol: Protocol; vision: boolean }> = {
   'anthropic/claude-opus-5.5': { protocol: 'anthropic', vision: true },
   'anthropic/claude-sonnet-5.5': { protocol: 'anthropic', vision: true },
@@ -491,7 +491,7 @@ function insetOnCounter(typeA: string, boxA: ReturnType<typeof footprint>, typeB
 
 /*
  * ———— 布局几何校验 ————
- * 同步点：src/features/interior/model/layoutRules.ts 里的 BACK_REQUIRED_TYPES、clipArea、backingOf、
+ * 同步点：src/lib/floor-plan/layout-rules.ts 里的 BACK_REQUIRED_TYPES、clipArea、backingOf、
  * passageBlocker 与这里是同一套定义（后端无法 import src/），改动时两边一起改。
  * 房间模式的 ring / edges / keepOuts / doors 由前端按真实户型算好随请求发来；
  * 整户模式由 planGeometry 按模型输出的墙、房间、门窗现算。

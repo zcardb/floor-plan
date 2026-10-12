@@ -1,0 +1,124 @@
+import { describe, expect, it } from 'vitest';
+import { blankDesign, createProject, referenceDesign } from '../templates';
+import { canDeleteWall, canEditStructure, canResizeWall, isBearingWall, isOnBearingWall, setWallBearing, wallKindName } from '../wall-policy';
+import { deriveRooms } from '../room-derive';
+import { resizeBlank } from '@/features/editor/model/blank-frame';
+import { calculateCosts } from '../costs';
+import { editSelection } from '@/features/editor/model/selection-edits';
+import { createSizeTransaction } from '@/features/editor/model/size-transaction';
+import { createDrawingDocument } from '@/lib/drawing/drawing-document';
+import type { Design, Wall } from '../types';
+const partition: Wall = { id: 'partition', kind: 'partition', a: [3000, 0], b: [3000, 6000], thickness: 240 };
+const fixture = () => deriveRooms({ ...blankDesign(), walls: [...blankDesign().walls, partition] });
+describe('承重墙标记策略', () => {
+  it('仅增加标记，不改变房间、面积、费用、导出几何和原类型', () => {
+    const before = fixture(), next = setWallBearing(before, partition.id, true);
+    expect(next.walls[next.walls.length - 1]).toEqual({ ...partition, loadBearing: true });
+    expect(next.rooms).toBe(before.rooms); expect(next.openings).toBe(before.openings);
+    expect(calculateCosts(next)).toEqual(calculateCosts(before));
+    expect(deriveRooms(next).rooms).toEqual(before.rooms);
+    const layers = { grid: false, dims: true, labels: true, furn: true, bearing: true, snap: true };
+    const geometry = (d: typeof before) => { const doc = createDrawingDocument(d, layers); return { ...doc, entities: doc.entities.map(({ group: _group, ...e }) => e) }; };
+    expect(geometry(next)).toEqual(geometry(before));
+    expect(canResizeWall(next, next.walls[next.walls.length - 1]!)).toBe(false);
+    expect(canDeleteWall(next.walls[next.walls.length - 1]!)).toBe(false);
+    expect(setWallBearing(next, partition.id, true)).toBe(next);
+    const restored = setWallBearing(next, partition.id, false);
+    expect(canResizeWall(restored, restored.walls[restored.walls.length - 1]!)).toBe(true);
+  });
+  it('保留既有洞口并保护墙尺寸；承重墙上的门窗仍可编辑', () => {
+    const before = fixture(); before.openings.push({ id: 'door', wallId: partition.id, kind: 'door', offset: 2000, width: 900 });
+    const next = setWallBearing(before, partition.id, true);
+    expect(next.openings).toEqual(before.openings);
+    expect(isOnBearingWall(next, partition.id)).toBe(true);
+    expect(() => editSelection(next, { kind: 'wall', id: partition.id }, { length: 5000 })).toThrow('锁定');
+    expect(editSelection(next, { kind: 'opening', id: 'door' }, { offset: 3000 }).openings[0].offset).toBe(3000);
+    expect(() => editSelection(next, { kind: 'opening', id: 'door' }, { offset: 5800 })).toThrow('超出');
+  });
+  it('参考户型（旧项目与新建项目）标记承重后，墙上的门窗仍可移动', () => {
+    for (const base of [referenceDesign(), createProject('reference').state]) {
+      const o = base.openings.find(o => base.walls.find(w => w.id === o.wallId)!.kind !== 'bearing')!;
+      const d = setWallBearing(base, o.wallId, true);
+      expect(isOnBearingWall(d, o.wallId)).toBe(true);
+      const next = editSelection(d, { kind: 'opening', id: o.id }, { width: o.width - 100 });
+      expect(next.openings.find(x => x.id === o.id)!.width).toBe(o.width - 100);
+    }
+  });
+  it('原始承重墙默认承重，可取消后删除，再标记又受保护；不存在的墙拒绝', () => {
+    const demo = referenceDesign(), original = demo.walls.find(w => w.kind === 'bearing')!;
+    expect(isBearingWall(original)).toBe(true); expect(canDeleteWall(original)).toBe(false);
+    const cleared = setWallBearing(demo, original.id, false), w = cleared.walls.find(w => w.id === original.id)!;
+    expect(w.loadBearing).toBe(false); expect(isBearingWall(w)).toBe(false); expect(canDeleteWall(w)).toBe(true);
+    const again = setWallBearing(cleared, original.id, true);
+    expect(canDeleteWall(again.walls.find(w => w.id === original.id)!)).toBe(false);
+    for (const kind of ['exterior', 'partition', 'low'] as const) expect(canDeleteWall(demo.walls.find(w => w.kind === kind)!)).toBe(true);
+    expect(() => setWallBearing(fixture(), 'missing', true)).toThrow('不存在');
+  });
+  it('外围墙/矮墙身份保留，户型调整不会丢失标记或绕过保护', () => {
+    const before = blankDesign(), marked = setWallBearing(before, 'outer-0', true);
+    expect(wallKindName(marked.walls[0])).toBe('外围墙');
+    expect(resizeBlank(marked, marked.width, marked.depth, marked.thickness).walls[0].loadBearing).toBe(true);
+    expect(() => resizeBlank(marked, 7000, 6000, 240)).toThrow('承重');
+    expect(() => resizeBlank(marked, 6000, 6000, 300)).toThrow('承重');
+    const inner = setWallBearing(fixture(), partition.id, true);
+    expect(() => resizeBlank(inner, 2500, 6000, 240)).toThrow('边界');
+    const low = { ...partition, kind: 'low' as const };
+    const d = { ...blankDesign(), walls: [...before.walls, low] };
+    expect(wallKindName(setWallBearing(d, low.id, true).walls[d.walls.length - 1]!)).toBe('矮墙');
+  });
+});
+
+describe('绘墙 / 门 / 窗入口', () => {
+  it('空白户型恒开放；参考户型只在非只读时开放', () => {
+    expect(canEditStructure(blankDesign(), true)).toBe(true);
+    expect(canEditStructure(referenceDesign(), true)).toBe(false);
+    expect(canEditStructure(referenceDesign(), false)).toBe(true);
+  });
+});
+
+describe('墙体可编辑性只看承重', () => {
+  const unlocked = () => ({ ...referenceDesign(), structureUnlocked: true });
+  it('承重墙之外的所有墙体都可调尺寸，与项目来源、旧解锁标记无关', () => {
+    for (const d of [referenceDesign(), unlocked(), createProject('reference').state]) {
+      expect(d.walls.some(w => canResizeWall(d, w))).toBe(true);
+      for (const w of d.walls) expect(canResizeWall(d, w)).toBe(!isBearingWall(w) && !d.demolished.includes(w.id));
+    }
+    const d = unlocked(), low = d.walls.find(w => w.kind === 'low')!;
+    expect(canResizeWall({ ...d, demolished: [low.id] }, low)).toBe(false);
+  });
+  it('未标记承重的旧项目外围墙可直接改尺寸', () => {
+    const d = referenceDesign(), w = d.walls.find(w => w.id === 'w7')!;
+    expect(isBearingWall(w)).toBe(false);
+    const next = editSelection(d, { kind: 'wall', id: w.id }, { thickness: 300 });
+    expect(next.walls.find(x => x.id === w.id)!.thickness).toBe(300);
+    expect(next.rooms.map(r => r.name)).toEqual(d.rooms.map(r => r.name));
+    expect(() => editSelection(setWallBearing(d, w.id, true), { kind: 'wall', id: w.id }, { thickness: 300 })).toThrow('承重');
+  });
+  it('新建项目不再依赖解锁标记', () => {
+    expect(createProject('reference').state.structureUnlocked).toBeUndefined();
+    expect(createProject('blank').state.structureUnlocked).toBeUndefined();
+    expect(referenceDesign().structureUnlocked).toBeUndefined();
+  });
+  it('墙体的尺寸边界仍按统一范围拒绝', () => {
+    const d = unlocked(), w = d.walls.find(w => w.id === 'w7')!;
+    const selection = { kind: 'wall' as const, id: w.id };
+    expect(editSelection(d, selection, { thickness: 50 }).walls.find(x => x.id === w.id)!.thickness).toBe(50);
+    expect(editSelection(d, selection, { thickness: 1000 }).walls.find(x => x.id === w.id)!.thickness).toBe(1000);
+    expect(editSelection(d, selection, { length: 100 }).walls.find(x => x.id === w.id)).toBeDefined();
+    for (const bad of [49, 1001, Number.NaN]) expect(() => editSelection(d, selection, { thickness: bad })).toThrow('允许范围');
+    expect(() => editSelection(d, selection, { length: 50 })).toThrow('允许范围');
+  });
+  it('非法尺寸回滚预览且不提交，合法尺寸可撤销到原值', () => {
+    const before = unlocked();
+    let design: Design = before;
+    const transaction = createSizeTransaction(() => design, next => { design = next; }, (next, prev) => { design = next; expect(prev).toBe(before); });
+    const w = before.walls.find(x => x.id === 'w7')!;
+    const token = transaction.begin({ kind: 'wall', id: w.id });
+    expect(() => transaction.update(token, { thickness: '3000' })).toThrow('允许范围');
+    expect(design).toBe(before);
+    transaction.update(token, { thickness: '300' });
+    expect(design.walls.find(x => x.id === w.id)!.thickness).toBe(300);
+    expect(transaction.apply(token)).toBe(true);
+    expect(design.rooms.map(r => [r.id, r.name])).toEqual(before.rooms.map(r => [r.id, r.name]));
+  });
+});

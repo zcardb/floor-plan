@@ -7,9 +7,11 @@
     "dev": "vite",
     "build": "NODE_ENV=development vite build --mode development",
     "build:prod": "vite build",
-    "check": "pnpm lint && pnpm exec tsc --noEmit",
+    "check": "pnpm lint && pnpm exec tsc --noEmit && pnpm check:architecture && pnpm check:test-layout",
+    "check:architecture": "node scripts/check-architecture.mjs",
+    "check:test-layout": "node scripts/check-test-layout.mjs",
     "lint": "eslint .",
-    "test": "vitest run src/features/interior",
+    "test": "vitest run src scripts",
     "preview": "vite preview",
     "pInstall": "pnpm install"
   },

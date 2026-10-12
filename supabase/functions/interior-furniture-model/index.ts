@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 type Protocol = 'anthropic' | 'chat' | 'responses' | 'gemini';
-/** 与前端 src/features/interior/ai/models.ts 保持一致；只用可读图的模型，才能照着效果图建模。 */
+/** 与前端 src/features/ai-design/model/models.ts 保持一致；只用可读图的模型，才能照着效果图建模。 */
 const MODELS: Record<string, { protocol: Protocol }> = {
   'anthropic/claude-opus-5.5': { protocol: 'anthropic' },
   'anthropic/claude-sonnet-5.5': { protocol: 'anthropic' },
@@ -68,7 +68,7 @@ function jsonObject(text: string): unknown {
   return null;
 }
 
-/** 与前端 src/features/interior/model/furniture3d.ts 的 sanitizeModel3d 使用同一套规则。 */
+/** 与前端 src/lib/floor-plan/furniture-3d.ts 的 sanitizeModel3d 使用同一套规则。 */
 const KINDS = ['box', 'cylinder', 'sphere'], FINISHES = ['matte', 'gloss', 'metal'], AXES = ['x', 'y', 'z'];
 const MIN_SIZE = 0.01;
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));

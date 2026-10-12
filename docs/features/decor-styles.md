@@ -1,7 +1,7 @@
 # 装修风格（Decor Styles）
 
 风格是 3D 场景的渲染主题：同一份方案换一套风格，墙面颜色、家具主色、木作 / 五金 / 软装点缀都会跟着换。
-数据与规则在 `src/features/interior/model/decorStyles.ts`，3D 构建见 [3d-scene.md](./3d-scene.md)。
+数据与规则在 `src/lib/floor-plan/decor-styles.ts`，3D 构建见 [3d-scene.md](./3d-scene.md)。
 
 ## 1. 作用范围（强制）
 
@@ -38,7 +38,7 @@
 
 1. 在 `DECOR_STYLES` 里加一项，所有颜色用 6 位小写 HEX；
 2. `id` 一旦发布就不能改（已保存的方案靠它找回风格），只能下线；下线的 id 读取时回落默认风格；
-3. `decorStyles.test.ts` 会校验数量、唯一性、颜色格式与 softness 范围，按需更新数量断言。
+3. `decor-styles.test.ts` 会校验数量、唯一性、颜色格式与 softness 范围，按需更新数量断言。
 
 ## 4. 外部 3D 素材的导入边界
 
@@ -59,9 +59,9 @@
 
 ## 5. 管理端
 
-管理端「风格管理」（`/styles`，`StyleManager`）列出全部风格及其驱动的材质取值，用于核对与对外说明。风格是随代码发布的内置资源，管理端只读；要改风格就改 `decorStyles.ts` 并走评审。
+管理端「风格管理」（`/styles`，`StyleManager`）列出全部风格及其驱动的材质取值，用于核对与对外说明。风格是随代码发布的内置资源，管理端只读；要改风格就改 `decor-styles.ts` 并走评审。
 
 ## 6. 必备测试
 
-- `model/decorStyles.test.ts`：目录数量与唯一性、颜色格式、默认风格不改色、未知 id 兜底、有角色的家具换色而家电不换色、`validateDesign` 接受已知 id 并拒绝未知 id。
-- `scene/furniture.test.ts`：每种家具类型在默认与非默认风格下都能构建，且风格确实改变主体材质（见 [3d-scene.md](./3d-scene.md)）。
+- `lib/floor-plan/__tests__/decor-styles.test.ts`：目录数量与唯一性、颜色格式、默认风格不改色、未知 id 兜底、有角色的家具换色而家电不换色、`validateDesign` 接受已知 id 并拒绝未知 id。
+- `features/scene-3d/__tests__/furniture.test.ts`：每种家具类型在默认与非默认风格下都能构建，且风格确实改变主体材质（见 [3d-scene.md](./3d-scene.md)）。
