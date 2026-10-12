@@ -7,6 +7,8 @@ import type { LibraryItem } from '../model/types';
 import { validFurnitureType, validFurnitureOutline } from '../model/furnitureAppearance';
 import { sanitizeModel3d } from '../model/furniture3d';
 import { BUILTIN_IDS } from '../model/builtinAssets';
+/** 每页家具数：与项目管理一致，滚到底部再取下一页，不在首次进入时多取。 */
+export const CATALOG_PAGE_SIZE = 12;
 /** PostgREST 的 in 列表：值里有冒号和中文，逐个加双引号。 */
 const BUILTIN_IN = `(${BUILTIN_IDS.map(id => `"${id.replace(/"/g, '\\"')}"`).join(',')})`;
 export function useFurnitureCatalog() {
@@ -19,6 +21,11 @@ export function useFurnitureCatalog() {
     const {data,error} = await supabase.from('interior_furniture_catalog').select('*').in('catalog_id', BUILTIN_IDS);
     if (!error && run === epoch.current) setOverrides((data||[]).map(furnitureFromRow));
   }, []);
+  /** 每个分类的条数（筛选项上的数字）：慢，后台读，读到才更新。 */
+  const loadStats = useCallback(async (run: number) => {
+    const stats = await Promise.all(categories.map(async category => { const {count,error} = await supabase.from('interior_furniture_catalog').select('catalog_id',{count:'exact',head:true}).not('catalog_id','in',BUILTIN_IN).eq('category',category); if(error)throw error; return [category,count||0] as const; })).catch(()=>null);
+    if(stats && run === epoch.current) setCounts(Object.fromEntries(stats));
+  }, []);
   const load = useCallback(async (more=false) => {
     const run=++epoch.current; setLoading(true); setError('');
     try {
@@ -26,22 +33,21 @@ export function useFurnitureCatalog() {
     if (run !== epoch.current) return;
     if (!session) { reset(); return; }
     const start=more?offset.current:0;
-    const [page,stats] = await Promise.all([
-      supabase.from('interior_furniture_catalog').select('*',{count:'exact'}).not('catalog_id','in',BUILTIN_IN).order('created_at',{ascending:false}).order('catalog_id').range(start,start+23),
-      Promise.all(categories.map(async category => { const {count,error} = await supabase.from('interior_furniture_catalog').select('catalog_id',{count:'exact',head:true}).not('catalog_id','in',BUILTIN_IN).eq('category',category); if(error)throw error; return [category,count||0] as const; })).catch((e:Error)=>e),
-    ]);
+    // 首屏只等这一页：分类计数是慢查询（每个分类一次），放后台补，不挡住列表出现。
+    const page = await supabase.from('interior_furniture_catalog').select('*',{count:'exact'}).not('catalog_id','in',BUILTIN_IN).order('created_at',{ascending:false}).order('catalog_id').range(start,start+CATALOG_PAGE_SIZE-1);
     if(run!==epoch.current)return;
     setLoading(false);
-    if(page.error || stats instanceof Error){setError(page.error?.message || (stats as Error).message);return;}
+    if(page.error){setError(page.error.message);return;}
+    void loadStats(run);
     // 内置家具的覆盖行走 overrides，不出现在账号家具列表与计数里。
     if(!more)void loadOverrides(run);
     const mapped=(page.data||[]).map(furnitureFromRow);
-    offset.current=start+mapped.length; setItems(old=>more?[...old,...mapped]:mapped); setCount(page.count||0); setCounts(Object.fromEntries(stats)); setHasMore(offset.current<(page.count||0));
+    offset.current=start+mapped.length; setItems(old=>more?[...old,...mapped]:mapped); setCount(page.count||0); setHasMore(offset.current<(page.count||0));
     } catch(cause) {
       if(run!==epoch.current)return;
       setLoading(false);setError(cause instanceof Error?cause.message:'家具读取失败，请重试');
     }
-  },[reset,loadOverrides]);
+  },[reset,loadOverrides,loadStats]);
   const save=useCallback(async(item:LibraryItem)=>{
     if(!validFurnitureType(item.type)||!validFurnitureOutline(item.shape))throw new Error('参考类型或外形无效');
     const {data:{session}}=await supabase.auth.getSession(); if(!session)throw new Error('请先登录');
