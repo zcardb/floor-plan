@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { blankDesign, referenceDesign } from '../data/templates';
-import { rebuildRooms, rect } from './geometry';
+import { rect } from './geometry';
+import { deriveRooms } from './roomDerive';
 import { removeRoom, roomOwnWalls } from './roomRemoval';
 import { openRoomIds } from './roomEnclosure';
 import { setWallBearing } from './wallPolicy';
@@ -52,7 +53,7 @@ describe('删除房间', () => {
     expect(next.openings.map(o => o.id)).toEqual(['door']);
   });
   it('空白户型删除一间：只留下共用隔墙与另一间的墙', () => {
-    const d = rebuildRooms({ ...blankDesign(), walls: [...blankDesign().walls, { ...partition, a: [3000, 0], b: [3000, 6000] }] });
+    const d = deriveRooms({ ...blankDesign(), walls: [...blankDesign().walls, { ...partition, a: [3000, 0], b: [3000, 6000] }] });
     const left = d.rooms.find(r => r.rings[0]!.every(p => p[0] <= 3000))!;
     const next = removeRoom(d, left.id).design;
     expect(next.rooms).toHaveLength(1);

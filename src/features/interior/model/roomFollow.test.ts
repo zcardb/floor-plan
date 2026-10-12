@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { blankDesign, designForTemplate } from '../data/templates';
-import { area, rebuildRooms } from './geometry';
+import { area } from './geometry';
+import { deriveRooms } from './roomDerive';
 import { syncRooms } from './roomFollow';
 import type { Design, Point, Wall } from './types';
 
@@ -52,7 +53,7 @@ describe('墙体变化后房间按「墙 + 分隔线」重算', () => {
     const partition: Wall = { id: 'p', kind: 'partition', a: [3000, 0], b: [3000, 6000], thickness: 240 };
     const base = { ...blankDesign(), walls: [...blankDesign().walls, partition] };
     expect(syncRooms(blankDesign(), base).rooms).toHaveLength(2);
-    expect(rebuildRooms(base).rooms).toHaveLength(2);
+    expect(deriveRooms(base).rooms).toHaveLength(2);
   });
 });
 

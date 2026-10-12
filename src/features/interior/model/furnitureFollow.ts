@@ -1,12 +1,12 @@
 import { length } from './geometry';
 import type { Design, Furniture, Point, Wall } from './types';
+import { dot } from './vector';
 
 /** 家具边与墙面的最大间隙（mm），以内视为贴墙。 */
 const ATTACH_GAP = 50;
 /** 家具边与墙平行的角度容差（°）。 */
 const ANGLE_TOLERANCE = 1;
 
-const dot = (p: Point, q: Point) => p[0] * q[0] + p[1] * q[1];
 
 /** 贴墙家具在墙上的投影：中心距墙 A 端 t，沿墙半长 tangentHalf；不贴墙时为 null。 */
 export interface WallContact { t: number; tangentHalf: number; gap: number }

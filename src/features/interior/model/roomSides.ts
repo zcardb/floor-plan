@@ -2,6 +2,7 @@ import { faceGroup } from './dimensionBinding';
 import { canResizeWall } from './wallPolicy';
 import { moveStructureBand } from './structureBand';
 import type { Design, Point } from './types';
+import { sub } from './vector';
 
 /** 房间顶点来自墙面求交，与墙面之间允许的误差（mm），与 roomFollow 的贴合容差一致。 */
 const faceEpsilon = 1.5;
@@ -37,7 +38,6 @@ export interface RoomSide {
   reason?: string;
 }
 
-const sub = (p: Point, q: Point): Point => [p[0] - q[0], p[1] - q[1]];
 const crossOf = (u: Point, v: Point) => u[0] * v[1] - u[1] * v[0];
 const dist = (p: Point, q: Point) => Math.hypot(p[0] - q[0], p[1] - q[1]);
 const signedArea = (ring: Point[]) => ring.reduce((s, p, i) => {

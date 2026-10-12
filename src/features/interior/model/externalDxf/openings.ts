@@ -1,7 +1,8 @@
 import { inRing, wallPoly } from '../geometry';
 import type { Opening, Point, Wall } from '../types';
 import { uid } from '../types';
-import { boundsOf, cross, distance, dot, groupCollinear, normalOf, onAxis, sub, type AxisGroup, type Interval } from './vector';
+import { boundsOf, groupCollinear, normalOf, onAxis, type AxisGroup, type Interval } from './vector';
+import { cross, distance, dot, sub } from '../vector';
 import type { WallPiece } from './walls';
 
 const MIN_OPENING = 300, MAX_OPENING = 6000, MAX_BAND = 700;

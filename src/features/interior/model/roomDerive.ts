@@ -2,9 +2,13 @@ import polygonClipping from 'polygon-clipping';
 import { bbox, inRing, length, rect, wallPoly } from './geometry';
 import { connectedWallPoly } from './wallConnections';
 import { JOIN_TOLERANCE, baseName, freeName, netArea, openRing, wallFootprints } from './roomRegions';
-import { migrateSeparators } from './separators';
 import { uid, type Design, type Point, type Room, type Separator, type Wall } from './types';
+import { add, cross, dot, sub, unit } from './vector';
 
+/** 分隔线端点与墙面之间允许的贴合误差（mm）。 */
+export const SEPARATOR_TOUCH = 2;
+/** 短于该长度（mm）的分隔线丢弃。 */
+export const MIN_SEPARATOR_LENGTH = 20;
 /** 房间面积门槛（mm²，即 0.3 m²）：飘窗、储物间都能成房间，墙垛碎块不算。 */
 export const MIN_ROOM_AREA = 300_000;
 /** 平均宽度门槛（≈ 2 × 面积 / 周长，mm）：比它窄的是墙缝，不算房间。 */
@@ -138,4 +142,111 @@ export function deriveRooms(d: Design, previous: Room[] = d.rooms): Design {
 
 function nextRoomName(taken: Set<string>) {
   for (let i = 1; ; i++) if (!taken.has(`房间 ${i}`)) return `房间 ${i}`;
+}
+
+// ---- 旧数据迁移 ----
+
+/** 迁移时，相邻两房间平行对边之间超出墙厚的容差（mm）。 */
+const GAP_SLACK = 60;
+
+function signedArea(ring: Point[]) {
+  let sum = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const p = ring[i]!, q = ring[(i + 1) % ring.length]!;
+    sum += p[0] * q[1] - q[0] * p[1];
+  }
+  return sum / 2;
+}
+
+interface Edge { a: Point; dir: Point; out: Point; L: number }
+function edgesOf(room: Room): Edge[] {
+  const ring = room.rings[0] ?? [];
+  const ccw = signedArea(ring) > 0;
+  const edges: Edge[] = [];
+  ring.forEach((a, i) => {
+    const b = ring[(i + 1) % ring.length]!, dir = unit(sub(b, a));
+    if (!dir) return;
+    edges.push({ a, dir, out: ccw ? [dir[1], -dir[0]] : [-dir[1], dir[0]], L: Math.hypot(b[0] - a[0], b[1] - a[1]) });
+  });
+  return edges;
+}
+
+/** 两间房相对的平行边之间（缝宽 ≤ 墙厚 + 60 mm、沿边方向有重叠）的中线段。 */
+function midlines(r1: Room, r2: Room, maxGap: number): [Point, Point][] {
+  const lines: [Point, Point][] = [];
+  for (const e of edgesOf(r1))
+    for (const f of edgesOf(r2)) {
+      if (dot(e.out, f.out) > -0.999) continue;
+      const gap = dot(sub(f.a, e.a), e.out);
+      if (gap < -SEPARATOR_TOUCH || gap > maxGap) continue;
+      const t1 = dot(sub(f.a, e.a), e.dir), t2 = t1 + dot(f.dir, e.dir) * f.L;
+      const from = Math.max(0, Math.min(t1, t2)), to = Math.min(e.L, Math.max(t1, t2));
+      if (to - from < MIN_SEPARATOR_LENGTH) continue;
+      const base = add(e.a, e.out, gap / 2);
+      lines.push([add(base, e.dir, from), add(base, e.dir, to)]);
+    }
+  return lines;
+}
+
+/** 线段减去墙体覆盖的部分：贴着墙面走（偏 1 mm 落进墙里）的也算被覆盖。 */
+function uncovered([a, b]: [Point, Point], walls: Point[][]): [Point, Point][] {
+  const dir = sub(b, a), L = Math.hypot(dir[0], dir[1]);
+  const u: Point = [dir[0] / L, dir[1] / L], n: Point = [-u[1], u[0]];
+  const cuts = new Set([0, 1]);
+  for (const poly of walls)
+    poly.forEach((p, i) => {
+      const q = poly[(i + 1) % poly.length]!, e = sub(q, p), denominator = cross(dir, e);
+      if (Math.abs(denominator) < 1e-9) {
+        for (const v of [p, q]) { const t = dot(sub(v, a), dir) / (L * L); if (t > 0 && t < 1) cuts.add(t); }
+        return;
+      }
+      const t = cross(sub(p, a), e) / denominator, s = cross(sub(p, a), dir) / denominator;
+      if (t > 0 && t < 1 && s >= 0 && s <= 1) cuts.add(t);
+    });
+  const ts = [...cuts].sort((x, y) => x - y);
+  const covered = (p: Point) => walls.some(poly => inRing(add(p, n, 1), poly) || inRing(add(p, n, -1), poly) || inRing(p, poly));
+  const pieces: [Point, Point][] = [];
+  for (let i = 0; i < ts.length - 1; i++) {
+    const from = add(a, dir, ts[i]!), to = add(a, dir, ts[i + 1]!);
+    if (covered(add(a, dir, (ts[i]! + ts[i + 1]!) / 2))) continue;
+    const last = pieces[pieces.length - 1];
+    if (last && last[1][0] === from[0] && last[1][1] === from[1]) last[1] = to;
+    else pieces.push([from, to]);
+  }
+  return pieces.filter(([p, q]) => Math.hypot(q[0] - p[0], q[1] - p[1]) >= MIN_SEPARATOR_LENGTH);
+}
+
+const roundPoint = ([x, y]: Point): Point => [Math.round(x * 10) / 10, Math.round(y * 10) / 10];
+
+function overlap(a: Point[][], b: Point[][]) {
+  try {
+    return polygonClipping.intersection(a, b).reduce((s, p) => s + netArea(p.map(r => r.slice(0, -1) as Point[])), 0);
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * 旧项目（没有 separators 字段）迁移：先只按墙算区域，一个区域里有两间以上旧房间时，
+ * 在相邻房间平行对边的中线处补分隔线（墙已覆盖的部分扣掉），再按旧房间沿用名称与材质重算房间。
+ */
+export function migrateSeparators(d: Design): Design {
+  if (d.separators) return d;
+  const bare: Design = { ...d, separators: [] };
+  if (!d.walls.length) return bare;
+  const regions = enclosedRegions(bare);
+  const rooms = d.rooms.filter(r => r.rings[0] && r.rings[0].length >= 3);
+  const groups = regions.map(region => rooms.filter(r => overlap(region, r.rings) >= 0.5 * netArea(r.rings)));
+  const maxGap = Math.max(d.thickness, ...d.walls.map(w => w.thickness)) + GAP_SLACK;
+  const walls = d.walls.filter(w => !d.demolished.includes(w.id) && w.kind !== 'low' && length(w) > 0.01)
+    .map(w => connectedWallPoly(w, d.walls, d.demolished));
+  const separators: Separator[] = [];
+  for (const group of groups)
+    for (let i = 0; i < group.length; i++)
+      for (let j = i + 1; j < group.length; j++)
+        for (const line of midlines(group[i]!, group[j]!, maxGap))
+          for (const [a, b] of uncovered(line, walls))
+            // 迁移结果要可复现（同一模板每次生成都一样），id 按序号编排。
+            separators.push({ id: `separator-${separators.length + 1}`, a: roundPoint(a), b: roundPoint(b) });
+  return deriveRooms({ ...bare, separators }, d.rooms);
 }

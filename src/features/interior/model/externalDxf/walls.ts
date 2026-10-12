@@ -1,9 +1,7 @@
 import { inRing, wallPoly } from '../geometry';
 import type { Point, Wall } from '../types';
-import {
-  angleBucket, boundsOf, bucketNormal, cross, distance, dot, groupCollinear, intersectIntervals, midpoint, onAxis, projectRange,
-  subtractIntervals, sub, wrapBucket, type AxisGroup, type Interval,
-} from './vector';
+import { angleBucket, boundsOf, bucketNormal, groupCollinear, intersectIntervals, midpoint, onAxis, projectRange, subtractIntervals, wrapBucket, type AxisGroup, type Interval } from './vector';
+import { cross, distance, dot, sub } from '../vector';
 
 /** 没有配上对的单线，按这个厚度当作单线墙。 */
 export const SINGLE_WALL_THICKNESS = 120;

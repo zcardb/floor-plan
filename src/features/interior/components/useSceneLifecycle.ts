@@ -1,8 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { notify } from "@/lib/notify";
+import type { SceneFailure } from "../scene/Scene3D";
 
-/** 3D 失败的来源：模块下载、渲染器创建、运行中崩溃、图形资源被系统回收。 */
-export type SceneFailure = "module" | "renderer" | "crash" | "context-lost";
 export type SceneEvent =
   | { type: "open" }
   | { type: "ready" }

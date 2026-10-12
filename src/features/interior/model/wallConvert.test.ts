@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { blankDesign } from '../data/templates';
-import { rebuildRooms } from './geometry';
+import { deriveRooms } from './roomDerive';
 import { convertStructure, structureForm } from './wallConvert';
 import type { Design, Wall } from './types';
 
@@ -8,7 +8,7 @@ import type { Design, Wall } from './types';
 function twoRooms(extra: Partial<Wall> = {}): Design {
   const d = blankDesign();
   const wall: Wall = { id: 'inner', kind: 'partition', a: [d.width / 2, 0], b: [d.width / 2, d.depth], thickness: 120, ...extra };
-  return rebuildRooms({ ...d, walls: [...d.walls, wall], openings: [...d.openings, { id: 'door', wallId: 'inner', kind: 'door', offset: 1000, width: 800 }] });
+  return deriveRooms({ ...d, walls: [...d.walls, wall], openings: [...d.openings, { id: 'door', wallId: 'inner', kind: 'door', offset: 1000, width: 800 }] });
 }
 const wallT = { kind: 'wall', id: 'inner' } as const;
 

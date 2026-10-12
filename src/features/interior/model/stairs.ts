@@ -1,4 +1,5 @@
 import type { Design, Furniture, LibraryItem, Point, StairForm, StairSpec } from './types';
+import { add } from './vector';
 
 function clamp(v: number, min: number, max: number) { return Math.min(max, Math.max(min, v)); }
 
@@ -103,7 +104,6 @@ export interface StairLayout {
 interface Flight { start: Point; end: Point; width: number; tread: number }
 type FlightLayout = Pick<StairLayout, 'outline' | 'lines' | 'walk'> & { flights: Flight[] };
 
-const add = (p: Point, v: Point, k = 1): Point => [p[0] + v[0] * k, p[1] + v[1] * k];
 const dist = (a: Point, b: Point) => Math.hypot(b[0] - a[0], b[1] - a[1]);
 function unit(a: Point, b: Point): Point {
   const L = dist(a, b) || 1;

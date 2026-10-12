@@ -1,11 +1,8 @@
 import type { Point } from '../types';
+import { cross, distance, dot } from '../vector';
 
-/** 识别算法用到的二维向量与区间小工具。 */
+/** 识别算法用到的方向、区间与共线分组小工具（基础向量运算见 model/vector）。 */
 export type Interval = [number, number];
-export const sub = (p: Point, q: Point): Point => [p[0] - q[0], p[1] - q[1]];
-export const dot = (p: Point, q: Point) => p[0] * q[0] + p[1] * q[1];
-export const cross = (p: Point, q: Point) => p[0] * q[1] - p[1] * q[0];
-export const distance = (p: Point, q: Point) => Math.hypot(p[0] - q[0], p[1] - q[1]);
 export const midpoint = (p: Point, q: Point): Point => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
 export const normalOf = (u: Point): Point => [-u[1], u[0]];
 /** 无向直线的统一方向：x 分量非负（竖直线朝 +y）。 */

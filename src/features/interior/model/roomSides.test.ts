@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { blankDesign, referenceDesign } from '../data/templates';
-import { rebuildRooms, area } from './geometry';
+import { area } from './geometry';
+import { deriveRooms } from './roomDerive';
 import { createSizeTransaction } from './sizeTransaction';
 import { editRoomSide, normalizedOutline, roomSides } from './roomSides';
 import { setWallBearing } from './wallPolicy';
@@ -11,7 +12,7 @@ const wall = (id: string, a: Point, b: Point, extra: Partial<Wall> = {}): Wall =
 function split(): Design {
   const d = blankDesign({ width: 9000, depth: 10000 });
   d.walls.push(wall('p', [3000, 0], [3000, 10000]));
-  return rebuildRooms(d);
+  return deriveRooms(d);
 }
 const leftRoom = (d: Design) => d.rooms.find(r => r.rings[0]!.every(p => p[0] <= 3000))!;
 
@@ -63,7 +64,7 @@ describe('房间逐边尺寸', () => {
   it('改到穿过其他墙时整次拒绝', () => {
     const d = split();
     d.walls.push(wall('q', [6000, 0], [6000, 10000]));
-    const designed = rebuildRooms(d), room = leftRoom(designed);
+    const designed = deriveRooms(d), room = leftRoom(designed);
     const top = roomSides(designed, room.id).find(s => s.facing === 'up')!;
     expect(() => editRoomSide(designed, room.id, top.index, 7000, 'start')).toThrow();
   });
@@ -71,7 +72,7 @@ describe('房间逐边尺寸', () => {
   it('承重隔墙一侧的边列出长度并说明锁定原因', () => {
     const d = blankDesign({ width: 9000, depth: 10000 });
     d.walls.push(wall('p', [3000, 0], [3000, 10000], { loadBearing: true }));
-    const designed = rebuildRooms(setWallBearing(d, 'outer-3', true)), room = leftRoom(designed);
+    const designed = deriveRooms(setWallBearing(d, 'outer-3', true)), room = leftRoom(designed);
     const top = roomSides(designed, room.id).find(s => s.facing === 'up')!;
     expect(Math.round(top.length)).toBe(2880);
     expect(top.reason).toMatch('承重墙');

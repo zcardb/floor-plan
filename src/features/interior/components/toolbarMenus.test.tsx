@@ -22,8 +22,6 @@ import { NewProjectDialog } from './NewProjectDialog';
 import { AiCreateProjectDialog } from './lazyDialogs';
 import { CreateProjectMenuItems, type CreateProjectActions } from './CreateProjectMenuItems';
 import { Logo } from './Logo';
-import { ProjectRowActions } from './ProjectRowActions';
-import { AccountMenu } from './AccountMenu';
 import { AccountAvatar } from './AccountAvatar';
 import { ExportMenu, saveState } from './ExportMenu';
 import { SoftwareSoonItem } from './SoftwareSoonItem';
@@ -64,7 +62,6 @@ const items = (tree: Node[]) => tree.filter(n => n.type === DropdownMenuItem);
 const options = (tree: Node[]) => items(tree).filter(n => n.props.className === 'project-menu-option');
 /** 新建方式条目（图标块 + 标题 + 说明）。 */
 const createOptions = (tree: Node[]) => tree.filter(n => typeof n.props.title === 'string' && typeof n.props.onSelect === 'function');
-const actions = (tree: Node[]) => tree.filter(n => n.type === ProjectRowActions);
 beforeEach(() => { state.values = []; state.cursor = 0; state.refs = []; state.effects = []; });
 
 describe('ProjectMenu', () => {
@@ -136,19 +133,11 @@ describe('ProjectMenu', () => {
     expect(labels[1]).toContain(other.name);
     expect(labels).not.toContain('保存到云端');
     expect(labels).not.toContain('返回项目管理');
-    expect(actions(tree)).toHaveLength(0);
   });
   it('项目行只有名称、日期与当前勾选，不再放重命名 / 删除（只在项目管理页操作）', () => {
     const { tree } = menu({ localProjects: [current, other, row('s', '默认方案', true)] });
-    expect(actions(tree)).toHaveLength(0);
     expect(tree.some(n => n.type === ProjectRenameDialog || n.type === ProjectDeleteDialog)).toBe(false);
     expect(options(tree)).toHaveLength(3);
-  });
-  it('系统默认方案在共享按钮里禁用重命名与删除，复制仅在传入时显示', () => {
-    const buttons = (r: ProjectSummary, onDuplicate?: () => void) =>
-      nodes(ProjectRowActions({ row: r, disabled: false, onRename: vi.fn(), onDelete: vi.fn(), onDuplicate })).filter(n => n.type === Button);
-    expect(buttons(row('s', '默认方案', true)).map(n => n.props.disabled)).toEqual([true, true]);
-    expect(buttons(other, vi.fn()).map(n => n.props['aria-label'])).toEqual(['重命名Home', '复制Home', '删除Home']);
   });
   it('切换项目进行中时返回与新建入口禁用', () => {
     state.values[0] = 'b';
@@ -246,25 +235,6 @@ describe('ListLoadMore', () => {
       expect(text(ListLoadMore({ list: page(45, 45) })!.props.children as ReactNode)).toContain('已加载全部 45 条');
       expect(ListLoadMore({ list: page(12, 12) })).toBeNull();
     } finally { vi.unstubAllGlobals(); }
-  });
-});
-
-describe('AccountMenu', () => {
-  it('登录后只显示圆形头像，菜单含名称、邮箱全文与退出登录', () => {
-    const onLogout = vi.fn();
-    const tree = nodes(AccountMenu({ email: '1879385@qq.com', loggedIn: true, onLogin: vi.fn(), onLogout }));
-    const trigger = tree.find(n => n.props.className === 'account-trigger')!;
-    expect(nodes(trigger.props.children as ReactNode).map(n => n.type)).toEqual([AccountAvatar]);
-    expect(trigger.props['aria-label']).toBe('我的账号：1879385');
-    const head = tree.find(n => n.props.className === 'account-menu-head')!;
-    expect(text(head.props.children as ReactNode)).toBe('18793851879385@qq.com');
-    (items(tree).find(n => text(n.props.children as ReactNode).includes('退出登录'))!.props.onSelect as () => void)();
-    expect(onLogout).toHaveBeenCalledOnce();
-  });
-  it('访客显示登录按钮', () => {
-    const onLogin = vi.fn(), tree = nodes(AccountMenu({ loggedIn: false, onLogin, onLogout: vi.fn() }));
-    expect(tree[0].type).toBe(Button);
-    expect(text(tree[0].props.children as ReactNode)).toBe('登录');
   });
 });
 

@@ -1,16 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { blankDesign, referenceDesign } from "../data/templates";
-import {
-  area,
-  center,
-  inRoom,
-  length,
-  rebuildRooms,
-  rect,
-  resizeBlank,
-  snapMove,
-  blockFurnitureMove,
-} from "./geometry";
+import { area, center, inRoom, length, rect, snapMove, blockFurnitureMove } from "./geometry";
+import { deriveRooms } from "./roomDerive";
+import { resizeBlank } from "./blankFrame";
 import { validateDesign } from "./validation";
 import { materials } from "../data/catalog";
 describe("户型几何与输入保护", () => {
@@ -35,10 +27,10 @@ describe("户型几何与输入保护", () => {
         thickness: 240,
         kind: "partition" as const,
       };
-    const split = rebuildRooms({ ...base, walls: [...base.walls, wall] });
+    const split = deriveRooms({ ...base, walls: [...base.walls, wall] });
     expect(split.rooms).toHaveLength(2);
     expect(split.rooms.reduce((s, r) => s + area(r), 0)).toBeCloseTo(34.56);
-    const unfinished = rebuildRooms({
+    const unfinished = deriveRooms({
       ...base,
       walls: [...base.walls, { ...wall, b: [3000, 3000] }],
     });
@@ -48,16 +40,16 @@ describe("户型几何与输入保护", () => {
     const base = blankDesign();
     const points: [number, number][] = [[1000, 1000], [3000, 1000], [3000, 3000], [1000, 3000]];
     const walls = points.map((a, i) => ({ id: `closed-${i}`, a, b: points[(i + 1) % 4], thickness: 200, kind: 'partition' as const }));
-    const design = rebuildRooms({ ...base, walls: [...base.walls, ...walls] });
+    const design = deriveRooms({ ...base, walls: [...base.walls, ...walls] });
     expect(design.rooms).toHaveLength(2);
     expect(design.rooms.some(r => Math.abs(area(r) - 3.24) < 0.001)).toBe(true);
     const restored = validateDesign(JSON.parse(JSON.stringify(design)));
     expect(restored.walls).toEqual(design.walls);
-    expect(rebuildRooms(restored).rooms).toHaveLength(2);
+    expect(deriveRooms(restored).rooms).toHaveLength(2);
   });
   it("房间拆分保留原房间ID且不产生重复ID", () => {
     const d = blankDesign(),
-      s = rebuildRooms({
+      s = deriveRooms({
         ...d,
         walls: [
           ...d.walls,

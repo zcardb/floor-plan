@@ -5,7 +5,8 @@ import { mergeWall, wallMergeGroup } from './wallMerge';
 import { setWallBearing, isBearingWall } from './wallPolicy';
 import { calculateCosts } from './costs';
 import { validateDesign } from './validation';
-import { length, resizeBlank } from './geometry';
+import { length } from './geometry';
+import { resizeBlank } from './blankFrame';
 import { createDrawingDocument } from './drawingDocument';
 const layers = { grid: false, dims: true, labels: true, furn: true, bearing: true, snap: true };
 describe('取消分割合并连续墙', () => {

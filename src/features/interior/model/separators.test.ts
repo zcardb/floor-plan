@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { blankDesign, designForTemplate } from '../data/templates';
 import { area } from './geometry';
 import { syncRooms } from './roomFollow';
-import { addSeparator, followSeparators, migrateSeparators, moveSeparatorBy, moveSeparatorEnd, removeSeparator, resizeSeparator, separatorEndAttached } from './separators';
+import { addSeparator, followSeparators, moveSeparatorBy, moveSeparatorEnd, removeSeparator, resizeSeparator, separatorEndAttached } from './separators';
+import { migrateSeparators } from './roomDerive';
 import { separatorEndTarget, separatorShift } from './separatorDrag';
 import type { Design, Point, Separator, Wall } from './types';
 

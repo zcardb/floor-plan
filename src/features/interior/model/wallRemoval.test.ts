@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { blankDesign, designForTemplate, referenceDesign } from '../data/templates';
-import { area, inRoom, rebuildRooms, rect, resizeBlank, ringArea, wallPoly } from './geometry';
+import { area, inRoom, rect, ringArea, wallPoly } from './geometry';
+import { deriveRooms } from './roomDerive';
+import { resizeBlank } from './blankFrame';
 import { validateDesign } from './validation';
 import { isBearingWall, setWallBearing } from './wallPolicy';
 import { purgeDemolished, removeWall } from './wallRemoval';
 import type { Design, Point, Wall } from './types';
 
 const drawn: Wall = { id: 'inner', kind: 'partition', a: [3000, 0], b: [3000, 6000], thickness: 200 };
-const blank = () => rebuildRooms({ ...blankDesign(), walls: [...blankDesign().walls, drawn] });
+const blank = () => deriveRooms({ ...blankDesign(), walls: [...blankDesign().walls, drawn] });
 /** 非空白户型：6 m × 6 m 外框 + x = 2500 的隔墙，两侧各一间。 */
 const partition2: Wall = { id: 'inner', kind: 'partition', a: [2500, 0], b: [2500, 6000], thickness: 200 };
 const split2 = (): Design => ({

@@ -1,6 +1,7 @@
 import { deriveRooms } from './roomDerive';
 import { dropOrphanFurniture } from './roomFurniture';
-import { followSeparators, migrateSeparators } from './separators';
+import { followSeparators } from './separators';
+import { migrateSeparators } from './roomDerive';
 import type { Design } from './types';
 
 /**

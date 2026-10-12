@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { blankDesign } from '../data/templates';
-import { BLANK_FRAME_CHANGED, area, blankFrameIntact, rect, rebuildRooms, resizeBlank } from './geometry';
+import { area, rect } from './geometry';
+import { BLANK_FRAME_CHANGED, blankFrameIntact, resizeBlank } from './blankFrame';
+import { deriveRooms } from './roomDerive';
 import { syncRooms } from './roomFollow';
 import { moveWallWithJoints } from './wallMove';
 import { editSelection } from './selectionEdits';
@@ -8,13 +10,13 @@ import { canResizeWall, setWallBearing } from './wallPolicy';
 import type { Design, Wall } from './types';
 
 const partition: Wall = { id: 'inner', kind: 'partition', a: [3000, 0], b: [3000, 6000], thickness: 240 };
-const fixture = (): Design => rebuildRooms({ ...blankDesign(), walls: [...blankDesign().walls, partition] });
+const fixture = (): Design => deriveRooms({ ...blankDesign(), walls: [...blankDesign().walls, partition] });
 /** 旧算法：外框矩形减去隔墙带。 */
 const totalArea = (d: Design) => d.rooms.reduce((s, r) => s + area(r), 0);
 
 describe('空白户型：房间按实际墙体轮廓重算', () => {
   it('外围墙未动时结果与外框矩形一致', () => {
-    const d = rebuildRooms(blankDesign());
+    const d = deriveRooms(blankDesign());
     expect(d.rooms).toHaveLength(1);
     expect(area(d.rooms[0]!)).toBeCloseTo(area({ id: 'x', name: '', mat: 'wood', rings: [rect(0, 0, d.width, d.depth)] }), 6);
     const split = fixture();

@@ -4,9 +4,9 @@ import { syncRooms } from './roomFollow';
 import { bbox, length, nearestOnWall, rect, ringArea, wallPoly } from './geometry';
 import { validateWallSegment } from './wallDrawing';
 import type { Design, Point, Wall } from './types';
+import { distance } from './vector';
 
 const epsilon = 0.05;
-const distance = (a: Point, b: Point) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 
 /**
  * 一条结构尺寸：两侧的墙带（沿 axis 垂直方向的坐标 start / end），

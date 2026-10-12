@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { blankDesign } from '../data/templates';
-import { length, resizeBlank } from './geometry';
+import { length } from './geometry';
+import { resizeBlank } from './blankFrame';
 import { calculateCosts } from './costs';
 import { junctionCuts, splitAtJunctions } from './wallAutoSplit';
 import type { Design, Point, Wall } from './types';

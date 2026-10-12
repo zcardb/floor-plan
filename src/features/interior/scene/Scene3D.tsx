@@ -18,7 +18,6 @@ import { floorMaterialOf } from "../model/floorMaterials";
 import { floorSurface, floorTexture } from "./floorTexture";
 import { isCoarsePointer, releasePointerLock, tryPointerLock } from "@/lib/platform";
 import { createListenerRegistry } from "./listeners";
-import type { SceneFailure } from "../components/useSceneLifecycle";
 import { doorOrientation } from '../model/doorOrientation';
 import { doorSymbol, doorType } from '../model/doorType';
 import {
@@ -46,6 +45,8 @@ import { CEILING, WALL_CAP, WINDOW_FRAME, doorColor, isEntryDoor, wallColor } fr
 import { openingDimensions } from "../model/costs";
 import { connectedWallPoly, wallSectionPolygons } from '../model/wallConnections';
 import type { ScreenRect } from "../model/selectionAnchor";
+/** 3D 失败的来源：模块下载、渲染器创建、运行中崩溃、图形资源被系统回收。 */
+export type SceneFailure = "module" | "renderer" | "crash" | "context-lost";
 export interface SceneHandle {
   /** 生成当前视角 PNG；保存与提示由调用方统一处理。 */
   shot: () => Promise<Blob>;

@@ -1,21 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { blankDesign, createProject, referenceDesign } from '../data/templates';
 import { canDeleteWall, canEditStructure, canResizeWall, isBearingWall, isOnBearingWall, setWallBearing, wallKindName } from './wallPolicy';
-import { rebuildRooms, resizeBlank } from './geometry';
+import { deriveRooms } from './roomDerive';
+import { resizeBlank } from './blankFrame';
 import { calculateCosts } from './costs';
 import { editSelection } from './selectionEdits';
 import { createSizeTransaction } from './sizeTransaction';
 import { createDrawingDocument } from './drawingDocument';
 import type { Design, Wall } from './types';
 const partition: Wall = { id: 'partition', kind: 'partition', a: [3000, 0], b: [3000, 6000], thickness: 240 };
-const fixture = () => rebuildRooms({ ...blankDesign(), walls: [...blankDesign().walls, partition] });
+const fixture = () => deriveRooms({ ...blankDesign(), walls: [...blankDesign().walls, partition] });
 describe('承重墙标记策略', () => {
   it('仅增加标记，不改变房间、面积、费用、导出几何和原类型', () => {
     const before = fixture(), next = setWallBearing(before, partition.id, true);
     expect(next.walls[next.walls.length - 1]).toEqual({ ...partition, loadBearing: true });
     expect(next.rooms).toBe(before.rooms); expect(next.openings).toBe(before.openings);
     expect(calculateCosts(next)).toEqual(calculateCosts(before));
-    expect(rebuildRooms(next).rooms).toEqual(before.rooms);
+    expect(deriveRooms(next).rooms).toEqual(before.rooms);
     const layers = { grid: false, dims: true, labels: true, furn: true, bearing: true, snap: true };
     const geometry = (d: typeof before) => { const doc = createDrawingDocument(d, layers); return { ...doc, entities: doc.entities.map(({ group: _group, ...e }) => e) }; };
     expect(geometry(next)).toEqual(geometry(before));

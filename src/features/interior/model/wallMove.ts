@@ -2,13 +2,13 @@ import { length, nearestOnWall } from './geometry';
 import { canResizeWall } from './wallPolicy';
 import { keepOpeningsInPlace, openingsFitWalls } from './openingAnchor';
 import type { Design, Point, Wall } from './types';
+import { dot } from './vector';
 
 /** 移墙后墙段（含被带动的连接墙）的最短长度（mm）。 */
 const MIN_LENGTH = 100;
 /** 导向墙与被移动墙夹角的正弦下限：更平行的墙不能作为端点滑轨。 */
 const MIN_ANGLE_SIN = 0.2;
 
-const dot = (p: Point, q: Point) => p[0] * q[0] + p[1] * q[1];
 const unit = (w: Wall): Point => {
   const L = length(w);
   return [(w.b[0] - w.a[0]) / L, (w.b[1] - w.a[1]) / L];

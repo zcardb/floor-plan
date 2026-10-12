@@ -3,7 +3,7 @@ import type { TemplatePreset } from './templatePresets';
 import { normalizeFurniture } from "../model/costs";
 import { outerWalls, rect } from "../model/geometry";
 import { mergeAllSplits } from "../model/wallBulk";
-import { migrateSeparators } from "../model/separators";
+import { migrateSeparators } from "../model/roomDerive";
 import {
   uid,
   type Design,

@@ -54,3 +54,12 @@ export const DXF_DASHED_PATTERN = [LAYER_STYLES.DEMOLISHED.dash![0], -LAYER_STYL
 export const EXPORT_FONT_STACK = "'PingFang SC','Microsoft YaHei','Noto Sans SC','Source Han Sans SC',sans-serif";
 /** Offset from the visual centre of a line of text to its baseline, as a fraction of font size. */
 export const TEXT_BASELINE_SHIFT = 0.35;
+
+/**
+ * 制图规范（GB/T 50001、ISO 128）：文字从图纸下方或右侧阅读。drawing（y 向下）坐标下的角度归一到 [-90°, 90°)，
+ * 对应 DXF 角度不落在 (90°, 270°]。文字均为居中对齐，翻转 180° 不改变位置。
+ */
+export function readableRotation(degrees: number): number {
+  const a = ((degrees % 360) + 360) % 360;
+  return a >= 90 && a < 270 ? a - 180 : a >= 270 ? a - 360 : a;
+}

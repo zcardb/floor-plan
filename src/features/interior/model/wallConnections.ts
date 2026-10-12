@@ -1,10 +1,9 @@
 import polygonClipping from 'polygon-clipping';
 import { length, nearestOnWall, wallPoly } from './geometry';
 import type { Point, Wall } from './types';
+import { cross, distance } from './vector';
 
 const epsilon = 0.01;
-const distance = (a: Point, b: Point) => Math.hypot(a[0] - b[0], a[1] - b[1]);
-const cross = (a: Point, b: Point) => a[0] * b[1] - a[1] * b[0];
 interface Ray { direction: Point; thickness: number }
 
 // The coordinates describe faces only. Centerlines, IDs and opening offsets stay intact.

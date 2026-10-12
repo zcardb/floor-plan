@@ -1,13 +1,12 @@
 import { snapToDragStep } from './dragStep';
 import type { Design, Point } from './types';
+import { dot, sub } from './vector';
 
 /** 端点 / 平移吸附距离（屏幕像素），与绘墙吸附一致。 */
 const SNAP_PX = 12;
 const MIN_LENGTH = 20;
 const PARALLEL = 1e-3;
 
-const sub = (p: Point, q: Point): Point => [p[0] - q[0], p[1] - q[1]];
-const dot = (p: Point, q: Point) => p[0] * q[0] + p[1] * q[1];
 const unitOf = (v: Point): Point | undefined => {
   const n = Math.hypot(v[0], v[1]);
   return n > 1e-9 ? [v[0] / n, v[1] / n] : undefined;

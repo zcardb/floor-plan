@@ -4,7 +4,8 @@ import { XMLParser } from 'fast-xml-parser';
 import { svgPathProperties } from 'svg-path-properties';
 import { FurnitureShape } from '../components/FurnitureShape';
 import type { Furniture, Point } from './types';
-import { readableRotation, type DrawingEntity, type DrawingLayer } from './drawingDocument';
+import { type DrawingEntity, type DrawingLayer } from './drawingDocument';
+import { readableRotation } from './drawingStyle';
 import { isStairs } from './stairs';
 
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '', preserveOrder: true });

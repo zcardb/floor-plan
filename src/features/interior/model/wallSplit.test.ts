@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import polygonClipping from 'polygon-clipping';
 import { blankDesign, referenceDesign } from '../data/templates';
-import { area, length, rebuildRooms, resizeBlank, ringArea } from './geometry';
+import { area, length, ringArea } from './geometry';
+import { deriveRooms } from './roomDerive';
+import { resizeBlank } from './blankFrame';
 import { splitMaxCuts, splitWall } from './wallSplit';
 import { connectedWallPoly, wallSectionPolygons } from './wallConnections';
 import { validateDesign } from './validation';
@@ -107,9 +109,9 @@ describe('图纸墙段分割', () => {
     equalShape(footprint(t.walls), footprint(splitWall(t, 'p', [1000]).design.walls));
   });
   it('重建房间、费用、净距及局部承重的固定墙带保持', () => {
-    const d = rebuildRooms(fixture([3000, 0], [3000, 6000]));
+    const d = deriveRooms(fixture([3000, 0], [3000, 6000]));
     const next = splitWall(d, 'p', [50, 300]).design;
-    expect(rebuildRooms(next).rooms.map(area)).toEqual(d.rooms.map(area));
+    expect(deriveRooms(next).rooms.map(area)).toEqual(d.rooms.map(area));
     expect(calculateCosts(next)).toEqual(calculateCosts(d));
     const a = dimensionBinding(d.walls, true, 3120, d.width, 2000)!;
     const b = dimensionBinding(next.walls, true, 3120, d.width, 2000)!;

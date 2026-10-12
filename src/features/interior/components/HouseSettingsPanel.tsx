@@ -6,7 +6,7 @@ import { DimensionSettings } from './DimensionSettings';
 import { NorthSettings } from './NorthSettings';
 import { DragStepSettings } from './DragStepSettings';
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { BLANK_FRAME_CHANGED, blankFrameIntact, resizeBlank } from "../model/geometry";
+import { BLANK_FRAME_CHANGED, blankFrameIntact, resizeBlank } from "../model/blankFrame";
 import type { Design } from "../model/types";
 
 /**

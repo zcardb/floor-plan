@@ -2,7 +2,8 @@ import polygonClipping from 'polygon-clipping';
 import { bbox, inRing, rect, ringArea } from '../geometry';
 import { connectedWallPoly } from '../wallConnections';
 import { uid, type Point, type Room, type Wall } from '../types';
-import { boundsOf, distance, normalOf } from './vector';
+import { boundsOf, normalOf } from './vector';
+import { distance } from '../vector';
 
 const MIN_ROOM_AREA = 1e6;
 const MAX_RING_POINTS = 1000;

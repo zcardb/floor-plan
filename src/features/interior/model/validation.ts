@@ -5,7 +5,7 @@ import { validModel3d } from './furniture3d';
 import { validStairSpec } from './stairs';
 import { referenceDesign } from "../data/templates";
 import { length } from "./geometry";
-import { migrateSeparators } from "./separators";
+import { migrateSeparators } from "./roomDerive";
 import { validateProcurement } from "./materialProcurement";
 import { normalizeFurniture, validPrice } from "./costs";
 import { isOpeningKind, isSurfaceKey, isWallKey, ROOF_SLOPE_MAX, validCustomOpening, validCustomWall } from "./hardMaterials";

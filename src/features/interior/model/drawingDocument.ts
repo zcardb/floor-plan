@@ -10,6 +10,7 @@ import type { Design, Layers, Opening, Point } from './types';
 import { furnitureDrawing, furnitureLayer } from './furnitureDrawing';
 import { isStairs, stairSpec } from './stairs';
 import { isBearingWall, wallKindName } from './wallPolicy';
+import { readableRotation } from './drawingStyle';
 
 export type DrawingLayer = 'WALLS' | 'DEMOLISHED' | 'ROOMS' | 'SEPARATORS' | 'DOORS' | 'WINDOWS' | 'FURNITURE' | 'STAIRS' | 'ROOM_LABELS' | 'DIMENSIONS';
 /** Object grouping for vector exports (SVG/PDF). DXF geometry ignores it. */
@@ -61,14 +62,6 @@ export function transformEntity(e: DrawingEntity, point: Point, rotation: number
   if (e.kind === 'circle') return { ...e, center: at(e.center) };
   if (e.kind === 'ellipse') return { ...e, center: at(e.center), major: [c * e.major[0] - s * e.major[1], s * e.major[0] + c * e.major[1]] };
   return { ...e, point: at(e.point), rotation: readableRotation(e.rotation + rotation * 180 / Math.PI) };
-}
-/**
- * 制图规范（GB/T 50001、ISO 128）：文字从图纸下方或右侧阅读。drawing（y 向下）坐标下的角度归一到 [-90°, 90°)，
- * 对应 DXF 角度不落在 (90°, 270°]。文字均为居中对齐，翻转 180° 不改变位置。
- */
-export function readableRotation(degrees: number): number {
-  const a = ((degrees % 360) + 360) % 360;
-  return a >= 90 && a < 270 ? a - 180 : a >= 270 ? a - 360 : a;
 }
 
 /** Opening symbol in local coordinates: wall direction is +x, opening centre at the origin. */
