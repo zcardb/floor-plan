@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-type Protocol = 'anthropic' | 'chat' | 'responses';
+type Protocol = 'anthropic' | 'chat' | 'responses' | 'gemini';
 /** 与前端 src/features/interior/ai/models.ts 保持一致；只用可读图的模型，才能照着效果图建模。 */
 const MODELS: Record<string, { protocol: Protocol }> = {
   'anthropic/claude-opus-5.5': { protocol: 'anthropic' },
@@ -8,13 +8,14 @@ const MODELS: Record<string, { protocol: Protocol }> = {
   'openai/gpt-6.1-sol': { protocol: 'responses' },
   'openai/gpt-6-astra': { protocol: 'responses' },
   'openai/gpt-6-luna': { protocol: 'responses' },
+  'google/gemini-3.8-flash': { protocol: 'gemini' },
   'moonshotai/kimi-k3': { protocol: 'chat' },
   'alibaba/qwen-3.8-max': { protocol: 'chat' },
   'minimax/minimax-m3': { protocol: 'chat' },
 };
 const DEFAULT_MODEL = 'openai/gpt-6-luna';
 const BASE = 'https://api.enter.pro/code/api/v1/ai';
-const ENDPOINT: Record<Protocol, string> = { anthropic: `${BASE}/messages`, chat: `${BASE}/chat/completions`, responses: `${BASE}/responses` };
+const ENDPOINT: Record<Exclude<Protocol, 'gemini'>, string> = { anthropic: `${BASE}/messages`, chat: `${BASE}/chat/completions`, responses: `${BASE}/responses` };
 const PROJECT_ID = 'eba6e37b0b3d4d608b63a3efedec61a3';
 const MAX_TOKENS = 4000;
 const MAX_PARTS = 40;
@@ -170,8 +171,82 @@ const friendly = (status: number) =>
 
 class UpstreamError extends Error { constructor(message: string, readonly status: number) { super(message); this.name = 'UpstreamError'; } }
 
+/** Gemini 走自己的流式接口（只有 streamGenerateContent），鉴权用 x-goog-api-key。 */
+const GEMINI_ENDPOINT = (model: string) => `https://api.enter.pro/code/api/ai/v1beta/models/${model}:streamGenerateContent`;
+/** Gemini 的输出上限包含思考 token，给足余量，避免正文被截断。 */
+const GEMINI_MAX_TOKENS = MAX_TOKENS * 3;
+/** Gemini 只收 base64 内联文件：单个文件上限，超出或下载失败就跳过该文件，不让整次生成失败。 */
+const INLINE_MAX_BYTES = 7 * 1024 * 1024;
+
+function toBase64(bytes: Uint8Array) {
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
+async function inlinePart(url: string, fallbackType: string) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    if (bytes.length > INLINE_MAX_BYTES) throw new Error(`too large: ${bytes.length}`);
+    const type = res.headers.get('content-type')?.split(';')[0].trim();
+    return { inlineData: { mimeType: type && type !== 'application/octet-stream' ? type : fallbackType, data: toBase64(bytes) } };
+  } catch (e) {
+    console.error('inline file skipped', url.slice(0, 200), e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
+async function geminiBody(system: string, messages: Msg[]) {
+  const contents = await Promise.all(messages.map(async (m) => {
+    const files = m.role === 'user' ? await Promise.all([
+      ...(m.images ?? []).map((url) => inlinePart(url, 'image/jpeg')),
+    ]) : [];
+    return { role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.text }, ...files.filter((f) => f !== null)] };
+  }));
+  return { contents, systemInstruction: { parts: [{ text: system }] }, generationConfig: { maxOutputTokens: GEMINI_MAX_TOKENS } };
+}
+
+/** 把 Gemini 的 SSE 读完拼成正文（跳过思考片段）；流里的 error 事件按上游错误处理。 */
+function geminiReply(raw: string) {
+  let text = '', finish = '';
+  let error: unknown = null;
+  for (const line of raw.split(NL)) {
+    if (!line.startsWith('data:')) continue;
+    const payload = line.slice(5).trim();
+    if (!payload || payload === '[DONE]') continue;
+    try {
+      const data = JSON.parse(payload);
+      if (data?.error) { error = data.error; continue; }
+      const candidate = data?.candidates?.[0];
+      for (const p of candidate?.content?.parts ?? []) if (typeof p?.text === 'string' && !p.thought) text += p.text;
+      if (candidate?.finishReason) finish = candidate.finishReason;
+    } catch { /* 忽略残缺的数据行 */ }
+  }
+  return { text, error, finish };
+}
+
+async function requestGemini(token: string, session: string, model: string, system: string, messages: Msg[]) {
+  const response = await fetch(GEMINI_ENDPOINT(model), {
+    method: 'POST',
+    headers: { 'x-goog-api-key': token, 'Content-Type': 'application/json', 'X-Session-ID': session, 'X-Enter-Project-ID': PROJECT_ID },
+    body: JSON.stringify(await geminiBody(system, messages)),
+  });
+  const raw = await response.text().catch(() => '');
+  const { text, error, finish } = geminiReply(raw);
+  if (!response.ok || error) {
+    console.error('model upstream error', model, response.status, (error ? JSON.stringify(error) : raw).slice(0, 1000));
+    const status = response.ok ? 502 : response.status;
+    throw new UpstreamError(friendly(status), status);
+  }
+  if (!text) console.error('empty model output', model, JSON.stringify({ finish }));
+  return text;
+}
+
 async function requestModel(token: string, session: string, model: string, system: string, messages: Msg[]) {
   const { protocol } = MODELS[model];
+  if (protocol === 'gemini') return requestGemini(token, session, model, system, messages);
   const response = await fetch(ENDPOINT[protocol], {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'X-Session-ID': session, 'X-Enter-Project-ID': PROJECT_ID },

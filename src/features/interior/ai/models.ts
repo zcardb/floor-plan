@@ -5,7 +5,7 @@
 export interface AiModel {
   id: string;
   name: string;
-  group: "Claude" | "OpenAI" | "国产";
+  group: "Claude" | "OpenAI" | "Gemini" | "国产";
 }
 
 export const AI_MODELS: AiModel[] = [
@@ -14,6 +14,7 @@ export const AI_MODELS: AiModel[] = [
   { id: "openai/gpt-6.1-sol", name: "GPT 6.1 Sol", group: "OpenAI" },
   { id: "openai/gpt-6-astra", name: "GPT 6 Astra", group: "OpenAI" },
   { id: "openai/gpt-6-luna", name: "GPT 6 Luna", group: "OpenAI" },
+  { id: "google/gemini-3.8-flash", name: "Gemini 3.8 Flash", group: "Gemini" },
   { id: "moonshotai/kimi-k3", name: "Kimi K3", group: "国产" },
   { id: "alibaba/qwen-3.8-max", name: "Qwen 3.8 Max Preview", group: "国产" },
   { id: "minimax/minimax-m3", name: "MiniMax M3", group: "国产" },
