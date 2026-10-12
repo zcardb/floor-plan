@@ -1,6 +1,12 @@
 # 方案报告 — 强制
 
-把方案的成本、房间、布局体检与家具清单收成一份多页 A4 PDF：顶栏「生成方案报告」点击后**直接导出文件**，没有预览弹窗、没有页面级路由。相关文件（`src/features/interior/`）：
+> **职责**：方案报告：预览弹窗与多页 A4 PDF。
+>
+> **公开入口**：`ReportPreview`（lazy）、`loadReportExport()`（按需加载 PDF 生成，含 pdf-lib）。
+>
+> 计划见同目录 `plan.md`；目录与依赖规则见 `docs/architecture.md`。
+
+把方案的成本、房间、布局体检与家具清单收成一份多页 A4 PDF：编辑器顶栏「保存与导出」→「生成方案报告」打开报告预览，预览与 PDF 同一口径，在预览里下载；没有页面级路由。相关文件（路径相对 `src/`）：
 
 | 文件 | 职责 |
 | --- | --- |
@@ -15,7 +21,7 @@
 | `features/report/model/report-export.ts` | `reportFile(design, name, defaults?)`：buildReport → loadPdfFont → reportPdf，返回 `ExportFile` |
 | `lib/drawing/drawing-export.ts` | 复用的 `loadPdfFont`、`fileName`、`ExportFile`（与图纸导出同一套约定） |
 
-报告是**纯导出功能**：`features/report/model/report.ts` 之后的一切都只服务 PDF，没有 UI 组件。要改版面，改的是 `report-pdf.ts` 与它用的 `pdf-flow.ts` / `pdf-plan.ts`。
+界面只有预览弹窗（`components/report-preview.tsx`，由公开入口以 lazy 组件 `ReportPreview` 导出）；`model/report.ts` 之后的一切都只服务 PDF。要改版面，改的是 `report-pdf.ts` 与它用的 `pdf-flow.ts` / `pdf-plan.ts`；PDF 生成由公开入口的 `loadReportExport()` 按需加载（含 pdf-lib，不进首屏包）。
 
 ## 1. 数据（`features/report/model/report.ts`）
 
@@ -42,7 +48,7 @@
 
 ## 2. 入口与导出出口
 
-- 入口：**顶栏右侧「生成方案报告」，点击直接导出 PDF**，不打开任何预览。游客与登录一致（未登录按方案自带单价算）。
+- 入口：顶栏「保存与导出」→「生成方案报告」，先打开预览，预览里点击下载导出 PDF。预览读取账号默认价后把它交回工作台，PDF 与预览同一口径。游客与登录一致（未登录按方案自带单价算）。
 - 工作台的接法：`exportAction.run("方案报告", …)` 里动态 `import("../model/reportExport")` → `reportFile(snapshot, 项目名, defaults?)` → 把 `ExportFile` 交给 `exportAction` 的统一出口（`saveFile` → `notify`，微信等不能直接下载时由 `SaveFileDialog` 兜底）。**不要另写下载逻辑**，也不要在首屏静态导入 `reportExport`（pdf-lib 不进首屏包）。
 - 文件由 `reportFile(design: Design, name: string, defaults?: AccountCostSettings): Promise<ExportFile>` 生成（`features/report/model/report-export.ts`）：内部 `buildReport` → `loadPdfFont` → `reportPdf`（含平面图页），只生成、不保存。
 - 文件名：`项目名-方案报告.pdf`，非法字符按 `drawing-export.ts` 的 `fileName` 规则替换为 `-`；项目名为空时写「未命名方案」。
@@ -74,7 +80,7 @@
 - `features/report/__tests__/house-type.test.ts` / `features/report/__tests__/gross-area.test.ts`：户型识别与内置模板、AI 范例一致；建筑面积大于套内净面积、无墙无房时为 0。
 - `features/report/__tests__/report-pdf.test.ts`：回读页数 ≥ 3 且每页 A4；第 1 页文字按「项目名 → 日期 → 信息带 → 图名与比例」的顺序出现、没有封面内容；平面图是一张表单 XObject，等比、居中、落在信息带之下与页脚之上、占正文一半以上，图层对象与平面图自己导出的那份逐名逐序一致、默认全开、没有多余页对象；第 2 页以目录开头，目录页码等于各分节实际所在的页（含九科目全有的最挤情况与长清单页码后移的情况），预算构成与关键数字六张卡都在；第 3 页起依次是三张清单、页脚每页都有项目名与页码；表格跨页重复「标题（续）」与表头；横竖版自动选择；无墙体时第 1 页照旧并写「暂无平面图」；项目名很长时页标题与页脚截断不溢出；`reportFile` 的文件名、账号默认价与空项目名。字体文件缺失时整组跳过（标题写明原因），不报红。
 - `lib/drawing/__tests__/pdf-font.test.ts`：补齐后 loca 为长格式、偏移全为偶数、轮廓不变、可重复调用；子集嵌入与图纸 PDF 导出后每个字形都完整。
-- 报告是纯导出功能，没有组件测试；页面观感靠下面的手工复查。
+- 预览只做展示，没有单独的组件测试；页面观感靠下面的手工复查。
 
 ### 手工复查做法（改了页序 / 平面图页 / 字体后必做）
 
@@ -83,4 +89,4 @@
 
 ## 6. 当前未做
 
-报告预览弹层与分享链接（**产品上就是直接下载，不做预览**，见 §2）、3D 效果图封面、PDF 书签（大纲，「目录」目前只有文字页码，点不进页面）、过道连通与家具重叠体检、税费与多币种。要补哪一项，先更新本文件再实施。
+分享链接、3D 效果图封面、PDF 书签（大纲，「目录」目前只有文字页码，点不进页面）、过道连通与家具重叠体检、税费与多币种。要补哪一项，先更新本文件再实施。

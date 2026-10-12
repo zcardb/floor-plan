@@ -1,4 +1,4 @@
--- 账号自定义装修风格：每行一套风格，name 之外的定义存在 spec（字段见 src/features/interior/model/decorStyles.ts 的 DecorStyle），仅本人可读写。
+-- 账号自定义装修风格：每行一套风格，name 之外的定义存在 spec（字段见 src/lib/floor-plan/decor-styles.ts 的 DecorStyle），仅本人可读写。
 CREATE TABLE public.interior_style_catalog (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), owner_id uuid NOT NULL DEFAULT auth.uid(), style_key text NOT NULL CHECK (style_key ~ '^my-[a-z0-9]{6,32}$'), name text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 20), spec jsonb NOT NULL CHECK (jsonb_typeof(spec) = 'object' AND octet_length(spec::text) <= 20000), created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), UNIQUE (owner_id, style_key));
 ALTER TABLE public.interior_style_catalog ENABLE ROW LEVEL SECURITY;
 CREATE POLICY interior_style_catalog_own ON public.interior_style_catalog FOR ALL TO authenticated USING (auth.uid() = owner_id) WITH CHECK (auth.uid() = owner_id);
@@ -40,7 +40,7 @@ revoke all on public.interior_account_library from anon, public;
 grant select on public.interior_account_library to authenticated;
 
 -- ── 列表接口（统一分页格式）──────────────────────────────────────────────
--- 三个函数返回同一个形状，前端见 src/lib/paging.ts：
+-- 三个函数返回同一个形状，前端见 src/lib/paging（契约）与 src/lib/backend/page-rpc.ts（调用）：
 --   { "list": [...], "pagination": { "page", "pageSize", "total" }, "counts": { 分类: 条数 } }
 -- page 从 1 开始；pageSize 默认 20、最大 100，传 0 表示只要 total 与 counts。
 -- total 是符合当前筛选的条数；counts 是各分类的条数，不随所选分类与搜索词变化。

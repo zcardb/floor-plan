@@ -1,7 +1,13 @@
 # 装修风格（Decor Styles）
 
+> **职责**：装修风格：编辑器风格面板、风格管理页与风格详情、我的风格（账号自建）的读写。风格定义与内置目录在 `lib/floor-plan`（`decor-styles.ts`、`decor-style-presets.ts`）。
+>
+> **公开入口**：`StylePanel`、`saveAccountStyle`、`StyleManager`（lazy）。
+>
+> 计划见同目录 `plan.md`；目录与依赖规则见 `docs/architecture.md`。
+
 风格是 3D 场景的渲染主题：同一份方案换一套风格，墙面颜色、家具主色、木作 / 五金 / 软装点缀都会跟着换。
-数据与规则在 `src/lib/floor-plan/decor-styles.ts`，3D 构建见 [3d-scene.md](./3d-scene.md)。
+数据与规则在 `src/lib/floor-plan/decor-styles.ts`，3D 构建见 [3D 场景](../scene-3d/README.md)。
 
 ## 1. 作用范围（强制）
 
@@ -30,14 +36,16 @@
 
 **默认风格**（`default`）不改任何家具颜色——每件家具用自己保存的 `color`，墙面维持原有暖灰，渲染结果与引入风格之前一致。
 
-## 3. 内置风格目录
+## 3. 风格目录
 
-19 套风格对齐三维家方案库的「风格」筛选项（欧式、美式、中式、田园、现代、北欧、地中海、新古典、简约、工业、东南亚、日式、轻奢、新中式、侘寂、法式、奶油风、原木、中古风），去掉了没有固定配色的「混搭」，再加上默认配色，共 20 套。顺序按当下热度排列，相邻两套刻意拉开区分度。
+**内置风格**共 100 套（`lib/floor-plan/decor-style-presets.ts`）：「默认配色」+ 19 个风格大类（对齐三维家方案库的「风格」筛选项：欧式、美式、中式、田园、现代、北欧、地中海、新古典、简约、工业、东南亚、日式、轻奢、新中式、侘寂、法式、奶油风、原木、中古风，去掉没有固定配色的「混搭」）及其常见细分。排列顺序即面板展示顺序：默认配色在最前，其后按大类分组，每组先基础款、再细分款。
+
+**我的风格**是账号自建的风格（表 `interior_style_catalog`，id 以 `my-` 开头），可以基于任意一套风格新建（编辑器里还能「从当前方案提取」配色），也可以把内置风格「复制为我的风格」后再改。读写见 `api/account-styles.ts`，列表走统一分页接口（`interior_library_page`，`p_kinds = ['style']`）。
 
 新增风格时：
 
-1. 在 `DECOR_STYLES` 里加一项，所有颜色用 6 位小写 HEX；
-2. `id` 一旦发布就不能改（已保存的方案靠它找回风格），只能下线；下线的 id 读取时回落默认风格；
+1. 在 `DECOR_STYLE_PRESETS` 所属大类的分组末尾加一项，所有颜色用 6 位小写 HEX，7 个家具角色的颜色都要给全；
+2. `id` 用小写短横线、全局唯一且不以 `my-` 开头；一旦发布就不能改（已保存的方案靠它找回风格），只能下线；下线的 id 读取时回落默认风格；
 3. `decor-styles.test.ts` 会校验数量、唯一性、颜色格式与 softness 范围，按需更新数量断言。
 
 ## 4. 外部 3D 素材的导入边界
@@ -59,9 +67,9 @@
 
 ## 5. 管理端
 
-管理端「风格管理」（`/styles`，`StyleManager`）列出全部风格及其驱动的材质取值，用于核对与对外说明。风格是随代码发布的内置资源，管理端只读；要改风格就改 `decor-styles.ts` 并走评审。
+管理端「风格管理」（`/styles`，`components/style-manager.tsx`）以卡片列出内置风格与我的风格，按大类筛选、滚动加载（统一分页，每页 20 条）；点开进入风格详情（`/styles/:id`，`components/style-detail.tsx`），查看它驱动的材质取值与适用家具。内置风格只读，可复制为我的风格；我的风格可编辑、删除。编辑器侧栏的风格面板（`components/style-panel.tsx`）只负责选择与新建，新建后直接套用。
 
 ## 6. 必备测试
 
 - `lib/floor-plan/__tests__/decor-styles.test.ts`：目录数量与唯一性、颜色格式、默认风格不改色、未知 id 兜底、有角色的家具换色而家电不换色、`validateDesign` 接受已知 id 并拒绝未知 id。
-- `features/scene-3d/__tests__/furniture.test.ts`：每种家具类型在默认与非默认风格下都能构建，且风格确实改变主体材质（见 [3d-scene.md](./3d-scene.md)）。
+- `features/scene-3d/__tests__/furniture.test.ts`：每种家具类型在默认与非默认风格下都能构建，且风格确实改变主体材质（见 [3D 场景](../scene-3d/README.md)）。

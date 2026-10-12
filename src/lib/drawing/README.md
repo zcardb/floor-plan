@@ -1,6 +1,6 @@
 # 导出规范（CAD / DXF）— 强制
 
-新增或修改任何家具、结构、标注时，都必须满足本文件。导出逻辑集中在 `src/features/interior/model/`：
+新增或修改任何家具、结构、标注时，都必须满足本文件。图纸生成与写出集中在 `src/lib/drawing/`（编辑器的导出菜单与方案报告共用）；编辑器按需加载 `drawing-export.ts`，不进首屏包：
 
 | 文件 | 职责 |
 | --- | --- |
@@ -36,7 +36,7 @@
 ## 4. 文字
 
 - 制图标准（GB/T 50001 附录、ISO 128）要求文字从图纸下方或右侧阅读，也就是 DXF 角度不落在 (90°, 270°]。
-- 所有文字角度都要经过 `drawing-document.ts` 的 `readableRotation()`；`transformEntity` 和 `furnitureDrawing` 已自动处理，新增文字走这两条路径即可。
+- 所有文字角度都要经过 `drawing-style.ts` 的 `readableRotation()`；`transformEntity` 和 `furnitureDrawing` 已自动处理，新增文字走这两条路径即可。
 - 文字样式固定用 `STUDIO_CN`（`simplex.shx` + `gbcbig.shx`），否则中文在 AutoCAD 里显示成 `?`。
 - 字号写毫米模型尺寸，不要写屏幕像素。
 

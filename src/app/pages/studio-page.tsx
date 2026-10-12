@@ -16,7 +16,7 @@ const menuProjects:PageSource<ProjectSummary>=request=>projectPage(request,{thum
 // 首屏默认是 2D 工作台：账号管理外壳按需下载（各管理页再由所属 Feature 按需下载），登录弹窗由账号 Feature 按需下载，都不进首屏包。
 const AccountCMS=lazy(()=>import('../account-cms/account-cms').then(m=>({default:m.AccountCMS})));
 // 所有页面级路由共用这一个实例：会话、自动保存和当前项目都挂在 useProjects 上，换地址不能把它卸载。
-const Index=()=>{
+const StudioPage=()=>{
   const projects=useProjects(),costs=useAccountCosts(projects.session?.user.id);
   const [authOpen,setAuthOpenState]=useState(false),[authMounted,setAuthMounted]=useState(false),[authIntent,setAuthIntent]=useState<'cloud'|null>(null),[cmsDirty,setCmsDirty]=useState(false);
   const route=useStudioRoute(projects,cmsDirty),view=route.view,goToActive=route.goToActive;
@@ -45,4 +45,4 @@ const Index=()=>{
   const workbench=view.kind==='guest'||route.projectReady;
   return <CostDefaultsContext.Provider value={owner?costs.settings:{}}><AccountCostSaveContext.Provider value={owner?costs.save:null}>{view.kind==='cms'?<Suspense fallback={loading('加载内容')}><AccountCMS key={owner} projects={projects} costs={costs} tab={view.tab} styleId={view.styleId} onTab={tab=>route.goTo(cmsPath(tab))} onStyle={id=>route.goTo(id?stylePath(id):cmsPath('styles'))} onDirty={setCmsDirty} pendingLeave={route.pendingLeave} opened={goToActive}/></Suspense>:!workbench?loading(view.kind==='project'?'打开项目':'恢复工作室'):projects.active?<Workbench key={(owner||'guest')+projects.active.id} project={projects.active} projectNavigation={{cloudProjects:owner?menuProjects:undefined,localProjects:owner?[...projects.guests,...projects.builtins]:projects.builtins,onOpen:async row=>entered(await projects.open(row)),onCreateProject:owner?async project=>entered(await projects.create(project,true)):undefined,onDuplicate:owner?duplicateProject:undefined}} createFromTemplate={async id=>entered(await projects.create(createProject(id),true))} update={projects.update} status={projects.status} loggedIn={!!owner} email={projects.session?.user.email} projects={()=>void manage()} login={login} logout={()=>void projects.signOut()} loggingOut={projects.signingOut} cloudSave={cloudSave} guestEdits={projects.guestEdits}/>:null}{authMounted&&<Suspense fallback={null}><AuthDialog open={authOpen} intent={authIntent} onOpenChange={v=>{setAuthOpen(v);if(!v)setAuthIntent(null);}}/></Suspense>}</AccountCostSaveContext.Provider></CostDefaultsContext.Provider>;
 };
-export default Index;
+export default StudioPage;

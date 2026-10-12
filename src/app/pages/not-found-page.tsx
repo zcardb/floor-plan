@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation } from "react-router-dom";
 
-const NotFound = () => {
+const NotFoundPage = () => {
   const location = useLocation();
   const { t } = useTranslation();
 
@@ -26,4 +26,4 @@ const NotFound = () => {
   );
 };
 
-export default NotFound;
+export default NotFoundPage;

@@ -1,5 +1,5 @@
-import Index from "./pages/studio-page";
-import NotFound from "./pages/not-found-page";
+import StudioPage from "./pages/studio-page";
+import NotFoundPage from "./pages/not-found-page";
 import {
   ASSISTANTS_PATH,
   FURNITURE_PATH,
@@ -11,15 +11,15 @@ import {
 } from "./routes";
 
 /**
- * 页面级路由。所有工作室页面共用同一个 <Index /> 实例（会话、自动保存、当前项目都挂在它上面），
- * 所以它们是同一条父路由下的子路径，子路径只负责匹配地址，页面由 Index 按地址渲染。
+ * 页面级路由。所有工作室页面共用同一个 <StudioPage /> 实例（会话、自动保存、当前项目都挂在它上面），
+ * 所以它们是同一条父路由下的子路径，子路径只负责匹配地址，页面由 StudioPage 按地址渲染。
  * 新增页面：在 app/routes.ts 加路径，再到这里注册。
  */
 export const routers = [
   {
     path: "/",
     name: "home",
-    element: <Index />,
+    element: <StudioPage />,
     children: [
       { path: PROJECTS_PATH, name: "projects" },
       { path: PROJECT_ROUTE, name: "project-detail" },
@@ -34,7 +34,7 @@ export const routers = [
   {
     path: "*",
     name: "404",
-    element: <NotFound />,
+    element: <NotFoundPage />,
   },
 ];
 

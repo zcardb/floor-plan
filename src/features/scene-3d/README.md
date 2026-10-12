@@ -1,5 +1,11 @@
 # 3D 家具与场景渲染（SCENE）— 强制
 
+> **职责**：3D 场景（three.js）：家具精修模型、墙门窗地面天花、材质与环境反射、昼夜灯光、漫游与视角。
+>
+> **公开入口**：`loadScene3D()`（按需加载场景模块）与类型 `Scene3D`、`SceneHandle`、`SceneOptions`、`SceneFailure`。`three` 只能在本 Feature 里导入。
+>
+> 计划见同目录 `plan.md`；目录与依赖规则见 `docs/architecture.md`。
+
 3D 场景里的家具模型、地面贴图、墙门窗配色、环境反射与昼夜灯光都按这份规则实现。观感以参考实现（先住 `view3d.js`）为准。相关文件：
 
 | 文件 | 职责 |
