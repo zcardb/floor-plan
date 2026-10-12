@@ -1,11 +1,23 @@
 import type { Opening } from '../model/types';
 import { doorOrientation, type DoorOrientation } from '../model/doorOrientation';
-import { EditorSelect } from './EditorSelect';
+import { doorType } from '../model/doorType';
+import { PanelSegmented } from './PanelSegmented';
+
+/**
+ * 门开向：紧凑的分段控件（比下拉更小，选项一眼看全、点一下就改）。
+ * 双开门两侧都有铰链，只留开启侧；推拉门没有开向（工具条上不显示入口）。
+ */
 export function DoorOrientationControls({ door, onChange }: { door: Opening; onChange: (patch: DoorOrientation) => void }) {
-  if (door.kind !== 'door') return null;
+  if (door.kind !== 'door' || doorType(door) === 'sliding') return null;
   const { hinge, swingSide } = doorOrientation(door);
   return <div className="door-orientation-controls">
-    <EditorSelect label="铰链侧" value={hinge} options={[{ value: 'start', label: '左侧 · 沿墙起点侧' }, { value: 'end', label: '右侧 · 沿墙终点侧' }]} onChange={value => onChange({ hinge: value as Opening['hinge'] })} />
-    <EditorSelect label="开启侧" value={String(swingSide)} options={[{ value: '-1', label: '墙体一侧' }, { value: '1', label: '墙体另一侧' }]} onChange={value => onChange({ swingSide: Number(value) as -1 | 1 })} />
+    {doorType(door) === 'single' && <>
+      <span>铰链侧</span>
+      <PanelSegmented label="铰链侧" value={hinge} options={[{ value: 'start', label: '左' }, { value: 'end', label: '右' }]}
+        onChange={value => onChange({ hinge: value as Opening['hinge'] })} />
+    </>}
+    <span>开启侧</span>
+    <PanelSegmented label="开启侧" value={swingSide} options={[{ value: -1, label: '一侧' }, { value: 1, label: '另一侧' }]}
+      onChange={value => onChange({ swingSide: value as -1 | 1 })} />
   </div>;
 }

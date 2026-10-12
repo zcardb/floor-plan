@@ -1,6 +1,7 @@
 import { area, bbox, center, length } from './geometry';
 import { connectedWallPoly, wallSectionPolygons } from './wallConnections';
 import { doorOrientation } from './doorOrientation';
+import { arcClockwise, doorSymbol, doorType } from './doorType';
 import { openingKindLabel } from './hardMaterials';
 import { dimensionSettings } from './dimensionSettings';
 import { dimensionLabelOffset, perimeterDimensions } from './perimeterDimensions';
@@ -80,10 +81,15 @@ export function openingDrawing(o: Opening, thickness: number): DrawingEntity[] {
   ];
   if (o.kind === 'window') return [{ kind: 'polyline', closed: true, layer, points: [[-half, -t], [half, -t], [half, t], [-half, t]] },
     drawingLine([-half, 0], [half, 0], layer)];
-  const { mirrorX, mirrorY } = doorOrientation(o), hinge: Point = [-half * mirrorX, 0];
-  const a: Point = [-half * mirrorX, -o.width * mirrorY], b: Point = [half * mirrorX, 0];
-  return [drawingLine(hinge, a, layer), { kind: 'arc', layer, center: hinge, radius: o.width,
-    start: Math.atan2(a[1] - hinge[1], a[0] - hinge[0]), end: Math.atan2(b[1] - hinge[1], b[0] - hinge[0]), clockwise: mirrorX * mirrorY > 0 }];
+  // 门：与画布同一份符号（model/doorType.ts）——门扇为直线、开启弧为 ARC、推拉门扇为闭合多段线，全部在 A-DOOR 图层。
+  const { leaves, arcs, panels } = doorSymbol(o);
+  return [
+    ...leaves.map(l => drawingLine(l.from, l.to, layer)),
+    ...arcs.map(({ center, radius, from, to }): DrawingEntity => ({ kind: 'arc', layer, center, radius,
+      start: Math.atan2(from[1] - center[1], from[0] - center[0]), end: Math.atan2(to[1] - center[1], to[0] - center[0]), clockwise: arcClockwise(center, from, to) })),
+    ...panels.map(({ x, y, width, depth }): DrawingEntity => ({ kind: 'polyline', closed: true, layer,
+      points: [[x, y], [x + width, y], [x + width, y + depth], [x, y + depth]] })),
+  ];
 }
 
 /** Deduplicates block geometry by signature; same base name with a different signature gets a `_2`, `_3`… suffix. */
@@ -156,9 +162,11 @@ export function createDrawingDocument(d: Design, layers: Layers): DrawingDocumen
     const p: Point = [wall.a[0] + ux * o.offset, wall.a[1] + uy * o.offset], rotation = Math.atan2(uy, ux);
     const group = { id: o.id, name: openingKindLabel(o.kind) };
     const { mirrorX, mirrorY } = doorOrientation(o), local = openingDrawing(o, wall.thickness);
-    const prefix = o.kind === 'door' ? 'DOOR' : o.kind === 'window' ? 'WIN' : 'PASS';
+    // 图块名：单开沿用 DOOR_宽x厚；双开 / 推拉在前缀里写明类型，CAD 里按块名即可区分。
+    const type = o.kind === 'door' ? doorType(o) : null;
+    const prefix = o.kind === 'door' ? (type === 'single' ? 'DOOR' : `DOOR_${type!.toUpperCase()}`) : o.kind === 'window' ? 'WIN' : 'PASS';
     const block = blocks.name(`${prefix}_${Math.round(o.width)}x${Math.round(wall.thickness)}`,
-      JSON.stringify([o.kind, o.width, wall.thickness, o.kind === 'door' ? [mirrorX, mirrorY] : 0]), local);
+      JSON.stringify([o.kind, o.width, wall.thickness, o.kind === 'door' ? [type, mirrorX, mirrorY] : 0]), local);
     inserts.push({ block, point: p, rotation, layer: openingLayer(o), groupId: o.id });
     entities.push(...local.map(e => ({ ...transformEntity(e, p, rotation), group })));
   }

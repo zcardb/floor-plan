@@ -183,6 +183,7 @@ export function validateDesign(value: unknown): Design {
       !isOpeningKind(o.kind) ||
       (o.hinge !== undefined && !['start', 'end'].includes(o.hinge)) ||
       (o.swingSide !== undefined && o.swingSide !== -1 && o.swingSide !== 1) ||
+      (o.doorType !== undefined && (o.kind !== 'door' || !['single', 'double', 'sliding'].includes(o.doorType))) ||
       !finite(o.width, 100, 10000) ||
       !finite(o.offset, 0) ||
       o.offset - o.width / 2 < -0.01 ||

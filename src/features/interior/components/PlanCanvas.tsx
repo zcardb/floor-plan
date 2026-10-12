@@ -31,6 +31,7 @@ import {
   isOpeningTool,
   uid,
   type Design,
+  type Opening,
   type Layers,
   type LibraryItem,
   type Point,
@@ -53,9 +54,9 @@ import { formatMeters } from '../model/lengthUnits';
 import { perimeterDimensions, planDrawingBounds, type DimensionSegment } from '../model/perimeterDimensions';
 import type { DimensionBinding } from '../model/dimensionBinding';
 import { PerimeterDimensions } from './PerimeterDimensions';
-import { doorOrientation } from '../model/doorOrientation';
 import { openingKindLabel } from '../model/hardMaterials';
 import { placeOpening } from '../model/openingPlacement';
+import { arcClockwise, doorSymbol } from '../model/doorType';
 import { dragOpening, dragOpeningEdge } from '../model/openingDrag';
 import { isCompletionClick, supportsPointerCompletion } from '../model/toolCompletion';
 import { createWheelIntent } from '../model/wheelIntent';
@@ -921,20 +922,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
                 />
               </>
             ) : (
-              <g transform={`scale(${doorOrientation(o).mirrorX} ${doorOrientation(o).mirrorY})`}>
-                <path
-                  d={`M${-o.width / 2} 0V${-o.width}`}
-                  stroke="var(--plan-wood-dark)"
-                  strokeWidth={35}
-                />
-                <path
-                  d={`M${-o.width / 2} ${-o.width}A${o.width} ${o.width} 0 0 1 ${o.width / 2} 0`}
-                  fill="none"
-                  stroke="var(--plan-ink)"
-                  strokeWidth={10}
-                  strokeDasharray="50 40"
-                />
-              </g>
+              <DoorSymbol door={o} />
             )}
           </g>
         );
@@ -1179,4 +1167,23 @@ function OpeningEndHandles({ design, openingId, scale }: { design: Design; openi
         fill="var(--plan-porcelain)" stroke="var(--plan-selection)" strokeWidth={2 / scale} />;
     })}
   </>;
+}
+
+/** 门符号：单开一扇 + 一段开启弧，双开两扇 + 两段弧，推拉两扇错位叠放（符号见 model/doorType.ts）。 */
+function DoorSymbol({ door }: { door: Opening }) {
+  const { leaves, arcs, panels } = doorSymbol(door);
+  return (
+    <g>
+      {panels.map((panel, i) => (
+        <rect key={i} x={panel.x} y={panel.y} width={panel.width} height={panel.depth} fill="var(--plan-porcelain)" stroke="var(--plan-wood-dark)" strokeWidth={12} />
+      ))}
+      {leaves.map((leaf, i) => (
+        <path key={i} d={`M${leaf.from[0]} ${leaf.from[1]}L${leaf.to[0]} ${leaf.to[1]}`} stroke="var(--plan-wood-dark)" strokeWidth={35} />
+      ))}
+      {arcs.map(({ center, radius, from, to }, i) => (
+        <path key={i} d={`M${from[0]} ${from[1]}A${radius} ${radius} 0 0 ${arcClockwise(center, from, to) ? 1 : 0} ${to[0]} ${to[1]}`}
+          fill="none" stroke="var(--plan-ink)" strokeWidth={10} strokeDasharray="50 40" />
+      ))}
+    </g>
+  );
 }

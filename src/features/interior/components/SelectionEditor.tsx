@@ -68,6 +68,8 @@ import { EditorTooltip } from '@/components/ui/editor-tooltip';
 import { DoorOrientationControls } from './DoorOrientationControls';
 import { StairEditor } from './StairEditor';
 import { changeDoorOrientation } from '../model/doorOrientation';
+import { doorType } from '../model/doorType';
+import { DoorTypeMenu } from './DoorTypeMenu';
 import { useEditorDrag } from './useEditorDrag';
 import { separatorLength } from '../model/separators';
 import type { AiEntryTone } from '../ai/useRoomAi';
@@ -462,11 +464,12 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           </EditorTooltip>
           <PopoverContent className="visual-editor-popover"><h3>{openingName(p.design, o)}款式</h3><OpeningVariantSelect design={p.design} opening={o} accountOpenings={p.accountOpenings} change={p.change} /></PopoverContent>
         </Popover>}
-        {o?.kind === 'door' && <Popover open={open === 'direction'} onOpenChange={value => setPanel(value, 'direction')}>
+        {o?.kind === 'door' && <DoorTypeMenu design={p.design} door={o} change={p.change} />}
+        {o?.kind === 'door' && doorType(o) !== 'sliding' && <Popover open={open === 'direction'} onOpenChange={value => setPanel(value, 'direction')}>
           <EditorTooltip label="门开向">
             <PopoverTrigger asChild><button type="button" aria-label="调整门开向"><DoorOpen size={15} />开向<ChevronDown size={12} /></button></PopoverTrigger>
           </EditorTooltip>
-          <PopoverContent className="visual-editor-popover"><h3>门开向</h3><DoorOrientationControls door={o} onChange={patch => p.change(d => changeDoorOrientation(d, o.id, patch))} /></PopoverContent>
+          <PopoverContent className="visual-editor-popover door-orientation-popover" aria-label="门开向"><DoorOrientationControls door={o} onChange={patch => p.change(d => changeDoorOrientation(d, o.id, patch))} /></PopoverContent>
         </Popover>}
         {(f || group.length > 1) && (
           <EditorTooltip label={group.length > 1 ? "整组旋转 90°" : "旋转 90°"} shortcut="R">

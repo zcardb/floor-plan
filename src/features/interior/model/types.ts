@@ -23,6 +23,8 @@ export interface Opening {
   open?: boolean;
   hinge?: 'start' | 'end';
   swingSide?: -1 | 1;
+  /** 门的开启方式：缺省为单开（见 model/doorType.ts），只对 kind === 'door' 有效。 */
+  doorType?: 'single' | 'double' | 'sliding';
   height?: number;
   sill?: number;
   /** 自定义门窗款式 key（见 Design.customOpenings）；为空时是标准门/窗。 */

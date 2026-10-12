@@ -1,6 +1,6 @@
 import { length } from "./geometry";
 import { connectedWallPoly } from './wallConnections';
-import { doorSwingPoints } from './doorOrientation';
+import { doorSwingPoints } from './doorType';
 import { furnitureCorners, groupBounds } from './furnitureGroup';
 import type { Design, Point, Selection } from "./types";
 export interface ScreenRect {

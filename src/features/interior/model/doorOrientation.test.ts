@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { changeDoorOrientation, doorOrientation, doorSwingPoints } from './doorOrientation';
+import { changeDoorOrientation, doorOrientation } from './doorOrientation';
+import { doorSwingPoints } from './doorType';
 import { referenceDesign } from '../data/templates';
 import { validateDesign } from './validation';
 import { selectionPoints } from './selectionAnchor';

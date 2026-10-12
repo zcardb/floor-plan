@@ -1,5 +1,5 @@
 import { openingRoomIds } from './costs';
-import { doorSwingPoints } from './doorOrientation';
+import { doorSweeps } from './doorType';
 import { openingSill } from './hardMaterials';
 import { bbox, inRing, length, nearestOnWall, ringArea, wallPoly } from './geometry';
 import { fitsInRoom, footprintCorners } from './roomFit';
@@ -158,9 +158,11 @@ export function roomKeepOuts(d: Design, room: Room): { keepOuts: KeepOut[]; door
     keepOuts.push({ kind: 'doorway', poly: band(DOORWAY_DEPTH) });
     doors.push(toWorld([0, s * (t + DOORWAY_DEPTH / 2)]));
     if (o.kind !== 'door') continue;
-    const hinge = toWorld([(o.hinge ?? 'start') === 'start' ? -half : half, 0]);
-    const sweep = [hinge, ...doorSwingPoints(o).map(toWorld)];
-    if (inRing(centroid(sweep), ring)) keepOuts.push({ kind: 'doorSweep', poly: sweep });
+    // 单开一个扫掠区、双开两个；推拉门不占开启范围。
+    for (const local of doorSweeps(o)) {
+      const sweep = local.map(toWorld);
+      if (inRing(centroid(sweep), ring)) keepOuts.push({ kind: 'doorSweep', poly: sweep });
+    }
   }
   return { keepOuts, doors };
 }

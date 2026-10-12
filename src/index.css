@@ -51,6 +51,14 @@
 .wall-form-check { position: absolute; top: 4px; right: 4px; width: 12px; height: 12px; stroke-width: 2.5; color: hsl(var(--primary)); }
 .wall-options-note { display: flex; align-items: center; gap: 6px; margin: 2px 3px 2px; padding: 6px 8px; border-radius: 6px; background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); font-size: var(--fs-hint); line-height: 14px; }
 .wall-options-note svg { flex: none; width: 12px; height: 12px; }
+/* 门的开启方式：每项带平面图符号预览（图形优于文字），当前项主色 + 对勾 */
+.door-type-item { gap: 10px; }
+.door-type-item[aria-current] > span { color: hsl(var(--primary)); font-weight: 600; }
+.door-type-preview { flex: none; width: 22px; height: 22px; fill: none; }
+.door-type-preview path { stroke: hsl(var(--muted-foreground)); stroke-width: 1.4; }
+.door-type-item[aria-current] .door-type-preview path { stroke: hsl(var(--primary)); }
+.door-type-preview .door-type-frame { stroke: hsl(var(--border)); stroke-width: 2; }
+.door-type-item .door-type-check { margin-left: auto; width: 14px; height: 14px; color: hsl(var(--primary)); }
 /* 墙选项 · 操作行：单行（图标 · 名称 · 右侧状态），比两行说明更易扫读 */
 .wall-options-row { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 0 9px; border-radius: 6px; cursor: pointer; font-size: var(--fs-group); font-weight: 500; }
 .wall-options-row > svg { flex: none; width: 16px; height: 16px; stroke-width: 1.75; }
@@ -2308,7 +2316,10 @@
 }
 .visual-editor-drag-handle[data-dragging="true"] { cursor: grabbing; }
 .visual-selection-editor > .visual-editor-drag-handle { width: 26px; height: 30px; padding: 3px; }
-.door-orientation-controls { display: grid; gap: 6px; }
+/* 门开向弹层：只有一两组短选项，比默认弹层更窄更紧，不占画布 */
+.door-orientation-popover { width: auto; min-width: 0; padding: 8px 10px; }
+.door-orientation-controls { display: grid; grid-template-columns: auto minmax(132px, 1fr); align-items: center; gap: 6px 10px; }
+.door-orientation-controls > span { color: hsl(var(--muted-foreground)); font-size: var(--fs-label); white-space: nowrap; }
 .visual-object-name {
   max-width: 110px;
   overflow: hidden;

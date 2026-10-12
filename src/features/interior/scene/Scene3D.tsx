@@ -19,6 +19,7 @@ import { isCoarsePointer, releasePointerLock, tryPointerLock } from "@/lib/platf
 import { createListenerRegistry } from "./listeners";
 import type { SceneFailure } from "../components/useSceneLifecycle";
 import { doorOrientation } from '../model/doorOrientation';
+import { doorSymbol, doorType } from '../model/doorType';
 import {
   area,
   bbox,
@@ -545,8 +546,10 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         if (!tap) return;
         const hit = pick(e);
         if (hit?.object.userData.door) {
-          const door = r.doors.find((d) => d.id === hit.object.userData.door);
-          if (door) door.open = !door.open;
+          // 双开门的两扇一起开合
+          const leaves = r.doors.filter((d) => d.id === hit.object.userData.door);
+          const open = !leaves[0]?.open;
+          for (const leaf of leaves) leaf.open = open;
           if(latest.current.options.mode==='orbit')latest.current.select({kind:'opening',id:hit.object.userData.door});
         } else if (latest.current.options.mode === "orbit") {
           if(hit?.object.userData.wall){const w=latest.current.design.walls.find(w=>w.id===hit.object.userData.wall);if(w){const dx=w.b[0]-w.a[0],dy=w.b[1]-w.a[1];wallClick={id:w.id,fraction:Math.max(0,Math.min(1,((hit.point.x*1000-w.a[0])*dx+(hit.point.z*1000-w.a[1])*dy)/(dx*dx+dy*dy)))};}}
@@ -579,8 +582,9 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         if (e.code === "KeyE") {
           const hit = pick();
           if (hit && hit.distance < 3 && hit.object.userData.door) {
-            const door = r.doors.find((d) => d.id === hit.object.userData.door);
-            if (door) door.open = !door.open;
+            const leaves = r.doors.filter((d) => d.id === hit.object.userData.door);
+            const open = !leaves[0]?.open;
+            for (const leaf of leaves) leaf.open = open;
           }
         }
       };
@@ -639,6 +643,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
                   )
                 : undefined;
             if (!opening || opening.kind === "window") return true;
+            // 推拉门不在 r.doors 里（没有开合），视为可通行；平开 / 双开关着时挡路。
             const door = r.doors.find((o) => o.id === opening.id);
             if (door && !door.open) return true;
           }
@@ -940,34 +945,44 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
               glass.castShadow = false;
             }
           } else if (o.kind === "door") {
-            const pivot = new THREE.Group();
             const ang = Math.atan2(w.b[1] - w.a[1], w.b[0] - w.a[0]),
-              ww = o.width / 1000;
-            const { mirrorX, rotationSign } = doorOrientation(o);
-            pivot.position.set(
-              x - mirrorX * (Math.cos(ang) * ww) / 2,
-              0,
-              z - mirrorX * (Math.sin(ang) * ww) / 2,
-            );
-            pivot.rotation.y = angle + rotationSign * Math.PI / 2;
-            const leaf = new THREE.Mesh(
-              new THREE.BoxGeometry(ww, Math.min(H, dims.height / 1000), 0.04),
-              mat("#bc9a74"),
-            );
-            leaf.position.set(mirrorX * ww / 2, Math.min(H, dims.height / 1000) / 2, 0);
-            leaf.castShadow = true;
-            pivot.add(leaf);
-            pivot.userData.door = o.id;
-            pivot.userData.opening = o.id;
-            r.arch.add(pivot);
-            r.doors.push({
-              group: pivot,
-              id: o.id,
-              angle,
-              open: true,
-              rotationSign,
-              width: ww,
-            });
+              ww = o.width / 1000,
+              leafH = Math.min(H, dims.height / 1000),
+              ux = Math.cos(ang),
+              uz = Math.sin(ang);
+            const type = doorType(o);
+            if (type === "sliding") {
+              // 推拉：两扇沿墙一前一后叠放（与平面符号一致），不做开合动画。
+              for (const panel of doorSymbol(o).panels) {
+                const along = (panel.x + panel.width / 2) / 1000,
+                  across = (panel.y + panel.depth / 2) / 1000;
+                const leaf = new THREE.Mesh(new THREE.BoxGeometry(panel.width / 1000, leafH, panel.depth / 1000), mat("#bc9a74"));
+                leaf.position.set(x + ux * along - uz * across, leafH / 2, z + uz * along + ux * across);
+                leaf.rotation.y = angle;
+                leaf.castShadow = true;
+                leaf.userData.opening = o.id;
+                r.arch.add(leaf);
+              }
+            } else {
+              // 单开一扇；双开两扇各半宽，分别铰接在两侧门框，开向与平面图开启弧一致。
+              const leaves = type === "double"
+                ? (["start", "end"] as const).map((hinge) => ({ hinge, width: ww / 2 }))
+                : [{ hinge: o.hinge ?? "start", width: ww }];
+              for (const { hinge, width } of leaves) {
+                const { mirrorX, rotationSign } = doorOrientation({ hinge, swingSide: o.swingSide });
+                const pivot = new THREE.Group();
+                pivot.position.set(x - (mirrorX * ux * ww) / 2, 0, z - (mirrorX * uz * ww) / 2);
+                pivot.rotation.y = angle + rotationSign * Math.PI / 2;
+                const leaf = new THREE.Mesh(new THREE.BoxGeometry(width, leafH, 0.04), mat("#bc9a74"));
+                leaf.position.set((mirrorX * width) / 2, leafH / 2, 0);
+                leaf.castShadow = true;
+                pivot.add(leaf);
+                pivot.userData.door = o.id;
+                pivot.userData.opening = o.id;
+                r.arch.add(pivot);
+                r.doors.push({ group: pivot, id: o.id, angle, open: true, rotationSign, width });
+              }
+            }
           }
           cursor = b;
         }
