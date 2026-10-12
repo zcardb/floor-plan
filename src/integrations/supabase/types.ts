@@ -3876,7 +3876,17 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      interior_account_library: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          data: Json | null
+          item_key: string | null
+          kind: string | null
+          name: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never

@@ -1,0 +1,24 @@
+-- 账号家具库合并视图：家具 / 地面 / 墙面 / 门窗 / 屋面 / 吊顶 一次读完，每行带统一的分类。
+-- security_invoker：按查询者身份执行，沿用各表已有的「仅本人」RLS，不放宽任何权限。
+create or replace view public.interior_account_library
+with (security_invoker = true) as
+select 'furniture'::text as kind, t.catalog_id as item_key, t.name, t.category, t.created_at, to_jsonb(t) - 'owner_id' - 'id' as data
+  from public.interior_furniture_catalog t
+union all
+select 'floor', t.floor_key, t.name, '地面', t.created_at, to_jsonb(t) - 'owner_id' - 'id'
+  from public.interior_floor_catalog t
+union all
+select 'wall', t.wall_key, t.name, '墙面', t.created_at, to_jsonb(t) - 'owner_id' - 'id'
+  from public.interior_wall_catalog t
+union all
+select 'opening', t.opening_key, t.name, '门窗', t.created_at, to_jsonb(t) - 'owner_id' - 'id'
+  from public.interior_opening_catalog t
+union all
+select 'roof', t.roof_key, t.name, '屋面', t.created_at, to_jsonb(t) - 'owner_id' - 'id'
+  from public.interior_roof_catalog t
+union all
+select 'ceiling', t.ceiling_key, t.name, '吊顶', t.created_at, to_jsonb(t) - 'owner_id' - 'id'
+  from public.interior_ceiling_catalog t;
+
+revoke all on public.interior_account_library from anon, public;
+grant select on public.interior_account_library to authenticated;
