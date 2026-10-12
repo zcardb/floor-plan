@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { blankDesign } from '../data/templates';
-import { expandToGroups, furnitureInRect, groupBounds, groupFurniture, groupIds, isPersistentGroup, moveGroup, normalizeRect, persistentGroupOf, removeGroup, selectionOf, ungroupFurniture } from './furnitureGroup';
+import { duplicateFurniture, expandToGroups, furnitureInRect, groupBounds, groupFurniture, groupIds, isPersistentGroup, moveGroup, normalizeRect, persistentGroupOf, removeGroup, selectionOf, ungroupFurniture } from './furnitureGroup';
 import type { Design, Furniture } from './types';
 
 const item = (id: string, cx: number, cy: number, rot = 0): Furniture => ({ id, type: 'chair', name: id, cx, cy, w: 400, d: 400, rot, color: '#888888' });
@@ -62,5 +62,35 @@ describe('家具组合', () => {
     const legacy = design();
     expect(ungroupFurniture(legacy, ['a'])).toBe(legacy);
     expect(expandToGroups(legacy, ['a'])).toEqual(['a']);
+  });
+});
+
+describe('复制家具', () => {
+  it('单件：复制件偏移 200mm、有新 id、不改变原件', () => {
+    const d = design();
+    const r = duplicateFurniture(d, ['a']);
+    expect(r.ids).toHaveLength(1);
+    const copy = r.design.furniture.find(f => f.id === r.ids[0])!;
+    expect({ cx: copy.cx, cy: copy.cy }).toEqual({ cx: 1200, cy: 1200 });
+    expect(copy.name).toBe('a');
+    expect(d.furniture).toHaveLength(3);
+    expect(r.design.furniture).toHaveLength(4);
+  });
+  it('组合：整组一起复制，相对位置不变，复制件是新组合（与原组合、彼此都不同）', () => {
+    const d = groupFurniture(design(), ['a', 'b'], 'g1');
+    const r = duplicateFurniture(d, ['a', 'b']);
+    expect(r.ids).toHaveLength(2);
+    const copies = r.design.furniture.filter(f => r.ids.includes(f.id));
+    expect(copies.map(f => [f.cx - 1000, f.cy - 1200])).toEqual([[200, 0], [1200, 0]]);
+    expect(new Set(copies.map(f => f.groupId)).size).toBe(1);
+    expect(copies[0].groupId).not.toBe('g1');
+    expect(isPersistentGroup(r.design, r.ids)).toBe(true);
+  });
+  it('只选组合里一件也复制整组；没有选中时不改动', () => {
+    const d = groupFurniture(design(), ['a', 'b'], 'g1');
+    expect(duplicateFurniture(d, ['b']).ids).toHaveLength(2);
+    const none = duplicateFurniture(d, []);
+    expect(none.ids).toEqual([]);
+    expect(none.design).toBe(d);
   });
 });

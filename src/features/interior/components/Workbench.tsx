@@ -12,7 +12,7 @@ import { splitWall as splitWallModel } from '../model/wallSplit';
 import { removeWall as removeWallModel } from '../model/wallRemoval';
 import { clearRoomFurniture } from '../model/roomFurniture';
 import { removeRoom as removeRoomModel, type RoomRemoval } from '../model/roomRemoval';
-import { expandToGroups, groupFurniture, groupIds, isPersistentGroup, moveGroup, removeGroup, ungroupFurniture } from '../model/furnitureGroup';
+import { duplicateFurniture, expandToGroups, groupFurniture, groupIds, isPersistentGroup, moveGroup, removeGroup, ungroupFurniture } from '../model/furnitureGroup';
 import { reorderFurniture } from '../model/furnitureLayer';
 import { rotateUnit } from '../model/movableUnit';
 import { deriveRooms } from '../model/roomDerive';
@@ -104,7 +104,6 @@ import { useOpeningCatalog } from "../cloud/useOpeningCatalog";
 import { useCeilingCatalog, useRoofCatalog } from "../cloud/useSurfaceCatalogs";
 import { useFurnitureCatalog } from "../cloud/useFurnitureCatalog";
 import { SelectionEditor, type SelectionEditorHandle } from "./SelectionEditor";
-import { furnitureKey } from "../model/costs";
 import type { ScreenRect } from "../model/selectionAnchor";
 import { PlanCanvas, type CanvasHandle } from "./PlanCanvas";
 import type { Scene3D, SceneHandle, SceneOptions } from "../scene/Scene3D";
@@ -440,20 +439,19 @@ export function Workbench(p: Props) {
     setSelection({ kind: "group", ids: members });
     notify.success(`已将 ${members.length} 件家具组合，可整体移动`);
   }, [d, selection, change]);
+  /** 复制：单件家具，或多选 / 组合（整组一起复制，复制件仍是一个组合）。 */
   const duplicate = useCallback(() => {
-    if (selection?.kind !== "furniture") return;
-    const f = d.furniture.find((f) => f.id === selection.id);
-    if (!f) return;
-    const next = {
-      ...f,
-      catalogId: furnitureKey(f),
-      id: uid(),
-      cx: f.cx + 200,
-      cy: f.cy + 200,
-    };
-    change((d) => ({ ...d, furniture: [...d.furniture, next] }));
-    setSelection({ kind: "furniture", id: next.id });
-    notify.success(`已复制「${f.name}」`);
+    const ids = selection?.kind === "furniture" ? [selection.id] : selection?.kind === "group" ? groupIds(d, selection) : [];
+    const { design, ids: copied } = duplicateFurniture(d, ids);
+    if (!copied.length) return;
+    change(() => design);
+    if (copied.length === 1) {
+      setSelection({ kind: "furniture", id: copied[0] });
+      notify.success(`已复制「${design.furniture.find(f => f.id === copied[0])!.name}」`);
+    } else {
+      setSelection({ kind: "group", ids: copied });
+      notify.success(`已复制 ${copied.length} 件家具`);
+    }
   }, [d, selection, change]);
   const removeWall = useCallback(
     (wallId: string) => {

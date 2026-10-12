@@ -1,4 +1,5 @@
-import type { Design, Furniture, Point, Selection } from './types';
+import { furnitureKey } from './costs';
+import { uid, type Design, type Furniture, type Point, type Selection } from './types';
 
 export interface Rect { x1: number; y1: number; x2: number; y2: number }
 
@@ -96,4 +97,35 @@ export function ungroupFurniture(d: Design, ids: string[]): Design {
 export function removeGroup(d: Design, ids: string[]): Design {
   const set = new Set(ids);
   return { ...d, furniture: d.furniture.filter(f => !set.has(f.id)) };
+}
+
+/** 复制件相对原件的偏移（mm），避免与原件完全重叠。 */
+export const DUPLICATE_OFFSET = 200;
+
+/**
+ * 复制家具：单件或整组（选中组合时连同整组成员一起复制）。
+ * 复制件位于原件右下方，保留相对位置与图层顺序（排在最上层）；原组合复制后是一个新的独立组合。
+ */
+export function duplicateFurniture(d: Design, ids: string[]): { design: Design; ids: string[] } {
+  const members = expandToGroups(d, ids);
+  if (!members.length) return { design: d, ids: [] };
+  const set = new Set(members), groupMap = new Map<string, string>();
+  const copies = d.furniture.filter(f => set.has(f.id)).map(f => ({
+    ...f,
+    catalogId: furnitureKey(f),
+    id: uid(),
+    cx: f.cx + DUPLICATE_OFFSET,
+    cy: f.cy + DUPLICATE_OFFSET,
+    ...(f.groupId ? { groupId: newGroupId(groupMap, f.groupId) } : {}),
+  }));
+  return { design: { ...d, furniture: [...d.furniture, ...copies] }, ids: copies.map(f => f.id) };
+}
+
+/** 复制件的 groupId 映射：每个原组合对应一个新的组合 id。 */
+function newGroupId(map: Map<string, string>, groupId: string) {
+  const existing = map.get(groupId);
+  if (existing) return existing;
+  const id = uid();
+  map.set(groupId, id);
+  return id;
 }

@@ -203,6 +203,7 @@ describe('房间与家具的工具条', () => {
     const apart = { ...blankDesign(), furniture: [furniture('a', 1000), furniture('b', 2100)] };
     const menu = (h: { element: ReactElement }) => elements(h.element).find(node => node.type === LayerMenu);
     const single = harness('door', false, { design: apart, selection: { kind: 'furniture', id: 'a' }, showCosts: true });
+    expect(elements(single.element).some(node => node.props['aria-label'] === '复制对象')).toBe(true);
     const group = harness('door', false, { design: apart, selection: { kind: 'group', ids: ['a', 'b'] } });
     expect(menu(single)?.props).toMatchObject({ ids: ['a'], variant: 'toolbar' });
     expect(menu(group)?.props).toMatchObject({ ids: ['a', 'b'], variant: 'toolbar' });

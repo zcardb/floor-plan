@@ -475,9 +475,9 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </button>
           </EditorTooltip>
         )}
-        {f && (
-          <EditorTooltip label="复制对象" shortcut="Ctrl D">
-            <button type="button" aria-label="复制对象" onClick={p.duplicate}>
+        {(f || group.length > 1) && (
+          <EditorTooltip label={group.length > 1 ? (grouped ? "复制组合" : "复制所选") : "复制对象"} shortcut="Ctrl D">
+            <button type="button" aria-label={group.length > 1 ? (grouped ? "复制组合" : "复制所选") : "复制对象"} onClick={p.duplicate}>
               <Copy size={15} />
             </button>
           </EditorTooltip>
