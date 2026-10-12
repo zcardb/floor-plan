@@ -15,6 +15,7 @@ import { followWallFurniture } from '../model/furnitureFollow';
 import { moveWallWithJoints } from '../model/wallMove';
 import { keepOpeningsInPlace, openingsFitWalls } from '../model/openingAnchor';
 import { dragStep, snapToDragStep, stepDelta } from '../model/dragStep';
+import { edgeCursor, FURNITURE_EDGES, snapFurnitureEdge, type FurnitureEdge } from '../model/furnitureResize';
 import {
   area,
   center,
@@ -23,7 +24,7 @@ import {
   norm,
   roomPath,
 } from "../model/geometry";
-import { sameGuides, type AlignmentGuide } from '../model/furnitureAlignment';
+import { sameGuides, type AlignmentGuide } from '../model/alignment';
 import { dragUnit } from '../model/movableUnit';
 import { AlignmentGuides } from './AlignmentGuides';
 import {
@@ -392,7 +393,7 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
       }
       return;
     }
-    if (["move", "rot", "size", "wallmove", "endpoint"].includes(dr.kind)) {
+    if (["move", "rot", "size", "wallmove", "endpoint"].includes(dr.kind) || dr.kind.startsWith("edge-")) {
       if (dr.moved) {
         const wallEdit = dr.kind === "wallmove" || dr.kind === "endpoint";
         let next = d;
@@ -715,6 +716,12 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
               100,
               snapToDragStep((-dx * Math.sin(a) + dy * Math.cos(a)) * 2, step),
             );
+          }
+          if (dr.kind.startsWith("edge-")) {
+            // 拖一条边：对边不动，只有这条边跟着指针；吸附与对齐线和整体拖动同一套。
+            const edged = snapFurnitureEdge(dr.before, f, dr.kind.slice(5) as FurnitureEdge, p, layers.snap, 8 / view.s);
+            Object.assign(f, edged.patch);
+            showGuides(edged.guides);
           }
         }
         if (wall) {
@@ -1049,6 +1056,9 @@ export const PlanCanvas = forwardRef<CanvasHandle, Props>(function PlanCanvas(
                     stroke="var(--plan-selection)"
                     strokeWidth={2 / view.s}
                   />
+                  {FURNITURE_EDGES.map((edge) => (
+                    <FurnitureEdgeHandle key={edge} edge={edge} f={f} scale={view.s} />
+                  ))}
                   <rect
                     data-handle="size"
                     x={f.w / 2 - 7 / view.s}
@@ -1120,6 +1130,24 @@ function MeasureLine({ a, b, scale }: { a: Point; b: Point; scale: number }) {
       >
         {formatMeters(Math.hypot(a[0] - b[0], a[1] - b[1]))} m
       </text>
+    </g>
+  );
+}
+
+/** 选中家具时每条边的拖拽手柄：整条边是透明热区，中点有一个可见的小把手。坐标在家具局部系内。 */
+function FurnitureEdgeHandle({ edge, f, scale }: { edge: FurnitureEdge; f: { w: number; d: number; rot: number }; scale: number }) {
+  const pad = 5 / scale, hit = 10 / scale, thick = 6 / scale;
+  const horizontal = edge === 'n' || edge === 's';
+  const along = horizontal ? f.w + 2 * pad : f.d + 2 * pad;
+  const grip = Math.min(18 / scale, along * 0.4);
+  const at = edge === 'e' ? f.w / 2 + pad : edge === 'w' ? -f.w / 2 - pad : edge === 's' ? f.d / 2 + pad : -f.d / 2 - pad;
+  const box = (len: number, width: number) => horizontal
+    ? { x: -len / 2, y: at - width / 2, width: len, height: width }
+    : { x: at - width / 2, y: -len / 2, width, height: len };
+  return (
+    <g data-handle={`edge-${edge}`} className="plan-furniture-edge" style={{ cursor: edgeCursor(f.rot, edge) }}>
+      <rect {...box(along, hit)} fill="transparent" />
+      <rect {...box(grip, thick)} rx={thick / 2} fill="var(--plan-porcelain)" stroke="var(--plan-selection)" strokeWidth={1.5 / scale} />
     </g>
   );
 }

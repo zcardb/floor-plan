@@ -70,7 +70,6 @@ import { StairEditor } from './StairEditor';
 import { changeDoorOrientation } from '../model/doorOrientation';
 import { useEditorDrag } from './useEditorDrag';
 import { separatorLength } from '../model/separators';
-import { overlaps } from '../model/layoutRules';
 import type { AiEntryTone } from '../ai/useRoomAi';
 export interface SelectionEditorHandle {
   update: (r: ScreenRect | null) => void;
@@ -198,10 +197,6 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
           : null,
       group = groupIds(p.design, sel);
     const grouped = isPersistentGroup(p.design, group);
-    // 图层顺序只在家具互相压住时才有意义：选中的家具与其它家具没有任何重叠，就不显示「图层」。
-    // 判据复用布局校验的 overlaps（超过 50mm 才算，地毯压家具、椅子收进桌下这类正常叠放不算）。
-    const picked = f ? [f] : p.design.furniture.filter(item => group.includes(item.id));
-    const layered = picked.some(item => p.design.furniture.some(other => other.id !== item.id && overlaps(item, other)));
     const roomItems = r ? p.design.furniture.filter(f => inRoom([f.cx, f.cy], r)) : [];
     const roomFurniture = roomItems.length;
     // 门窗款式：只有标准款且未换过款式时没有可切换项，不显示入口（与属性面板一致）。
@@ -387,7 +382,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </PopoverContent>
           </Popover>
         )}
-        {w && <WallOptionsMenu design={p.design} wall={w} change={p.change} splitWall={p.splitWall} mergeWall={p.mergeWall} removeWall={p.removeWall} />}
+        {(w || separator || o?.kind === 'passage') && sel && sel.kind !== 'group' && <WallOptionsMenu design={p.design} target={{ kind: sel.kind as 'wall' | 'separator' | 'opening', id: sel.id }} change={p.change} select={p.select} splitWall={p.splitWall} mergeWall={p.mergeWall} removeWall={p.removeWall} />}
         {(f || w) && <ColorPicker label={f ? "家具颜色" : "墙体颜色"} variant="swatch" value={f?.color || w?.color || ""} onChange={paint} />}
         {r && (
           <Popover
@@ -487,7 +482,6 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </button>
           </EditorTooltip>
         )}
-        {(f || group.length > 1) && layered && <LayerMenu design={p.design} ids={f ? [f.id] : group} change={p.change} variant="toolbar" />}
         {group.length > 1 && p.toggleGroup && (
           <EditorTooltip label={grouped ? "解除组合" : "组合"} shortcut={grouped ? "Ctrl Shift G" : "Ctrl G"}>
             <button type="button" aria-label={grouped ? "解除组合" : "组合"} aria-pressed={grouped} onClick={p.toggleGroup}>
@@ -495,6 +489,8 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </button>
           </EditorTooltip>
         )}
+        {/* 图层：所有家具都显示，固定在金额前面。 */}
+        {(f || group.length > 1) && <LayerMenu design={p.design} ids={f ? [f.id] : group} change={p.change} variant="toolbar" />}
         {/* 金额紧挨在删除左边；删除是最后一个操作，后面只剩「取消选择」。 */}
         {/* 房间的金额按钮直接展开右侧本间成本面板（单价在面板里逐项调整），没有下拉。 */}
         {p.showCosts && r && (

@@ -54,7 +54,7 @@ describe('墙选项菜单的删除入口', () => {
     const { entry } = wallMenu(d, drawn.id, removeWall);
     const remove = entry('删除当前墙')!;
     expect(remove.props.disabled).toBe(false);
-    expect(text(remove.props.children as ReactNode)).toContain('删除这面墙及墙上门窗');
+    expect(text(remove.props.children as ReactNode)).toContain('连同墙上门窗');
     (remove.props.onSelect as () => void)();
     expect(removeWall).toHaveBeenCalledWith(drawn.id);
   });
@@ -72,7 +72,7 @@ describe('墙选项菜单的删除入口', () => {
     const { entry } = wallMenu(d, d.walls[0].id, vi.fn());
     const remove = entry('删除当前墙')!;
     expect(remove.props.disabled).toBe(true);
-    expect(text(remove.props.children as ReactNode)).toContain('请先取消承重标记');
+    expect(text(remove.props.children as ReactNode)).toContain('先取消承重');
     expect(entry('取消标记承重')!.props.disabled).toBeFalsy();
   });
 });

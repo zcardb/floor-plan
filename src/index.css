@@ -27,7 +27,7 @@
 .wall-options-trigger { height: 30px; padding: 5px 7px; gap: 5px; border: 0; background: none; color: hsl(var(--foreground)); font-size: 12px; font-weight: 400; box-shadow: none; }
 .wall-options-trigger svg { width: 12px; height: 12px; }
 .wall-options-trigger[data-state="open"] { background: hsl(var(--accent)); }
-.wall-options-menu { width: 260px; max-width: calc(100vw - 24px); padding: 6px; border-radius: 10px; background: hsl(var(--popover)); border-color: hsl(var(--border)); box-shadow: 0 8px 24px hsl(var(--foreground) / 0.1); }
+.wall-options-menu { width: 272px; max-width: calc(100vw - 24px); padding: 6px; border-radius: 10px; background: hsl(var(--popover)); border-color: hsl(var(--border)); box-shadow: 0 8px 24px hsl(var(--foreground) / 0.1); }
 .wall-options-section { display: flex; align-items: center; justify-content: space-between; padding: 8px 9px 5px; color: hsl(var(--muted-foreground)); font-size: 10px; font-weight: 500; letter-spacing: 0.04em; user-select: none; }
 .wall-options-status { font-size: 10px; letter-spacing: 0; }
 .wall-options-item { min-height: 48px; align-items: flex-start; gap: 10px; padding: 9px; border-radius: 6px; cursor: pointer; }
@@ -38,6 +38,31 @@
 .wall-options-item[data-disabled] { opacity: 1; cursor: default; color: hsl(var(--muted-foreground) / 0.65); }
 .wall-options-item[data-disabled] small { color: hsl(var(--muted-foreground) / 0.65); }
 .wall-options-divider { margin: 6px 3px; }
+/* 墙选项 · 替换为：三张等宽卡片单选（认知优于回忆：图标 + 名称 + 一句话说明），当前形态主色描边 + 角标对勾 */
+.wall-form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 2px 3px 4px; }
+.wall-form-card { position: relative; display: grid; justify-items: center; gap: 2px; min-height: 0; padding: 10px 4px 8px; border: 1px solid hsl(var(--border)); border-radius: 8px; text-align: center; cursor: pointer; transition: border-color .15s ease, background-color .15s ease; }
+.wall-form-card:focus, .wall-form-card[data-highlighted] { background: hsl(var(--accent)); border-color: hsl(var(--primary) / 0.35); }
+.wall-form-card.is-current { border-color: hsl(var(--primary)); background: hsl(var(--primary) / 0.06); cursor: default; }
+.wall-form-card[data-disabled] { opacity: .45; cursor: not-allowed; }
+.wall-form-icon { width: 20px; height: 20px; margin-bottom: 2px; stroke-width: 1.6; color: hsl(var(--muted-foreground)); }
+.wall-form-card.is-current .wall-form-icon { color: hsl(var(--primary)); }
+.wall-form-label { font-size: var(--fs-group); line-height: 16px; font-weight: 600; color: hsl(var(--foreground)); }
+.wall-form-hint { font-size: var(--fs-hint); line-height: 13px; color: hsl(var(--muted-foreground)); }
+.wall-form-check { position: absolute; top: 4px; right: 4px; width: 12px; height: 12px; stroke-width: 2.5; color: hsl(var(--primary)); }
+.wall-options-note { display: flex; align-items: center; gap: 6px; margin: 2px 3px 2px; padding: 6px 8px; border-radius: 6px; background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); font-size: var(--fs-hint); line-height: 14px; }
+.wall-options-note svg { flex: none; width: 12px; height: 12px; }
+/* 墙选项 · 操作行：单行（图标 · 名称 · 右侧状态），比两行说明更易扫读 */
+.wall-options-row { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 0 9px; border-radius: 6px; cursor: pointer; font-size: var(--fs-group); font-weight: 500; }
+.wall-options-row > svg { flex: none; width: 16px; height: 16px; stroke-width: 1.75; }
+.wall-options-row > small { margin-left: auto; color: hsl(var(--muted-foreground)); font-size: var(--fs-hint); font-weight: 400; white-space: nowrap; }
+.wall-options-row[data-disabled] { opacity: 1; cursor: default; color: hsl(var(--muted-foreground) / 0.6); }
+.wall-options-row[data-disabled] small { color: hsl(var(--muted-foreground) / 0.6); }
+/* 承重开关：只做视觉，交互由整行菜单项承担 */
+.wall-options-switch { flex: none; display: inline-flex; align-items: center; width: 28px; height: 16px; padding: 2px; border-radius: 999px; background: hsl(var(--input)); transition: background-color .15s ease; }
+.wall-options-switch > span { width: 12px; height: 12px; border-radius: 999px; background: hsl(var(--background)); box-shadow: 0 1px 2px hsl(var(--foreground) / 0.2); transition: transform .15s ease; }
+.wall-options-switch[data-state="checked"] { background: hsl(var(--primary)); }
+.wall-options-switch[data-state="checked"] > span { transform: translateX(12px); }
+.wall-options-row > small + .wall-options-switch { margin-left: 2px; }
 .wall-split-dialog { width: min(760px, calc(100vw - 24px)); max-width: min(760px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow-y: auto; gap: 14px; padding: 20px; }
 .wall-split-modebar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .wall-split-segmented { display: inline-flex; padding: 3px; gap: 3px; border-radius: var(--ctl-radius); background: hsl(var(--muted)); }
@@ -1015,6 +1040,10 @@
   .dimension-edit-dialog { max-width: min(420px, calc(100vw - 32px)); }
   .selection-overlay [data-handle] {
     cursor: pointer;
+  }
+  /* 家具边手柄：悬停时中点把手填充选中色，提示可拖 */
+  .plan-furniture-edge:hover rect + rect {
+    fill: var(--plan-selection);
   }
   .plan-opening {
     cursor: pointer;

@@ -1,5 +1,6 @@
-import type { AlignmentGuide } from '../model/furnitureAlignment';
+import type { AlignmentGuide } from '../model/alignment';
 
+/** 通用对齐辅助线：家具拖动、拖边调整等所有吸附场景共用（数据见 model/alignment.ts）。 */
 export function AlignmentGuides({ guides, scale }: { guides: AlignmentGuide[]; scale: number }) {
   if (!guides.length) return null;
   const pad = 12 / scale, r = 2.5 / scale;

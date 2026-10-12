@@ -159,6 +159,22 @@ describe('PlanCanvas 家具对齐线', () => {
     expect(h.commit).toHaveBeenCalledOnce();
   });
 });
+describe('PlanCanvas 家具拖边调整尺寸', () => {
+  it('拖右边只改宽度，左边不动，松手提交一次原始快照', () => {
+    const h = harness();
+    h.design.openings = [];
+    h.design.furniture = [{ id: 'f', type: 'sofa', name: '沙发', cx: 2000, cy: 2000, w: 1000, d: 600, rot: 0, color: '#ccc' }];
+    hooks.refs = []; hooks.states = [];
+    h.handlers = h.component.render({ ...h.props, selection: { kind: 'furniture', id: 'f' } }, null).props;
+    h.handlers.onPointerDown!(event(2500, 2000, 1, 'data-handle', 'edge-e'));
+    h.handlers.onPointerMove!(event(2810, 2100, 1, 'data-handle', 'edge-e'));
+    const f = h.preview.mock.calls[h.preview.mock.calls.length - 1][0].furniture[0];
+    expect([f.cx - f.w / 2, f.cx + f.w / 2, f.cy, f.d]).toEqual([1500, 2800, 2000, 600]);
+    h.handlers.onPointerUp!(event(2810, 2100, 1, 'data-handle', 'edge-e'));
+    expect(h.commit).toHaveBeenCalledOnce();
+    expect(h.commit.mock.calls[0][1].furniture[0].w).toBe(1000);
+  });
+});
 describe('PlanCanvas 门窗事件链', () => {
   it('选中门窗时距离层接收实时设计，关闭外围尺寸仍显示，取消选中隐藏', () => {
     const h = harness();
