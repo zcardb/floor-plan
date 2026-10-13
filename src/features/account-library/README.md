@@ -18,5 +18,5 @@
 ## 规则
 
 - 家具管理页列表用 `interior_library_page`，以 `p_exclude_keys = BUILTIN_IDS` 排除内置家具的覆盖行，覆盖行另外按 `catalog_id` 读取；排序为自建在前、内置在后。
-- 家具图片的 AI 调整、AI 生成 3D 部件经 `ai-design` 的公开入口（`FurnitureAiDialog`、`useFurnitureImage`）。
+- 家具图片的 AI 生成与调整经 `ai-design` 的公开入口（`FurnitureAiDialog`、`useFurnitureImage`）。
 - 材料采购编辑复用 `costs` 的 `MaterialProcurementEditor`。

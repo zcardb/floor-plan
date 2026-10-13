@@ -4509,7 +4509,7 @@ svg.material-thumb { display: block; }
 .style-create-error { margin:0; font-size:var(--fs-label); color:hsl(var(--destructive)); }
 
 
-/* ── 3D 光照：右下角「白天 ─ 日照时间 ─ 夜晚」，与左下缩放条、左上竖条互不遮挡 ── */
+/* ── 3D 光照：画布右上角「白天 ─ 日照时间 ─ 夜晚」，与左侧竖条、左下缩放条互不遮挡 ── */
 .scene-light-control { gap:10px; min-height:var(--ctl-lg); padding:4px 6px 4px 4px; border-radius:12px; font-size:var(--fs-control); color:hsl(var(--foreground)); box-shadow:var(--shadow-float); }
 .scene-light-control button { display:grid; place-items:center; width:var(--ctl-md); height:var(--ctl-md); border-radius:var(--ctl-radius-in); color:hsl(var(--muted-foreground)); }
 .scene-light-control button:hover { background:hsl(var(--secondary)); color:hsl(var(--foreground)); }

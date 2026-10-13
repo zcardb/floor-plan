@@ -10,7 +10,7 @@
 | [account-library](./account-library/README.md) | 账号家具与材料库：家具管理页、自定义家具与材料、账号默认单价、编辑器家具库数据 | `useAccountLibrary`、`accountFurniturePage`、`AccountFurnitureLibrary`（lazy）、`CustomFurnitureDialog`（lazy） | ai-design、costs |
 | [costs](./costs/README.md) | 方案与成本侧栏、顶栏造价、单价与材料采购编辑 | `CostPanel`、`CostChip`、`PriceField`、`MaterialProcurementEditor` | — |
 | [decor-styles](./decor-styles/README.md) | 装修风格：编辑器风格面板、风格管理与详情、我的风格 | `StylePanel`、`saveAccountStyle`、`StyleManager`（lazy） | account-library |
-| [ai-design](./ai-design/README.md) | AI 布局、AI 对话、AI 新建项目、家具图片与 3D 部件生成、小助手管理 | `useRoomAi`、`useAiCatalog`、`useFurnitureImage`；`AiRoomDialog`、`AiChatPanel`、`AiCreateProjectDialog`、`FurnitureAiDialog`、`AssistantManager`（均 lazy）及类型 | projects（仅类型） |
+| [ai-design](./ai-design/README.md) | AI 布局、AI 对话、AI 新建项目、家具图片生成、小助手管理 | `useRoomAi`、`useAiCatalog`、`useFurnitureImage`；`AiRoomDialog`、`AiChatPanel`、`AiCreateProjectDialog`、`FurnitureAiDialog`、`AssistantManager`（均 lazy）及类型 | projects（仅类型） |
 | [report](./report/README.md) | 方案报告：预览与多页 A4 PDF | `ReportPreview`（lazy）、`loadReportExport()` | — |
 | [scene-3d](./scene-3d/README.md) | 3D 场景（three.js）：家具精修模型、材质与灯光、漫游 | `loadScene3D()` 及类型 | — |
 | [dxf-import](./dxf-import/README.md) | 导入 DXF 户型图与 JSON 方案文件 | `DxfImportDialog`、`parseDesignFile`、`IMPORT_ACCEPT`、`DXF_TEMPLATE_ID`、`DxfSource` | — |
