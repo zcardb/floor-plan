@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { isStaleBuildError, notifyStaleBuild } from "./staleBuild";
 
 /** 从任意抛出值中取可读的错误信息。 */
 export function errorMessage(cause: unknown, fallback = "未知错误"): string {
@@ -23,11 +24,14 @@ export const notify = {
   success: (title: string, description?: string) =>
     toast.success(title, { description, duration: 2500 }),
   fail: (title: string) => toast.error(title, { duration: 4000 }),
-  error: (title: string, cause?: unknown) =>
-    toast.error(title, {
+  error: (title: string, cause?: unknown) => {
+    // 网站发布了新版本、旧页面拿不到按需模块：报原始英文错误没有用，改为「刷新页面」提示。
+    if (isStaleBuildError(cause)) return notifyStaleBuild();
+    return toast.error(title, {
       description: cause === undefined ? undefined : errorMessage(cause, "请稍后重试"),
       duration: 6000,
-    }),
+    });
+  },
   info: (title: string) => toast.info(title, { duration: 3000 }),
   warning: (title: string, description?: string) =>
     toast.warning(title, { description, duration: 5000 }),
