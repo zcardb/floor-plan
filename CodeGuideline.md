@@ -1,153 +1,76 @@
-# Code Guideline
+# 代码规范（Code Guideline）
 
-## Project Structure Overview
+本文件说明目录职责、新增代码放在哪里、路由与多语言规则。分层与依赖的完整规则见 `docs/architecture.md`，组件复用见 `AGENTS.md`；**新增、删除或挪动模块时，同一次改动里更新这些文档。**
+
+## 目录总览
 
 ```
 project-root/
-  ├── i18n.config.json       # i18n manifest for supported locales and language metadata
-  ├── public/
-  │   └── locales/           # public/locales/{code}.json translation files
-  ├── src/
-  │   ├── components/        # All reusable UI components
-  │   │   └── ui/            # Prebuilt and custom UI components, grouped by function
-  │   ├── hooks/             # Custom React hooks
-  │   ├── i18n/              # i18n runtime: config.ts (entry) + util.ts (helpers)
-  │   ├── lib/               # Utility functions and libraries
-  │   ├── pages/             # Application pages (each page in its own subdirectory)
-  │   ├── App.tsx            # Main app component, sets up route providers
-  │   ├── router.tsx         # Router config, sets up routing
-  │   ├── main.tsx           # Entry point for the React app
-  │   └── index.css          # Global styles
-  ├── package.json           # Project metadata and scripts
-  ├── tailwind.config.ts     # Tailwind CSS configuration
-  └── ...                    # Other config and lock files
+├── index.html                 入口 HTML（引用 /src/main.tsx）
+├── i18n.config.json           多语言清单：回退语言、语言名、浏览器识别别名、书写方向
+├── public/                    静态资源；public/locales/{code}.json 为翻译文件
+├── src/
+│   ├── main.tsx               应用入口（平台约定，位置固定）
+│   ├── analytics.ts           平台埋点（平台约定，位置固定）
+│   ├── app/                   应用层：app.tsx（全局 Provider）、router.tsx（路由表）、routes.ts（路径与 resolveView）、pages/、account-cms/、hooks/
+│   ├── features/<名>/         业务用例（清单见 src/features/features.md）
+│   ├── components/<组件>/     跨 Feature 复用的界面；ui/ 为 shadcn 基础控件（清单见 src/components/components.md）
+│   ├── contexts/<能力>/       由应用层提供 Provider 的全局能力
+│   ├── lib/<能力>/            技术模块：floor-plan（户型领域内核）、drawing（图纸导出）、backend（Supabase 入口）、notify、paging、platform
+│   ├── hooks/                 通用 Hook
+│   ├── utils/                 通用纯函数
+│   ├── styles/index.css       全局样式与主题 Token
+│   ├── i18n/                  多语言运行时（平台脚手架）
+│   └── integrations/supabase/ Supabase 客户端与类型（自动生成，不手改）
+├── scripts/                   架构与测试目录检查
+├── docs/                      架构、接口方案、UI 规范、跨模块功能规范
+└── supabase/                  数据库迁移与 Edge Functions
 ```
 
-> Backend-handoff temporary files (`scripts/`, `i18n.scan.json`, `reports/i18n/`, `docs/i18n-*.md`) are kept in the repo only until backend integration of i18n statistics/scan/auto-translate is complete. They are owned by the backend long-term and will be removed once integration lands. Treat them as read-only handoff copies — do not extend them.
+## 新增代码放在哪里
 
-## Directory Responsibilities
+| 要加的东西 | 放在 |
+| --- | --- |
+| 新页面 / 页面级视图 | `src/app/routes.ts` 加路径，`src/app/router.tsx` 注册（见下方路由规则）；页面装配放 `src/app/pages/` |
+| 新的业务用例 | 新建 `src/features/<名>/`（含 `README.md`、`plan.md`、`index.ts`），并补进 `src/features/features.md` |
+| 已有用例里的界面、Hook、接口、逻辑 | 该 Feature 的 `components/`、`hooks/`、`api/`、`model/` |
+| 多个 Feature 共用的户型规则或数据 | `src/lib/floor-plan/` |
+| 多个 Feature 共用的界面 | `src/components/<组件>/`，并补进 `src/components/components.md` |
+| 与业务无关的 Hook / 纯函数 | `src/hooks/` / `src/utils/` |
+| 列表数据 | 统一分页接口 + `usePagedList` + `ListLoadMore`（`docs/architecture.md` §5） |
+| 后端读写 | 所属 Feature 的 `api/`，经 `@/lib/backend` |
 
-- **public/**: Static files served directly. Place images, icons, and robots.txt here.
-- **public/locales/**: Translation files, one per language (`{code}.json`). Flat dotted keys (e.g. `home.hero.title`); the `fallbackLng` file is the structural source of truth.
-- **i18n.config.json**: The lightweight i18n manifest for fallback language, language labels, browser detection aliases, and document direction. Single source of truth for the language list.
-- **src/components/**: All UI components.  
-  - **ui/**: Contains atomic and composite UI components.  
-  - *Group related components into subdirectories if they share a domain or feature (e.g., `form/`, `charts/`).*
-- **src/hooks/**: Custom React hooks. Each file should export a single hook focused on one responsibility.
-- **src/i18n/**: Two files only.
-  - `config.ts` is the runtime entry: imports the manifest via `util.ts`, initializes i18next (HTTP backend, language detector, react binding), syncs `<html lang/dir>`, and re-exports the helpers. Importing this file for its side effect boots i18next.
-  - `util.ts` holds pure helpers parsed from the manifest: `fallbackLng`, `supportedLngs`, `languageOptions`, `normalizeLanguage`, `getLanguageDirection`, plus types.
-  - Components use the official `useTranslation()` from `react-i18next` directly; there is no project-specific `useT` wrapper.
-- **src/features/**: Feature modules. Before building new UI, pick from the shared components listed in `AGENTS.md` (reuse first). `interior/` UI must follow `src/features/interior/UI_GUIDELINES.md` (font scale, control heights, toolbar and icon sizes, plus the interaction and UX-psychology rules in sections 5–7: no fake progress, always keep an exit path, one primary action per view).
-  - `interior/model/routes.ts`: page-level route paths, path builders and the pure `resolveView()` (URL + login state → current page).
-  - `interior/components/useStudioRoute.ts`: two-way sync between the URL and studio state (URL → open project, UI → navigate) plus the single leave guard (`useBlocker`).
-- **src/lib/**: Utility functions and libraries that are not React components or hooks.
-- **src/pages/**: All route-level pages.  
-  - *Each page should have its own subdirectory if it contains more than a single file or has related logic/components.*
-- **src/App.tsx**: Sets up global providers.
-- **src/router.tsx**: Sets up routing.
-- **src/main.tsx**: Application entry point.
+命名：目录与文件 kebab-case，组件 PascalCase，Hook 以 `use` 开头；测试放所属模块的 `__tests__/`。
 
-**Important:**
-Whenever a new module (such as a component, hook, or utility) or a new page is added or removed, this document **must be updated immediately** to reflect the changes. Keeping this documentation up to date ensures that all collaborators have a clear understanding of the current project structure and its intended organization.
+## 路由规则（强制）
 
-## How to Add New Code
+每个页面级视图都必须体现在地址上，而且是双向的。
 
-### 1. Adding a New Page
+- **新页面或页面级视图切换（侧栏项、详情页、独立流程页）都要有自己的路由**：路径加在 `src/app/routes.ts`，在 `src/app/router.tsx` 注册并起语义化的 `name`。
+- **不要用 `useState` 决定「当前是哪个页面」**：地址是唯一来源，页面由地址推导（`resolveView`），换页用 `navigate`。
+- **双向**：界面操作更新地址；刷新、粘贴链接、浏览器前进后退都恢复同一页面（详情页恢复同一项目）。
+- **工作室的各页面共用一个 `StudioPage` 实例**（`/` 下的子路由），会话、自动保存与当前项目在换地址时不会卸载；不要给它们拆出独立页面组件。
+- **离开拦截只走 `src/app/hooks/use-studio-route.ts` 里唯一的 `useBlocker`**，浏览器后退与站内链接行为一致。
+- **每条新路由都要写清未登录访客去哪**，并在 `src/app/__tests__/routes.test.ts` 补 `resolveView` 用例。
+- 页面内的界面状态（列表筛选、2D / 3D、面板页签）不进地址，除非明确要求。
 
-- **Create a subdirectory under `src/pages/` for each new page.**
-  - Example: For a "Dashboard" page, create `src/pages/dashboard/`.
-- **Place the main page component as `index.tsx` inside the subdirectory.**
-- **Add any page-specific components or logic in the same subdirectory.**
-- **Register the new route in `src/router.tsx and generate a semantic name.**
-  - Example:
-    ```tsx
-    import Dashboard from "./pages/dashboard";
-    // ...
-    {
-      path: "/dashboard",
-      name: 'dashboard',
-      element: <Dashboard />
-    }
-    ```
+## 多语言（平台脚手架）
 
-### 2. Adding a New Component
+- 语言元数据只写在 `i18n.config.json`；不要在 `src/i18n/*.ts` 里硬编码语言列表、语言名、浏览器别名或 RTL 列表。
+- 翻译内容在 `public/locales/{code}.json`（扁平的点分键），回退语言的文件是键的权威集合。
+- 运行时只经 `src/i18n/util.ts` 读取清单；`src/i18n/config.ts` 是启动入口（初始化 i18next、同步 `<html lang/dir>`）。
+- 组件直接用 `react-i18next` 的 `useTranslation()`，不另包 Hook。
 
-- **If you are adding a group of related components, create a subdirectory (e.g., `form/`, `charts/`).**
-- **If the component is only used by a specific page, place it in that page's subdirectory under `src/pages/`.**
-- **Each component should be focused on a single responsibility.**
-- **Small files (< 100 lines) are encouraged for a single component.**
+## 功能规范（强制）
 
-### 3. Adding a New Hook
+只属于一个模块的规则写在该模块的 `README.md`，跨模块的在 `docs/features/`（索引 `docs/features/README.md`）。改功能前先读对应规范，规则变化时同一次改动里更新。
 
-- **Create a new file in `src/hooks/` named after the hook (e.g., `use-feature.ts`).**
-- **Each file should export only one hook.**
-- **Hooks should be as small and focused as possible.**
+- **所有家具、结构、标注的导出都要符合 CAD / DXF 行业规范**，见 `src/lib/drawing/README.md`：每类对象一个登记图层（ACI 颜色、线宽、线型），符号用命名 BLOCK + INSERT（块内无文字、无负缩放），文字从下方或右侧可读，毫米单位，`STUDIO_CN` 文字样式。
+- 楼梯：`docs/features/stairs.md`；3D 场景、装修风格、方案报告：各自 Feature 的 `README.md`。
 
-### 4. Adding Utilities
+## 编码习惯
 
-- **Add utility functions to `src/lib/`.**
-- **Group related utilities in the same file or subdirectory if needed.**
-
-### 5. Adding or Updating Languages
-
-- **Language metadata must go through `i18n.config.json`.**
-- **Do not hardcode supported languages, labels, browser detection aliases, or RTL direction lists in `src/i18n/*.ts`.**
-- **Locale content lives in `public/locales/{code}.json`** as flat dotted-key JSON; the `fallbackLng` file owns the canonical key set.
-- **Runtime code reads the manifest only through `src/i18n/util.ts`.** Adding or removing a language means editing `i18n.config.json` plus the matching `public/locales/{code}.json`; nothing in `src/i18n/` needs to change.
-- **Translations are read with the official `useTranslation()` from `react-i18next`.** No custom hook, no cast at call sites.
-
-## Routing Rules (mandatory)
-
-Every page-level view must be reflected in the URL, in both directions.
-
-- **Any new page, or any page-level view switch (sidebar item, detail page, standalone flow page), must get its own route.** Add the path to `src/features/interior/model/routes.ts` and register it in `src/router.tsx` with a semantic `name`.
-- **Never use `useState` to decide "which page am I on".** The URL is the single source of truth: derive the page from it (`resolveView`) and change pages with `navigate`, never by setting component state.
-- **Two-way means:** UI actions update the URL; refresh, pasted links and browser back/forward restore the same page (and the same project for detail pages).
-- **Studio pages share one `<Index />` instance** (child routes under `/`), so session, autosave and the open project survive route changes. Do not give them separate page components.
-- **Leave guards go through the single `useBlocker` in `useStudioRoute.ts`**, so browser back and in-app links behave the same.
-- **Each new route states where a logged-out visitor goes**, and gets a `resolveView` case in `model/routes.test.ts`.
-- In-page UI state (list filters, 2D/3D view, panel tabs) stays out of the URL unless explicitly requested.
-
-## Feature Specs (mandatory)
-
-Per-feature rules live in `docs/features/` (index: `docs/features/README.md`). Read the matching spec before changing a feature, and update it in the same change when a rule changes.
-
-- **Every furniture item, structure or annotation must export in line with CAD / DXF industry conventions** — see `docs/features/drawing-export.md`: one registered layer per object class (ACI colour, lineweight, linetype), symbols as named BLOCK + INSERT without text inside and without negative scale, text readable from the bottom or right, millimetre units, `STUDIO_CN` text style, and DXF read-back tests.
-- Stairs: `docs/features/stairs.md`.
-
-## Coding Best Practices
-
-- **One module, one responsibility:**  
-  Each file (component, hook, utility) should do one thing only.
-- **High cohesion, low coupling:**  
-  Keep related logic together and avoid unnecessary dependencies between modules.
-- **Naming conventions:**  
-  - Use `PascalCase` for components and page directories.
-  - Use `camelCase` for hooks and utility functions.
-  - Name page subdirectories and files after their route or feature.
-- **Component structure:**  
-  - Keep components small and focused.
-  - Extract subcomponents if a component grows too large.
-- **Page structure:**  
-  - Place all logic, hooks, and components specific to a page in its subdirectory.
-  - Only share code via `components/`, `hooks/`, or `lib/` if it is truly reusable.
-- **Documentation:**  
-  - Add comments for complex logic.
-  - Document the purpose of each module at the top of the file if not obvious.
-
-## Example: Adding a New "Profile" Page
-
-1. **Create a directory:**  
-   `src/pages/profile/`
-2. **Add the main page component:**  
-   `src/pages/profile/index.tsx`
-3. **Add page-specific components:**  
-   `src/pages/profile/ProfileHeader.tsx`, `src/pages/profile/ProfileDetails.tsx`
-4. **Register the route in `App.tsx`:**
-   ```tsx
-   import Profile from "./pages/profile";
-   // ...
-   <Route path="/profile" element={<Profile />} />
-   ```
-5. **If you need a reusable button, add it to `src/components/ui/button.tsx`.**
+- 一个文件只做一件事；相关逻辑放在一起，避免不必要的模块依赖。
+- 组件保持小而专注，过大时拆出子组件或 Hook。
+- 复杂逻辑写注释；模块用途不明显时在文件顶部说明。
+- 改完按 `AGENTS.md` §4 跑完检查。

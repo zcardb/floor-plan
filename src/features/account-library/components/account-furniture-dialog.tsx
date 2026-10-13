@@ -1,0 +1,169 @@
+import { Suspense, useState } from 'react';
+import { Loader2, RotateCcw, Trash2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
+import type { LibraryItem } from '@/lib/floor-plan/types';
+import { categories } from '@/lib/floor-plan/catalog';
+import { FurnitureVisual } from './furniture-visual';
+import { FurnitureAiDialog, type FurnitureAiResult } from '@/features/ai-design';
+import { FurnitureFormFields } from './furniture-form-fields';
+import { furnitureDraftOf, parseFurnitureDraft, previewFurnitureDraft, FURNITURE_DRAFT_ERROR, type FurnitureDraft } from '../model/furniture-draft';
+import { notify } from '@/lib/notify';
+import { builtinOf } from '@/lib/floor-plan/builtin-assets';
+
+type Assets = Pick<LibraryItem, 'imageUrl' | 'image3dUrl' | 'model3d'>;
+
+/** 表单里除单价外的字段是否改过（单价走账号默认价，单独比较）。 */
+const fieldsChanged = (item: LibraryItem, next: Omit<LibraryItem, 'price'>) =>
+  (['name', 'category', 'type', 'w', 'd', 'height', 'color'] as const).some(key => item[key] !== next[key]) || (item.shape || 'reference') !== (next.shape || 'reference')
+  || JSON.stringify(item.model3d ?? null) !== JSON.stringify(next.model3d ?? null);
+
+/**
+ * 家具详情：表单项与「新建你的家具」一致。自定义家具所有项都可改；内置家具可改名称、尺寸、颜色
+ * （写进账号库的覆盖行，分类与参考类型保持只读），并设置账号默认单价。
+ * 素材与名称 / 尺寸 / 颜色的覆盖对新放置的家具生效；已放置的家具只跟随素材，项目内单独改过的以项目为准。
+ */
+export function AccountFurnitureDialog({ item, isCustom, referencePrice, onOpenChange, onChanged, applyDefaultPrice, remove, saveGeometry, saveFields, saveAssets, adjusted = false, commitBusy = false, commitError = '', retryPrice, saved = false }: {
+  commitBusy?: boolean; commitError?: string; retryPrice?: () => Promise<boolean>; saved?: boolean;
+  saveGeometry?: (item: LibraryItem) => Promise<boolean>;
+  /** 内置家具：把名称、尺寸、颜色与 2D / 3D 素材写进账号覆盖行。 */
+  saveFields?: (item: LibraryItem) => Promise<boolean>;
+  /** 内置家具：只保存 2D / 3D 素材覆盖（AI 调整与「恢复默认素材」走这里）。 */
+  saveAssets?: (assets: Assets) => Promise<boolean>;
+  /** 内置家具的素材已调整过（可恢复默认）。 */
+  adjusted?: boolean;
+  applyDefaultPrice: (price: number | null) => Promise<boolean>;
+  item: LibraryItem; isCustom: boolean; referencePrice: number | null;
+  onOpenChange: (v: boolean) => void; onChanged: (next: LibraryItem | null) => void;
+  remove: (catalogId: string) => Promise<boolean>;
+}) {
+  const builtin = builtinOf(item.catalogId);
+  // 内置家具还没有覆盖行时，item.price 为空，单价回落到项目参考价（内置参考价）。
+  const initialPrice = item.price ?? builtin?.price ?? referencePrice ?? null;
+  const [draft, setDraft] = useState<FurnitureDraft>(() => furnitureDraftOf({ ...item, price: initialPrice }));
+  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [confirming, setConfirming] = useState(false);
+  const [adjusting, setAdjusting] = useState(false);
+  const editable = isCustom && !!saveGeometry;
+  /** 内置家具：名称、尺寸、颜色可改，写的是覆盖行。 */
+  const fieldsEditable = editable || (!!saveFields && !retryPrice);
+  /** 视觉区跟随表单实时预览：参考符号按当前草稿绘制，俯视图沿用已保存的。 */
+  const display: LibraryItem = fieldsEditable ? { ...item, ...previewFurnitureDraft(draft, { w: item.w, d: item.d, height: item.height || 700 }), name: draft.name.trim() || item.name } : item;
+  const canAdjust = (editable || !!saveAssets) && !retryPrice;
+  /** 内置家具：分类、参考类型、外形只读（改了等于换一款家具），其余字段可改。 */
+  const assetsOnly = !isCustom;
+  const working = busy || commitBusy;
+  const failure = commitError || error;
+  const patch = (next: Partial<FurnitureDraft>) => { setError(''); setDraft(current => ({ ...current, ...next })); };
+
+  /**
+   * 应用 AI 结果：只写 2D 俯视图 imageUrl；旧数据里已有的 3D 素材原样保留（3D 场景仍会用它）。
+   * 不提交表单里其它未保存的修改。
+   */
+  const applyImage = async ({ url }: FurnitureAiResult) => {
+    const next: LibraryItem = { ...item, imageUrl: url };
+    const ok = saveGeometry ? await saveGeometry(next)
+      : saveAssets ? await saveAssets({ imageUrl: next.imageUrl, image3dUrl: next.image3dUrl, model3d: next.model3d }) : false;
+    if (!ok) return false;
+    onChanged(next);
+    return true;
+  };
+  /** 恢复内置素材：覆盖行写回内置值，使用它的项目随之恢复。 */
+  const restoreAssets = async () => {
+    if (!saveAssets || !builtin || working) return;
+    setBusy(true); setError('');
+    try {
+      if (!(await saveAssets({ imageUrl: builtin.imageUrl, image3dUrl: builtin.image3dUrl, model3d: builtin.model3d }))) { setError('未能恢复，请重试。'); return; }
+      onChanged({ ...item, imageUrl: builtin.imageUrl, image3dUrl: builtin.image3dUrl, model3d: builtin.model3d });
+      notify.success(`「${item.name}」已恢复默认素材`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '恢复失败，请重试');
+    } finally { setBusy(false); }
+  };
+
+  const finish = async () => {
+    if (working) return;
+    const parsed = parseFurnitureDraft(draft);
+    if (!parsed) { setError(FURNITURE_DRAFT_ERROR); notify.fail(FURNITURE_DRAFT_ERROR); return; }
+    const { price, ...fields } = parsed;
+    const next: LibraryItem = { ...item, ...fields };
+    const changedFields = fieldsEditable && fieldsChanged(item, next), changedPrice = price !== initialPrice;
+    if (!changedFields && !changedPrice) { onOpenChange(false); return; }
+    setBusy(true); setError('');
+    try {
+      const writeFields = saveGeometry ?? saveFields;
+      if (changedFields && !(await writeFields!(next))) { setError('未能保存，本次修改已保留，请重试。'); return; }
+      if (changedPrice && !retryPrice && !(await applyDefaultPrice(price))) { setError('单价未能保存，本次修改已保留，请重试。'); onChanged(next); return; }
+      onChanged({ ...next, price });
+      notify.success(`「${next.name}」已保存，使用它的项目会同步更新`);
+      onOpenChange(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '保存失败，请重试');
+      notify.error(`「${next.name}」保存失败`, cause);
+    } finally { setBusy(false); }
+  };
+  const retry = async () => {
+    if (working || !retryPrice) return;
+    setBusy(true); setError('');
+    try { if (await retryPrice()) notify.success('「' + item.name + '」账号默认单价已保存'); else setError('未能保存，请重试。'); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : '保存失败，请重试'); }
+    finally { setBusy(false); }
+  };
+  const drop = async () => {
+    if (working || retryPrice) return; setBusy(true); setError('');
+    try { await remove(item.catalogId!); setConfirming(false); onChanged(null); onOpenChange(false); notify.success('已删除家具「' + item.name + '」'); }
+    catch (e) { setError(e instanceof Error ? e.message : '删除失败，请重试'); setConfirming(false); notify.error('删除家具「' + item.name + '」失败', e); }
+    finally { setBusy(false); }
+  };
+
+  const categoryField = <div className="custom-field">
+    <Label htmlFor="furniture-category">分类</Label>
+    <Select value={draft.category} onValueChange={category => patch({ category })} disabled={!editable || working}>
+      <SelectTrigger id="furniture-category" className="h-9 text-xs"><SelectValue /></SelectTrigger>
+      <SelectContent position="popper" className="category-select-content">
+        {[...new Set([draft.category, ...categories])].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  </div>;
+
+  return <>
+    <Dialog open onOpenChange={v => { if (!working) onOpenChange(v); }}>
+      <DialogContent className="cms-detail-dialog furniture-detail-dialog" onEscapeKeyDown={event => { if (working) event.preventDefault(); }} onInteractOutside={event => { if (working) event.preventDefault(); }}>
+        <DialogHeader>
+          <DialogTitle>{item.name}</DialogTitle>
+          <DialogDescription>{item.category} · {fieldsEditable ? isCustom ? '自定义家具，所有项都可修改' : '内置家具，可改名称、尺寸、颜色，并用「AI 调整」更换 2D 俯视图；分类与参考类型不可改' : '内置家具，可设置账号默认单价'}。素材与名称、尺寸、颜色对新放置的家具生效；项目里单独改过的以项目为准。</DialogDescription>
+        </DialogHeader>
+        <div className="furniture-detail-body">
+          <FurnitureVisual item={display} onAdjust={canAdjust ? () => setAdjusting(true) : undefined} />
+          <form id="furniture-detail-form" className="furniture-detail-side" onSubmit={e => { e.preventDefault(); void finish(); }}>
+            <FurnitureFormFields draft={draft} onChange={patch} categoryField={categoryField} priceOnly={!fieldsEditable} identityLocked={assetsOnly} disabled={working || !!retryPrice}
+              priceLabel="账号默认单价 · 元 / 件" priceHint="仅影响未单独调价的项目；项目内改价仍以项目为准。" />
+            {failure && <div className="cost-save-error" role="alert"><span>{failure}</span>{retryPrice && <Button type="button" variant="outline" disabled={working} onClick={() => void retry()}>重试保存</Button>}</div>}
+          </form>
+        </div>
+        <div className="cms-detail-actions furniture-detail-actions">
+          <p className="cost-sync" role="status">{working ? '正在保存…' : saved && !failure ? '已保存并生效' : '点击完成即保存所有修改'}</p>
+          {adjusted && saveAssets && <Button type="button" variant="ghost" className="cms-detail-action" disabled={working || !!retryPrice} onClick={() => void restoreAssets()}><RotateCcw size={14} />恢复默认素材</Button>}
+          {isCustom && <Button type="button" variant="ghost" className="cms-detail-action text-destructive hover:bg-destructive/10 hover:text-destructive" disabled={working || !!retryPrice} onClick={() => setConfirming(true)}><Trash2 size={14} />删除家具</Button>}
+          <Button type="button" variant="outline" className="cms-detail-action" disabled={working} onClick={() => onOpenChange(false)}>取消</Button>
+          <Button type="submit" form="furniture-detail-form" className="cms-detail-action" disabled={working}>{working ? <><Loader2 size={14} className="animate-spin" />正在保存…</> : '完成'}</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    {adjusting && (saveGeometry || saveAssets) && <Suspense fallback={null}><FurnitureAiDialog item={display} onClose={() => setAdjusting(false)} onApply={applyImage} /></Suspense>}
+    <AlertDialog open={confirming} onOpenChange={setConfirming}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>删除「{item.name}」？</AlertDialogTitle>
+          <AlertDialogDescription>账号家具库中的该款式会被移除；已放置到项目中的家具不受影响。</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={working}>取消</AlertDialogCancel>
+          <AlertDialogAction disabled={working} onClick={e => { e.preventDefault(); void drop(); }}>删除家具</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </>;
+}
