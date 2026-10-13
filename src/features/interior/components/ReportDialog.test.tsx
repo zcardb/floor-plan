@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { blankDesign, referenceDesign } from '../data/templates';
 import { REPORT_CONTENTS, REPORT_NOTES, REPORT_SECTIONS, buildReport } from '../model/report';
-import { ReportView } from './ReportDialog';
+import { ReportView } from './ReportView';
 
 const DATE = new Date(2026, 9, 12);
 const html = (model: ReturnType<typeof buildReport>, planSrc: string | null) => renderToStaticMarkup(createElement(ReportView, { model, planSrc }));

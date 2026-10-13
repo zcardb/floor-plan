@@ -10,4 +10,5 @@ export const CustomFurnitureDialog = lazy(() => import("./CustomFurnitureDialog"
 export const AiRoomDialog = lazy(() => import("./AiRoomDialog").then((m) => ({ default: m.AiRoomDialog })));
 export const AiChatPanel = lazy(() => import("./AiChatPanel").then((m) => ({ default: m.AiChatPanel })));
 export const AiCreateProjectDialog = lazy(() => import("./AiCreateProjectDialog").then((m) => ({ default: m.AiCreateProjectDialog })));
-export const ReportPreview = lazy(() => import("./ReportPreview").then((m) => ({ default: m.ReportPreview })));
+/** 方案报告正文（报告模型 + 平面图）：弹窗外壳常驻，打开后才下载这部分。 */
+export const ReportContent = lazy(() => import("./ReportContent").then((m) => ({ default: m.ReportContent })));

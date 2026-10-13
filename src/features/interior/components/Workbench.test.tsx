@@ -31,7 +31,8 @@ import { Library } from './Library';
 import { PlanRailTools, SceneRailPanels, SceneRailTools, SceneViewMenu } from './RailTools';
 import { CostChip } from './CostChip';
 import { LayoutPanel, LayoutTidyButton } from './LayoutPanel';
-import { AiChatPanel, DimensionEditDialog, ReportPreview, WallSplitDialog } from './lazyDialogs';
+import { AiChatPanel, DimensionEditDialog, WallSplitDialog } from './lazyDialogs';
+import { ReportDialog } from './ReportDialog';
 import { SidePanel } from './SidePanel';
 import { CanvasRail, RailButton } from './CanvasRail';
 import { DropdownMenu, DropdownMenuItem } from '@/components/ui/dropdown-menu';
@@ -507,12 +508,12 @@ describe('编辑器分区：侧栏、竖条与画布', () => {
     const right = render().find(n => n.props.className === 'toolbar-right')!;
     const order = nodes(right).filter(n => n.type === CostChip || n.type === ExportMenu || (n.type === 'button' && n.props['aria-label'] === '家具库'));
     expect(order.map(n => n.type === CostChip ? '成本' : n.type === ExportMenu ? '保存' : '家具')).toEqual(['家具', '成本', '保存']);
-    expect(render().some(n => n.type === ReportPreview)).toBe(false);
+    expect(render().some(n => n.type === ReportDialog && n.props.open)).toBe(false);
     (render().find(n => n.type === ExportMenu)!.props.onReport as () => void)();
-    const preview = render().find(n => n.type === ReportPreview)!;
-    expect(preview.props).toMatchObject({ exporting: false, onExport: expect.any(Function) });
+    const preview = render().find(n => n.type === ReportDialog)!;
+    expect(preview.props).toMatchObject({ open: true, exporting: false, onExport: expect.any(Function) });
     (preview.props.onClose as () => void)();
-    expect(render().some(n => n.type === ReportPreview)).toBe(false);
+    expect(render().find(n => n.type === ReportDialog)!.props.open).toBe(false);
   });
   it('左下角视图区有「布局整理」（带问题角标），只读预览不显示；点它先整理再打开布局整理侧栏', () => {
     const tidy = (tree: Node[]) => tree.find(n => n.type === LayoutTidyButton);

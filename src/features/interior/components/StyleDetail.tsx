@@ -3,6 +3,7 @@ import { ArrowLeft, Copy, Loader2, RotateCcw, Save, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { usePagedList } from "@/hooks/usePagedList";
 import { notify } from "@/lib/notify";
 import type { PageRequest, PageResult } from "@/lib/paging";
@@ -41,6 +42,11 @@ const HARD_FIELDS: { key: "wall" | "door" | "wood" | "legs" | "accent"; label: s
 ];
 const ALL = "全部";
 const MINE = "我的家具";
+/** 风格大类下拉里「不归类」的取值（Select 的选项值不能为空串）。 */
+const NO_CATEGORY = "none";
+const CATEGORY_OPTIONS = [{ value: NO_CATEGORY, label: "不归类" }, ...DECOR_CATEGORIES.map((c) => ({ value: c, label: c }))];
+const METAL_OPTIONS = (Object.keys(METAL_LABEL) as MetalFinish[]).map((m) => ({ value: m, label: METAL_LABEL[m] }));
+const LEGS_OPTIONS = [{ value: "wood", label: "木质收分腿" }, { value: "metal", label: "细金属腿" }];
 /** 家具清单里的内置家具（楼梯是构件，不随风格着色）与它们的分类。 */
 const BUILTIN = catalog.filter((item) => item.type !== "stairs");
 const GROUPS = [ALL, ...new Set(BUILTIN.map((item) => item.category))];
@@ -54,6 +60,20 @@ const myFurniture = (group: string) => async (request: PageRequest): Promise<Pag
     counts: { [MINE]: costCounts(page.counts, { custom: false })["软装"] ?? 0 },
   };
 };
+
+/** 详情页里的紧凑下拉（风格大类、五金、家具腿），与项目其余下拉同一套 shadcn Select。 */
+function DetailSelect<T extends string>({ label, value, options, onChange }: {
+  label: string; value: T; options: { value: T; label: string }[]; onChange: (value: T) => void;
+}) {
+  return (
+    <Select value={value} onValueChange={(next) => onChange(next as T)}>
+      <SelectTrigger aria-label={label} className="style-detail-select"><SelectValue /></SelectTrigger>
+      <SelectContent className="editor-select-menu">
+        {options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  );
+}
 
 /** 一行颜色：色块 + 色号；可编辑时右侧是取色器。 */
 function ColorRow({ label, hint, value, editable, onChange, extra }: {
@@ -181,10 +201,8 @@ export function StyleDetail({ style, custom, onBack, onDuplicate, duplicating = 
           ) : <h1>{style.name}</h1>}
           <div className="style-detail-meta">
             {custom ? (
-              <select aria-label="风格大类" value={draft.category ?? ""} onChange={(e) => edit({ category: (e.target.value || undefined) as DecorCategory | undefined })}>
-                <option value="">不归类</option>
-                {DECOR_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <DetailSelect label="风格大类" value={draft.category ?? NO_CATEGORY} options={CATEGORY_OPTIONS}
+                onChange={(next) => edit({ category: next === NO_CATEGORY ? undefined : (next as DecorCategory) })} />
             ) : style.category && <span className="style-tag">{style.category}</span>}
             <span className="style-tag is-muted">{custom ? "我的风格" : "内置风格"}</span>
           </div>
@@ -213,9 +231,7 @@ export function StyleDetail({ style, custom, onBack, onDuplicate, duplicating = 
             <span className="style-color-value">
               <i style={{ background: METAL_FINISH[draft.metal].color }} aria-hidden="true" />
               {custom ? (
-                <select aria-label="五金材质" value={draft.metal} onChange={(e) => edit({ metal: e.target.value as MetalFinish })}>
-                  {(Object.keys(METAL_LABEL) as MetalFinish[]).map((m) => <option key={m} value={m}>{METAL_LABEL[m]}</option>)}
-                </select>
+                <DetailSelect label="五金材质" value={draft.metal} options={METAL_OPTIONS} onChange={(metal) => edit({ metal })} />
               ) : <code>{METAL_LABEL[draft.metal]}</code>}
             </span>
           </div>
@@ -223,10 +239,7 @@ export function StyleDetail({ style, custom, onBack, onDuplicate, duplicating = 
             <span className="style-color-label"><b>家具腿</b><small>现代、工业常用细金属腿</small></span>
             <span className="style-color-value">
               {custom ? (
-                <select aria-label="家具腿" value={draft.legsKind} onChange={(e) => edit({ legsKind: e.target.value as DecorStyle["legsKind"] })}>
-                  <option value="wood">木质收分腿</option>
-                  <option value="metal">细金属腿</option>
-                </select>
+                <DetailSelect label="家具腿" value={draft.legsKind} options={LEGS_OPTIONS} onChange={(legsKind) => edit({ legsKind: legsKind as DecorStyle["legsKind"] })} />
               ) : <code>{draft.legsKind === "metal" ? "细金属腿" : "木质收分腿"}</code>}
             </span>
           </div>

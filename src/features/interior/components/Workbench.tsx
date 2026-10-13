@@ -3,7 +3,8 @@ import { canDeleteWall } from '../model/wallPolicy';
 import { ExportMenu, type ExportFormat } from './ExportMenu';
 import { ProjectMenu, type ProjectNavigation } from './ProjectMenu';
 import { WorkbenchBanner } from './WorkbenchBanner';
-import { AiChatPanel, AiRoomDialog, CustomFurnitureDialog, DimensionEditDialog, ReportPreview, WallSplitDialog } from './lazyDialogs';
+import { AiChatPanel, AiRoomDialog, CustomFurnitureDialog, DimensionEditDialog, WallSplitDialog } from './lazyDialogs';
+import { ReportDialog } from './ReportDialog';
 import { CompassRose } from './CompassRose';
 import { northAngle } from '../model/northAngle';
 import { syncAccountFurniture, syncAccountMaterials } from '../model/furnitureSync';
@@ -850,6 +851,27 @@ export function Workbench(p: Props) {
             </button>
           </EditorTooltip>
         </div>
+        <span className="toolbar-divider" />
+        <div className="tool-group undo-actions">
+          <ToolButton
+            label="撤销"
+            iconOnly
+            shortcut="Ctrl Z"
+            onClick={undo}
+            disabled={!counts.undo}
+          >
+            <Undo2 size={16} />
+          </ToolButton>
+          <ToolButton
+            label="重做"
+            iconOnly
+            shortcut="Ctrl ⇧ Z"
+            onClick={redo}
+            disabled={!counts.redo}
+          >
+            <Redo2 size={16} />
+          </ToolButton>
+        </div>
         <span className="toolbar-divider danger-divider" />
         <div className="tool-group danger-actions">
           <ToolButton label="重置" onClick={resetDesign}>
@@ -875,27 +897,6 @@ export function Workbench(p: Props) {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        </div>
-        <span className="toolbar-divider" />
-        <div className="tool-group undo-actions">
-          <ToolButton
-            label="撤销"
-            iconOnly
-            shortcut="Ctrl Z"
-            onClick={undo}
-            disabled={!counts.undo}
-          >
-            <Undo2 size={16} />
-          </ToolButton>
-          <ToolButton
-            label="重做"
-            iconOnly
-            shortcut="Ctrl ⇧ Z"
-            onClick={redo}
-            disabled={!counts.redo}
-          >
-            <Redo2 size={16} />
-          </ToolButton>
         </div>
         <div className="toolbar-right">
           <EditorTooltip label="家具库">
@@ -1241,7 +1242,7 @@ export function Workbench(p: Props) {
         onCreateOpening={saveCustomOpening}
       /></Suspense>}
       {aiEnabled && roomAi.room && <Suspense fallback={null}><AiRoomDialog ai={roomAi} furniture={aiCatalog.items} /></Suspense>}
-      {reportOpen && <Suspense fallback={null}><ReportPreview design={d} name={p.project.name} exporting={exportAction.pending} onClose={() => setReportOpen(false)} onExport={exportReport} /></Suspense>}
+      <ReportDialog open={reportOpen} design={d} name={p.project.name} exporting={exportAction.pending} onClose={() => setReportOpen(false)} onExport={exportReport} />
       <SaveFileDialog file={pendingFile} onClose={() => setPendingFile(null)} />
     </div>
     </div>
