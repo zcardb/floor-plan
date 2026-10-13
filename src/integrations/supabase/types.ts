@@ -3927,13 +3927,13 @@ export type Database = {
       }
       interior_library_page: {
         Args: {
-          p_category?: string | null
-          p_exclude_keys?: string[] | null
-          p_kinds?: string[] | null
-          p_major?: string | null
+          p_category?: string
+          p_exclude_keys?: string[]
+          p_kinds?: string[]
+          p_major?: string
           p_page?: number
           p_page_size?: number
-          p_query?: string | null
+          p_query?: string
         }
         Returns: Json
       }
@@ -3941,7 +3941,7 @@ export type Database = {
         Args: {
           p_page?: number
           p_page_size?: number
-          p_query?: string | null
+          p_query?: string
           p_thumbnails?: boolean
         }
         Returns: Json
