@@ -1,7 +1,7 @@
 import { openingRoomIds } from './costs';
 import { doorSweeps } from './doorType';
 import { openingSill } from './hardMaterials';
-import { bbox, inRing, length, nearestOnWall, ringArea, wallPoly } from './geometry';
+import { bbox, inRing, inRoom, length, nearestOnWall, ringArea, wallPoly } from './geometry';
 import { fitsInRoom, footprintCorners } from './roomFit';
 import type { Design, Furniture, Point, Room } from './types';
 
@@ -337,7 +337,8 @@ const ACTION: Record<ViolationKind, string> = {
   bounds: '收回到房间内',
 };
 
-function problemOf(v: Violation): string {
+/** 违规的中文描述：落库校正的提示与方案报告的「布局体检」共用同一套说法。 */
+export function problemOf(v: Violation): string {
   if (v.kind === 'backing') return `背后是${SPAN_LABEL[v.other ?? 'none']}，没有实墙可靠`;
   if (v.kind === 'doorSweep') return '压在门扇开启范围内';
   if (v.kind === 'doorway') return '挡住门口通行区';
@@ -467,6 +468,69 @@ export function settleFurniture(furniture: Furniture[], layout: RoomLayout): { f
     for (let j = i + 1; j < out.length; j++)
       if (overlaps(out[i]!, out[j]!)) { unresolved.push(`${out[i]!.name} 与 ${out[j]!.name} 有重叠，请手动调整`); break; }
   return { furniture: out, report: { adjusted, unresolved } };
+}
+
+/** 家具归属：以家具中心点落在的第一个房间为准。布局体检与布局整理共用，两边口径一致。 */
+export function furnitureByRoom(d: Design): Map<string, Furniture[]> {
+  const byRoom = new Map<string, Furniture[]>();
+  for (const f of d.furniture) {
+    const room = d.rooms.find((r) => inRoom([f.cx, f.cy], r));
+    if (!room) continue;
+    const list = byRoom.get(room.id);
+    if (list) list.push(f);
+    else byRoom.set(room.id, [f]);
+  }
+  return byRoom;
+}
+
+/** 布局体检的一条问题：哪个房间的哪件家具违反了哪条硬约束。 */
+export interface LayoutIssue {
+  roomId: string;
+  room: string;
+  furnitureId: string;
+  furniture: string;
+  kind: ViolationKind;
+  /** 问题的中文描述，与 AI 布局校正的提示同一套说法。 */
+  problem: string;
+}
+
+/**
+ * 布局体检：逐间按布局硬约束（房间轮廓、背靠实墙、门扇、门口通行区、窗洞）检查房内家具。
+ * 方案报告的「布局体检」与编辑器的「布局整理」侧栏共用这一份结果。
+ * `checked` 为参与检查的家具件数（中心点落在某个房间里的家具）。
+ */
+export function layoutIssues(d: Design): { issues: LayoutIssue[]; checked: number } {
+  const byRoom = furnitureByRoom(d), issues: LayoutIssue[] = [];
+  let checked = 0;
+  for (const room of d.rooms) {
+    const inside = byRoom.get(room.id);
+    if (!inside) continue;
+    const layout = roomLayout(d, room);
+    checked += inside.length;
+    for (const f of inside)
+      for (const v of violationsOf(f, layout))
+        issues.push({ roomId: room.id, room: room.name, furnitureId: f.id, furniture: f.name, kind: v.kind, problem: problemOf(v) });
+  }
+  return { issues, checked };
+}
+
+/**
+ * 布局整理：逐间对房内家具做 settleFurniture 校正（与 AI 落库校正同一套规则），合规的家具原样不动。
+ * 说明带上房间名；没有任何家具被挪动时原样返回传入的方案对象，调用方据此判断要不要写入撤销栈。
+ */
+export function tidyLayout(d: Design): { design: Design; report: LayoutReport } {
+  const report: LayoutReport = { adjusted: [], unresolved: [] };
+  const byRoom = furnitureByRoom(d), moved = new Map<string, Furniture>();
+  for (const room of d.rooms) {
+    const inside = byRoom.get(room.id);
+    if (!inside) continue;
+    const settled = settleFurniture(inside, roomLayout(d, room));
+    settled.furniture.forEach((f, i) => { if (f !== inside[i]) moved.set(f.id, f); });
+    report.adjusted.push(...settled.report.adjusted.map((note) => `${room.name} · ${note}`));
+    report.unresolved.push(...settled.report.unresolved.map((note) => `${room.name} · ${note}`));
+  }
+  if (!moved.size) return { design: d, report };
+  return { design: { ...d, furniture: d.furniture.map((f) => moved.get(f.id) ?? f) }, report };
 }
 
 /** 发给模型的布局数据：相对分区左上角、取整，体积可控。 */

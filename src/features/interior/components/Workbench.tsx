@@ -3,7 +3,7 @@ import { canDeleteWall } from '../model/wallPolicy';
 import { ExportMenu, type ExportFormat } from './ExportMenu';
 import { ProjectMenu, type ProjectNavigation } from './ProjectMenu';
 import { WorkbenchBanner } from './WorkbenchBanner';
-import { AiChatPanel, AiRoomDialog, CustomFurnitureDialog, DimensionEditDialog, WallSplitDialog } from './lazyDialogs';
+import { AiChatPanel, AiRoomDialog, CustomFurnitureDialog, DimensionEditDialog, ReportPreview, WallSplitDialog } from './lazyDialogs';
 import { CompassRose } from './CompassRose';
 import { northAngle } from '../model/northAngle';
 import { syncAccountFurniture, syncAccountMaterials } from '../model/furnitureSync';
@@ -32,7 +32,6 @@ import {
   ChevronDown,
   Combine,
   DoorOpen,
-  Eye,
   Layers3,
   LayoutTemplate,
   Loader2,
@@ -42,8 +41,6 @@ import {
   Redo2,
   RotateCcw,
   Scan,
-  ScanLine,
-  Settings2,
   ShieldOff,
   Sun,
   Trash2,
@@ -85,18 +82,19 @@ import {
   selectionKey,
   type Tool,
 } from "../model/types";
-import { blankDesign, designForTemplate, isAiDesign } from "../data/templates";
+import { blankDesign, designForTemplate, isAiDesign, presetById } from "../data/templates";
 import { openingKindLabel } from "../model/hardMaterials";
 import { useRoomAi } from "../ai/useRoomAi";
 import { useAiCatalog } from "../ai/useAiCatalog";
 import { library } from "../data/catalog";
 import { Library } from "./Library";
-import { WallToolMenu } from './WallToolMenu';
 import { CostPanel } from "./CostPanel";
+import { CostChip } from "./CostChip";
+import { StylePanel } from "./StylePanel";
+import { PlanRailTools, SceneRailPanels, SceneRailTools } from "./RailTools";
 import { SidePanel, type PanelKind } from "./SidePanel";
 import { CanvasRail } from "./CanvasRail";
 import { ViewMenu } from "./ViewMenu";
-import { OverviewPanel } from "./OverviewPanel";
 import { HouseSettingsPanel } from "./HouseSettingsPanel";
 import { useAccountLibrary } from "../cloud/useAccountLibrary";
 import { SelectionEditor, type SelectionEditorHandle } from "./SelectionEditor";
@@ -105,6 +103,10 @@ import { PlanCanvas, type CanvasHandle } from "./PlanCanvas";
 import type { Scene3D, SceneHandle, SceneOptions } from "../scene/Scene3D";
 import type { SaveStatus } from "../cloud/useProjects";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import type { AccountCostSettings } from "../model/costDefaults";
+import { tidyLayout, type LayoutReport } from "../model/layoutRules";
+import { LayoutPanel, LayoutTidyButton } from "./LayoutPanel";
+import type { DecorStyle } from "../model/decorStyles";
 import { DXF_TEMPLATE_ID } from "../model/externalDxf/recognize";
 type SceneComponent = typeof Scene3D;
 /** 3D 模块只下载一次：首屏（2D 页面与数据）完成后空闲时预加载，悬停 / 点击 3D 时复用同一个 promise。 */
@@ -120,7 +122,7 @@ const loadScene = () =>
 const preloadScene = () => void loadScene().catch(() => undefined);
 /** 窄屏（≤1100px）侧栏以抽屉形式覆盖画布：放置家具、点画布、Esc 后自动收起。 */
 const isDrawerLayout = () => typeof matchMedia !== "undefined" && matchMedia("(max-width:1100px)").matches;
-const PANEL_TITLES: Record<PanelKind, string> = { library: "家具列表", ai: "AI 设计", settings: "户型设置", overview: "方案总览", cost: "成本核算" };
+const PANEL_TITLES: Record<PanelKind, string> = { library: "家具列表", ai: "AI 设计", settings: "户型设置", cost: "方案与成本", style: "装修风格", layout: "布局整理" };
 interface Props {
   project: Project;
   projectNavigation: ProjectNavigation;
@@ -188,7 +190,9 @@ export function Workbench(p: Props) {
     // 右侧统一侧栏：同一时间只开一个；默认收起，画布完整可见，需要时从竖条打开。
     [sidePanel, setSidePanel] = useState<PanelKind | null>(null),
     [scale, setScale] = useState(0.05),
-    [pendingFile, setPendingFile] = useState<PendingFile | null>(null);
+    [pendingFile, setPendingFile] = useState<PendingFile | null>(null),
+    [reportOpen, setReportOpen] = useState(false),
+    [lastTidy, setLastTidy] = useState<LayoutReport | null>(null);
   const selectionId = selectionKey(selection);
   useEffect(()=>{ sizeTransaction.flush(); },[selectionId,tool,view,sizeTransaction]);
   // 3D 没有成组选择。
@@ -356,7 +360,9 @@ export function Workbench(p: Props) {
     }, [sizeTransaction]),
     closePanels = useCallback(() => { sizeTransaction.flush(); if (isDrawerLayout()) setSidePanel(null); }, [sizeTransaction]);
   const toggleView = async (next: "2d" | "3d") => {
+    // 无论切到哪边，竖条都回到最上面的「选择」：2D 退出绘制工具，3D 退出漫游回到可点选的视角。
     setTool("select");
+    setSceneOptions((o) => (o.mode === "orbit" ? o : { ...o, mode: "orbit" }));
     if (next === view) return;
     if (next === "2d") return lifecycle.close();
     // 先切到 3D 并显示加载遮罩，场景首帧编译完成（onReady）后再撤掉
@@ -606,21 +612,11 @@ export function Workbench(p: Props) {
   // 游客改过模版才提示登录保存；「暂不保存」只关掉当前这一版，再改一次会重新出现。
   const [bannerClosed, setBannerClosed] = useState(0);
   const showGuestBanner = !p.loggedIn && p.guestEdits > 0 && p.guestEdits !== bannerClosed;
-  /** 所有导出的唯一出口：组件只生成文件，这里统一保存和提示。 */
-  const exportAction = useAsyncAction(async (format: ExportFormat) => {
+  /** 所有导出的唯一出口：调用方只负责生成文件，这里统一保存和提示。 */
+  const exportAction = useAsyncAction(async (label: string, make: () => Promise<PendingFile | undefined>) => {
     try {
-      let file: PendingFile, label: string;
-      if (format === "png") {
-        const blob = view === "2d" ? await canvas.current?.exportImage() : await scene.current?.shot();
-        if (!blob) return;
-        file = { blob, name: view === "2d" ? "户型方案-2D.png" : "户型方案-3D视角.png" };
-        label = view === "2d" ? "2D 图片" : "3D 视角图片";
-      } else {
-        const snapshot = structuredClone(model.current.current);
-        const { drawingFile, projectJsonFile } = await import("../model/drawingExport");
-        file = format === "json" ? projectJsonFile(snapshot, p.project.name) : await drawingFile(snapshot, format, p.project.name);
-        label = `${format.toUpperCase()} 文件`;
-      }
+      const file = await make();
+      if (!file) return;
       const result = saveFile(file.blob, file.name);
       if (result.kind === "downloaded") notify.success(`已导出${label}`);
       else setPendingFile({ blob: result.blob, name: result.name });
@@ -630,7 +626,49 @@ export function Workbench(p: Props) {
   });
   const exportFile = (format: ExportFormat) => {
     sizeTransaction.cancel();
-    void exportAction.run(format);
+    if (format === "png") {
+      const plan = view === "2d";
+      void exportAction.run(plan ? "2D 图片" : "3D 视角图片", async () => {
+        const blob = plan ? await canvas.current?.exportImage() : await scene.current?.shot();
+        return blob ? { blob, name: plan ? "户型方案-2D.png" : "户型方案-3D视角.png" } : undefined;
+      });
+      return;
+    }
+    const snapshot = structuredClone(model.current.current);
+    void exportAction.run(`${format.toUpperCase()} 文件`, async () => {
+      const { drawingFile, projectJsonFile } = await import("../model/drawingExport");
+      return format === "json" ? projectJsonFile(snapshot, p.project.name) : drawingFile(snapshot, format, p.project.name);
+    });
+  };
+  /** 方案报告：预览弹窗把它读到的账号默认价交回来，PDF 与预览同一口径；pdf-lib 按需加载，不进首屏包。保存成功后关闭预览。 */
+  const exportReport = (defaults: AccountCostSettings) => {
+    sizeTransaction.cancel();
+    const snapshot = structuredClone(model.current.current);
+    void exportAction.run("方案报告", async () => {
+      const { reportFile } = await import("../model/reportExport");
+      const file = await reportFile(snapshot, p.project.name, defaults);
+      setReportOpen(false);
+      return file;
+    });
+  };
+  /** 新建风格：存进账号风格库并重读，套用由风格面板完成。写入模块按需加载，不进首屏包。 */
+  const createStyle = async (style: DecorStyle) => {
+    const { saveAccountStyle } = await import("../cloud/accountWrites");
+    await saveAccountStyle(style);
+    await loadAccountLibrary();
+    notify.success(`已新建「${style.name}」并套用`);
+  };
+  /**
+   * 布局整理：逐间把挡门、压窗、背后没墙、出了房间的家具挪到最近的合法位置（一步撤销即可还原），
+   * 然后打开「布局整理」侧栏，列出仍需手动处理的问题。
+   */
+  const tidyFurniture = () => {
+    if (readOnly) return;
+    sizeTransaction.flush();
+    const before = model.current.current, { design: next, report } = tidyLayout(before);
+    if (next !== before) change(() => next);
+    setLastTidy(report);
+    setSidePanel("layout");
   };
   const clearFurniture = async () => {
     if (readOnly) return;
@@ -703,9 +741,10 @@ export function Workbench(p: Props) {
   ];
   const resetDesign = async () => {
     if (readOnly) return;
-    // CAD 导入、AI 生成的户型没有内置的初始模板，重置会把它换成参考户型。
-    if (d.templateId === DXF_TEMPLATE_ID || isAiDesign(d)) {
-      notify.fail(`${isAiDesign(d) ? "AI 生成" : "CAD 导入"}的户型没有初始模板，请用撤销逐步恢复`);
+    // CAD 导入、AI 生成、以及来自已下线模板的户型都没有可重建的初始模板，重置会把它换成参考户型。
+    const retired = d.template !== "blank" && !!d.templateId && !isAiDesign(d) && d.templateId !== DXF_TEMPLATE_ID && !presetById(d.templateId);
+    if (d.templateId === DXF_TEMPLATE_ID || isAiDesign(d) || retired) {
+      notify.fail(`${isAiDesign(d) ? "AI 生成" : retired ? "来自已下线模板" : "CAD 导入"}的户型没有初始模板，请用撤销逐步恢复`);
       return;
     }
     const ok = await confirm({
@@ -811,73 +850,6 @@ export function Workbench(p: Props) {
             </button>
           </EditorTooltip>
         </div>
-        <span className="toolbar-divider" />
-        {view === "2d" ? (
-          <div className="tool-group">
-            {structureTools && (
-              <>
-                <WallToolMenu tool={tool} setTool={setTool} />
-                <ToolButton label="门" active={tool === "door"} onClick={() => setTool("door")}>
-                  <DoorOpen size={16} />
-                </ToolButton>
-                <ToolButton label="窗" active={tool === "window"} onClick={() => setTool("window")}>
-                  <ScanLine size={16} />
-                </ToolButton>
-              </>
-            )}
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="tool-button compact-only" aria-label="更多">
-                    <Settings2 size={16} />
-                    <span>更多</span>
-                    <ChevronDown size={12} />
-                  </button>
-                </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem className="danger-item compact-only" onSelect={resetDesign}>
-                  <RotateCcw />
-                  重置方案
-                </DropdownMenuItem>
-                {clearActions.map(a => (
-                  <DropdownMenuItem key={a.label} className="danger-item compact-only" disabled={!a.count} onSelect={a.run}>
-                    <a.icon />
-                    {a.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        ) : (
-          <div className="tool-group">
-            <ToolButton
-              label="鸟瞰"
-              active={sceneOptions.mode === "orbit"}
-              onClick={() => setSceneOptions((o) => ({ ...o, mode: "orbit" }))}
-            >
-              <Eye size={16} />
-            </ToolButton>
-            <ToolButton
-              label="漫游"
-              active={sceneOptions.mode === "walk"}
-              onClick={() => {
-                setSelection(null);
-                setSceneOptions((o) => ({ ...o, mode: "walk", cut: false }));
-              }}
-            >
-              <UserRound size={16} />
-            </ToolButton>
-            <ToolButton label="俯视" onClick={() => scene.current?.top()}>
-              <LayoutTemplate size={16} />
-            </ToolButton>
-            <ToolButton
-              label="剖切"
-              active={sceneOptions.cut}
-              onClick={() => setSceneOptions((o) => ({ ...o, cut: !o.cut }))}
-            >
-              <ScanLine size={16} />
-            </ToolButton>
-          </div>
-        )}
         <span className="toolbar-divider danger-divider" />
         <div className="tool-group danger-actions">
           <ToolButton label="重置" onClick={resetDesign}>
@@ -926,10 +898,24 @@ export function Workbench(p: Props) {
           </ToolButton>
         </div>
         <div className="toolbar-right">
+          <EditorTooltip label="家具库">
+            <button
+              type="button"
+              className={"tool-button toolbar-chip" + (sidePanel === "library" ? " active" : "")}
+              aria-label="家具库"
+              aria-pressed={sidePanel === "library"}
+              onClick={() => togglePanel("library")}
+            >
+              <Armchair size={16} />
+              <span>家具</span>
+            </button>
+          </EditorTooltip>
+          <CostChip design={d} active={sidePanel === "cost"} onClick={() => togglePanel("cost")} />
           <ExportMenu
             view={view}
             pending={exportAction.pending}
             onExport={exportFile}
+            onReport={() => { sizeTransaction.flush(); setReportOpen(true); }}
             status={p.status}
             loggedIn={p.loggedIn}
             readOnly={readOnly}
@@ -1009,18 +995,16 @@ export function Workbench(p: Props) {
           </div>
         )}
         {view === "3d" && (
-          <div className="scene-light-control">
-            <EditorTooltip
-              label={sceneOptions.night ? "切换到白天" : "切换到夜晚"}
-              side="top"
-            >
+          <div className="scene-light-control" role="group" aria-label="光照">
+            <EditorTooltip label="白天" side="top">
               <button
-                aria-label={sceneOptions.night ? "切换到白天" : "切换到夜晚"}
-                onClick={() =>
-                  setSceneOptions((o) => ({ ...o, night: !o.night }))
-                }
+                type="button"
+                aria-label="白天"
+                aria-pressed={!sceneOptions.night}
+                className={sceneOptions.night ? "" : "active"}
+                onClick={() => setSceneOptions((o) => ({ ...o, night: false }))}
               >
-                {sceneOptions.night ? <Moon size={16} /> : <Sun size={16} />}
+                <Sun size={16} />
               </button>
             </EditorTooltip>
             <EditorTooltip label="日照时间" side="top">
@@ -1031,6 +1015,7 @@ export function Workbench(p: Props) {
                 max={18}
                 step={0.25}
                 value={sceneOptions.hour}
+                disabled={sceneOptions.night}
                 onChange={(e) =>
                   setSceneOptions((o) => ({ ...o, hour: Number(e.target.value) }))
                 }
@@ -1038,11 +1023,19 @@ export function Workbench(p: Props) {
             </EditorTooltip>
             <span>
               {String(Math.floor(sceneOptions.hour)).padStart(2, "0")}:
-              {String(Math.round((sceneOptions.hour % 1) * 60)).padStart(
-                2,
-                "0",
-              )}
+              {String(Math.round((sceneOptions.hour % 1) * 60)).padStart(2, "0")}
             </span>
+            <EditorTooltip label="夜晚" side="top">
+              <button
+                type="button"
+                aria-label="夜晚"
+                aria-pressed={sceneOptions.night}
+                className={sceneOptions.night ? "active" : ""}
+                onClick={() => setSceneOptions((o) => ({ ...o, night: true }))}
+              >
+                <Moon size={16} />
+              </button>
+            </EditorTooltip>
           </div>
         )}
         {view === "2d" && <CompassRose angle={northAngle(d)} />}
@@ -1056,6 +1049,7 @@ export function Workbench(p: Props) {
             }}
             onRatio={(ratio) => canvas.current?.ratio(ratio)}
           />
+          {!readOnly && <LayoutTidyButton design={d} onTidy={tidyFurniture} />}
           <i />
           <EditorTooltip label="缩小" side="top">
             <button
@@ -1152,7 +1146,39 @@ export function Workbench(p: Props) {
           hidden={readOnly || tool !== 'select' || (!!sidePanel && isDrawerLayout()) || (view === "3d" && sceneOptions.mode === "walk")}
           costs={() => openPanel("cost")}
         />
-        <CanvasRail sidePanel={sidePanel} stage={stage} onToggle={togglePanel} />
+        <CanvasRail
+          sidePanel={sidePanel}
+          stage={stage}
+          onToggle={togglePanel}
+          tools={view === "2d" ? (
+            <PlanRailTools
+              tool={tool}
+              setTool={setTool}
+              structureTools={structureTools}
+              addItem={(item) => add(item)}
+              onReset={resetDesign}
+              clearActions={clearActions}
+            />
+          ) : (
+            <SceneRailTools
+              mode={sceneOptions.mode}
+              onSelect={() => setSceneOptions((o) => ({ ...o, mode: "orbit" }))}
+              onWalk={() => {
+                setSelection(null);
+                setSceneOptions((o) => ({ ...o, mode: "walk", cut: false }));
+              }}
+              view={{
+                cut: sceneOptions.cut,
+                night: sceneOptions.night,
+                onIso: () => scene.current?.iso(),
+                onTop: () => scene.current?.top(),
+                onCut: (cut) => setSceneOptions((o) => ({ ...o, cut })),
+                onNight: (night) => setSceneOptions((o) => ({ ...o, night })),
+              }}
+            />
+          )}
+          panels={view === "3d" && <SceneRailPanels sidePanel={sidePanel} onToggle={togglePanel} />}
+        />
       </main>
       {sidePanel && (
         <SidePanel title={PANEL_TITLES[sidePanel]} readOnly={readOnly && sidePanel !== "library"} onClose={() => { sizeTransaction.flush(); setSidePanel(null); }}>
@@ -1174,7 +1200,17 @@ export function Workbench(p: Props) {
             <Suspense fallback={null}><AiChatPanel loggedIn={p.loggedIn} login={p.login} /></Suspense>
           ) : sidePanel === "settings" ? (
             <HouseSettingsPanel design={d} change={change} />
-          ) : sidePanel === "cost" ? (
+          ) : sidePanel === "style" ? (
+            <StylePanel design={d} change={change} mine={p.loggedIn ? accountLibrary.styles : []} onCreate={p.loggedIn && !readOnly ? createStyle : undefined} />
+          ) : sidePanel === "layout" ? (
+            <LayoutPanel
+              design={d}
+              lastTidy={lastTidy}
+              selectedId={selection?.kind === "furniture" ? selection.id : null}
+              onTidy={tidyFurniture}
+              onSelect={(id) => setSelection({ kind: "furniture", id })}
+            />
+          ) : (
             <CostPanel
               design={d}
               selection={selection}
@@ -1182,8 +1218,6 @@ export function Workbench(p: Props) {
               select={select}
               back={() => select(null)}
             />
-          ) : (
-            <OverviewPanel design={d} change={change} select={select} onCosts={() => openPanel("cost")} />
           )}
         </SidePanel>
       )}
@@ -1207,6 +1241,7 @@ export function Workbench(p: Props) {
         onCreateOpening={saveCustomOpening}
       /></Suspense>}
       {aiEnabled && roomAi.room && <Suspense fallback={null}><AiRoomDialog ai={roomAi} furniture={aiCatalog.items} /></Suspense>}
+      {reportOpen && <Suspense fallback={null}><ReportPreview design={d} name={p.project.name} exporting={exportAction.pending} onClose={() => setReportOpen(false)} onExport={exportReport} /></Suspense>}
       <SaveFileDialog file={pendingFile} onClose={() => setPendingFile(null)} />
     </div>
     </div>

@@ -1,13 +1,12 @@
 import { INNER_WALL, libraryResolver, type Box, type FurnitureSpec, type FurnitureZone, type PlanSpec } from "../data/floorplanBuilder";
-import { TEMPLATE_PRESETS } from "../data/templates";
-import type { TemplatePreset } from "../data/templatePresets";
+import { AI_EXAMPLE_PLANS, type ExamplePlan } from "./examplePlans";
 import { catalogIdOf, isBuiltinItem } from "./catalog";
 import { roomContext } from "./context";
 import type { AiCatalog, AiCatalogEntry, AiPlacedItem, AiPlanExample, AiRoomContext, AiRoomExample } from "./types";
 
 /**
- * 把算法模板序列化成 AI 输出约定下的「标准答案」，随请求发给模型做范例（few-shot）。
- * 家具代号每次请求现分配，所以范例必须按本次目录现算；模板改了范例自动同步。
+ * 把算法范例户型（见 examplePlans.ts）序列化成 AI 输出约定下的「标准答案」，随请求发给模型做范例（few-shot）。
+ * 家具代号每次请求现分配，所以范例必须按本次目录现算；范例户型改了范例自动同步。
  */
 
 const SEAT_TYPES = new Set(["chair", "officechair", "barstool"]);
@@ -92,7 +91,7 @@ function centerlineBox([x1, y1, x2, y2]: Box, width: number, depth: number): Box
   return [x1 > 0 ? x1 - h : x1, y1 > 0 ? y1 - h : y1, x2 < width ? x2 + h : x2, y2 < depth ? y2 + h : y2];
 }
 
-function planOutput(preset: TemplatePreset, spec: PlanSpec, catalog: AiCatalog): AiPlanExample["output"] {
+function planOutput(preset: ExamplePlan, spec: PlanSpec, catalog: AiCatalog): AiPlanExample["output"] {
   const rooms = spec.rooms.filter((r): r is typeof r & { box: Box } => !!r.box);
   return {
     summary: preset.name,
@@ -112,15 +111,14 @@ function planOutput(preset: TemplatePreset, spec: PlanSpec, catalog: AiCatalog):
 
 const metres = (mm: number) => `${+(mm / 1000).toFixed(1)} m`;
 
-/** 整户范例：每套算法模板一条（需求描述 + 完整 JSON 答案）。 */
+/** 整户范例：每套范例户型一条（需求描述 + 完整 JSON 答案）。 */
 export function planExamples(catalog: AiCatalog): AiPlanExample[] {
-  return TEMPLATE_PRESETS.flatMap((preset) => {
-    const spec = preset.spec?.();
-    if (!spec) return [];
-    return [{
-      requirement: `${preset.layout}，长 ${metres(spec.width)} × 宽 ${metres(spec.depth)}；${preset.description}`,
-      output: planOutput(preset, spec, catalog),
-    }];
+  return AI_EXAMPLE_PLANS.map((plan) => {
+    const spec = plan.spec();
+    return {
+      requirement: `${plan.layout}，长 ${metres(spec.width)} × 宽 ${metres(spec.depth)}；${plan.description}`,
+      output: planOutput(plan, spec, catalog),
+    };
   });
 }
 
@@ -144,13 +142,12 @@ interface TemplateRoom {
 
 let templateRoomCache: TemplateRoom[] | null = null;
 
-/** 全部算法模板里带家具的房间（与目录无关，算一次缓存）。门窗取自建好的方案，和真实请求同一格式。 */
+/** 全部范例户型里带家具的房间（与目录无关，算一次缓存）。门窗取自建好的方案，和真实请求同一格式。 */
 function templateRooms(): TemplateRoom[] {
   if (templateRoomCache) return templateRoomCache;
-  templateRoomCache = TEMPLATE_PRESETS.flatMap((preset) => {
-    const spec = preset.spec?.();
-    if (!spec) return [];
-    const design = preset.build();
+  templateRoomCache = AI_EXAMPLE_PLANS.flatMap((plan) => {
+    const spec = plan.spec();
+    const design = plan.design();
     return spec.rooms.flatMap((r) => {
       const kind = roomKindOf(r.name);
       const zone = r.box && spec.furniture.find((z) => sameBox(z.zone, r.box!));

@@ -17,7 +17,7 @@ describe('空白户型自定义长宽', () => {
   it('默认仍为 6 × 6 m；createProject 传入尺寸只作用于空白户型', () => {
     expect([blankDesign().width, blankDesign().depth]).toEqual([6000, 6000]);
     expect(createProject('blank', '新家', { width: 9000, depth: 4000 }).state).toMatchObject({ width: 9000, depth: 4000, template: 'blank' });
-    const preset = TEMPLATE_PRESETS[1];
+    const preset = TEMPLATE_PRESETS[0];
     expect(createProject(preset.id, '模板', { width: 9000, depth: 4000 }).state.width).toBe(preset.build().width);
   });
 });
@@ -38,7 +38,7 @@ describe('新建项目表单', () => {
     expect(html).toMatch(/<button[^>]*disabled/);
   });
   it('选择模板时显示模板长宽，输入框只读不可修改，预览同步标注', () => {
-    const preset = TEMPLATE_PRESETS[1], design = preset.build();
+    const preset = TEMPLATE_PRESETS[0], design = preset.build();
     const tpl = renderToStaticMarkup(createElement(NewProjectForm, { pending: false, onSubmit: () => {}, defaultTemplate: preset.id }));
     for (const [id, mm] of [['project-width', design.width], ['project-depth', design.depth]] as const) {
       const input = tpl.match(new RegExp(`<input[^>]*id="${id}"[^>]*>`))![0];

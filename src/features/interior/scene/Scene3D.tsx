@@ -8,13 +8,14 @@ import {
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { PointerLockControls } from "three/examples/jsm/controls/PointerLockControls.js";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import {
   CSS2DRenderer,
   CSS2DObject,
 } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import { notify } from "@/lib/notify";
 import { floorMaterialOf } from "../model/floorMaterials";
-import { floorTexture } from "./floorTexture";
+import { floorSurface, floorTexture } from "./floorTexture";
 import { isCoarsePointer, releasePointerLock, tryPointerLock } from "@/lib/platform";
 import { createListenerRegistry } from "./listeners";
 import type { SceneFailure } from "../components/useSceneLifecycle";
@@ -34,9 +35,14 @@ import type {
   Layers,
   LibraryItem,
   Point,
+  Room,
   Selection,
 } from "../model/types";
 import { buildFurniture, disposeMaterials, mat } from "./furniture";
+import { createEnvironment, createSceneMaterials, type SceneMaterials } from "./sceneMaterials";
+import { applyLighting, buildRoomLamps, createGround, roomLamps } from "./lighting";
+import { designStyle, furnitureLook, METAL_FINISH } from "../model/decorStyles";
+import { CEILING, WALL_CAP, WINDOW_FRAME, doorColor, isEntryDoor, wallColor } from "./archLook";
 import { openingDimensions } from "../model/costs";
 import { connectedWallPoly, wallSectionPolygons } from '../model/wallConnections';
 import type { ScreenRect } from "../model/selectionAnchor";
@@ -106,8 +112,16 @@ interface Runtime {
   arch: THREE.Group;
   furn: THREE.Group;
   labelGroup: THREE.Group;
+  /** 吸顶灯盘与房间点光源；不参与点选。 */
+  lamps: THREE.Group;
+  /** 场景外的大地面。 */
+  ground: ReturnType<typeof createGround>;
   sun: THREE.DirectionalLight;
   hemi: THREE.HemisphereLight;
+  /** RoomEnvironment 预滤波出的环境贴图，只挂给金属 / 光滑材质。 */
+  env: THREE.WebGLRenderTarget | null;
+  /** 本场景的材质副本：挂环境反射的、会发光的，昼夜切换只改它们。 */
+  materials: SceneMaterials;
   doors: {
     group: THREE.Group;
     id: string;
@@ -137,12 +151,49 @@ function clear(g: THREE.Group) {
   });
   g.clear();
 }
+/** 房间轮廓（含内洞）；flip 时不翻转 y，旋转后法线朝下，用来做天花。 */
+function roomShape(room: Room, flip = false) {
+  const ring = (points: Point[]) => points.map((p) => new THREE.Vector2(p[0] / 1000, (flip ? p[1] : -p[1]) / 1000));
+  const shape = new THREE.Shape(ring(room.rings[0]));
+  shape.holes = room.rings.slice(1).map((hole) => new THREE.Path(ring(hole)));
+  return shape;
+}
+/**
+ * 墙顶压顶：拉伸墙体的顶面换成第二个材质。ExtrudeGeometry 的第 0 组先底面、后顶面（各占一半），
+ * 第 1 组是侧面；拆开后底面、侧面用墙色（门洞过梁的底面也是墙色），只有顶面用压顶色。
+ */
+function capTop(geometry: THREE.ExtrudeGeometry) {
+  const [lids, sides] = geometry.groups;
+  if (!lids || !sides) return;
+  const half = lids.count / 2;
+  geometry.clearGroups();
+  geometry.addGroup(lids.start, half, 0);
+  geometry.addGroup(lids.start + half, half, 1);
+  geometry.addGroup(sides.start, sides.count, 0);
+}
+/** 窗框：约每 0.9 m 一根竖梃（含两端）加上下两道横框，合成一个网格；沿局部 x 轴（墙方向）展开。 */
+function windowFrame(width: number, sill: number, top: number, material: THREE.Material) {
+  const h = top - sill;
+  if (h <= 0 || width <= 0) return null;
+  const n = Math.max(1, Math.round(width / 0.9)),
+    parts: THREE.BufferGeometry[] = [];
+  for (let k = 0; k <= n; k++) parts.push(new THREE.BoxGeometry(0.04, h, 0.06).translate(-width / 2 + (k * width) / n, sill + h / 2, 0));
+  for (const y of [sill + 0.02, top - 0.02]) parts.push(new THREE.BoxGeometry(width, 0.04, 0.06).translate(0, y, 0));
+  const geometry = mergeGeometries(parts);
+  parts.forEach((p) => p.dispose());
+  if (!geometry) return null;
+  const frame = new THREE.Mesh(geometry, material);
+  frame.castShadow = frame.receiveShadow = true;
+  return frame;
+}
 export const Scene3D = forwardRef<SceneHandle, Props>(
   function Scene3D(props, ref) {
     const host = useRef<HTMLDivElement>(null),
       runtime = useRef<Runtime | null>(null),
       latest = useRef(props);
     latest.current = props;
+    /** 方案当前的装修风格。内置风格与方案里存的自定义风格都是稳定引用，可以直接做 effect 依赖。 */
+    const decor = designStyle(props.design);
     const [paused, setPaused] = useState(true),
       /** 指针锁定不可用（iframe 沙箱、触屏）时改为按住拖动转向。 */
       [free, setFree] = useState(false),
@@ -310,6 +361,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
       renderer.shadowMap.autoUpdate = false;
       renderer.shadowMap.needsUpdate = true;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.05;
       el.prepend(renderer.domElement);
       const labels = new CSS2DRenderer();
       labels.setSize(el.clientWidth, el.clientHeight);
@@ -342,10 +394,15 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
       sun.shadow.normalBias = 0.02;
       const hemi = new THREE.HemisphereLight("#fff9ec", "#b4a58e", 1.5);
       scene.add(sun, sun.target, hemi);
+      // 环境贴图只生成一次，由 materials 挂到本场景的金属 / 光滑材质副本上
+      const env = createEnvironment(renderer),
+        materials = createSceneMaterials(env?.texture ?? null);
       const arch = new THREE.Group(),
         furn = new THREE.Group(),
-        labelGroup = new THREE.Group();
-      scene.add(arch, furn, labelGroup);
+        labelGroup = new THREE.Group(),
+        lamps = new THREE.Group(),
+        groundMesh = createGround();
+      scene.add(arch, furn, labelGroup, lamps, groundMesh);
       const r: Runtime = {
         renderer,
         labels,
@@ -356,8 +413,12 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         arch,
         furn,
         labelGroup,
+        lamps,
+        ground: groundMesh,
         sun,
         hemi,
+        env,
+        materials,
         doors: [],
         ray: new THREE.Raycaster(),
         pointer: new THREE.Vector2(),
@@ -795,6 +856,8 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         clear(arch);
         clear(furn);
         clear(labelGroup);
+        clear(lamps);
+        groundMesh.geometry.dispose();
         r.textures.forEach((t) => t.dispose());
         r.helper?.geometry.dispose();
         r.helper?.material.dispose();
@@ -804,6 +867,8 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
             ms.forEach((m) => m.dispose());
           }
         });
+        materials.dispose();
+        r.env?.dispose();
         disposeMaterials();
         renderer.dispose();
         // 不主动交还，iOS 上反复进出 3D 会累积上下文，最终无法再创建
@@ -818,11 +883,18 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
       if (!r) return;
       clear(r.arch);
       clear(r.labelGroup);
+      clear(r.lamps);
       r.textures.forEach((t) => t.dispose());
       r.textures = [];
       r.doors = [];
       const d = latest.current.design,
-        H = props.options.cut ? 1.2 : d.height / 1000;
+        ceiling = d.height / 1000,
+        H = props.options.cut ? 1.2 : ceiling,
+        style = decor,
+        finish = METAL_FINISH[style.metal],
+        cap = mat(WALL_CAP, 0.9),
+        knobMat = mat(finish.color, finish.roughness, finish.metalness),
+        frameMat = mat(WINDOW_FRAME.color, WINDOW_FRAME.roughness, WINDOW_FRAME.metalness);
       const addBox = (
         w: number,
         h: number,
@@ -843,33 +915,27 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         return o;
       };
       for (const room of d.rooms) {
-        const shape = new THREE.Shape(
-          room.rings[0].map(
-            (p) => new THREE.Vector2(p[0] / 1000, -p[1] / 1000),
-          ),
-        );
-        shape.holes = room.rings
-          .slice(1)
-          .map(
-            (h) =>
-              new THREE.Path(
-                h.map((p) => new THREE.Vector2(p[0] / 1000, -p[1] / 1000)),
-              ),
-          );
-        const geo = new THREE.ShapeGeometry(shape);
+        const geo = new THREE.ShapeGeometry(roomShape(room));
         geo.rotateX(-Math.PI / 2);
-        const texture = floorTexture(floorMaterialOf(d, room.mat));
-        texture.colorSpace = THREE.SRGBColorSpace;
+        const floorMat = floorMaterialOf(d, room.mat),
+          texture = floorTexture(floorMat);
+        texture.anisotropy = r.renderer.capabilities.getMaxAnisotropy();
         r.textures.push(texture);
         const floor = new THREE.Mesh(
           geo,
-          new THREE.MeshStandardMaterial({ map: texture, roughness: 0.65 }),
+          new THREE.MeshStandardMaterial({ map: texture, roughness: floorSurface(floorMat).roughness }),
         );
         floor.material.userData.transient = true;
         floor.userData.room = room.id;
         floor.receiveShadow = true;
         floor.position.y = room.counted === false ? 0.45 : 0;
         r.arch.add(floor);
+        // 天花：法线朝下，鸟瞰时背面被剔除，只有在室内仰视时看得到；剖切时不建。不投影，阳光照常进屋
+        if (H >= ceiling) {
+          const lid = new THREE.Mesh(new THREE.ShapeGeometry(roomShape(room, true)).rotateX(Math.PI / 2), mat(CEILING, 1));
+          lid.position.y = ceiling;
+          r.arch.add(lid);
+        }
         const p = center(room),
           label = document.createElement("div");
         label.className = "scene-room-label";
@@ -881,11 +947,14 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
           latest.current.options.mode === "orbit" &&
           room.counted !== false;
         r.labelGroup.add(lo);
-        if (props.options.night) {
-          const light = new THREE.PointLight("#ffddb0", 12, 9, 2);
-          light.position.set(p[0] / 1000, d.height / 1000 - 0.2, p[1] / 1000);
-          r.arch.add(light);
-        }
+      }
+      // 吸顶灯：灯一直在场景里，昼夜切换只改强度（见 applyLighting），所以这里不依赖 night
+      r.lamps.add(...buildRoomLamps(roomLamps(d.rooms, ceiling, H), latest.current.options.night));
+      // 大地面跟着户型走，画得离原点再远也铺得满
+      const outline = d.walls.flatMap((w) => [w.a, w.b]);
+      if (outline.length) {
+        const b = bbox(outline);
+        r.ground.position.set((b.x + b.x2) / 2000, r.ground.position.y, (b.y + b.y2) / 2000);
       }
       for (const w of d.walls.filter((w) => !d.demolished.includes(w.id))) {
         const L = length(w) / 1000,
@@ -893,7 +962,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
           openings = d.openings
             .filter((o) => o.wallId === w.id)
             .sort((a, b) => a.offset - b.offset),
-          color = w.color || "#eee9de";
+          wallMat = mat(wallColor(w, style), 0.92);
         const footprint = connectedWallPoly(w, d.walls, d.demolished);
         const part = (start: number, end: number, y: number, h: number) => {
           if (end - start < 0.001 || h < 0.001) return;
@@ -901,7 +970,8 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
             const shape = new THREE.Shape(polygon.map(p => new THREE.Vector2(p[0] / 1000, -p[1] / 1000)));
             const geometry = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false, steps: 1 });
             geometry.rotateX(-Math.PI / 2);
-            const mesh = new THREE.Mesh(geometry, mat(color));
+            capTop(geometry);
+            const mesh = new THREE.Mesh(geometry, [wallMat, cap]);
             mesh.position.y = y;
             mesh.castShadow = mesh.receiveShadow = true;
             mesh.userData.wall = w.id;
@@ -944,19 +1014,27 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
               glass.rotation.y = angle;
               glass.castShadow = false;
             }
+            const frame = windowFrame(b - a, sill, Math.min(H, head), frameMat);
+            if (frame) {
+              frame.position.set(x, 0, z);
+              frame.rotation.y = angle;
+              frame.userData.opening = o.id;
+              r.arch.add(frame);
+            }
           } else if (o.kind === "door") {
             const ang = Math.atan2(w.b[1] - w.a[1], w.b[0] - w.a[0]),
               ww = o.width / 1000,
               leafH = Math.min(H, dims.height / 1000),
               ux = Math.cos(ang),
               uz = Math.sin(ang);
-            const type = doorType(o);
+            const type = doorType(o),
+              leafMat = mat(doorColor(style, isEntryDoor(w, o, d.rooms)), 0.5);
             if (type === "sliding") {
               // 推拉：两扇沿墙一前一后叠放（与平面符号一致），不做开合动画。
               for (const panel of doorSymbol(o).panels) {
                 const along = (panel.x + panel.width / 2) / 1000,
                   across = (panel.y + panel.depth / 2) / 1000;
-                const leaf = new THREE.Mesh(new THREE.BoxGeometry(panel.width / 1000, leafH, panel.depth / 1000), mat("#bc9a74"));
+                const leaf = new THREE.Mesh(new THREE.BoxGeometry(panel.width / 1000, leafH, panel.depth / 1000), leafMat);
                 leaf.position.set(x + ux * along - uz * across, leafH / 2, z + uz * along + ux * across);
                 leaf.rotation.y = angle;
                 leaf.castShadow = true;
@@ -973,10 +1051,15 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
                 const pivot = new THREE.Group();
                 pivot.position.set(x - (mirrorX * ux * ww) / 2, 0, z - (mirrorX * uz * ww) / 2);
                 pivot.rotation.y = angle + rotationSign * Math.PI / 2;
-                const leaf = new THREE.Mesh(new THREE.BoxGeometry(width, leafH, 0.04), mat("#bc9a74"));
+                const leaf = new THREE.Mesh(new THREE.BoxGeometry(width, leafH, 0.04), leafMat);
                 leaf.position.set((mirrorX * width) / 2, leafH / 2, 0);
                 leaf.castShadow = true;
-                pivot.add(leaf);
+                // 球形把手压扁后两面都露出门扇，靠近开启边
+                const knob = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 8), knobMat);
+                knob.position.set(mirrorX * (width - 0.07), Math.min(1, leafH - 0.05), 0);
+                knob.scale.z = 2.2;
+                knob.castShadow = true;
+                pivot.add(leaf, knob);
                 pivot.userData.door = o.id;
                 pivot.userData.opening = o.id;
                 r.arch.add(pivot);
@@ -988,6 +1071,8 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
         }
         part(cursor, L, 0, w.kind === "low" ? Math.min(1, H) : H);
       }
+      r.materials.adopt(r.arch);
+      r.materials.adopt(r.lamps);
       r.renderer.shadowMap.needsUpdate = true;
       r.needsRender = true;
     }, [
@@ -996,17 +1081,19 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
       props.design.openings,
       props.design.demolished,
       props.design.height,
+      decor,
       props.options.cut,
-      props.options.night,
     ]);
     useEffect(() => {
       const r = runtime.current;
       if (!r) return;
       clear(r.furn);
-      props.design.furniture.forEach((f) => r.furn.add(buildFurniture(f)));
+      // 风格在这里解析成每件家具的配色，构建器只认 look
+      props.design.furniture.forEach((f) => r.furn.add(buildFurniture(f, furnitureLook(decor, f))));
+      r.materials.adopt(r.furn);
       r.renderer.shadowMap.needsUpdate = true;
       r.needsRender = true;
-    }, [props.design.furniture]);
+    }, [props.design.furniture, decor]);
     useEffect(() => {
       const r = runtime.current;
       if (!r) return;
@@ -1036,6 +1123,7 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
       props.selection,
       props.layers,
       props.design.furniture,
+      decor,
       props.options.mode,
       props.design.rooms,
     ]);
@@ -1043,9 +1131,8 @@ export const Scene3D = forwardRef<SceneHandle, Props>(
       const r = runtime.current;
       if (!r) return;
       const { night, hour } = props.options;
-      r.scene.background = new THREE.Color(night ? "#202838" : "#f3efe7");
-      r.hemi.intensity = night ? 0.2 : 1.4;
-      r.sun.intensity = night ? 0.07 : 2.5;
+      // 昼夜只改灯光强度、背景与地面颜色、曝光和本场景的材质副本，不重建任何几何
+      applyLighting(r, night);
       const t = (hour - 6) / 12;
       r.sun.position.set(
         15 * Math.cos(t * Math.PI),

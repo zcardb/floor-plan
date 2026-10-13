@@ -3,7 +3,7 @@ import { buildAiCatalog } from "./catalog";
 import { planExamples, roomExamples, roomKindOf } from "./examples";
 import { planToDesign } from "./apply";
 import { sanitizePlan } from "./sanitize";
-import { TEMPLATE_PRESETS } from "../data/templates";
+import { AI_EXAMPLE_PLANS } from "./examplePlans";
 import type { AiCatalog, AiPlacedItem } from "./types";
 
 const footprint = (p: AiPlacedItem, e: { w: number; d: number }, W: number, D: number) => {
@@ -17,12 +17,12 @@ const footprint = (p: AiPlacedItem, e: { w: number; d: number }, W: number, D: n
 
 const entryOf = (catalog: AiCatalog, code: string) => catalog.entries.find((e) => e.code === code)!;
 
-describe("AI 范例（算法模板序列化）", () => {
+describe("AI 范例（范例户型序列化）", () => {
   const catalog = buildAiCatalog();
   const examples = planExamples(catalog);
 
-  it("每套算法模板一条整户范例", () => {
-    expect(examples).toHaveLength(TEMPLATE_PRESETS.filter((p) => p.spec).length);
+  it("每套范例户型一条整户范例", () => {
+    expect(examples).toHaveLength(AI_EXAMPLE_PLANS.length);
     expect(examples).toHaveLength(5);
   });
 

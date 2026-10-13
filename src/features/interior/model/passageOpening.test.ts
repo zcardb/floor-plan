@@ -4,7 +4,7 @@ import { openingDimensions, calculateCosts } from './costs';
 import { createDrawingDocument } from './drawingDocument';
 import { validateDesign } from './validation';
 import { editSelection } from './selectionEdits';
-import { accountCostEntries } from './accountCostEntries';
+import { builtinCostEntries } from './accountCostEntries';
 import { openingName, validCustomOpening } from './hardMaterials';
 import type { Design, Opening } from './types';
 
@@ -44,7 +44,7 @@ describe('垭口', () => {
     expect(design.rooms.map(r => r.name)).toEqual(expect.arrayContaining(['厨房', '餐厅']));
     const costs = calculateCosts(design);
     expect(costs.hard.some(row => row.group === 'openingPrices' && row.key === 'passage')).toBe(true);
-    expect(accountCostEntries([], {}).some(e => e.group === 'openingPrices' && e.key === 'passage' && e.name === '垭口')).toBe(true);
+    expect(builtinCostEntries().some(e => e.group === 'openingPrices' && e.key === 'passage' && e.name === '垭口')).toBe(true);
   });
   it('高度超过层高时拒绝修改', () => {
     const { design } = withPassage();

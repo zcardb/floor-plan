@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
-import { errorMessage, notify } from "@/lib/notify";
+import { notify } from "@/lib/notify";
 import { onPageHide } from "@/lib/platform";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { validateDesign } from "../model/validation";
@@ -11,9 +11,7 @@ import { uid, type Design, type Project } from "../model/types";
 import { purgeRecoveryCopies, readGuestDefault, readGuests, writeGuests, writeGuestDefault } from "./guestStore";
 import { TEMPLATE_PRESETS, presetById } from '../data/templates';
 import { builtinProject, isBuiltinId, isPresetId } from '../data/templatePresets';
-import { compactThumbnail, readThumbnail, type ThumbnailDesign } from '../model/planThumbnail';
-/** 云端项目列表每次加载条数，与列表滚动加载的批次一致。 */
-const LIST_PAGE_SIZE = 12;
+import { compactThumbnail, type ThumbnailDesign } from '../model/planThumbnail';
 export type SaveStatusKind = "saved" | "saving" | "dirty" | "error" | "conflict";
 export interface SaveStatus {
   kind: SaveStatusKind;
@@ -61,15 +59,12 @@ export function useProjects() {
   const confirm = useConfirm();
   const [guests, setGuests] = useState(readGuests),
     [session, setSession] = useState<Session | null>(null),
-    [cloud, setCloud] = useState<ProjectSummary[]>([]),
     [active, setActive] = useState<Project | null>(() => readGuestDefault()),
     [ready, setReady] = useState(false),
     [status, setStatus] = useState<SaveStatus>(STATUS.local),
-    [listError, setListError] = useState(""),
     [signingOut, setSigningOut] = useState(false),
+    /** 正在打开某个云端项目。 */
     [loading, setLoading] = useState(false),
-    [listReady, setListReady] = useState(false),
-    [hasMore, setHasMore] = useState(false),
     /** 游客模式下对当前方案的编辑次数：0 表示还没改动过模版，顶部提示条据此出现。 */
     [guestEdits, setGuestEdits] = useState(0);
   const sessionRef = useRef(session),
@@ -97,65 +92,6 @@ export function useProjects() {
     setStatus(STATUS.local);
     return true;
   }, []);
-  /** 缺缩略图的云端项目（旧版本客户端写入的）：用已保存的方案补算一份，只写缩略图列，不改修改时间。 */
-  const backfillThumbnails = useCallback(async (rows: ProjectSummary[]) => {
-    for (const row of rows.slice(0, 6)) {
-      const generation = epoch.current;
-      const { data } = await attempt(supabase.from("interior_design_projects").select("state").eq("id", row.id).maybeSingle());
-      if (!data || generation !== epoch.current) continue;
-      let thumbnail;
-      try { thumbnail = compactThumbnail(data.state as unknown as Design); } catch { continue; }
-      // 只补空值：用户此刻可能正好保存了更新的缩略图，不能覆盖。
-      const { error } = await attempt(supabase.from("interior_design_projects").update({ thumbnail: thumbnail as unknown as Json }).eq("id", row.id).is("thumbnail", null));
-      if (error || generation !== epoch.current) continue;
-      setCloud((c) => c.map((r) => (r.id === row.id ? { ...r, thumbnail } : r)));
-    }
-  }, []);
-  const loadList = useCallback(
-    async (more = false) => {
-      if (!sessionRef.current) return;
-      const generation = epoch.current;
-      setLoading(true);
-      setListError("");
-      const start = more ? cloud.length : 0;
-      let result;
-      try {
-        result = await supabase
-          .from("interior_design_projects")
-          .select("id,name,updated_at,revision,thumbnail")
-          .order("updated_at", { ascending: false })
-          .range(start, start + LIST_PAGE_SIZE - 1);
-      } catch (cause) {
-        if (generation !== epoch.current) return;
-        setLoading(false); setListReady(true);
-        setListError(errorMessage(cause, "请检查网络后重试"));
-        notify.error("云端项目读取失败", cause);
-        return;
-      }
-      if (generation !== epoch.current) return;
-      const { data, error } = result;
-      setLoading(false); setListReady(true);
-      if (error) {
-        setListError(error.message);
-        notify.error("云端项目读取失败", error);
-        return;
-      }
-      const list = data.map((r) => ({
-        id: r.id,
-        name: r.name,
-        updatedAt: r.updated_at || "",
-        revision: r.revision,
-        thumbnail: readThumbnail(r.thumbnail),
-        cloud: true,
-      }));
-      setCloud((c) => (more ? [...c, ...list] : list));
-      setHasMore(data.length === LIST_PAGE_SIZE);
-      void backfillThumbnails(list.filter((r) => !r.thumbnail));
-    },
-    [cloud.length, backfillThumbnails],
-  );
-  const loadListRef = useRef(loadList);
-  loadListRef.current = loadList;
   useEffect(() => {
     const {
       data: { subscription },
@@ -165,9 +101,6 @@ export function useProjects() {
         epoch.current++;
         if (timer.current) clearTimeout(timer.current);
         dirty.current = false;
-        setCloud([]);
-        setListReady(false);
-        setListError("");
         setLoading(false);
         const guest = readGuestDefault(); activeRef.current = guest; setActive(guest);
         setStatus(STATUS.local);
@@ -176,7 +109,6 @@ export function useProjects() {
       sessionRef.current = s;
       setSession(s);
       setReady(true);
-      if (s) setTimeout(() => void loadListRef.current(), 0);
     });
     void supabase.auth.getSession().then(({ data, error }) => {
       if (error) notify.error("登录状态恢复失败", error);
@@ -184,7 +116,6 @@ export function useProjects() {
       if (data.session && !sessionRef.current) {
         sessionRef.current = data.session;
         setSession(data.session);
-        void loadListRef.current();
       }
     });
     const invalidate = () => {
@@ -256,19 +187,6 @@ export function useProjects() {
       };
       activeRef.current = next;
       setActive(next);
-      setCloud((c) =>
-        c.map((r) =>
-          r.id === p.id
-            ? {
-                ...r,
-                name: next.name,
-                revision: next.revision,
-                updatedAt: next.updatedAt,
-                thumbnail,
-              }
-            : r,
-        ),
-      );
       dirty.current = version !== editVersion.current;
       setStatus(dirty.current ? STATUS.dirty : STATUS.cloud);
       return true;
@@ -428,17 +346,6 @@ export function useProjects() {
           notify.error("创建云端项目失败", error);
           return false;
         }
-        setCloud((c) => [
-          {
-            id: next.id,
-            name: next.name,
-            revision: 0,
-            updatedAt: next.updatedAt,
-            thumbnail,
-            cloud: true,
-          },
-          ...c,
-        ]);
         setStatus(STATUS.cloud);
       } else persist([next, ...guestsRef.current]);
       epoch.current++;
@@ -475,17 +382,6 @@ export function useProjects() {
       notify.error("保存到云端失败", error);
       return false;
     }
-    setCloud((c) => [
-      {
-        id: next.id,
-        name: next.name,
-        revision: 0,
-        updatedAt: next.updatedAt,
-        thumbnail,
-        cloud: true,
-      },
-      ...c,
-    ]);
     epoch.current++;
     dirty.current = false;
     activeRef.current = next;
@@ -519,7 +415,6 @@ export function useProjects() {
           notify.fail("没有权限删除项目「" + p.name + "」，它仍在云端");
           return false;
         }
-        setCloud((c) => c.filter((r) => r.id !== p.id));
       } else if (!persist(guestsRef.current.filter((r) => r.id !== p.id))) {
         return false; // persist 已提示本机存储写入失败，列表保持原样
       }
@@ -560,11 +455,6 @@ export function useProjects() {
           notify.error("重命名失败", error ?? "项目版本已变化，请重新加载后重试");
           return false;
         }
-        setCloud((c) =>
-          c.map((r) =>
-            r.id === p.id ? { ...r, name, revision: data.revision } : r,
-          ),
-        );
         if (activeRef.current?.id === p.id) {
           const next = { ...activeRef.current, name, revision: data.revision };
           activeRef.current = next;
@@ -623,16 +513,12 @@ export function useProjects() {
   };
   return {
     guests,
-    cloud,
     builtins: TEMPLATE_PRESETS.map(p => ({ id: 'builtin-template:' + p.id, name: p.name, revision: 0, updatedAt: '', builtin: true, templateId: p.id })),
     active,
     session,
     ready,
     status,
     loading,
-    listReady,
-    listError,
-    hasMore,
     guestEdits,
     update,
     save,
@@ -644,8 +530,6 @@ export function useProjects() {
     rename,
     duplicate,
     saveGuestToCloud,
-    loadMore: () => loadList(true),
-    reload: () => loadList(),
     signOut,
     signingOut,
   };

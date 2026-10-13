@@ -5,7 +5,7 @@ import { AssistantAvatarView } from "./AssistantAvatarView";
 import { AssistantDialog } from "./AssistantDialog";
 import type { PickerItem } from "./pickerItems";
 import { AI_MODELS, modelName, type AiEngine } from "../ai/models";
-import type { Assistant, AssistantInput } from "../cloud/useAssistants";
+import type { Assistant, AssistantInput } from "../cloud/assistants";
 
 const ASSISTANT_GROUP = "我的小助手";
 const MODEL_GROUP = "模型";

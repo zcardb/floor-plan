@@ -1,6 +1,10 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+// 列表接口在服务端渲染里不会返回：由用例直接指定接口已返回的数据（见 usePagedList.testing）。
+vi.mock('@/hooks/usePagedList', () => import('@/hooks/usePagedList.testing'));
+vi.mock('../cloud/projectPages', () => ({ projectPage: vi.fn(async () => ({ list: [], pagination: { page: 1, pageSize: 20, total: 0 }, counts: {} })), backfillThumbnails: vi.fn(async () => 0) }));
+vi.mock('../cloud/libraryPages', () => ({ accountItemPage: vi.fn(async () => ({ list: [], pagination: { page: 1, pageSize: 20, total: 0 }, counts: {} })), readBuiltinOverrides: vi.fn(async () => []) }));
 vi.mock('../cloud/useFurnitureImage',()=>({useFurnitureImage:()=>({image:'',busy:false,error:'',generate:vi.fn(),cancel:vi.fn()})}));
 // 识别确认弹窗走 Portal，服务端渲染不出内容：换成一个标记，并让导入流程的状态可由用例指定。
 const importState = vi.hoisted(() => ({ drawing: null as null | { source: unknown; name: string } }));
@@ -18,9 +22,17 @@ import type { useProjects, ProjectSummary } from '../cloud/useProjects';
 import { TEMPLATE_PRESETS, createProject } from '../data/templates';
 import { mineCardActions, templateCardActions } from './projectCardActions';
 import { compactThumbnail } from '../model/planThumbnail';
+import { mineEntry } from '../model/projectFilter';
+import { accountItemEntry } from '../model/accountCostEntries';
+import { accountItemPage } from '../cloud/libraryPages';
+import { projectPage } from '../cloud/projectPages';
+import { pagedListFake } from '@/hooks/usePagedList.testing';
 
 const project = { id: 'one', name: '我的项目', updatedAt: '2026-10-08', revision: 0, cloud: true };
 const render = (node: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(node);
+/** 列表接口已经返回的云端项目（第一页）；total 是符合筛选的总数，counts.mine 是云端项目总数。 */
+const cloud = (rows: ProjectSummary[], total = rows.length) => { pagedListFake.remote = { list: rows.slice(0, 20).map(mineEntry), total, counts: { mine: total } }; };
+beforeEach(() => { pagedListFake.reset(); cloud([project]); });
 describe('管理端精简与加载分支', () => {
   it('骨架只有非文字占位和无障碍加载标签', () => {
     const html = render(createElement(ManagementLoading, { heading: true, label: '加载账号成本' }));
@@ -48,16 +60,17 @@ describe('管理端精简与加载分支', () => {
     expect(html).not.toContain('cms-loading-item-visual');
     expect(html).not.toContain('<button');
   });
-  const projects = (loading: boolean, cloud: ProjectSummary[] = [project]) => ({ guests: [], cloud, builtins: TEMPLATE_PRESETS.map(p => ({ id: 'builtin-template:' + p.id, name: p.name, revision: 0, updatedAt: '', builtin: true, templateId: p.id })), loading, hasMore: false, reload: () => {}, open: async () => true }) as unknown as ReturnType<typeof useProjects>;
+  const projects = () => ({ guests: [], builtins: TEMPLATE_PRESETS.map(p => ({ id: 'builtin-template:' + p.id, name: p.name, revision: 0, updatedAt: '', builtin: true, templateId: p.id })), loading: false, open: async () => true }) as unknown as ReturnType<typeof useProjects>;
   it('选了外部 DXF 后显示识别确认弹窗；没有待识别图纸时不显示', () => {
-    expect(render(createElement(ProjectManager, { projects: projects(false), opened: () => {} }))).not.toContain('data-dxf-import');
+    expect(render(createElement(ProjectManager, { projects: projects(), opened: () => {} }))).not.toContain('data-dxf-import');
     importState.drawing = { source: {}, name: '户型图' };
     try {
-      expect(render(createElement(ProjectManager, { projects: projects(false), opened: () => {} }))).toContain('data-dxf-import="户型图"');
+      expect(render(createElement(ProjectManager, { projects: projects(), opened: () => {} }))).toContain('data-dxf-import="户型图"');
     } finally { importState.drawing = null; }
   });
-  it('刷新在新建左侧，后台刷新保留项目，列表底部没有重复刷新', () => {
-    const html = render(createElement(ProjectManager, { projects: projects(true), opened: () => {} }));
+  it('刷新在新建左侧，切换筛选时保留上一份项目，列表底部没有重复刷新', () => {
+    pagedListFake.loading = true;
+    const html = render(createElement(ProjectManager, { projects: projects(), opened: () => {} }));
     expect(html).toContain('aria-haspopup="menu"');
     expect(html).toMatch(/<input[^>]*type="file"[^>]*hidden/);
     expect(html.indexOf('cms-refresh-button')).toBeGreaterThan(-1);
@@ -74,7 +87,7 @@ describe('管理端精简与加载分支', () => {
   });
   it('我的项目与内置模板同一套卡片：点卡片打开，「⋯」与标题同行', () => {
     const guest = { ...project, id: 'local', name: '本地项目', cloud: false, state: createProject('blank').state };
-    const html = render(createElement(ProjectManager, { projects: { ...projects(false), guests: [guest] } as unknown as ReturnType<typeof useProjects>, opened: () => {} }));
+    const html = render(createElement(ProjectManager, { projects: { ...projects(), guests: [guest] } as unknown as ReturnType<typeof useProjects>, opened: () => {} }));
     for (const name of ['本地项目', '我的项目']) {
       expect(html).toContain(`aria-label="打开项目 ${name}"`);
       expect(html).toContain(`aria-label="${name} 的更多操作"`);
@@ -89,8 +102,8 @@ describe('管理端精简与加载分支', () => {
     expect(html).toContain('project-card-placeholder');
   });
   it('云端项目用保存时留下的瘦身平面图渲染缩略图', () => {
-    const thumbnail = compactThumbnail(createProject('blank').state);
-    const html = render(createElement(ProjectManager, { projects: projects(false, [{ ...project, thumbnail }]), opened: () => {} }));
+    cloud([{ ...project, thumbnail: compactThumbnail(createProject('blank').state) }]);
+    const html = render(createElement(ProjectManager, { projects: projects(), opened: () => {} }));
     expect(html).toContain('aria-label="我的项目 平面缩略图"');
     expect(html).not.toContain('project-card-placeholder');
   });
@@ -111,8 +124,11 @@ describe('管理端精简与加载分支', () => {
     expect(copy).toHaveBeenCalled();
   });
   it('首次无数据加载和真实空态明确区分', () => {
-    const loading = render(createElement(ProjectManager, { projects: projects(true, []), opened: () => {} }));
-    const empty = render(createElement(ProjectManager, { projects: projects(false, []), opened: () => {} }));
+    cloud([]);
+    pagedListFake.loading = true;
+    const loading = render(createElement(ProjectManager, { projects: projects(), opened: () => {} }));
+    pagedListFake.loading = false;
+    const empty = render(createElement(ProjectManager, { projects: projects(), opened: () => {} }));
     expect(loading).toContain('cms-loading-placeholder');
     expect(loading).not.toContain('还没有设计项目');
     expect(empty).toContain('还没有设计项目');
@@ -120,7 +136,7 @@ describe('管理端精简与加载分支', () => {
     expect(empty).not.toContain('没有匹配的项目');
   });
   it('项目管理与家具库同版式：搜索框与全部 / 内置 / 我的三个分类，默认全部', () => {
-    const html = render(createElement(ProjectManager, { projects: projects(false), opened: () => {} }));
+    const html = render(createElement(ProjectManager, { projects: projects(), opened: () => {} }));
     expect(html).toContain('aria-label="搜索项目"');
     expect(html).toContain('aria-label="项目分类"');
     // 项目管理没有左侧切换器：胶囊所在行是 bare 单列，从行首平铺，不被压进左侧固定列
@@ -140,33 +156,54 @@ describe('管理端精简与加载分支', () => {
     // 我的项目按修改时间排在内置模板之前
     expect(html.indexOf('打开项目 我的项目')).toBeLessThan(html.indexOf('预览模板 '));
   });
-  it('滚动加载：首批只渲染 12 条，云端还有更多时内置模板暂不露出、数量带 +', () => {
-    const many = Array.from({ length: 20 }, (_, i) => ({ ...project, id: 'p' + i, name: '项目' + i }));
-    const first = render(createElement(ProjectManager, { projects: projects(false, many), opened: () => {} }));
-    expect(first.match(/aria-label="打开项目 /g)).toHaveLength(12);
-    // 首屏只有第 1 页的 12 条；滚到底部自动加载下一页，没有需要点击的「加载更多」按钮
+  it('滚动加载：首批只渲染 20 条，云端还有更多时内置模板暂不露出，数量来自列表接口', () => {
+    cloud(Array.from({ length: 45 }, (_, i) => ({ ...project, id: 'p' + i, name: '项目' + i })), 45);
+    const first = render(createElement(ProjectManager, { projects: projects(), opened: () => {} }));
+    expect(first.match(/aria-label="打开项目 /g)).toHaveLength(20);
+    // 首屏只有第 1 页的 20 条；滚到底部自动加载下一页，没有需要点击的「加载更多」按钮
     expect(first).toContain('正在加载更多');
     expect(first).not.toContain('>加载更多</button>');
-    expect(first).not.toContain('aria-label="项目分页"');
+    expect(first).not.toContain('预览模板 ');
+    expect(first).toMatch(/>我的<b>45<\/b>/);
+    expect(first).toMatch(new RegExp('>全部<b>' + (45 + TEMPLATE_PRESETS.length) + '</b>'));
     // 全部读完时不再显示加载状态
-    expect(render(createElement(ProjectManager, { projects: projects(false), opened: () => {} }))).not.toContain('正在加载更多');
-    const more = render(createElement(ProjectManager, { projects: { ...projects(false), hasMore: true } as ReturnType<typeof useProjects>, opened: () => {} }));
-    expect(more).toMatch(/>我的<b>1\+<\/b>/);
-    expect(more).not.toContain('预览模板 ');
-    expect(more).toContain('正在加载更多');
-    expect(more).not.toContain('>加载更多</button>');
+    cloud([project]);
+    expect(render(createElement(ProjectManager, { projects: projects(), opened: () => {} }))).not.toContain('正在加载更多');
+  });
+  it('项目列表接口：按页读取我的云端项目，带上当前搜索词，列表行换成项目卡片', async () => {
+    render(createElement(ProjectManager, { projects: projects(), opened: () => {} }));
+    vi.mocked(projectPage).mockResolvedValueOnce({ list: [project], pagination: { page: 2, pageSize: 20, total: 21 }, counts: { mine: 21 } });
+    const page = await pagedListFake.options!.remote!({ page: 2, pageSize: 20 });
+    expect(projectPage).toHaveBeenLastCalledWith({ page: 2, pageSize: 20 }, { query: '' });
+    expect(page.list).toEqual([mineEntry(project)]);
+    expect(page.counts).toEqual({ mine: 21 });
   });
   it('列表读取失败显示错误与重试，而不是“还没有设计项目”', () => {
-    const failed = render(createElement(ProjectManager, { projects: { ...projects(false, []), listError: 'Failed to fetch' } as ReturnType<typeof useProjects>, opened: () => {} }));
+    cloud([]);
+    pagedListFake.error = 'Failed to fetch';
+    const failed = render(createElement(ProjectManager, { projects: projects(), opened: () => {} }));
     expect(failed).toContain('role="alert"');
     expect(failed).toContain('云端项目读取失败');
     expect(failed).toContain('重试');
     expect(failed).not.toContain('还没有设计项目');
   });
-  it('家具管理采用成本版式：页头刷新、硬装软装切换与价格卡片', () => {
-    const library = { furniture: [], overrides: [], floors: [], walls: [], openings: [], roofs: [], ceilings: [], loading: true, error: '', load: async () => {} };
-    const html = render(createElement(AccountFurnitureLibrary, { library, defaults: {}, saveDefaults: async () => true, onDirty: () => {}, onNew: () => {} }));
+  const furniture = () => render(createElement(AccountFurnitureLibrary, { revision: 0, defaults: {}, saveDefaults: async () => true, onDirty: () => {}, onNew: () => {} }));
+  it('家具管理首次进入：页头可用、刷新转圈，列表位置是家具库版式的骨架', () => {
+    pagedListFake.remote = { list: [], total: 0, counts: {} };
+    pagedListFake.loading = true;
+    const html = furniture();
     expect(html).toContain('aria-busy="true"');
+    expect(html).toContain('cms-loading-item-visual');
+    expect(html).not.toContain('cms-item-card--cost');
+    const toolbar = html.slice(html.indexOf('cms-heading-actions'));
+    // 刷新与项目管理 / 小助手同一套：图标按钮在新建左侧，加载中转圈并禁用
+    expect(toolbar).toMatch(/cms-refresh-button cms-icon-button" disabled="" aria-busy="true" aria-label="刷新"><svg[^>]*animate-spin/);
+    expect(toolbar.indexOf('aria-label="刷新"')).toBeLessThan(toolbar.indexOf('新建家具'));
+  });
+  it('家具管理采用成本版式：硬装软装切换与价格卡片，我的条目在前、内置在后', () => {
+    const wall = { key: 'custom-22222222-2222-4222-8222-222222222222', name: '艺术涂料', color: '#d9cbb6', price: 120 };
+    pagedListFake.remote = { list: [accountItemEntry({ kind: 'wall', item: wall })], total: 1, counts: { 墙面: 1, 硬装: 1, 软装: 0, 全部: 1, 自定义: 1 } };
+    const html = furniture();
     expect(html).toContain('cms-item-card--cost');
     expect(html).not.toContain('cost-list-row');
     expect(html).not.toContain('cost-policy');
@@ -177,34 +214,42 @@ describe('管理端精简与加载分支', () => {
     expect(html).toMatch(/aria-pressed="true"[^>]*>全部<b>\d+<\/b>/);
     expect(html).toContain('>硬装<b>');
     expect(html).toContain('>软装<b>');
-    // 「自定义」是一级分类，排在软装之后
-    expect(html).toMatch(/>自定义<b>\d+<\/b>/);
+    // 「自定义」是一级分类，排在软装之后；数量只算账号里自建的条目
+    expect(html).toContain('>自定义<b>1</b>');
     expect(html.indexOf('>软装<b>')).toBeLessThan(html.indexOf('>自定义<b>'));
     expect(html).not.toContain('aria-label="硬装分类"');
     expect(html).not.toContain('>卧室<b>');
     expect(html.match(/class="cms-filter-group/g)).toHaveLength(1);
-    // 卡片连成一整片：没有「全部单价」标题行，也没有按分类分段的小标题
+    // 卡片连成一整片：没有「全部单价」标题行，也没有按分类分段的小标题；第一张是我的墙面
     expect(html).not.toContain('cost-results-heading');
     expect(html).not.toContain('全部单价');
-    expect(html).not.toContain('按需设置，无需全部填写');
     expect(html).not.toContain('cms-category-block');
     expect(html.match(/class="cms-item-grid"/g)).toHaveLength(1);
+    expect(html.match(/aria-label="(编辑|查看)[^"]*"/)![0]).toBe('aria-label="编辑艺术涂料单价"');
+    expect(html.match(/aria-label="(编辑|查看)[^"]*"/g)).toHaveLength(20);
+    expect(html).toContain('正在加载更多');
     const toolbar = html.slice(html.indexOf('cms-heading-actions'), html.indexOf('cms-filter-rows'));
     expect(toolbar).toContain('搜索材料或家具');
-    // 刷新与项目管理 / 小助手同一套：图标按钮在新建左侧，加载中转圈并禁用
-    expect(toolbar).toMatch(/cms-refresh-button cms-icon-button" disabled="" aria-busy="true" aria-label="刷新"><svg[^>]*animate-spin/);
-    expect(toolbar.indexOf('aria-label="刷新"')).toBeLessThan(toolbar.indexOf('新建家具'));
     // 保存状态空闲时不渲染
     expect(html).not.toContain('cms-sync-pill');
     expect(html).not.toContain('正在读取');
   });
-  it('家具读取仍显示内置家具并保留错误，但不增加读取文字行', () => {
-    const library = { furniture: [], overrides: [], floors: [], walls: [], openings: [], roofs: [], ceilings: [], loading: true, error: '读取失败', load: async () => {} };
-    const html = render(createElement(AccountFurnitureLibrary, { library, defaults: {}, saveDefaults: async () => true, onDirty: () => {}, onNew: () => {} }));
-    expect(html).toContain('aria-busy="true"');
+  it('家具读取失败仍显示内置条目并给出错误与重试', () => {
+    pagedListFake.remote = { list: [], total: 0, counts: {} };
+    pagedListFake.error = '读取失败';
+    const html = furniture();
     expect(html).toContain('cms-item-card');
     expect(html).toContain('读取失败');
+    expect(html).toContain('role="alert"');
     expect(html).not.toContain('正在读取家具');
+  });
+  it('家具管理的列表接口：大类、分类与搜索词交给数据库筛选，自建条目换成卡片、数量补上大类合计', async () => {
+    furniture();
+    vi.mocked(accountItemPage).mockResolvedValueOnce({ list: [{ kind: 'wall', item: { key: 'custom-22222222-2222-4222-8222-222222222222', name: '艺术涂料', color: '#d9cbb6', price: 120 } }], pagination: { page: 1, pageSize: 20, total: 1 }, counts: { 墙面: 1, 卧室: 2 } });
+    const page = await pagedListFake.options!.remote!({ page: 1, pageSize: 20 });
+    expect(accountItemPage).toHaveBeenLastCalledWith({ page: 1, pageSize: 20 }, { major: undefined, category: undefined, query: '' });
+    expect((page.list[0] as { name: string; account?: unknown }).name).toBe('艺术涂料');
+    expect(page.counts).toEqual({ 墙面: 1, 卧室: 2, 全部: 3, 硬装: 1, 软装: 2, 自定义: 3 });
   });
   it('统一搜索框：空闲提示 / 快捷键，输入后显示匹配数与清空，加载时转圈', () => {
     const idle = render(createElement(CmsSearchField, { label: '搜索', placeholder: '搜索…', value: '', onChange: () => {}, matchCount: 6 }));

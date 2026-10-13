@@ -81,3 +81,27 @@ describe('PriceInput 提示去重', () => {
     expect(notify.warning).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('PriceInput 键盘', () => {
+  const key = (h: ReturnType<typeof harness>, k: string) => {
+    const event = { key: k, preventDefault: vi.fn(), stopPropagation: vi.fn(), nativeEvent: { isComposing: false } };
+    (h.render().find(n => n.type === Input)!.props.onKeyDown as (e: typeof event) => void)(event);
+    return event;
+  };
+  it('回车直接应用：不用再点按钮', async () => {
+    const onApply = vi.fn(() => true);
+    const h = harness(onApply);
+    h.type('80');
+    expect(key(h, 'Enter').preventDefault).toHaveBeenCalled();
+    expect(onApply).toHaveBeenCalledWith(80);
+    await vi.waitFor(() => expect(notify.success).toHaveBeenCalledTimes(1));
+  });
+  it('Esc 还原草稿，不应用', () => {
+    const onApply = vi.fn(() => true);
+    const h = harness(onApply);
+    h.type('80');
+    key(h, 'Escape');
+    expect(h.render().find(n => n.type === Input)!.props.value).toBe('50');
+    expect(onApply).not.toHaveBeenCalled();
+  });
+});

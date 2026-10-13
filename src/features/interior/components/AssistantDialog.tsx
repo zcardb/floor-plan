@@ -12,7 +12,7 @@ import { FurniturePicker } from "./FurniturePicker";
 import type { PickerItem } from "./pickerItems";
 import { ASSISTANT_AVATARS, DEFAULT_ASSISTANT_AVATAR, avatarOf } from "../ai/assistantAvatars";
 import { AI_MODELS, DEFAULT_AI_MODEL, modelName, modelOf } from "../ai/models";
-import { ASSISTANT_LIMITS, type Assistant, type AssistantInput } from "../cloud/useAssistants";
+import { ASSISTANT_LIMITS, type Assistant, type AssistantInput } from "../cloud/assistants";
 /** Markdown 解析库只在打开预览时下载。 */
 const AssistantMarkdown = lazy(() => import("./AssistantMarkdown"));
 

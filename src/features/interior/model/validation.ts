@@ -9,6 +9,7 @@ import { migrateSeparators } from "./separators";
 import { validateProcurement } from "./materialProcurement";
 import { normalizeFurniture, validPrice } from "./costs";
 import { isOpeningKind, isSurfaceKey, isWallKey, ROOF_SLOPE_MAX, validCustomOpening, validCustomWall } from "./hardMaterials";
+import { designStyleFields } from "./decorStyles";
 import type { Design, Room } from "./types";
 const fail = () => {
   throw new Error("方案格式不正确或数据超出允许范围");
@@ -291,9 +292,12 @@ export function validateDesign(value: unknown): Design {
       }
     }
   }
+  // 风格只影响 3D 观感：未知或无效的风格不拒绝整个方案，清掉后按默认配色渲染。
+  const { styleId, customStyle, ...rest } = v;
   // 旧项目没有分隔线：按旧房间轮廓补齐分隔线并重算房间（名称、材质沿用）。
   return migrateSeparators(structuredClone({
-    ...v,
+    ...rest,
+    ...designStyleFields(styleId, customStyle),
     rooms: v.rooms.map((r) => normalizeRoomSurfaces(v, r)),
     furniture: v.furniture.map(normalizeFurniture),
   }));

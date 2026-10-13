@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Check, ChevronDown, Loader2 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent,
@@ -7,15 +7,18 @@ import {
 import { CreateProjectMenuItems } from './CreateProjectMenuItems';
 import { useProjectCreation } from './useProjectCreation';
 import { Logo } from './Logo';
+import { ListLoadMore } from './ListLoadMore';
+import { usePagedList } from '@/hooks/usePagedList';
+import type { PageSource } from '@/lib/paging';
 import type { ProjectSummary } from '../cloud/useProjects';
 import type { Project } from '../model/types';
 
 export interface ProjectNavigation {
-  projectList: ProjectSummary[];
-  hasMore: boolean;
-  listLoading: boolean;
+  /** 云端项目的列表接口（统一分页）；游客没有云端项目，不传。 */
+  cloudProjects?: PageSource<ProjectSummary>;
+  /** 不经接口的项目：本机方案与内置模板，排在云端项目之后。 */
+  localProjects: ProjectSummary[];
   onOpen: (project: ProjectSummary) => Promise<boolean>;
-  onLoadMore: () => void;
   /** 登录后可在编辑器内新建项目（与项目管理页同一套方式），成功后切换到新项目。 */
   onCreateProject?: (project: Project) => Promise<boolean>;
   /** 登录后可复制当前项目，成功后进入副本。 */
@@ -34,19 +37,26 @@ interface Props extends ProjectNavigation {
 
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
 
-/** Triggers `onVisible` when scrolled into view inside its scroll container. */
-export function LoadMoreSentinel({ disabled, onVisible }: { disabled: boolean; onVisible: () => void }) {
-  const ref = useRef<HTMLDivElement>(null), latest = useRef(onVisible);
-  useEffect(() => { latest.current = onVisible; });
-  useEffect(() => {
-    const node = ref.current;
-    if (!node || disabled || typeof IntersectionObserver === 'undefined') return;
-    const observer = new IntersectionObserver(entries => { if (entries.some(e => e.isIntersecting)) latest.current(); },
-      { root: node.parentElement, rootMargin: '0px 0px 40px 0px' });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [disabled]);
-  return <div ref={ref} className="project-menu-sentinel" aria-hidden="true" />;
+/**
+ * 「切换项目」子菜单里的项目列表（统一分页，一页 20 个，滚到底加载下一页）。
+ * 子菜单展开时才挂载，所以每次展开读到的都是最新的云端项目，没展开就不发请求。
+ */
+export function ProjectSwitchList({ p, pending, onPick }: { p: Props; pending: string | null; onPick: (row: ProjectSummary) => void }) {
+  const list = usePagedList<ProjectSummary>({ remote: p.cloudProjects ?? null, local: p.localProjects, key: 'switch' });
+  return <div className="project-menu-list" role="group" aria-label={p.loggedIn ? '项目列表' : '内置模板'}>
+    {list.list.map(row => {
+      const current = row.id === p.project.id || (!p.loggedIn && row.templateId === p.project.templateId);
+      return <DropdownMenuItem key={row.id} className="project-menu-option" aria-current={current ? 'true' : undefined}
+        disabled={!!pending && !current} onSelect={event => { if (current) event.preventDefault(); else onPick(row); }}>
+        <span className="project-menu-name">{row.name}</span>
+        <span className="project-menu-date">{pending === row.id ? <Loader2 className="animate-spin" size={13} /> : row.builtin ? '内置模板' : shortDate(row.updatedAt)}</span>
+        <span className="project-menu-check">{current && <Check size={14} aria-label="当前项目" />}</span>
+      </DropdownMenuItem>;
+    })}
+    {list.loading && <div className="project-menu-loading" role="status" aria-label="加载项目"><Loader2 className="animate-spin" size={15} /></div>}
+    {list.error && <div className="project-menu-error" role="alert">云端项目读取失败<button type="button" onClick={list.reload}>重试</button></div>}
+    <ListLoadMore list={list} />
+  </div>;
 }
 
 /**
@@ -96,19 +106,7 @@ export function ProjectMenu(p: Props) {
         <DropdownMenuSub>
           <DropdownMenuSubTrigger className="project-menu-entry">{p.loggedIn ? '切换项目' : '切换户型'}</DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="toolbar-menu project-switch-menu" sideOffset={6}>
-            <div className="project-menu-list" role="group" aria-label={p.loggedIn ? '项目列表' : '内置模板'}>
-              {p.projectList.map(row => {
-                const current = row.id === p.project.id || (!p.loggedIn && row.templateId === p.project.templateId);
-                return <DropdownMenuItem key={row.id} className="project-menu-option" aria-current={current ? 'true' : undefined}
-                  disabled={!!pending && !current} onSelect={event => { if (current) event.preventDefault(); else void open(row); }}>
-                  <span className="project-menu-name">{row.name}</span>
-                  <span className="project-menu-date">{pending === row.id ? <Loader2 className="animate-spin" size={13} /> : row.builtin ? '内置模板' : shortDate(row.updatedAt)}</span>
-                  <span className="project-menu-check">{current && <Check size={14} aria-label="当前项目" />}</span>
-                </DropdownMenuItem>;
-              })}
-              {p.loggedIn && p.hasMore && <LoadMoreSentinel disabled={p.listLoading} onVisible={p.onLoadMore} />}
-              {p.loggedIn && p.listLoading && <div className="project-menu-loading" role="status" aria-label="加载更多项目"><Loader2 className="animate-spin" size={15} /></div>}
-            </div>
+            <ProjectSwitchList p={p} pending={pending} onPick={row => void open(row)} />
           </DropdownMenuSubContent>
         </DropdownMenuSub>
         {(p.onLogin || p.onLogout) && <DropdownMenuSeparator />}

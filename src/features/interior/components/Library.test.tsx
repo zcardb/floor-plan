@@ -1,20 +1,33 @@
 import { isValidElement, type ReactElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+// Hook 状态替身：按调用顺序占槽位，直接调用组件函数即可走完 useState / useRef（分页 Hook 也在其中）。
 const state = vi.hoisted(()=>({values:[] as unknown[],cursor:0}));
-vi.mock('react',async original=>({...await original<typeof import('react')>(),useState:(initial:unknown)=>{
-  const index=state.cursor++;
-  if(!(index in state.values))state.values[index]=initial;
-  return [state.values[index],(value:unknown)=>{state.values[index]=value;}];
-}}));
-import { Library, LIBRARY_PAGE_SIZE, StructuralItems } from './Library';
+vi.mock('react',async original=>({...await original<typeof import('react')>(),
+  useState:(initial:unknown)=>{
+    const index=state.cursor++;
+    if(!(index in state.values))state.values[index]=typeof initial==='function'?(initial as ()=>unknown)():initial;
+    return [state.values[index],(value:unknown)=>{state.values[index]=typeof value==='function'?(value as (current:unknown)=>unknown)(state.values[index]):value;}];
+  },
+  useRef:(initial:unknown)=>{
+    const index=state.cursor++;
+    if(!(index in state.values))state.values[index]={current:initial};
+    return state.values[index];
+  },
+  useEffect:()=>{},
+  useCallback:(callback:unknown)=>callback,
+}));
+import { Library, StructuralItems } from './Library';
 import { CmsFilterBar } from './CmsFilterBar';
-import { ProjectLoadMore } from './ProjectLoadMore';
+import { ListLoadMore } from './ListLoadMore';
+import { PanelList } from './PanelList';
+import { PAGE_SIZE } from '@/lib/paging';
 import { library } from '../data/catalog';
 type Node=ReactElement<Record<string,unknown>>;
 function nodes(tree:ReactNode):Node[]{
   if(Array.isArray(tree))return tree.flatMap(nodes);
   if(!isValidElement<Record<string,unknown>>(tree))return [];
   if(tree.type===StructuralItems)return nodes(StructuralItems(tree.props as Parameters<typeof StructuralItems>[0]));
+  if(tree.type===PanelList)return nodes(PanelList(tree.props as Parameters<typeof PanelList>[0]));
   return [tree,...nodes(tree.props.children as ReactNode)];
 }
 function text(tree:ReactNode):string{
@@ -80,25 +93,26 @@ describe('家具库头部与引导提示',()=>{
     expect(nodes(scroll).some(n=>n.props.className==='library-item')).toBe(true);
     // 分类沿用管理页的 CmsFilterBar，紧凑尺寸，第一项是默认选中的「全部」
     const bar=barOf(tree);
-    expect(bar.className).toBe('library-categories');
+    expect(bar.compact).toBe(true);
     expect(bar.chips.map(c=>c.label)).toEqual(['全部','卧室','客厅','餐厨','卫浴','家电','书房','硬装']);
     expect(bar.value).toBe('全部');
   });
-  it('「全部」按 12 件一页滚动加载：12 → 24 → 36',()=>{
+  it('「全部」按统一分页一页 20 件滚动加载：20 → 40 → 60',()=>{
     const h=harness();
     let tree=h.render();
     const cards=()=>tree.filter(n=>n.props.className==='library-item').length;
     expect(text(tree.find(n=>n.props.className==='library-subheading')!.props.children as ReactNode)).toContain(`全部家具 · ${library.length} 件`);
-    expect(cards()).toBe(LIBRARY_PAGE_SIZE);
-    for(const expected of [24,36]){
-      const more=tree.find(n=>n.type===ProjectLoadMore)!.props as Parameters<typeof ProjectLoadMore>[0];
-      expect(more.total).toBe(library.length);
-      more.onReach();tree=h.render();
+    expect(PAGE_SIZE).toBe(20);
+    expect(cards()).toBe(PAGE_SIZE);
+    for(const expected of [40,60]){
+      const more=(tree.find(n=>n.type===ListLoadMore)!.props as Parameters<typeof ListLoadMore>[0]).list;
+      expect(more.pagination).toMatchObject({pageSize:PAGE_SIZE,total:library.length});
+      more.loadMore();tree=h.render();
       expect(cards()).toBe(Math.min(expected,library.length));
     }
     // 切换分类后回到第一页
     barOf(tree).onChange('客厅');tree=h.render();
-    expect(cards()).toBeLessThanOrEqual(LIBRARY_PAGE_SIZE);
+    expect(cards()).toBeLessThanOrEqual(PAGE_SIZE);
     expect(tree.every(n=>n.props.className!=='library-item'||library.find(i=>'添加'+i.name===n.props['aria-label'])?.category==='客厅')).toBe(true);
     const card=tree.find(n=>n.props['aria-label']==='添加三人沙发')!;
     (card.props.onClick as ()=>void)();
@@ -106,11 +120,12 @@ describe('家具库头部与引导提示',()=>{
   });
   it('登录可编辑时右侧有 32px 新建按钮，只读或未登录时不显示',()=>{
     const add=vi.fn(),setTool=vi.fn(),onNew=vi.fn();
-    const withNew=nodes(Library({add,setTool,structureTools:true,onNew}));
+    const render=(props:Parameters<typeof Library>[0])=>{state.values=[];state.cursor=0;return nodes(Library(props));};
+    const withNew=render({add,setTool,structureTools:true,onNew});
     const button=withNew.find(n=>n.props.className==='library-new')!;
     expect(button.props['aria-label']).toBe('新建家具 / 账号库');
     (button.props.onClick as ()=>void)();
     expect(onNew).toHaveBeenCalledOnce();
-    expect(nodes(Library({add,setTool,structureTools:true})).some(n=>n.props.className==='library-new')).toBe(false);
+    expect(render({add,setTool,structureTools:true}).some(n=>n.props.className==='library-new')).toBe(false);
   });
 });

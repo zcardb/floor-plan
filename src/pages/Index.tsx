@@ -1,14 +1,18 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useProjects, type ProjectSummary } from '@/features/interior/cloud/useProjects';
+import { projectPage } from '@/features/interior/cloud/projectPages';
+import type { PageSource } from '@/lib/paging';
 import { useAccountCosts } from '@/features/interior/cloud/useAccountCosts';
 import { Workbench } from '@/features/interior/components/Workbench';
 import { AccountCostSaveContext, CostDefaultsContext } from '@/features/interior/components/CostDefaultsContext';
 import { useStudioRoute } from '@/features/interior/components/useStudioRoute';
 import { createProject } from '@/features/interior/data/templates';
 import { isBuiltinId } from '@/features/interior/data/templatePresets';
-import { PROJECTS_PATH, cmsPath } from '@/features/interior/model/routes';
+import { PROJECTS_PATH, cmsPath, stylePath } from '@/features/interior/model/routes';
 import { notify } from '@/lib/notify';
 import { ManagementLoading } from '@/features/interior/components/ManagementLoading';
+/** 工作台「切换项目」菜单用的云端项目列表：只要名称与时间，不带缩略图。 */
+const menuProjects:PageSource<ProjectSummary>=request=>projectPage(request,{thumbnails:false});
 // 首屏默认是 2D 工作台：账号管理页和登录弹窗按需下载，不进首屏包。
 const AccountCMS=lazy(()=>import('@/features/interior/components/AccountCMS').then(m=>({default:m.AccountCMS})));
 const AuthDialog=lazy(()=>import('@/features/interior/components/AuthDialog').then(m=>({default:m.AuthDialog})));
@@ -40,6 +44,6 @@ const Index=()=>{
   const loading=(label:string)=><div className="studio-restoring"><ManagementLoading heading label={label} /></div>;
   if(!projects.ready)return loading('恢复工作室');
   const workbench=view.kind==='guest'||route.projectReady;
-  return <CostDefaultsContext.Provider value={owner?costs.settings:{}}><AccountCostSaveContext.Provider value={owner?costs.save:null}>{view.kind==='cms'?<Suspense fallback={loading('加载内容')}><AccountCMS key={owner} projects={projects} costs={costs} tab={view.tab} onTab={tab=>route.goTo(cmsPath(tab))} onDirty={setCmsDirty} pendingLeave={route.pendingLeave} opened={goToActive}/></Suspense>:!workbench?loading(view.kind==='project'?'打开项目':'恢复工作室'):projects.active?<Workbench key={(owner||'guest')+projects.active.id} project={projects.active} projectNavigation={{projectList:owner?[...projects.builtins,...projects.guests,...projects.cloud]:projects.builtins,hasMore:projects.hasMore,listLoading:projects.loading,onOpen:async row=>entered(await projects.open(row)),onLoadMore:()=>void projects.loadMore(),onCreateProject:owner?async project=>entered(await projects.create(project,true)):undefined,onDuplicate:owner?duplicateProject:undefined}} createFromTemplate={async id=>entered(await projects.create(createProject(id),true))} update={projects.update} status={projects.status} loggedIn={!!owner} email={projects.session?.user.email} projects={()=>void manage()} login={login} logout={()=>void projects.signOut()} loggingOut={projects.signingOut} cloudSave={cloudSave} guestEdits={projects.guestEdits}/>:null}{authMounted&&<Suspense fallback={null}><AuthDialog open={authOpen} intent={authIntent} onOpenChange={v=>{setAuthOpen(v);if(!v)setAuthIntent(null);}}/></Suspense>}</AccountCostSaveContext.Provider></CostDefaultsContext.Provider>;
+  return <CostDefaultsContext.Provider value={owner?costs.settings:{}}><AccountCostSaveContext.Provider value={owner?costs.save:null}>{view.kind==='cms'?<Suspense fallback={loading('加载内容')}><AccountCMS key={owner} projects={projects} costs={costs} tab={view.tab} styleId={view.styleId} onTab={tab=>route.goTo(cmsPath(tab))} onStyle={id=>route.goTo(id?stylePath(id):cmsPath('styles'))} onDirty={setCmsDirty} pendingLeave={route.pendingLeave} opened={goToActive}/></Suspense>:!workbench?loading(view.kind==='project'?'打开项目':'恢复工作室'):projects.active?<Workbench key={(owner||'guest')+projects.active.id} project={projects.active} projectNavigation={{cloudProjects:owner?menuProjects:undefined,localProjects:owner?[...projects.guests,...projects.builtins]:projects.builtins,onOpen:async row=>entered(await projects.open(row)),onCreateProject:owner?async project=>entered(await projects.create(project,true)):undefined,onDuplicate:owner?duplicateProject:undefined}} createFromTemplate={async id=>entered(await projects.create(createProject(id),true))} update={projects.update} status={projects.status} loggedIn={!!owner} email={projects.session?.user.email} projects={()=>void manage()} login={login} logout={()=>void projects.signOut()} loggingOut={projects.signingOut} cloudSave={cloudSave} guestEdits={projects.guestEdits}/>:null}{authMounted&&<Suspense fallback={null}><AuthDialog open={authOpen} intent={authIntent} onOpenChange={v=>{setAuthOpen(v);if(!v)setAuthIntent(null);}}/></Suspense>}</AccountCostSaveContext.Provider></CostDefaultsContext.Provider>;
 };
 export default Index;

@@ -1,6 +1,10 @@
+import type { Database } from '@/integrations/supabase/types';
 import type { CustomFloor, CustomOpening, CustomWall, FloorPattern } from '../model/types';
+import type { AccountItem } from '../model/accountCostEntries';
+import { furnitureFromRow } from '../ai/furnitureRow';
 import { validCustomFloor } from '../model/floorMaterials';
 import { validCustomOpening, validCustomWall } from '../model/hardMaterials';
+import { validDecorStyle, type DecorStyle } from '../model/decorStyles';
 
 /** 账号库各表的一行 → 编辑器里的材料对象（无效行返回 null）。字段名与数据库列一致。 */
 type Row = Record<string, unknown>;
@@ -26,4 +30,25 @@ export function openingFromRow(r: Row): CustomOpening | null {
     width: Number(r.width), height: Number(r.height), price: price(r.price),
   };
   return validCustomOpening(opening) ? opening : null;
+}
+
+/** 自定义风格：style_key 即风格 id，名称单独成列，其余定义在 spec；不合规的行丢弃。 */
+export function styleFromRow(r: Row): DecorStyle | null {
+  const spec = r.spec && typeof r.spec === 'object' && !Array.isArray(r.spec) ? r.spec as Record<string, unknown> : {};
+  const style = { ...spec, id: String(r.style_key), name: String(r.name) };
+  return validDecorStyle(style) ? style : null;
+}
+
+/**
+ * 账号库视图（interior_account_library）的一行 → 自建条目：家具与地面、墙面、门窗、屋面、吊顶。
+ * 风格不在其中（见 styleFromRow）；种类不认识或数据不完整时返回 null。
+ */
+export function accountItemFromRow(kind: string | null, r: Row): AccountItem | null {
+  switch (kind) {
+    case 'furniture': return { kind, item: furnitureFromRow(r as Database['public']['Tables']['interior_furniture_catalog']['Row']) };
+    case 'floor': { const item = floorFromRow(r); return item && { kind, item }; }
+    case 'opening': { const item = openingFromRow(r); return item && { kind, item }; }
+    case 'wall': case 'roof': case 'ceiling': { const item = colorMaterialFromRow(r, kind + '_key'); return item && { kind, item }; }
+    default: return null;
+  }
 }

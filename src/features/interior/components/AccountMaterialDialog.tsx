@@ -40,11 +40,11 @@ export function AccountMaterialDialog({ entry, design, price, saves, applyDefaul
   busy: boolean; error: string; retry?: () => void;
   onSaved: (kind: keyof MaterialSaves) => void; onClose: () => void;
 }) {
-  const custom = !!entry.custom;
+  const custom = !!entry.account;
   const surface = surfaceKindOfCategory(entry.category);
   const kind: keyof MaterialSaves = entry.category === FLOOR_CATEGORY ? 'floor' : surface ?? 'opening';
-  const stored = (kind === 'floor' ? design.customFloors : kind === 'opening' ? design.customOpenings : kind === 'wall' ? design.customWalls : kind === 'roof' ? design.customRoofs : design.customCeilings)
-    ?.find(item => item.key === entry.key);
+  /** 自建材料在账号库里的那一行（内置材料没有）。 */
+  const stored = entry.account && entry.account.kind !== 'furniture' ? entry.account.item : undefined;
 
   /** 表单提交：几何 / 名称 / 颜色写回账号库（保留库中原单价），单价改动写入账号默认价。 */
   const save = async <T extends { key: string; name: string; price: number | null }>(item: T, original: T | undefined, write: (item: T) => Promise<void>) => {

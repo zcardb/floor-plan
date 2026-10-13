@@ -1,27 +1,14 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { EditorTooltip } from "@/components/ui/editor-tooltip";
-import type { CostRow, PriceGroup } from "../model/costs";
+import { COST_CATEGORIES as categories, inCostCategory as inCategory } from "../model/costCategories";
+import type { CostRow } from "../model/costs";
 import { yuan } from "../model/money";
 import type { Design } from "../model/types";
-import { STAIR_CATEGORY } from "../model/stairs";
 import { CostRowEditor } from "./CostRowEditor";
 import { LaborEditor } from "./LaborEditor";
 
 type Labor = NonNullable<NonNullable<Design["costSettings"]>["labor"]>;
-const categories: { id: PriceGroup | "labor" | "stairs"; label: string; hint: string }[] = [
-  { id: "floorPrices", label: "地面", hint: "含损耗 / 采购取整" },
-  { id: "wallPrices", label: "墙面", hint: "周长 × 层高，扣除门窗" },
-  { id: "openingPrices", label: "门窗", hint: "按开口面积 m²" },
-  { id: "roofPrices", label: "屋面", hint: "房间面积 ÷ cos 坡度" },
-  { id: "ceilingPrices", label: "吊顶", hint: "按房间面积" },
-  { id: "stairs", label: "楼梯", hint: "按件计价" },
-  { id: "constructionPrices", label: "拆改与新建", hint: "长度 × 层高" },
-  { id: "labor", label: "人工", hint: "独立总价条目" },
-  { id: "furniturePrices", label: "软装", hint: "同款家具单价联动" },
-];
-const inCategory = (row: CostRow, id: string) =>
-  id === "stairs" ? row.category === STAIR_CATEGORY : row.group === id && !row.category;
 
 /** 全屋口径：按类别折叠的价格明细。 */
 export function CostCategoryList({

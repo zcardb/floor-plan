@@ -8,13 +8,15 @@ import { useCostDesign } from "./CostDefaultsContext";
 import { CostCategoryList } from "./CostCategoryList";
 import { CostPricing } from "./CostPricing";
 import { CostSummary } from "./CostSummary";
+import { PlanMetrics } from "./PlanMetrics";
 import { RoomCostDetail } from "./RoomCostDetail";
 import { RoomCostList } from "./RoomCostList";
+import { ShortcutList } from "./PanelHint";
 
 /**
- * 成本页：口径跟随选中对象——选中房间（或房内家具）时看本间，否则看全屋。
- * 全屋口径自上而下是「合计 → 明细 → 按房间 → 计算口径细则」：
- * 先给一个金额结果，再展开细节，最后才是计算规则说明。
+ * 成本页，同时承担原来的「方案总览」：口径跟随选中对象——选中房间（或房内家具）时看本间，否则看全屋。
+ * 全屋口径自上而下是「方案指标 → 合计 → 按房间 → 明细 → 计算口径」：
+ * 先说这个家多大，再给一个金额结果，然后展开细节，最后才是计算规则说明。
  */
 export function CostPanel({
   design,
@@ -57,6 +59,9 @@ export function CostPanel({
   const drift = Math.abs(b.roomTotal + b.sharedTotal - b.total);
   return (
     <>
+      <section>
+        <PlanMetrics design={design} />
+      </section>
       <section>
         {/* 合计：一个焦点数字 + 硬装 / 软装 */}
         <CostSummary
@@ -106,6 +111,10 @@ export function CostPanel({
       <section>
         <h3 className="section-title">计算口径</h3>
         <p className="footnote">地面含损耗与采购取整；墙面扣除对应门窗；门窗按相邻房间平分；拆改、新建与人工为全屋公共项，不计入单个房间。</p>
+      </section>
+      <section>
+        <h3 className="section-title">快捷键</h3>
+        <ShortcutList />
       </section>
     </>
   );

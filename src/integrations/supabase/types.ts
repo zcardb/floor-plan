@@ -3844,6 +3844,36 @@ export type Database = {
         }
         Relationships: []
       }
+      interior_style_catalog: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          owner_id: string
+          spec: Json
+          style_key: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          owner_id?: string
+          spec: Json
+          style_key: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          owner_id?: string
+          spec?: Json
+          style_key?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       interior_wall_catalog: {
         Row: {
           color: string
@@ -3883,13 +3913,39 @@ export type Database = {
           data: Json | null
           item_key: string | null
           kind: string | null
+          major: string | null
           name: string | null
+          search: string | null
         }
         Relationships: []
       }
     }
     Functions: {
-      [_ in never]: never
+      interior_assistant_page: {
+        Args: { p_page?: number; p_page_size?: number }
+        Returns: Json
+      }
+      interior_library_page: {
+        Args: {
+          p_category?: string | null
+          p_exclude_keys?: string[] | null
+          p_kinds?: string[] | null
+          p_major?: string | null
+          p_page?: number
+          p_page_size?: number
+          p_query?: string | null
+        }
+        Returns: Json
+      }
+      interior_project_page: {
+        Args: {
+          p_page?: number
+          p_page_size?: number
+          p_query?: string | null
+          p_thumbnails?: boolean
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

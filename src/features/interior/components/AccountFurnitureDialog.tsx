@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Loader2, RotateCcw, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -7,11 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import type { LibraryItem } from '../model/types';
 import { categories } from '../data/catalog';
-import { FurnitureVisual, hasViews } from './FurnitureVisual';
-import { FurnitureAiDialog, defaultAdjustImage, type FurnitureAiResult } from './FurnitureAiDialog';
+import { FurnitureVisual } from './FurnitureVisual';
+import { FurnitureAiDialog, type FurnitureAiResult } from './FurnitureAiDialog';
 import { FurnitureFormFields } from './FurnitureFormFields';
-import type { ModelSnapshot } from './FurnitureModelPreview';
-import type { FurnitureView } from '../cloud/useFurnitureImage';
 import { furnitureDraftOf, parseFurnitureDraft, previewFurnitureDraft, FURNITURE_DRAFT_ERROR, type FurnitureDraft } from '../model/furnitureDraft';
 import { notify } from '@/lib/notify';
 import { builtinOf } from '../model/builtinAssets';
@@ -47,15 +45,12 @@ export function AccountFurnitureDialog({ item, isCustom, referencePrice, onOpenC
   const initialPrice = item.price ?? builtin?.price ?? referencePrice ?? null;
   const [draft, setDraft] = useState<FurnitureDraft>(() => furnitureDraftOf({ ...item, price: initialPrice }));
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [confirming, setConfirming] = useState(false);
-  const [view, setView] = useState<FurnitureView>('top'), [adjusting, setAdjusting] = useState<{ seed: File | null } | null>(null);
-  const snapshot = useRef<ModelSnapshot | null>(null);
+  const [adjusting, setAdjusting] = useState(false);
   const editable = isCustom && !!saveGeometry;
   /** 内置家具：名称、尺寸、颜色可改，写的是覆盖行。 */
   const fieldsEditable = editable || (!!saveFields && !retryPrice);
-  /** 视觉区跟随表单实时预览：参考符号与 3D 模型按当前草稿绘制，图片沿用已保存的。 */
+  /** 视觉区跟随表单实时预览：参考符号按当前草稿绘制，俯视图沿用已保存的。 */
   const display: LibraryItem = fieldsEditable ? { ...item, ...previewFurnitureDraft(draft, { w: item.w, d: item.d, height: item.height || 700 }), name: draft.name.trim() || item.name } : item;
-  /** 硬装只有 2D，一律按俯视图处理。 */
-  const activeView: FurnitureView = hasViews(display) ? view : 'top';
   const canAdjust = (editable || !!saveAssets) && !retryPrice;
   /** 内置家具：分类、参考类型、外形只读（改了等于换一款家具），其余字段可改。 */
   const assetsOnly = !isCustom;
@@ -64,13 +59,11 @@ export function AccountFurnitureDialog({ item, isCustom, referencePrice, onOpenC
   const patch = (next: Partial<FurnitureDraft>) => { setError(''); setDraft(current => ({ ...current, ...next })); };
 
   /**
-   * 应用 AI 结果：2D 写俯视图 imageUrl；3D 写 model3d（简易 3D 模型），
-   * 画布 3D 场景与详情预览用的都是它，家具主色仍按表单里的颜色。不提交表单里其它未保存的修改。
+   * 应用 AI 结果：只写 2D 俯视图 imageUrl；旧数据里已有的 3D 素材原样保留（3D 场景仍会用它）。
+   * 不提交表单里其它未保存的修改。
    */
-  const applyImage = async ({ url, model3d }: FurnitureAiResult) => {
-    const next: LibraryItem = activeView === 'top'
-      ? { ...item, imageUrl: url }
-      : { ...item, ...(model3d ? { model3d } : {}) };
+  const applyImage = async ({ url }: FurnitureAiResult) => {
+    const next: LibraryItem = { ...item, imageUrl: url };
     const ok = saveGeometry ? await saveGeometry(next)
       : saveAssets ? await saveAssets({ imageUrl: next.imageUrl, image3dUrl: next.image3dUrl, model3d: next.model3d }) : false;
     if (!ok) return false;
@@ -88,11 +81,6 @@ export function AccountFurnitureDialog({ item, isCustom, referencePrice, onOpenC
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '恢复失败，请重试');
     } finally { setBusy(false); }
-  };
-  /** 3D 既无 3D 效果图也无 2D 图时，用实时模型当前视角的截图作默认参考图。 */
-  const openAdjust = async () => {
-    const seed = activeView === 'perspective' && !defaultAdjustImage(item, 'perspective') ? await snapshot.current?.().catch(() => null) ?? null : null;
-    setAdjusting({ seed });
   };
 
   const finish = async () => {
@@ -145,10 +133,10 @@ export function AccountFurnitureDialog({ item, isCustom, referencePrice, onOpenC
       <DialogContent className="cms-detail-dialog furniture-detail-dialog" onEscapeKeyDown={event => { if (working) event.preventDefault(); }} onInteractOutside={event => { if (working) event.preventDefault(); }}>
         <DialogHeader>
           <DialogTitle>{item.name}</DialogTitle>
-          <DialogDescription>{item.category} · {fieldsEditable ? isCustom ? '自定义家具，所有项都可修改' : '内置家具，可改名称、尺寸、颜色，并用「AI 调整」更换 2D / 3D 素材；分类与参考类型不可改' : '内置家具，可设置账号默认单价'}。素材与名称、尺寸、颜色对新放置的家具生效；项目里单独改过的以项目为准。</DialogDescription>
+          <DialogDescription>{item.category} · {fieldsEditable ? isCustom ? '自定义家具，所有项都可修改' : '内置家具，可改名称、尺寸、颜色，并用「AI 调整」更换 2D 俯视图；分类与参考类型不可改' : '内置家具，可设置账号默认单价'}。素材与名称、尺寸、颜色对新放置的家具生效；项目里单独改过的以项目为准。</DialogDescription>
         </DialogHeader>
         <div className="furniture-detail-body">
-          <FurnitureVisual item={display} view={view} onView={setView} snapshotRef={snapshot} onAdjust={canAdjust ? () => void openAdjust() : undefined} />
+          <FurnitureVisual item={display} onAdjust={canAdjust ? () => setAdjusting(true) : undefined} />
           <form id="furniture-detail-form" className="furniture-detail-side" onSubmit={e => { e.preventDefault(); void finish(); }}>
             <FurnitureFormFields draft={draft} onChange={patch} categoryField={categoryField} priceOnly={!fieldsEditable} identityLocked={assetsOnly} disabled={working || !!retryPrice}
               priceLabel="账号默认单价 · 元 / 件" priceHint="仅影响未单独调价的项目；项目内改价仍以项目为准。" />
@@ -164,7 +152,7 @@ export function AccountFurnitureDialog({ item, isCustom, referencePrice, onOpenC
         </div>
       </DialogContent>
     </Dialog>
-    {adjusting && (saveGeometry || saveAssets) && <FurnitureAiDialog item={display} view={activeView} seed={adjusting.seed} onClose={() => setAdjusting(null)} onApply={applyImage} />}
+    {adjusting && (saveGeometry || saveAssets) && <FurnitureAiDialog item={display} onClose={() => setAdjusting(false)} onApply={applyImage} />}
     <AlertDialog open={confirming} onOpenChange={setConfirming}>
       <AlertDialogContent>
         <AlertDialogHeader>
