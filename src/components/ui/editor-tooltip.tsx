@@ -4,7 +4,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "./tooltip";
 
 export interface EditorTooltipProps {
   /** 动作名 */

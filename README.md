@@ -31,6 +31,16 @@ Prompt new features, refine the UI, or connect integrations — all changes are 
 
 ---
 
+## 项目文档
+
+- `AGENTS.md`：开发约定与组件复用表（动代码前先读）
+- `docs/architecture.md`：目录分层（app / features / components / contexts / lib / hooks / utils / styles）、依赖规则、按需加载与统一分页
+- `docs/api/paged-lists.md`：列表接口（统一分页）的数据库变更方案
+- `src/features/features.md`、`src/components/components.md`：各 Feature 与共享组件清单
+- `CodeGuideline.md`、`docs/ui-guidelines.md`、`docs/features/`：路由与多语言规则、UI 刻度、功能规范
+
+---
+
 ## Local development
 
 Prefer to work locally? You can clone this repo and start developing right away:
@@ -69,7 +79,6 @@ The template only owns three pieces of i18n data:
 - `i18n.config.json` — language manifest (`fallbackLng`, `languages[].{code,label,detect,dir}`)
 - `public/locales/{code}.json` — flat dotted-key translations, one file per language
 - `src/i18n/config.ts` + `src/i18n/util.ts` — runtime entry and pure helpers
-- `src/components/language-switcher.tsx` — neutral-themed UI sample
 
 ### Runtime behavior
 

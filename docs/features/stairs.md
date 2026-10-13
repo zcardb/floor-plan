@@ -4,11 +4,11 @@
 
 | 文件 | 职责 |
 | --- | --- |
-| `model/types.ts` | `StairForm`、`StairSpec`、`Furniture.stair`、`LibraryItem.stair` |
-| `model/stairs.ts` | 预设、参数推导、平面几何（`stairLayout`）、规范提示（`stairMetrics`） |
-| `components/StairPlan.tsx` | 把几何画成 SVG 图样 |
-| `components/StairEditor.tsx` | 专属编辑面板（类别、各跑宽、踏步数、方向、转向） |
-| `data/catalog.ts` | 素材库里引入 `stairLibrary` |
+| `lib/floor-plan/types.ts` | `StairForm`、`StairSpec`、`Furniture.stair`、`LibraryItem.stair` |
+| `lib/floor-plan/stairs.ts` | 预设、参数推导、平面几何（`stairLayout`）、规范提示（`stairMetrics`） |
+| `components/furniture-shape/stair-plan.tsx` | 把几何画成 SVG 图样 |
+| `features/editor/components/stair-editor.tsx` | 专属编辑面板（类别、各跑宽、踏步数、方向、转向） |
+| `lib/floor-plan/catalog.ts` | 素材库里引入 `stairLibrary` |
 
 ## 1. 类别与参数
 
@@ -50,7 +50,7 @@
 
 ## 3.1 编辑面板
 
-`StairEditor.tsx` 必须提供：类别卡片（缩略图按该类别标准梯段长绘制）、每跑“宽 / 长”、梯井宽（U 型）及其说明、外框组成算式、踏步数（自动 / 手动标记 + 恢复自动）、踏面宽、踏步高、行走方向、转向（多跑时）、推导结果（外框、实际踏面宽、实际踏步高、踏步数）与规范提示。
+`stair-editor.tsx` 必须提供：类别卡片（缩略图按该类别标准梯段长绘制）、每跑“宽 / 长”、梯井宽（U 型）及其说明、外框组成算式、踏步数（自动 / 手动标记 + 恢复自动）、踏面宽、踏步高、行走方向、转向（多跑时）、推导结果（外框、实际踏面宽、实际踏步高、踏步数）与规范提示。
 
 面板尺寸（`index.css` 的 `.stair-popover`）：宽 360px、`max-height: min(72vh, 520px)` 且内部滚动，`side="right"`，不得盖住正在编辑的楼梯。
 
@@ -70,7 +70,7 @@
 
 ## 6. 必须有的测试
 
-`src/features/interior/components/stairs.test.tsx`：
+`src/features/editor/__tests__/stairs.test.tsx`：
 
 - 五种类别都能渲染，含「上」字、箭头、起步点、折断线
 - 踏步线数量随踏步数变化；旧数据仍是 11 条
