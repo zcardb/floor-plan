@@ -54,7 +54,7 @@
 | 画布竖条 | `features/editor`：`CanvasRail` + `rail-tools.tsx`（`PlanRailTools` / `SceneRailTools`） | 画布左上，内容随 2D / 3D 切换：2D 选择 / 墙 / 门 / 窗 / 更多 / 家具，3D 鸟瞰 / 漫游 / 斜视 / 俯视 / 剖切 / 风格；底部固定「户型设置」+ 收起；游客与登录一致；整条可拖动 |
 | 竖条里的一行 | `features/editor`：`RailButton` | 图标 + 文字，当前项主色底 |
 | 顶栏造价 | `features/costs`：`CostChip` | 直接显示全屋造价，点击打开「方案与成本」侧栏 |
-| 方案报告 | `features/report`：`ReportPreview`（lazy） | 入口在顶栏「保存与导出」→「生成方案报告」：先预览，预览里下载 PDF（`loadReportExport()` 按需加载 pdf-lib）。规范见 `src/features/report/README.md` |
+| 方案报告 | `features/report`：`ReportDialog` | 入口在顶栏「保存与导出」→「生成方案报告」：弹窗立即打开并显示加载态，报告正文按需加载；预览里下载 PDF（`loadReportExport()` 按需加载 pdf-lib）。规范见 `src/features/report/README.md` |
 | 布局整理 | `features/editor`：`LayoutPanel` / `LayoutTidyButton` | 一键整理挡门、压窗、背后没墙、出了房间的家具（一步撤销），侧栏列出仍需手动处理的问题；规则在 `lib/floor-plan/layout-rules.ts` |
 | 方案指标卡 | `features/costs`：`PlanMetrics` | 套内净面积 / 空间数 / 家具数，放在成本侧栏顶部 |
 | 装修风格 | `features/decor-styles`：`StylePanel`（编辑器侧栏）、`StyleManager`（管理端「风格管理」，lazy） | 100 套内置风格 + 我的风格，只影响 3D 渲染；规范见 `src/features/decor-styles/README.md` |

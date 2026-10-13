@@ -96,7 +96,7 @@ import { CustomFurnitureDialog, useAccountLibrary } from "@/features/account-lib
 import { SelectionEditor, type SelectionEditorHandle } from "./selection-editor";
 import type { ScreenRect } from "@/lib/floor-plan/selection-anchor";
 import { PlanCanvas, type CanvasHandle } from "./plan-canvas";
-import { loadReportExport, ReportPreview } from "@/features/report";
+import { loadReportExport, ReportDialog } from "@/features/report";
 import { loadScene3D, type Scene3D, type SceneHandle, type SceneOptions } from "@/features/scene-3d";
 import { useAsyncAction } from "@/hooks/use-async-action";
 import type { AccountCostSettings } from "@/lib/floor-plan/cost-defaults";
@@ -845,6 +845,27 @@ export function Workbench(p: Props) {
             </button>
           </EditorTooltip>
         </div>
+        <span className="toolbar-divider" />
+        <div className="tool-group undo-actions">
+          <ToolButton
+            label="撤销"
+            iconOnly
+            shortcut="Ctrl Z"
+            onClick={undo}
+            disabled={!counts.undo}
+          >
+            <Undo2 size={16} />
+          </ToolButton>
+          <ToolButton
+            label="重做"
+            iconOnly
+            shortcut="Ctrl ⇧ Z"
+            onClick={redo}
+            disabled={!counts.redo}
+          >
+            <Redo2 size={16} />
+          </ToolButton>
+        </div>
         <span className="toolbar-divider danger-divider" />
         <div className="tool-group danger-actions">
           <ToolButton label="重置" onClick={resetDesign}>
@@ -870,27 +891,6 @@ export function Workbench(p: Props) {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        </div>
-        <span className="toolbar-divider" />
-        <div className="tool-group undo-actions">
-          <ToolButton
-            label="撤销"
-            iconOnly
-            shortcut="Ctrl Z"
-            onClick={undo}
-            disabled={!counts.undo}
-          >
-            <Undo2 size={16} />
-          </ToolButton>
-          <ToolButton
-            label="重做"
-            iconOnly
-            shortcut="Ctrl ⇧ Z"
-            onClick={redo}
-            disabled={!counts.redo}
-          >
-            <Redo2 size={16} />
-          </ToolButton>
         </div>
         <div className="toolbar-right">
           <EditorTooltip label="家具库">
@@ -1236,7 +1236,7 @@ export function Workbench(p: Props) {
         onCreateOpening={saveCustomOpening}
       /></Suspense>}
       {aiEnabled && roomAi.room && <Suspense fallback={null}><AiRoomDialog ai={roomAi} furniture={aiCatalog.items} /></Suspense>}
-      {reportOpen && <Suspense fallback={null}><ReportPreview design={d} name={p.project.name} exporting={exportAction.pending} onClose={() => setReportOpen(false)} onExport={exportReport} /></Suspense>}
+      <ReportDialog open={reportOpen} design={d} name={p.project.name} exporting={exportAction.pending} onClose={() => setReportOpen(false)} onExport={exportReport} />
       <SaveFileDialog file={pendingFile} onClose={() => setPendingFile(null)} />
     </div>
     </div>

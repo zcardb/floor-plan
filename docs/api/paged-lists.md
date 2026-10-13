@@ -1,8 +1,8 @@
 # 接口修改方案：列表统一分页
 
-> 状态：**待在 Enter 执行**。前端分支 `chore/fsd-restructure`（及它所基于的 `feat/paged-list-api`）已全部改用本方案的接口；数据库执行迁移之前，四个管理页与项目切换菜单的列表会读取失败。
+> 状态：**已执行**（2026-10-13）。Enter 原样执行了迁移，回写为 `supabase/migrations/migration_20261013_052138000`，并按线上库重新生成了 `src/integrations/supabase/types.ts`（提交 `c99976f`）。四个管理页与项目切换菜单都已改用本文的接口。
 >
-> 迁移文件：`supabase/migrations/migration_20261012_133000000`。只在本地 PGlite 替身库上验证过，尚未在线上库执行。
+> 上线前在本地 PGlite 替身库上验证过分页、counts、账号隔离与匿名无权限。
 
 ## 1. 背景与目标
 
@@ -84,17 +84,16 @@
 
 所有列表都经 `@/lib/backend` 的 `readPage(fn, args, { page, pageSize })` 调用，返回形状不对时按读取失败处理；页面状态统一由 `@/hooks/use-paged-list` 管理（见 `docs/architecture.md` §5）。
 
-## 5. 执行前确认
+## 5. 执行前确认（Enter 已核对）
 
-1. **`interior_ai_assistants` 的建表迁移不在仓库里**：线上库已有这张表（生成的类型与 Edge Function `interior-ai-design` 都在用），`interior_assistant_page` 依赖它。请确认它已开启 RLS 且策略为 `owner_id = auth.uid()`——函数按调用者身份执行，若没有「仅本人」策略，会读到别人的小助手。
+1. **`interior_ai_assistants` 的建表迁移不在仓库里**：线上库已有这张表（生成的类型与 Edge Function `interior-ai-design` 都在用），`interior_assistant_page` 依赖它。执行前已确认它开启了 RLS，增删改查四条策略均为 `owner_id = auth.uid()`——函数按调用者身份执行，没有这条策略就会读到别人的小助手。
 2. 其余被读取的表（`interior_design_projects` 与六张素材表）在仓库迁移里都已开启 RLS 并有「仅本人」策略。
 
-## 6. 执行步骤（在 Enter 里）
+## 6. 执行记录
 
-1. 把 `supabase/migrations/migration_20261012_133000000` 的 SQL **原样**交给 Enter 执行，说明只执行 SQL、不改前端代码。
-2. 执行后 Enter 会在 `origin/enter` 提交自己的迁移文件，并重新生成 `src/integrations/supabase/types.ts`。
-3. 合并回本分支时：`types.ts` 以 Enter 生成的为准（丢弃本地手写的同名改动）；删掉本地的 `migration_20261012_133000000`，避免同一份 SQL 出现两次。
-4. 主工作区切到包含前端改动的分支（例如 `git merge --ff-only chore/fsd-restructure`），重启开发服务。
+1. 2026-10-13，Enter 原样执行迁移 SQL，没有改前端代码。
+2. Enter 在 `enter` 分支把迁移文件回写为 `migration_20261013_052138000`，并重新生成 `types.ts`（列表函数的 `p_*` 参数改为可选、不含 `null`）。
+3. 合并到本分支时以 Enter 回写的迁移文件与 `types.ts` 为准，本地同一份 SQL（`migration_20261012_133000000`）已删除，避免执行两次。
 
 ## 7. 验收
 
@@ -118,7 +117,7 @@ select public.interior_library_page(1, 0, null, null, null, null, null);
 
 ## 8. 回滚
 
-先把前端回到不依赖本接口的提交（主工作区当前的 `feat/style-presets-and-report @ 4d4002c`），再执行：
+先把前端回到不依赖本接口的提交（`4d4002c`，即 PR #1 的第一个提交），再执行：
 
 ```sql
 drop function if exists public.interior_project_page(integer, integer, text, boolean);

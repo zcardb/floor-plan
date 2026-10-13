@@ -22,5 +22,5 @@
 ## 规则
 
 - 对象编辑能力只加在浮动工具条（`SelectionEditor`）里；方案与成本、户型、风格、家具库、AI 这类全局内容放在 `SidePanel`，入口在 `CanvasRail`（详见根目录 `AGENTS.md` §2）。
-- 3D 场景、报告预览与 PDF、AI 弹窗、自定义家具弹窗都经对应 Feature 的公开入口按需加载，不进首屏包。
+- 3D 场景、报告正文与 PDF、AI 弹窗、自定义家具弹窗都经对应 Feature 的公开入口按需加载，不进首屏包（报告弹窗只有轻量外壳随工作台常驻）。
 - 楼梯的数据、图样与规范提示见 `docs/features/stairs.md`。

@@ -2,7 +2,7 @@
 
 > **职责**：方案报告：预览弹窗与多页 A4 PDF。
 >
-> **公开入口**：`ReportPreview`（lazy）、`loadReportExport()`（按需加载 PDF 生成，含 pdf-lib）。
+> **公开入口**：`ReportDialog`（预览弹窗：外壳随工作台常驻，正文按需加载）、`loadReportExport()`（按需加载 PDF 生成，含 pdf-lib）。
 >
 > 计划见同目录 `plan.md`；目录与依赖规则见 `docs/architecture.md`。
 
@@ -21,7 +21,7 @@
 | `features/report/model/report-export.ts` | `reportFile(design, name, defaults?)`：buildReport → loadPdfFont → reportPdf，返回 `ExportFile` |
 | `lib/drawing/drawing-export.ts` | 复用的 `loadPdfFont`、`fileName`、`ExportFile`（与图纸导出同一套约定） |
 
-界面只有预览弹窗（`components/report-preview.tsx`，由公开入口以 lazy 组件 `ReportPreview` 导出）；`model/report.ts` 之后的一切都只服务 PDF。要改版面，改的是 `report-pdf.ts` 与它用的 `pdf-flow.ts` / `pdf-plan.ts`；PDF 生成由公开入口的 `loadReportExport()` 按需加载（含 pdf-lib，不进首屏包）。
+界面只有预览弹窗：外壳 `components/report-dialog.tsx` 由公开入口导出、随工作台常驻，点「生成方案报告」立即打开并显示加载态（`report-loading.tsx`）；正文 `report-content.tsx` 打开后才下载，等弹窗画出来的下一帧再算报告模型与平面图，交给 `report-view.tsx` 展示。`model/report.ts` 之后的一切都只服务 PDF。要改版面，改的是 `report-pdf.ts` 与它用的 `pdf-flow.ts` / `pdf-plan.ts`；PDF 生成由公开入口的 `loadReportExport()` 按需加载（含 pdf-lib，不进首屏包）。
 
 ## 1. 数据（`features/report/model/report.ts`）
 
