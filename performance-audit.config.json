@@ -7,8 +7,8 @@
     "kind": "app",
     "initialDynamicImports": ["_browser-ponyfill-B2B7efwu.js"],
     "deferredDynamicImports": [
-      {"key":"src/features/interior/scene/Scene3D.tsx","trigger":"interaction","reason":"Only loaded when the user explicitly switches from the 2D workbench to 3D."},
-      {"key":"src/features/interior/model/drawingExport.ts","trigger":"interaction","reason":"Only loaded when the user requests SVG or DXF drawing export."}
+      {"key":"src/features/scene-3d/components/scene-3d.tsx","trigger":"interaction","reason":"Only loaded when the user explicitly switches from the 2D workbench to 3D."},
+      {"key":"src/lib/drawing/drawing-export.ts","trigger":"interaction","reason":"Only loaded when the user requests SVG or DXF drawing export."}
     ],
     "initialFonts": []
   }]
