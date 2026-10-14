@@ -4307,6 +4307,26 @@ svg.material-thumb { display: block; }
 .furniture-visual-stage { display: grid; place-items: center; height: 100%; padding: 52px 24px 24px; }
 .furniture-visual-stage img, .furniture-visual-stage > svg { width: 100%; height: 100%; object-fit: contain; }
 .furniture-visual-ai { position: absolute; top: 12px; right: 12px; z-index: 1; gap: 5px; box-shadow: 0 1px 3px hsl(var(--foreground) / 0.08); }
+/* 2D / 3D 视角切换：左上角浮层分段控件 */
+.furniture-visual-views { position: absolute; top: 12px; left: 12px; z-index: 1; display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: hsl(var(--card) / 0.92); border: 1px solid hsl(var(--border)); box-shadow: 0 1px 3px hsl(var(--foreground) / 0.08); }
+.furniture-visual-views button { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 10px; border-radius: 7px; font-size: var(--fs-control); font-weight: 600; color: hsl(var(--muted-foreground)); transition: background-color .15s ease, color .15s ease; }
+.furniture-visual-views button:hover { color: hsl(var(--foreground)); }
+.furniture-visual-views button.is-active { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+.furniture-visual-views button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
+.furniture-visual-empty { display: grid; justify-items: center; gap: 10px; color: hsl(var(--muted-foreground)); font-size: var(--fs-title); text-align: center; }
+.furniture-visual-empty p { margin: 0; }
+/* 实时 3D 预览：铺满视觉区，可拖动旋转；加载 three 时居中提示 */
+.furniture-visual-3d { position: absolute; inset: 0; }
+.furniture-visual-loading { display: flex; align-items: center; justify-content: center; gap: 8px; height: 100%; color: hsl(var(--muted-foreground)); font-size: var(--fs-control); }
+.furniture-visual-loading svg { width: 16px; height: 16px; }
+.furniture-model-preview { position: absolute; inset: 0; cursor: grab; touch-action: none; }
+.furniture-model-preview:active { cursor: grabbing; }
+.furniture-model-canvas { display: block; width: 100%; height: 100%; }
+.furniture-model-hint { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); padding: 4px 10px; border-radius: 999px; background: hsl(var(--card) / 0.88); border: 1px solid hsl(var(--border)); color: hsl(var(--muted-foreground)); font-size: var(--fs-meta); white-space: nowrap; pointer-events: none; }
+/* AI 3D 候选：小卡片里静态一帧，不接管指针；放大查看时可拖动 */
+.furniture-ai-candidate-3d { position: absolute; inset: 0; }
+.furniture-model-preview.is-compact { cursor: inherit; touch-action: auto; pointer-events: none; }
+.image-lightbox-plan-paper:has(.furniture-ai-candidate-3d) { position: relative; padding: 0; overflow: hidden; }
 .ai-candidate-preview img.furniture-ai-candidate { width: 100%; height: 100%; object-fit: contain; }
 
 @media (max-width: 700px) {

@@ -2,7 +2,7 @@
 
 > **职责**：3D 场景（three.js）：家具精修模型、墙门窗地面天花、材质与环境反射、昼夜灯光、漫游与视角。
 >
-> **公开入口**：`loadScene3D()`（按需加载场景模块）与类型 `Scene3D`、`SceneHandle`、`SceneOptions`、`SceneFailure`。`three` 只能在本 Feature 里导入。
+> **公开入口**：`loadScene3D()`（按需加载场景模块）与类型 `Scene3D`、`SceneHandle`、`SceneOptions`、`SceneFailure`；`FurnitureModelPreview`（lazy，单件家具实时 3D 预览，类型 `ModelSnapshot`）。`three` 只能在本 Feature 里导入。
 >
 > 计划见同目录 `plan.md`；目录与依赖规则见 `docs/architecture.md`。
 
@@ -17,6 +17,7 @@
 | `features/scene-3d/model/scene-materials.ts` | 一个渲染器一份环境贴图，以及本场景的材质副本（反射 + 发光件） |
 | `features/scene-3d/model/lighting.ts` | 昼夜参数、吸顶灯、大地面，以及 `applyLighting(rig, night)` |
 | `features/scene-3d/components/scene-3d.tsx` | 解析风格、搭建墙门窗地面天花、挂环境贴图、昼夜灯光、按需重建 |
+| `features/scene-3d/components/furniture-model-preview.tsx` | 单件家具的实时 3D 预览（家具详情 3D 视角、AI 3D 候选）：同一个 `buildFurniture`，默认风格（保留家具自身颜色），可拖动旋转、可截图；`compact` 为候选卡片的静态一帧 |
 
 ## 1. 家具模型
 

@@ -3,6 +3,7 @@ import { FunctionsHttpError } from "@supabase/supabase-js";
 import type { LibraryItem } from '@/lib/floor-plan/types';
 import { backend } from "@/lib/backend";
 import type { AiFileRef } from "../model/reference-images";
+import { sanitizeModel3d, type FurnitureModel3d } from "@/lib/floor-plan/furniture-3d";
 import { furnitureHeight } from "@/lib/floor-plan/layout-rules";
 import { stairRiser } from "@/lib/floor-plan/stairs";
 import { notify } from "@/lib/notify";
@@ -87,6 +88,26 @@ export async function generateFurnitureImage(
     await wait(2000, cancelled, onWait);
   }
   throw new Error("图片仍在生成，请稍后重试");
+}
+
+/**
+ * 3D 视角的「AI 调整」：AI 用基本体拼出这件家具的简易 3D 模型（后端函数 interior-furniture-model），
+ * 前端再按 lib/floor-plan/furniture-3d 的同一套规则校验，产物直接用于详情预览与项目 3D 场景。
+ */
+export async function generateFurnitureModel(
+  item: LibraryItem,
+  options: { description?: string; images?: string[]; files?: AiFileRef[]; model?: string },
+): Promise<FurnitureModel3d> {
+  const data = await invoke("interior-furniture-model", {
+    item: aiFurnitureItem(item),
+    ...(options.description ? { description: options.description } : {}),
+    ...(options.images?.length ? { images: options.images } : {}),
+    ...(options.files?.length ? { files: options.files } : {}),
+    ...(options.model ? { model: options.model } : {}),
+  });
+  const model3d = sanitizeModel3d(data?.model3d);
+  if (!model3d) throw new Error("AI 没有给出可用的 3D 模型，请重试");
+  return model3d;
 }
 
 

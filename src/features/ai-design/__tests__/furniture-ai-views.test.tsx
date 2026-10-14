@@ -3,7 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { AiComposer } from "../components/ai-composer";
 import { FurnitureVisual } from "@/features/account-library/components/furniture-visual";
-import { FurnitureAiDialog, defaultAdjustImage } from "../components/furniture-ai-dialog";
+import { FurnitureAiDialog } from "../components/furniture-ai-dialog";
+import { defaultAdjustImage } from "../model/adjust-image";
 import { AccountFurnitureDialog } from "@/features/account-library/components/account-furniture-dialog";
 import { DEFAULT_AI_ENGINE } from "../model/models";
 import { ATTACHMENT_ACCEPT, pickAttachments, readyFiles, readyImageUrls, uploadedImage, type AiImageDraft } from "../model/reference-images";
@@ -11,6 +12,15 @@ import { validateDesign } from "@/lib/floor-plan/validation";
 import { HARD_CATEGORIES } from "@/lib/floor-plan/hard-materials";
 import { blankDesign } from "@/lib/floor-plan/templates";
 import type { LibraryItem } from "@/lib/floor-plan/types";
+
+// 实时 3D 预览依赖 WebGL：测试里换成占位元素，只校验何时渲染、带上哪件家具与 3D 部件。
+vi.mock("@/features/scene-3d", async () => {
+  const { createElement: h } = await import("react");
+  return {
+    FurnitureModelPreview: ({ item, compact }: { item: LibraryItem; compact?: boolean }) =>
+      h("div", { "data-testid": "model-preview", "data-parts": item.model3d?.parts.length ?? 0, "data-compact": compact ? "1" : "0" }, item.name),
+  };
+});
 
 // 弹层内容在浏览器里经 Portal 挂到 body，静态渲染拿不到；测试里把打开的弹层原地渲染（头部 header、标题 h2、说明 p），关闭的不渲染。
 vi.mock("@/components/ui/dialog", async () => {
@@ -65,74 +75,75 @@ describe("AI 附件：图片 + 家装素材", () => {
   });
 });
 
-describe("家具详情只有 2D", () => {
-  const visual = (item: LibraryItem, adjust = true) =>
-    html(createElement(FurnitureVisual, { item, onAdjust: adjust ? () => {} : undefined }));
+describe("家具详情：2D / 3D 预览与 AI 调整", () => {
+  const visual = (item: LibraryItem, view: "top" | "perspective" = "top", adjust = true) =>
+    html(createElement(FurnitureVisual, { item, view, onView: () => {}, onAdjust: adjust ? () => {} : undefined }));
   const withTop: LibraryItem = { ...sofa, imageUrl: "https://x/top.webp" };
-  /** 旧数据里可能存着 3D 效果图与 AI 3D 模型：数据照旧保留（3D 场景仍会用），详情里不再展示。 */
-  const legacy3d: LibraryItem = { ...sofa, image3dUrl: "https://x/3d.webp", model3d: { version: 1, parts: [{ kind: "box", x: 0, y: 0, z: 0, w: 1, h: 1, d: 1, color: "#334455" }] } };
+  const ai3d: LibraryItem = { ...sofa, model3d: { version: 1, parts: [{ kind: "box", x: 0, y: 0, z: 0, w: 1, h: 1, d: 1, color: "#334455" }] } };
   const detail = (props: Partial<Parameters<typeof AccountFurnitureDialog>[0]>) => html(createElement(AccountFurnitureDialog, {
     item: sofa, isCustom: false, referencePrice: null, onOpenChange: () => {}, onChanged: () => {}, applyDefaultPrice: async () => true, remove: async () => true, ...props,
   }));
 
-  it("软装：没有俯视图显示参考符号，有就显示俯视图；没有视角切换，也不渲染 3D", () => {
+  it("软装：左上角 2D / 3D 切换，默认 2D——没有俯视图显示参考符号，有就显示俯视图", () => {
     const plain = visual(sofa), top = visual(withTop);
+    expect(plain).toContain('aria-label="预览视角"');
+    expect(plain).toContain('aria-checked="true" aria-label="2D 俯视图"');
+    expect(plain).toContain('aria-checked="false" aria-label="3D 模型"');
     expect(plain).toContain('aria-label="布艺沙发参考符号"');
-    expect(plain).not.toContain("<img");
     expect(top).toContain('<img src="https://x/top.webp"');
-    expect(top).toContain('alt="布艺沙发2D 俯视图"');
-    expect(top).not.toContain("参考符号");
-    for (const out of [plain, top]) {
-      expect(out).not.toContain('role="radio');
-      expect(out).not.toContain("预览视角");
-      expect(out).not.toContain("3D");
-    }
-    // 旧的 3D 素材对视觉区没有任何影响：只有 3D 效果图时仍是参考符号，有俯视图时仍是俯视图。
-    expect(visual(legacy3d)).toBe(plain);
-    expect(visual({ ...legacy3d, imageUrl: "https://x/top.webp" })).toBe(top);
+    expect(top).not.toContain("model-preview");
   });
-  it("硬装同样只有 2D，和软装是同一个视觉区；没有保存权限时不显示 AI 调整", () => {
+  it("软装切到 3D：实时渲染与 3D 场景同一套模型（带 AI 3D 部件），旧的 3D 效果图不再顶替", () => {
+    const out = visual({ ...ai3d, image3dUrl: "https://x/3d.webp" }, "perspective");
+    expect(out).toContain('aria-label="布艺沙发实时 3D 模型预览"');
+    expect(out).toContain('data-testid="model-preview" data-parts="1" data-compact="0"');
+    expect(out).not.toContain("https://x/3d.webp");
+    expect(visual(sofa, "perspective")).toContain('data-parts="0"');
+  });
+  it("硬装只有 2D：不显示视角切换，即使传了 3D 也按俯视图显示；没有保存权限时不显示 AI 调整", () => {
     for (const category of HARD_CATEGORIES) {
-      expect(visual({ ...sofa, category })).toBe(visual(sofa));
-      expect(visual({ ...withTop, category })).toBe(visual(withTop));
-      expect(visual({ ...sofa, category }, false)).not.toContain("AI 调整");
+      const out = visual({ ...sofa, category }, "perspective");
+      expect(out).not.toContain("预览视角");
+      expect(out).not.toContain("model-preview");
+      expect(out).toContain("参考符号");
+      expect(visual({ ...sofa, category }, "top", false)).not.toContain("AI 调整");
     }
     expect(visual(sofa)).toContain("AI 调整");
-    expect(visual(sofa, false)).not.toContain("AI 调整");
-    expect(visual(withTop, false)).not.toContain("AI 调整");
+    expect(visual(sofa, "perspective", false)).not.toContain("AI 调整");
   });
-  it("AI 调整默认参考图只看 2D 俯视图，旧的 3D 效果图不拿来顶替", () => {
+  it("AI 调整默认参考图：2D 只用俯视图；3D 优先 3D 效果图，其次退回俯视图", () => {
     expect(defaultAdjustImage(withTop)).toBe("https://x/top.webp");
-    expect(defaultAdjustImage({ ...withTop, image3dUrl: "https://x/3d.webp" })).toBe("https://x/top.webp");
     expect(defaultAdjustImage({ ...sofa, image3dUrl: "https://x/3d.webp" })).toBeUndefined();
-    expect(defaultAdjustImage(sofa)).toBeUndefined();
+    expect(defaultAdjustImage(withTop, "perspective")).toBe("https://x/top.webp");
+    expect(defaultAdjustImage({ ...withTop, image3dUrl: "https://x/3d.webp" }, "perspective")).toBe("https://x/3d.webp");
+    expect(defaultAdjustImage(sofa, "perspective")).toBeUndefined();
   });
-  it("AI 调整弹窗只生成 2D 俯视图：标题含家具名，默认附上当前俯视图，无名称输入与模型选择器", () => {
-    const dialog = (item: LibraryItem) => html(createElement(FurnitureAiDialog, { item, onClose: () => {}, onApply: async () => true }));
-    const out = dialog(withTop), header = headerOf(out);
+  it("AI 调整弹窗 · 2D：标题含家具名与「2D 俯视图」，默认附上当前俯视图，生成图片", () => {
+    const out = html(createElement(FurnitureAiDialog, { item: withTop, onClose: () => {}, onApply: async () => true }));
+    const header = headerOf(out);
     expect(header).toContain("<h2>AI 调整 · 布艺沙发 · 2D 俯视图</h2>");
     expect(header).toContain("在当前 2D 俯视图基础上调整");
-    expect(header).not.toContain("3D");
     expect(out).toContain('<img src="https://x/top.webp" alt="附件 1"');
     expect(out).toContain('aria-label="生成图片"');
     expect(out).not.toContain("ai-engine");
-    expect(out).not.toContain("名称");
-    // 只有旧的 3D 效果图时不带附件，按需求重新生成。
-    const legacy = dialog(legacy3d);
-    expect(legacy).not.toContain("https://x/3d.webp");
-    expect(legacy).not.toContain('aria-label="附件"');
   });
-  it("家具详情弹窗：文案只提 2D 俯视图；只能设单价（没有保存权限）时不显示 AI 调整", () => {
+  it("AI 调整弹窗 · 3D：标题为「3D 模型」，按钮是「生成 3D 模型」；有 3D 效果图时默认带上", () => {
+    const out = html(createElement(FurnitureAiDialog, { item: { ...withTop, image3dUrl: "https://x/3d.webp" }, view: "perspective", onClose: () => {}, onApply: async () => true }));
+    const header = headerOf(out);
+    expect(header).toContain("<h2>AI 调整 · 布艺沙发 · 3D 模型</h2>");
+    expect(header).toContain("简易 3D 模型");
+    expect(out).toContain('<img src="https://x/3d.webp" alt="附件 1"');
+    expect(out).toContain('aria-label="生成 3D 模型"');
+  });
+  it("家具详情弹窗：软装有 2D / 3D 切换与 AI 调整，文案提到 3D 模型；只能设单价时不显示 AI 调整", () => {
     const builtin = detail({ saveFields: async () => true, saveAssets: async () => true });
-    expect(headerOf(builtin)).toContain("并用「AI 调整」更换 2D 俯视图");
-    expect(headerOf(builtin)).not.toContain("3D");
+    expect(headerOf(builtin)).toContain("并用「AI 调整」更换 2D 俯视图或 3D 模型");
     expect(builtin).toContain("furniture-visual-ai");
-    expect(builtin).toContain('aria-label="布艺沙发参考符号"');
-    expect(builtin).not.toContain('role="radio');
+    expect(builtin).toContain('aria-label="预览视角"');
     expect(detail({ isCustom: true, saveGeometry: async () => true })).toContain("furniture-visual-ai");
     const priceOnly = detail({});
     expect(priceOnly).not.toContain("furniture-visual-ai");
-    expect(priceOnly).not.toContain("AI 调整");
+    expect(priceOnly).toContain('aria-label="预览视角"');
   });
 });
 

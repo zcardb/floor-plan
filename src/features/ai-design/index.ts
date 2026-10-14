@@ -5,6 +5,8 @@ export { useFurnitureImage } from './hooks/use-furniture-image';
 export { useRoomAi } from './hooks/use-room-ai';
 export type { AiEntryTone } from './hooks/use-room-ai';
 export type { FurnitureAiResult } from './components/furniture-ai-dialog';
+export type { FurnitureView } from './hooks/use-furniture-image';
+export { VIEW_LABEL as FURNITURE_VIEW_LABEL, defaultAdjustImage } from './model/adjust-image';
 
 /* AI 界面较重（提示词编辑、结果预览、Markdown 渲染），一律首次打开时才下载。 */
 export const AiRoomDialog = lazy(() => import('./components/ai-room-dialog').then(m => ({ default: m.AiRoomDialog })));

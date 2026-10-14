@@ -18,5 +18,6 @@
 ## 规则
 
 - 家具管理页列表用 `interior_library_page`，以 `p_exclude_keys = BUILTIN_IDS` 排除内置家具的覆盖行，覆盖行另外按 `catalog_id` 读取；排序为自建在前、内置在后。
-- 家具图片的 AI 生成与调整经 `ai-design` 的公开入口（`FurnitureAiDialog`、`useFurnitureImage`）。
+- 家具详情左侧视觉区：软装有 2D / 3D 切换（硬装只有 2D）。3D 是 `scene-3d` 的 `FurnitureModelPreview` 实时模型，可拖动旋转，跟随表单里的尺寸与颜色实时预览。
+- 「AI 调整」跟随当前视角：2D 更换俯视图（写 `imageUrl`），3D 生成简易 3D 模型（写 `model3d`，项目 3D 场景同样使用）；3D 没有可参考的图片时，用实时模型截图当默认参考图。经 `ai-design` 的公开入口（`FurnitureAiDialog`、`useFurnitureImage`）。
 - 材料采购编辑复用 `costs` 的 `MaterialProcurementEditor`。
