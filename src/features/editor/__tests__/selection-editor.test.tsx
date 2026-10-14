@@ -68,6 +68,13 @@ describe('门窗 Visual editor 定位与可见性', () => {
     expect(h.node.style.visibility).toBe('hidden');
     expect(h.node.style.pointerEvents).toBe('none');
   });
+  it.each([['door', true], ['window', true], ['passage', false]] as const)('%s 工具条复制按钮：%s', (kind, shown) => {
+    const duplicate = vi.fn();
+    const copy = elements(harness(kind, false, { duplicate }).element).find(node => node.type === 'button' && node.props['aria-label'] === '复制对象');
+    expect(!!copy).toBe(shown);
+    (copy?.props.onClick as (() => void) | undefined)?.();
+    expect(duplicate).toHaveBeenCalledTimes(shown ? 1 : 0);
+  });
   it('取消选择或完全离屏时隐藏，重新获得锚点时恢复', () => {
     const h = harness('window');
     for (const rect of [null, { left: 900, top: 100, right: 950, bottom: 150 }]) {

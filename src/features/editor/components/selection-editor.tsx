@@ -70,6 +70,7 @@ import { changeDoorOrientation } from '@/lib/floor-plan/door-orientation';
 import { doorType } from '@/lib/floor-plan/door-type';
 import { DoorTypeMenu } from './door-type-menu';
 import { useEditorDrag } from '../hooks/use-editor-drag';
+import { canDuplicateOpening } from '../model/opening-placement';
 import { separatorLength } from '@/lib/floor-plan/separators';
 import type { AiEntryTone } from '@/features/ai-design';
 export interface SelectionEditorHandle {
@@ -477,7 +478,7 @@ export const SelectionEditor = forwardRef<SelectionEditorHandle, Props>(
             </button>
           </EditorTooltip>
         )}
-        {(f || group.length > 1) && (
+        {(f || group.length > 1 || canDuplicateOpening(o)) && (
           <EditorTooltip label={group.length > 1 ? (grouped ? "复制组合" : "复制所选") : "复制对象"} shortcut="Ctrl D">
             <button type="button" aria-label={group.length > 1 ? (grouped ? "复制组合" : "复制所选") : "复制对象"} onClick={p.duplicate}>
               <Copy size={15} />

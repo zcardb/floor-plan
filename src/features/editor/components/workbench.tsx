@@ -14,6 +14,8 @@ import { clearRoomFurniture } from '@/lib/floor-plan/room-furniture';
 import { removeRoom as removeRoomModel, type RoomRemoval } from '../model/room-removal';
 import { duplicateFurniture, expandToGroups, groupFurniture, groupIds, isPersistentGroup, moveGroup, removeGroup, ungroupFurniture } from '@/lib/floor-plan/furniture-group';
 import { reorderFurniture } from '../model/furniture-layer';
+import { canDuplicateOpening, duplicateOpening } from '../model/opening-placement';
+import { formatMeters } from '@/lib/floor-plan/length-units';
 import { rotateUnit } from '../model/movable-unit';
 import { deriveRooms, migrateSeparators } from '@/lib/floor-plan/room-derive';
 import { isStairs, resizeStair } from '@/lib/floor-plan/stairs';
@@ -433,8 +435,21 @@ export function Workbench(p: Props) {
     setSelection({ kind: "group", ids: members });
     notify.success(`已将 ${members.length} 件家具组合，可整体移动`);
   }, [d, selection, change]);
-  /** 复制：单件家具，或多选 / 组合（整组一起复制，复制件仍是一个组合）。 */
+  /** 复制：单件家具，或多选 / 组合（整组一起复制，复制件仍是一个组合）；门 / 窗复制到同一面墙的空位上。 */
   const duplicate = useCallback(() => {
+    if (selection?.kind === "opening") {
+      const source = d.openings.find(o => o.id === selection.id);
+      if (!canDuplicateOpening(source)) return;
+      const result = duplicateOpening(d, selection.id, uid());
+      if (result.ok === false) return notify.fail(result.reason);
+      change(() => result.design);
+      setSelection({ kind: "opening", id: result.id });
+      const copy = result.design.openings.find(o => o.id === result.id)!;
+      notify.success(result.fitted
+        ? `已复制${openingKindLabel(copy.kind)}，墙上空间不足，宽度已缩为 ${formatMeters(copy.width)} m`
+        : `已复制${openingKindLabel(copy.kind)}`);
+      return;
+    }
     const ids = selection?.kind === "furniture" ? [selection.id] : selection?.kind === "group" ? groupIds(d, selection) : [];
     const { design, ids: copied } = duplicateFurniture(d, ids);
     if (!copied.length) return;

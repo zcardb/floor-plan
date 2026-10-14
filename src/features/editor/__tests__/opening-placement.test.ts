@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { placeOpening } from '../model/opening-placement';
+import { canDuplicateOpening, duplicateOpening, placeOpening } from '../model/opening-placement';
+import { blankDesign } from '@/lib/floor-plan/templates';
 import type { Opening, Wall } from '@/lib/floor-plan/types';
 
 const wall = (len: number): Wall => ({ id: 'w', a: [0, 0], b: [len, 0], thickness: 120, kind: 'partition' });
@@ -32,5 +33,33 @@ describe('在墙上新增门窗', () => {
     expect(placeOpening({ openings: [] }, wall(80), 'door', 40)).toEqual({ ok: false, reason: '此墙段长度不足' });
     expect(placeOpening({ openings: [] }, wall(1000), 'passage', 500)).toEqual({ ok: false, reason: '此墙段长度不足' });
     expect(placeOpening({ openings: [opening(500, 1000), opening(2400, 1000)] }, wall(6000), 'passage', 1500)).toEqual({ ok: false, reason: '门窗不能重叠' });
+  });
+});
+
+describe('复制门窗', () => {
+  const design = (len: number, openings: Opening[]) => ({ ...blankDesign(), walls: [wall(len)], openings });
+  const copyOf = (r: ReturnType<typeof duplicateOpening>) => (r.ok ? r.design.openings.find(o => o.id === r.id)! : null);
+  it('复制件保留全部属性，放在同墙最近的空位（同样近时优先右侧），不与原件重叠', () => {
+    const source: Opening = { ...opening(2000, 1000), kind: 'window', sill: 900, height: 1500, variant: 'v1' };
+    const r = duplicateOpening(design(6000, [source]), source.id, 'copy');
+    expect(r).toMatchObject({ ok: true, id: 'copy', fitted: false });
+    expect(copyOf(r)).toEqual({ ...source, id: 'copy', offset: 3000 });
+    expect(r.ok && r.design.openings).toHaveLength(2);
+  });
+  it('右侧放不下时放到左侧', () => {
+    const r = duplicateOpening(design(4000, [opening(3000, 1000)]), 'o3000', 'copy');
+    expect(copyOf(r)).toMatchObject({ offset: 2000, width: 1000, kind: 'door' });
+  });
+  it('没有放得下原宽度的空档时缩到最大空档并居中；空档不足 10cm 不复制', () => {
+    const r = duplicateOpening(design(1800, [opening(500, 1000)]), 'o500', 'copy');
+    expect(r).toMatchObject({ ok: true, fitted: true });
+    expect(copyOf(r)).toMatchObject({ offset: 1400, width: 800 });
+    expect(duplicateOpening(design(1050, [opening(500, 1000)]), 'o500', 'copy')).toEqual({ ok: false, reason: '这面墙上没有空位放复制的门' });
+  });
+  it('垭口不能复制', () => {
+    const passage: Opening = { ...opening(1000, 900), kind: 'passage' };
+    expect(canDuplicateOpening(passage)).toBe(false);
+    expect(canDuplicateOpening(opening(1000, 900))).toBe(true);
+    expect(duplicateOpening(design(6000, [passage]), passage.id, 'copy').ok).toBe(false);
   });
 });
