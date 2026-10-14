@@ -17,7 +17,7 @@
 | `features/scene-3d/model/scene-materials.ts` | 一个渲染器一份环境贴图，以及本场景的材质副本（反射 + 发光件） |
 | `features/scene-3d/model/lighting.ts` | 昼夜参数、吸顶灯、大地面，以及 `applyLighting(rig, night)` |
 | `features/scene-3d/components/scene-3d.tsx` | 解析风格、搭建墙门窗地面天花、挂环境贴图、昼夜灯光、按需重建 |
-| `features/scene-3d/components/furniture-model-preview.tsx` | 单件家具的实时 3D 预览（家具详情 3D 视角、AI 3D 候选）：同一个 `buildFurniture`，默认风格（保留家具自身颜色），可拖动旋转、可截图；`compact` 为候选卡片的静态一帧 |
+| `features/scene-3d/components/furniture-model-preview.tsx` | 单件家具的实时 3D 预览（家具详情 3D 视角、AI 3D 候选）：同一个 `buildFurniture`，默认风格（保留家具自身颜色），可拖动旋转、可截图；`compact` 用于候选卡片：同样可拖动旋转（按需重绘、无惯性和缩放，拖动后不触发卡片点击） |
 
 ## 1. 家具模型
 

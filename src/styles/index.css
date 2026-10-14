@@ -4323,9 +4323,11 @@ svg.material-thumb { display: block; }
 .furniture-model-preview:active { cursor: grabbing; }
 .furniture-model-canvas { display: block; width: 100%; height: 100%; }
 .furniture-model-hint { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); padding: 4px 10px; border-radius: 999px; background: hsl(var(--card) / 0.88); border: 1px solid hsl(var(--border)); color: hsl(var(--muted-foreground)); font-size: var(--fs-meta); white-space: nowrap; pointer-events: none; }
-/* AI 3D 候选：小卡片里静态一帧，不接管指针；放大查看时可拖动 */
+/* AI 3D 候选：小卡片里也能直接拖动旋转（拖动不切换选中，单击选中）；放大查看是大尺寸 + 惯性 + 缩放 */
 .furniture-ai-candidate-3d { position: absolute; inset: 0; }
-.furniture-model-preview.is-compact { cursor: inherit; touch-action: auto; pointer-events: none; }
+.furniture-model-preview.is-compact { touch-action: pan-y; }
+.furniture-model-preview.is-compact .furniture-model-hint { bottom: 8px; padding: 2px 8px; opacity: 0; transition: opacity 0.2s ease; }
+.ai-candidate:hover .furniture-model-preview.is-compact .furniture-model-hint { opacity: 1; }
 .image-lightbox-plan-paper:has(.furniture-ai-candidate-3d) { position: relative; padding: 0; overflow: hidden; }
 .ai-candidate-preview img.furniture-ai-candidate { width: 100%; height: 100%; object-fit: contain; }
 

@@ -5,6 +5,7 @@ import { decorStyleById, furnitureLook } from "@/lib/floor-plan/decor-styles";
 import type { LibraryItem } from "@/lib/floor-plan/types";
 import { buildFurniture } from "../model/furniture";
 import { toFurnitureModel } from "../model/furniture-model";
+import { guardDragClick } from "../model/drag-click-guard";
 
 /** 截取当前视角为 PNG，供「AI 调整」作为 3D 的默认素材。 */
 export type ModelSnapshot = () => Promise<File | null>;
@@ -12,7 +13,7 @@ export type ModelSnapshot = () => Promise<File | null>;
 /**
  * 家具的实时 3D 预览：按参考几何（或 AI 3D 部件）渲染与项目 3D 场景相同的模型，可以拖动旋转。
  * 不属于某个方案，配色用默认风格（保留家具自己的颜色）。
- * 详情弹窗的 3D 视角与「AI 调整」的 3D 候选都用它；compact 用于候选小卡片：静态一帧、不接管指针、不投影。
+ * 详情弹窗的 3D 视角与「AI 调整」的 3D 候选都用它；compact 用于候选小卡片：同样可拖动旋转，但按需重绘、不投影，拖动后不触发卡片点击。
  * WebGL 不可用时调用 onFail，由调用方退回图片。
  */
 export function FurnitureModelPreview({ item, onFail, snapshotRef, compact = false }: {
@@ -58,16 +59,20 @@ export function FurnitureModelPreview({ item, onFail, snapshotRef, compact = fal
     renderer.domElement.className = "furniture-model-canvas";
     el.prepend(renderer.domElement);
     const orbit = new OrbitControls(camera, renderer.domElement);
-    orbit.enableDamping = true;
+    // 小卡片：同样可以拖动旋转，但不做惯性、不常驻渲染循环（只在视角变化时重绘），也不接管滚轮缩放，免得卡住弹窗滚动。
+    orbit.enableDamping = !compact;
+    orbit.enableZoom = !compact;
     orbit.enablePan = false;
     orbit.minDistance = radius * 1.3;
     orbit.maxDistance = radius * 6;
     orbit.minPolarAngle = 0.15;
     orbit.maxPolarAngle = Math.PI * 0.49;
-    // 小卡片里是静态预览：不接管指针（点击用于选中候选），只在尺寸变化时重绘。
-    orbit.enabled = !compact;
     camera.position.set(radius * 1.65, radius * 1.3, radius * 2.3);
     orbit.update();
+    const redraw = () => renderer.render(scene, camera);
+    if (compact) orbit.addEventListener("change", redraw);
+    // 小卡片在可点击的候选按钮里：拖动只旋转、不切换选中；单击仍然选中。
+    const unguard = compact ? guardDragClick(el) : null;
     const resize = () => {
       const w = el.clientWidth, h = el.clientHeight;
       if (!w || !h) return;
@@ -94,6 +99,8 @@ export function FurnitureModelPreview({ item, onFail, snapshotRef, compact = fal
       if (snapshotRef) snapshotRef.current = null;
       cancelAnimationFrame(raf);
       observer.disconnect();
+      orbit.removeEventListener("change", redraw);
+      unguard?.();
       orbit.dispose();
       group.traverse((o) => { if (o instanceof THREE.Mesh) o.geometry.dispose(); });
       group.clear();
@@ -107,7 +114,7 @@ export function FurnitureModelPreview({ item, onFail, snapshotRef, compact = fal
   if (failed) return null;
   return (
     <div className={"furniture-model-preview" + (compact ? " is-compact" : "")} ref={host}>
-      {!compact && <span className="furniture-model-hint">{item.model3d ? "AI 3D 模型" : "参考几何 3D"} · 可拖动旋转</span>}
+      <span className="furniture-model-hint">{compact ? "拖动旋转" : `${item.model3d ? "AI 3D 模型" : "参考几何 3D"} · 可拖动旋转`}</span>
     </div>
   );
 }
