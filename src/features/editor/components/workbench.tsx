@@ -50,7 +50,7 @@ import {
   X,
 } from "lucide-react";
 import { notify } from "@/lib/notify";
-import { trackDesignFileExported, trackReportPdfExported } from "@/lib/analytics/conversion-events";
+import { trackDesignFileExported, trackReportPdfExported } from "@/lib/analytics/events";
 import { afterFirstScreen } from "@/utils/after-first-screen";
 import { onPageHide, saveFile } from "@/lib/platform";
 import { ErrorBoundary } from "@/components/error-boundary/error-boundary";

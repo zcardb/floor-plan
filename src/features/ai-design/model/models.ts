@@ -34,3 +34,6 @@ export const DEFAULT_AI_ENGINE: AiEngine = { kind: "model", id: DEFAULT_AI_MODEL
 /** 发请求时的字段：二选一。 */
 export const engineFields = (engine: AiEngine): { model?: string; assistantId?: string } =>
   engine.kind === "model" ? { model: engine.id } : { assistantId: engine.id };
+
+/** 统计用的引擎名：模型 id；用自定义小助手时统一记为 assistant（不上报小助手 id）。 */
+export const engineName = (engine: AiEngine): string => (engine.kind === "assistant" ? "assistant" : engine.id);

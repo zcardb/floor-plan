@@ -1,7 +1,7 @@
 import { Suspense, useRef, useState } from 'react';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { notify } from '@/lib/notify';
-import { type ProjectCreateMethod, trackProjectCreated } from '@/lib/analytics/conversion-events';
+import { type ProjectCreateMethod, trackProjectCreated } from '@/lib/analytics/events';
 import { createProject } from '@/lib/floor-plan/templates';
 import { DxfImportDialog, IMPORT_ACCEPT } from '@/features/dxf-import';
 import type { Project } from '@/lib/floor-plan/types';

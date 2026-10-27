@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { notify } from '@/lib/notify';
-import { trackProjectCreated } from '@/lib/analytics/conversion-events';
+import { trackProjectCreated } from '@/lib/analytics/events';
 import { createProject } from '@/lib/floor-plan/templates';
 import { type DxfSource, parseDesignFile } from '@/features/dxf-import';
 import type { Design } from '@/lib/floor-plan/types';

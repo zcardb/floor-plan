@@ -11,8 +11,10 @@ import { initialPicks, pickNames, requiredOf, withPickSizes } from "../model/pic
 import { readyFiles, readyImageUrls, type AiImageDraft } from "../model/reference-images";
 import { sanitizeRoomItems } from "../model/sanitize";
 import { useAiBatch } from "./use-ai-batch";
+import { useAiRunReport } from "./use-ai-run-report";
 import type { AiCatalog, AiFurniturePick } from "../types";
-import { DEFAULT_AI_ENGINE, engineFields, type AiEngine } from "../model/models";
+import { trackAiLayoutApplied, type AiRun } from "@/lib/analytics/events";
+import { DEFAULT_AI_ENGINE, engineFields, engineName, type AiEngine } from "../model/models";
 
 /** 输入草稿：每个房间一份，关掉弹窗、切换选中对象都保留。 */
 export interface AiRoomDraft {
@@ -55,6 +57,9 @@ export function useRoomAi({ design, catalog, projectId, change }: {
   change: (fn: (d: Design) => Design) => void;
 }) {
   const ai = useAiBatch<AiRoomRequest, AiRoomResult>();
+  /** 本次发送的上下文：生成成功、失败与最终采纳共用同一份。 */
+  const run = useRef<AiRun>({ scope: "room_layout", engine: DEFAULT_AI_ENGINE.id, count: DEFAULT_AI_COUNT, hasReference: false });
+  useAiRunReport(ai.running, ai.batch, run.current);
   const [drafts, setDrafts] = useState<Record<string, AiRoomDraft>>({});
   const [openId, setOpenId] = useState<string | null>(null);
   const [view, setView] = useState<"input" | "results">("input");
