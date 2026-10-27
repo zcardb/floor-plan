@@ -5,6 +5,7 @@ import type { Json } from "@/lib/backend";
 import { notify } from "@/lib/notify";
 import { onPageHide } from "@/lib/platform";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { trackGuestSavedToCloud, trackProjectDeleted } from "@/lib/analytics/events";
 import { validateDesign } from "@/lib/floor-plan/validation";
 import { nextGuestEditCount } from "../model/template-state";
 import { uid, type Design, type Project } from "@/lib/floor-plan/types";
@@ -387,6 +388,7 @@ export function useProjects() {
     activeRef.current = next;
     setActive(next);
     setStatus(STATUS.cloud);
+    trackGuestSavedToCloud();
     notify.success("已保存到云端项目「" + next.name + "」");
     return true;
   }, []);
@@ -426,6 +428,7 @@ export function useProjects() {
         setActive(next);
         setStatus(STATUS.local);
       }
+      trackProjectDeleted(p.cloud === true);
       notify.success("已删除项目「" + p.name + "」");
       return true;
     },

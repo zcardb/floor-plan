@@ -13,9 +13,11 @@ import { planExamples } from "../model/examples";
 import { readyFiles, readyImageUrls } from "../model/reference-images";
 import { sanitizePlan } from "../model/sanitize";
 import { useAiBatch } from "../hooks/use-ai-batch";
+import { useAiRunReport } from "../hooks/use-ai-run-report";
 import { useAiCatalog } from "../hooks/use-ai-catalog";
 import { DEFAULT_AI_COUNT } from "../hooks/use-room-ai";
-import { DEFAULT_AI_ENGINE, engineFields } from "../model/models";
+import { DEFAULT_AI_ENGINE, engineFields, engineName } from "../model/models";
+import { trackAiLayoutApplied, type AiRun } from "@/lib/analytics/events";
 import { AI_TEMPLATE_ID } from "@/lib/floor-plan/templates";
 import { area } from "@/lib/floor-plan/geometry";
 import { reportCount } from "@/lib/floor-plan/layout-rules";
@@ -51,6 +53,9 @@ export function AiCreateProjectForm({ pending, onClose, onSubmit }: { pending: b
   const [view, setView] = useState<"input" | "results">("input"), [picked, setPicked] = useState<number | null>(null);
   const { catalog } = useAiCatalog(undefined, true);
   const ai = useAiBatch<PlanRequest, { design: Design }>();
+  /** 本次发送的上下文：生成成功、失败与最终采纳共用同一份。 */
+  const run = useRef<AiRun>({ scope: "plan", engine: DEFAULT_AI_ENGINE.id, count: DEFAULT_AI_COUNT, hasReference: false });
+  useAiRunReport(ai.running, ai.batch, run.current);
   const relaunch = useRef<(() => void) | null>(null);
 
   const send = () => {
@@ -59,6 +64,7 @@ export function AiCreateProjectForm({ pending, onClose, onSubmit }: { pending: b
     const request: PlanRequest = { description, images: readyImageUrls(composer.images) };
     const files = readyFiles(composer.images);
     const aiCatalog = catalog, count = composer.count, engine = engineFields(composer.engine);
+    run.current = { scope: "plan", engine: engineName(composer.engine), count, hasReference: request.images.length > 0 || files.length > 0 };
     const examples = planExamples(aiCatalog);
     const launch = () => ai.start(request, count, async (index, generationId) => {
       const { candidate } = await generatePlanCandidate({
@@ -80,6 +86,7 @@ export function AiCreateProjectForm({ pending, onClose, onSubmit }: { pending: b
   const chosen = selected === null ? undefined : slots[selected];
   const confirm = () => {
     if (chosen?.status !== "ready") return;
+    trackAiLayoutApplied(run.current, chosen.candidate.index);
     void markCandidateApplied(chosen.candidate.id).catch(() => undefined);
     onSubmit({ name: name.trim() || chosen.candidate.summary || "AI 户型", template: AI_TEMPLATE_ID, design: chosen.candidate.result.design });
   };

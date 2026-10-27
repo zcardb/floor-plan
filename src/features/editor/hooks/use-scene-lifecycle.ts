@@ -1,5 +1,10 @@
 import { useCallback, useRef, useState } from "react";
 import { notify } from "@/lib/notify";
+import {
+  trackScene3dFailed,
+  trackScene3dReady,
+  type Scene3dFailureReason,
+} from "@/lib/analytics/events";
 import type { SceneFailure } from "@/features/scene-3d";
 
 export type SceneEvent =
@@ -51,13 +56,30 @@ export function useSceneLifecycle() {
   const [state, setState] = useState(initialSceneState);
   const latest = useRef(state);
   latest.current = state;
+  /** 本次 3D 会话：进入时刻 + 是否已上报过首帧（资源被回收后重挂场景不再算一次「进入」）。 */
+  const session = useRef<{ startedAt: number; reported: boolean } | null>(null);
   const dispatch = useCallback((event: SceneEvent) => {
     const prev = latest.current,
       next = sceneReducer(prev, event);
     if (next === prev) return;
     latest.current = next;
     setState(next);
-    if (event.type === "fail" && next.view === "2d") notify.fail(SCENE_FAILURE_MESSAGE[event.reason]);
+    if (event.type === "open") session.current = { startedAt: performance.now(), reported: false };
+    if (event.type === "close") session.current = null;
+    if (event.type === "ready") {
+      const running = session.current;
+      if (running && !running.reported) {
+        running.reported = true;
+        trackScene3dReady(performance.now() - running.startedAt);
+      }
+    }
+    if (event.type === "fail") {
+      if (next.view === "2d") notify.fail(SCENE_FAILURE_MESSAGE[event.reason]);
+      trackScene3dFailed({
+        reason: event.reason.replace("-", "_") as Scene3dFailureReason,
+        recovered: next.view === "3d",
+      });
+    }
   }, []);
   return {
     ...state,

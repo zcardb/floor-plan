@@ -14,6 +14,7 @@ import { useAsyncAction } from '@/hooks/use-async-action';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { usePagedList } from '@/hooks/use-paged-list';
 import { notify } from '@/lib/notify';
+import { trackProjectCreated } from '@/lib/analytics/events';
 import type { PageRequest, PageResult } from '@/lib/paging';
 import { createProject, TEMPLATE_PRESETS } from '@/lib/floor-plan/templates';
 import { ProjectCard } from './project-card';
@@ -84,7 +85,12 @@ export function ProjectManager({ projects, opened }: { projects: Projects; opene
       if (kind === 'copyTemplate') {
         // 「用模板新建」即复制：直接生成一份可编辑的云端副本并打开，和复制我的项目同一流程。
         const name = row.name + ' · 副本';
-        if (await projects.create(createProject(row.templateId, name), true)) { notify.success('已复制为「' + name + '」'); opened(); }
+        if (await projects.create(createProject(row.templateId, name), true)) {
+          // 从模板新建也是一次项目创建，用 template 属性区分来源。
+          trackProjectCreated({ method: 'manual', template: row.templateId ?? 'blank' });
+          notify.success('已复制为「' + name + '」');
+          opened();
+        }
         return;
       }
       const removed = await projects.remove(row);

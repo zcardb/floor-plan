@@ -108,6 +108,7 @@ export function useRoomAi({ design, catalog, projectId, change }: {
     const existing = furnitureInRoom(source, room).slice(0, 60).map((f) => ({ name: f.name, w: Math.round(f.w), d: Math.round(f.d) }));
     const request: AiRoomRequest = { roomId: room.id, roomName: room.name, description, images, furniture: pickNames(draft.picks, aiCatalog), catalog: aiCatalog };
     const count = draft.count, engine = engineFields(draft.engine);
+    run.current = { scope: "room_layout", engine: engineName(draft.engine), count, hasReference: images.length > 0 || files.length > 0 };
     const examples = roomExamples(aiCatalog, context);
     const launch = () => ai.start(request, count, async (index, generationId) => {
       const { candidate } = await generateRoomCandidate({
@@ -141,6 +142,7 @@ export function useRoomAi({ design, catalog, projectId, change }: {
     const { roomId, roomName, catalog: aiCatalog } = batch.request;
     if (!latest.current.design.rooms.some((r) => r.id === roomId)) { notify.fail("房间已不存在，方案未改动"); return; }
     change((d) => applyRoomLayout(d, roomId, slot.candidate.result.items, aiCatalog));
+    trackAiLayoutApplied(run.current, slot.candidate.index);
     notify.success(`已应用到「${roomName}」`, "可按 Ctrl Z 撤销");
     void markCandidateApplied(slot.candidate.id).catch(() => undefined);
     ai.clear();

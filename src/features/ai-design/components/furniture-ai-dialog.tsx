@@ -9,8 +9,10 @@ import { AiResults } from './ai-results';
 import { readyFiles, readyImageUrls, uploadedImage, type AiFileRef, type AiImageDraft } from '../model/reference-images';
 import { uploadReferenceImage } from '../api/ai-client';
 import { useAiBatch } from '../hooks/use-ai-batch';
+import { useAiRunReport } from '../hooks/use-ai-run-report';
 import { DEFAULT_AI_COUNT } from '../hooks/use-room-ai';
-import { DEFAULT_AI_ENGINE } from '../model/models';
+import { DEFAULT_AI_ENGINE, engineName } from '../model/models';
+import { trackAiLayoutApplied, type AiRun } from '@/lib/analytics/events';
 import { VIEW_LABEL, defaultAdjustImage, defaultFurniturePrompt } from '../model/adjust-image';
 import { generateFurnitureImage, generateFurnitureModel, type FurnitureView } from '../hooks/use-furniture-image';
 import type { FurnitureModel3d } from '@/lib/floor-plan/furniture-3d';
@@ -57,6 +59,9 @@ export function FurnitureAiDialog({ item, view = 'top', seed, onClose, onApply }
   }, [seedDraft, seed]);
   const [mode, setMode] = useState<'input' | 'results'>('input'), [picked, setPicked] = useState<number | null>(null), [applying, setApplying] = useState(false);
   const ai = useAiBatch<Request, FurnitureAiResult>();
+  /** 本次发送的上下文：生成成功、失败与最终采纳共用同一份。 */
+  const run = useRef<AiRun>({ scope: is3d ? 'furniture_model' : 'furniture_image', engine: DEFAULT_AI_ENGINE.id, count: DEFAULT_AI_COUNT, hasReference: false });
+  useAiRunReport(ai.running, ai.batch, run.current);
   /** 每次发送 / 返回 / 关闭都换代：旧任务停止轮询，迟到结果丢弃。 */
   const generation = useRef(0), relaunch = useRef<(() => void) | null>(null);
   useEffect(() => () => { generation.current++; }, []);
@@ -66,8 +71,9 @@ export function FurnitureAiDialog({ item, view = 'top', seed, onClose, onApply }
     if (!description) return;
     const request: Request = { description, images: readyImageUrls(composer.images), files: readyFiles(composer.images) };
     const count = composer.count;
+    run.current = { scope: is3d ? 'furniture_model' : 'furniture_image', engine: engineName(composer.engine), count, hasReference: request.images.length > 0 || request.files.length > 0 };
     const launch = () => {
-      const run = ++generation.current;
+      const attempt = ++generation.current;
       ai.start(request, count, async (index) => {
         const requestId = crypto.randomUUID();
         // 3D 视角直接建模：AI 用基本体拼出家具外形，产物本身就是 3D 模型，不是图片。
@@ -76,10 +82,10 @@ export function FurnitureAiDialog({ item, view = 'top', seed, onClose, onApply }
             description: request.description, images: request.images, files: request.files,
             ...(composer.engine.kind === 'model' ? { model: composer.engine.id } : {}),
           });
-          if (run !== generation.current) throw new Error('已停止生成');
+          if (attempt !== generation.current) throw new Error('已停止生成');
           return { id: requestId, index, summary: `方案 ${index + 1}`, result: { url: '', model3d } };
         }
-        const url = await generateFurnitureImage(item, { requestId, view: 'top', ...request }, () => run !== generation.current);
+        const url = await generateFurnitureImage(item, { requestId, view: 'top', ...request }, () => attempt !== generation.current);
         if (!url) throw new Error('已停止生成');
         return { id: requestId, index, summary: `方案 ${index + 1}`, result: { url } };
       });
@@ -99,7 +105,7 @@ export function FurnitureAiDialog({ item, view = 'top', seed, onClose, onApply }
     if (chosen?.status !== 'ready' || applying) return;
     setApplying(true);
     try {
-      if (await onApply(chosen.candidate.result)) { notify.success(`「${item.name}」${VIEW_LABEL[view]}已更新`); close(); }
+      if (await onApply(chosen.candidate.result)) { trackAiLayoutApplied(run.current, chosen.candidate.index); notify.success(`「${item.name}」${VIEW_LABEL[view]}已更新`); close(); }
     } catch (cause) {
       notify.error(`「${item.name}」${is3d ? '3D 模型' : '图片'}保存失败`, cause);
     } finally {
