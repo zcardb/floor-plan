@@ -50,6 +50,7 @@ import {
   X,
 } from "lucide-react";
 import { notify } from "@/lib/notify";
+import { trackDesignFileExported, trackReportPdfExported } from "@/lib/analytics/conversion-events";
 import { afterFirstScreen } from "@/utils/after-first-screen";
 import { onPageHide, saveFile } from "@/lib/platform";
 import { ErrorBoundary } from "@/components/error-boundary/error-boundary";
@@ -623,11 +624,12 @@ export function Workbench(p: Props) {
   // 游客改过模版才提示登录保存；「暂不保存」只关掉当前这一版，再改一次会重新出现。
   const [bannerClosed, setBannerClosed] = useState(0);
   const showGuestBanner = !p.loggedIn && p.guestEdits > 0 && p.guestEdits !== bannerClosed;
-  /** 所有导出的唯一出口：调用方只负责生成文件，这里统一保存和提示。 */
-  const exportAction = useAsyncAction(async (label: string, make: () => Promise<PendingFile | undefined>) => {
+  /** 所有导出的唯一出口：调用方只负责生成文件，这里统一保存、提示，并在文件生成成功后记一次转化。 */
+  const exportAction = useAsyncAction(async (label: string, make: () => Promise<PendingFile | undefined>, track: () => void) => {
     try {
       const file = await make();
       if (!file) return;
+      track();
       const result = saveFile(file.blob, file.name);
       if (result.kind === "downloaded") notify.success(`已导出${label}`);
       else setPendingFile({ blob: result.blob, name: result.name });
@@ -642,14 +644,14 @@ export function Workbench(p: Props) {
       void exportAction.run(plan ? "2D 图片" : "3D 视角图片", async () => {
         const blob = plan ? await canvas.current?.exportImage() : await scene.current?.shot();
         return blob ? { blob, name: plan ? "户型方案-2D.png" : "户型方案-3D视角.png" } : undefined;
-      });
+      }, () => trackDesignFileExported({ format, view }));
       return;
     }
     const snapshot = structuredClone(model.current.current);
     void exportAction.run(`${format.toUpperCase()} 文件`, async () => {
       const { drawingFile, projectJsonFile } = await import("@/lib/drawing/drawing-export");
       return format === "json" ? projectJsonFile(snapshot, p.project.name) : drawingFile(snapshot, format, p.project.name);
-    });
+    }, () => trackDesignFileExported({ format, view }));
   };
   /** 方案报告：预览弹窗把它读到的账号默认价交回来，PDF 与预览同一口径；pdf-lib 按需加载，不进首屏包。保存成功后关闭预览。 */
   const exportReport = (defaults: AccountCostSettings) => {
@@ -660,7 +662,7 @@ export function Workbench(p: Props) {
       const file = await reportFile(snapshot, p.project.name, defaults);
       setReportOpen(false);
       return file;
-    });
+    }, trackReportPdfExported);
   };
   /** 新建风格：存进账号风格库并重读，套用由风格面板完成。 */
   const createStyle = async (style: DecorStyle) => {

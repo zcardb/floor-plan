@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAsyncAction } from '@/hooks/use-async-action';
 import { notify } from '@/lib/notify';
+import { trackProjectCreated } from '@/lib/analytics/conversion-events';
 import { createProject } from '@/lib/floor-plan/templates';
 import { type DxfSource, parseDesignFile } from '@/features/dxf-import';
 import type { Design } from '@/lib/floor-plan/types';
@@ -15,6 +16,7 @@ export function useProjectImport(projects: Pick<ReturnType<typeof useProjects>, 
   const importDesign = async (design: Design, name: string) => {
     const project = { ...createProject(design.template, name), state: design };
     if (!(await projects.create(project, true))) return false;
+    trackProjectCreated({ method: 'import', template: design.template });
     notify.success('已导入方案「' + project.name + '」');
     opened();
     return true;

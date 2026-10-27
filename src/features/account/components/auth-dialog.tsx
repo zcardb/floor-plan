@@ -12,6 +12,7 @@ import { EditorTooltip } from "@/components/ui/editor-tooltip";
 import { Input } from "@/components/ui/input";
 import { Mail, LockKeyhole } from "lucide-react";
 import { notify } from "@/lib/notify";
+import { trackLoginCompleted, trackSignupCompleted } from "@/lib/analytics/conversion-events";
 import { Logo } from "@/components/logo/logo";
 const authInput =
   "h-auto border-0 bg-transparent px-0 py-0 text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 md:text-xs max-[700px]:text-base";
@@ -84,6 +85,8 @@ export function AuthDialog({
               else notify.error(signup ? "注册失败" : "登录失败", result.error);
               return;
             }
+            if (signup) trackSignupCompleted({ needsVerification: !result.data.session, fromCloudSave: saving });
+            else trackLoginCompleted({ fromCloudSave: saving });
             if (!result.data.session) {
               setMessage(
                 saving
